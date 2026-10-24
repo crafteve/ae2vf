@@ -1,13 +1,14 @@
 {
   "item.idlefactory.terminal": "放置工厂终端",
   "itemGroup.idlefactory": "闲置工厂",
-  "screen.idlefactory.storage": "存储",
+  "screen.idlefactory.search_hint": "搜索物品…",
   "screen.idlefactory.status.equipped": "奇点：已装备",
   "screen.idlefactory.status.not_equipped": "奇点：未装备",
   "screen.idlefactory.status.no_network": "奇点：网络丢失",
   "screen.idlefactory.empty.not_equipped": "未装备奇点",
   "screen.idlefactory.empty.no_network": "未绑定网络",
   "screen.idlefactory.empty.no_stock": "没有库存",
+  "screen.idlefactory.empty.no_match": "没有匹配的物品",
   "message.idlefactory.singularity_equipped": "奇点已装备",
   "message.idlefactory.singularity_unequipped": "奇点已卸下",
   "message.idlefactory.singularity_dropped": "背包已满，奇点已掉落"

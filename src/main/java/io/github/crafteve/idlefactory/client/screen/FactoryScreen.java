@@ -1,20 +1,28 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+
+import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.ClientPacketHandler;
+import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.ItemGrid;
+import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.payload.StorageSnapshotS2C;
 
-import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.client.gui.me.search.RepoSearch;
+import appeng.menu.me.common.GridInventoryEntry;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -23,8 +31,11 @@ import net.minecraft.world.item.ItemStack;
  * <p>面板尺寸不写死，按当前 GUI 逻辑尺寸自适应：占满可用区域，四周只留 {@link #MARGIN} 的边距。
  * 这样 GUI scale 调大（逻辑尺寸变小）时不会溢出，调小（逻辑尺寸变大）时也不会缩成一小块。</p>
  *
- * <p>M1 在右侧加了一条 240px 宽的存储栏：顶部是奇点/网络状态，下面是 18×18 的物品网格。
- * 数据全部来自服务端的 {@link StorageSnapshotS2C}，客户端只读。</p>
+ * <p>右侧是 190px 宽的 AE2 终端风格存储栏：顶部搜索框（复用 AE2 的 {@link RepoSearch}）、
+ * 奇点/网络状态、9 列物品网格，底部是玩家背包（3×9 主背包 + 1×9 快捷栏）。
+ * 库存数据全部来自服务端的 {@link StorageSnapshotS2C}，客户端只做展示与过滤。</p>
+ *
+ * <p>所有颜色来自 {@link GuiTheme}，切换主题时这里不用改代码。</p>
  */
 public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 面板四周留白（GUI 逻辑像素）。 */
@@ -34,21 +45,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 最小面板高度。 */
     private static final int MIN_HEIGHT = 240;
 
-    /** 深色底 #1a1a1c。 */
-    private static final int COLOR_PANEL = 0xFF1A1A1C;
-    /** 边框 #2a2a2e。 */
-    private static final int COLOR_BORDER = 0xFF2A2A2E;
-    /** 青色标题与高亮 #4dd0e1。 */
-    private static final int COLOR_ACCENT = 0xFF4DD0E1;
-    /** 存储栏底色，比主面板稍暗。 */
-    private static final int COLOR_STORAGE_PANEL = 0xFF141416;
-    /** 物品格底色。 */
-    private static final int COLOR_SLOT = 0xFF212126;
-    /** 次要文字。 */
-    private static final int COLOR_MUTED = 0xFF6B6B72;
-    /** 错误/网络丢失提示色。 */
-    private static final int COLOR_ERROR = 0xFFE57373;
-
     /** 标题左侧标记的 x 偏移。 */
     private static final int TITLE_X = 20;
     /** 标题的 y 偏移。 */
@@ -57,22 +53,44 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int HEADER_HEIGHT = 44;
 
     /** 右侧存储栏宽度。 */
-    private static final int STORAGE_WIDTH = 240;
+    private static final int STORAGE_WIDTH = 190;
     /** 存储栏与面板右/下边缘的距离。 */
     private static final int STORAGE_MARGIN = 12;
-    /** 存储栏文字的内边距。 */
-    private static final int STORAGE_PADDING = 10;
-    /** 存储栏顶部（标题 + 状态）的高度。 */
-    private static final int STORAGE_HEADER_HEIGHT = 40;
-    /** 物品格边长。 */
-    private static final int CELL_SIZE = 18;
-    /** 每行格子数：12 × 18 = 216，正好放进 240 宽。 */
-    private static final int COLUMNS = 12;
+    /** 存储栏左右内边距。 */
+    private static final int STORAGE_PADDING = 9;
+    /** 搜索框距存储栏顶部的距离。 */
+    private static final int SEARCH_TOP = 8;
+    /** 搜索框高度。 */
+    private static final int SEARCH_HEIGHT = 14;
+    /** 状态文字距存储栏顶部的距离。 */
+    private static final int STATUS_TOP = 26;
+    /** 网格距存储栏顶部的距离。 */
+    private static final int GRID_TOP = 38;
+    /** 背包距存储栏底部的距离。 */
+    private static final int INVENTORY_BOTTOM_PADDING = 9;
+    /** 主背包与快捷栏之间、网格与背包之间的间距。 */
+    private static final int INVENTORY_GAP = 4;
 
-    /** 最近一次服务端快照；界面创建前到达的包由 {@link ClientPacketHandler} 缓存。 */
+    /** 当前主题；默认跟随 {@link GuiTheme#current()}（M1 是 DARK）。 */
+    private GuiTheme theme = GuiTheme.current();
+
+    /** 搜索框；每次 {@code init()} 重建（尺寸变化）。 */
+    @Nullable
+    private SearchEditBox searchBox;
+
+    /** 物品网格（滚动 / 悬停 / 选中都在里面）。 */
+    private final ItemGrid grid = new ItemGrid();
+
+    /** AE2 搜索语法解析器（@mod / #tag / *id / 拼音模组适配都继承自它）。 */
+    private final RepoSearch repoSearch = new RepoSearch();
+    /** key → 稳定 serial，避免过滤时 GridInventoryEntry 的缓存串味。 */
+    private final Map<AEKey, Long> serials = new HashMap<>();
+    private long nextSerial = 1L;
+
+    /** 最近一次服务端库存快照。 */
     private StorageSnapshotS2C snapshot = ClientPacketHandler.snapshot();
-    /** 网格滚动行数。 */
-    private int scrollRow;
+    /** 上一次过滤用的搜索词。 */
+    private String lastQuery = "";
 
     public FactoryScreen(FactoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -88,13 +106,35 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         this.imageHeight = Math.max(MIN_HEIGHT, this.height - MARGIN * 2);
         // 父类会用新的 imageWidth/imageHeight 重算 leftPos/topPos。
         super.init();
+
+        // 重建搜索框（resize 时旧控件已被 clearWidgets 移除），保留关键字
+        String query = this.searchBox != null ? this.searchBox.getValue() : this.lastQuery;
+        this.searchBox = this.addRenderableWidget(new SearchEditBox(
+                this.font,
+                searchBoxTextX(), searchBoxTextY(), searchBoxTextWidth(), 10,
+                this.theme,
+                Component.translatable("screen.idlefactory.search_hint")));
+        this.searchBox.setValue(query);
+        this.lastQuery = query;
+
+        this.grid.setBounds(gridX(), gridTop(), gridRows());
+        refreshFilter();
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // 搜索词变化时重新过滤（输入法/粘贴/退格都走这条路）
+        if (this.searchBox != null && !this.searchBox.getValue().equals(this.lastQuery)) {
+            refreshFilter();
+        }
+
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-        // 父类画完背景与标签后，再叠加存储栏内容（物品图标要盖在面板上）
-        this.renderStorageContents(guiGraphics);
+        renderStorageContents(guiGraphics, mouseX, mouseY);
+
+        ItemStack hovered = hoveredStack(mouseX, mouseY);
+        if (!hovered.isEmpty()) {
+            guiGraphics.renderTooltip(this.font, hovered, mouseX, mouseY);
+        }
     }
 
     @Override
@@ -104,49 +144,86 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int w = this.imageWidth;
         int h = this.imageHeight;
 
-        // 深色面板底色
-        guiGraphics.fill(x, y, x + w, y + h, COLOR_PANEL);
-
-        // 1px 细边框（上 / 下 / 左 / 右）
-        guiGraphics.fill(x, y, x + w, y + 1, COLOR_BORDER);
-        guiGraphics.fill(x, y + h - 1, x + w, y + h, COLOR_BORDER);
-        guiGraphics.fill(x, y, x + 1, y + h, COLOR_BORDER);
-        guiGraphics.fill(x + w - 1, y, x + w, y + h, COLOR_BORDER);
+        // 面板底色 + 1px 细边框
+        guiGraphics.fill(x, y, x + w, y + h, this.theme.panelBg());
+        guiGraphics.fill(x, y, x + w, y + 1, this.theme.panelBorder());
+        guiGraphics.fill(x, y + h - 1, x + w, y + h, this.theme.panelBorder());
+        guiGraphics.fill(x, y, x + 1, y + h, this.theme.panelBorder());
+        guiGraphics.fill(x + w - 1, y, x + w, y + h, this.theme.panelBorder());
 
         // 标题栏分隔线
-        guiGraphics.fill(x + 1, y + HEADER_HEIGHT, x + w - 1, y + HEADER_HEIGHT + 1, COLOR_BORDER);
+        guiGraphics.fill(x + 1, y + HEADER_HEIGHT, x + w - 1, y + HEADER_HEIGHT + 1, this.theme.panelBorder());
 
-        // 标题左侧的青色竖条
-        guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, COLOR_ACCENT);
+        // 标题左侧的强调色竖条
+        guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, this.theme.accent());
 
-        // 右侧存储栏
-        this.renderStoragePanel(guiGraphics);
+        renderStoragePanel(guiGraphics);
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         // 不调用父类：父类会画菜单标题和玩家物品栏标题，这版都用自定义布局。
         // 这里的坐标相对面板左上角。
-        guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, COLOR_ACCENT, false);
+        guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, this.theme.accent(), false);
     }
 
     /** 收到服务端库存快照时刷新界面。 */
-    public void applySnapshot(StorageSnapshotS2C snapshot) {
-        this.snapshot = snapshot;
-        this.scrollRow = 0;
+    public void applySnapshot(StorageSnapshotS2C payload) {
+        this.snapshot = payload;
+        refreshFilter();
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        // 搜索框有焦点时吞掉所有按键（ESC 除外），否则输入 e 会触发原版「关闭容器」
+        if (this.searchBox != null && this.searchBox.isFocused() && keyCode != 256) {
+            if (keyCode == 257) {
+                this.searchBox.setFocused(false);
+                return true;
+            }
+            String before = this.searchBox.getValue();
+            this.searchBox.keyPressed(keyCode, scanCode, modifiers);
+            if (!before.equals(this.searchBox.getValue())) {
+                refreshFilter();
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.searchBox != null && !this.searchBox.isMouseOver(mouseX, mouseY)) {
+            this.searchBox.setFocused(false);
+        }
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        return this.grid.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (isOverStorage(mouseX, mouseY)) {
-            int maxScroll = maxScrollRow();
-            if (maxScroll > 0) {
-                int delta = scrollY > 0 ? -1 : (scrollY < 0 ? 1 : 0);
-                this.scrollRow = Mth.clamp(this.scrollRow + delta, 0, maxScroll);
-                return true;
-            }
+        if (this.grid.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (this.grid.mouseDragged(mouseY)) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.grid.mouseReleased()) {
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     // ------------------------------------------------------------------
@@ -166,25 +243,35 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int gridX() {
-        return storageX() + (STORAGE_WIDTH - COLUMNS * CELL_SIZE) / 2;
+        return storageX() + STORAGE_PADDING;
     }
 
-    private int gridY() {
-        return storageY() + STORAGE_HEADER_HEIGHT;
+    private int gridTop() {
+        return storageY() + GRID_TOP;
+    }
+
+    private int hotbarY() {
+        return storageY() + storageHeight() - INVENTORY_BOTTOM_PADDING - ItemGrid.CELL_SIZE;
+    }
+
+    private int mainInvY() {
+        return hotbarY() - INVENTORY_GAP - 3 * ItemGrid.CELL_SIZE;
     }
 
     private int gridRows() {
-        return Math.max(1, (storageHeight() - STORAGE_HEADER_HEIGHT - 8) / CELL_SIZE);
+        return Math.max(1, (mainInvY() - INVENTORY_GAP - gridTop()) / ItemGrid.CELL_SIZE);
     }
 
-    private int maxScrollRow() {
-        int usedRows = (this.snapshot.entries().size() + COLUMNS - 1) / COLUMNS;
-        return Math.max(0, usedRows - gridRows());
+    private int searchBoxTextX() {
+        return storageX() + STORAGE_PADDING + 3;
     }
 
-    private boolean isOverStorage(double mouseX, double mouseY) {
-        return mouseX >= storageX() && mouseX < storageX() + STORAGE_WIDTH
-                && mouseY >= storageY() && mouseY < storageY() + storageHeight();
+    private int searchBoxTextY() {
+        return storageY() + SEARCH_TOP + 3;
+    }
+
+    private int searchBoxTextWidth() {
+        return STORAGE_WIDTH - STORAGE_PADDING * 2 - 6;
     }
 
     // ------------------------------------------------------------------
@@ -197,74 +284,102 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int w = STORAGE_WIDTH;
         int h = storageHeight();
 
-        guiGraphics.fill(x, y, x + w, y + h, COLOR_STORAGE_PANEL);
-        guiGraphics.fill(x, y, x + w, y + 1, COLOR_BORDER);
-        guiGraphics.fill(x, y + h - 1, x + w, y + h, COLOR_BORDER);
-        guiGraphics.fill(x, y, x + 1, y + h, COLOR_BORDER);
-        guiGraphics.fill(x + w - 1, y, x + w, y + h, COLOR_BORDER);
+        // 存储栏用面板底色，让深一档的格子（slotBg）显出层次
+        guiGraphics.fill(x, y, x + w, y + h, this.theme.panelBg());
+        guiGraphics.fill(x, y, x + w, y + 1, this.theme.panelBorder());
+        guiGraphics.fill(x, y + h - 1, x + w, y + h, this.theme.panelBorder());
+        guiGraphics.fill(x, y, x + 1, y + h, this.theme.panelBorder());
+        guiGraphics.fill(x + w - 1, y, x + w, y + h, this.theme.panelBorder());
 
-        // 标题与状态下方的一条分隔线（网格从 STORAGE_HEADER_HEIGHT 开始）
-        guiGraphics.fill(x + 1, y + STORAGE_HEADER_HEIGHT - 6,
-                x + w - 1, y + STORAGE_HEADER_HEIGHT - 5, COLOR_BORDER);
+        // 搜索框用格子底色，与存储栏底色区分
+        int searchX = x + STORAGE_PADDING;
+        int searchY = y + SEARCH_TOP;
+        int searchW = STORAGE_WIDTH - STORAGE_PADDING * 2;
+        int searchH = SEARCH_HEIGHT;
+        guiGraphics.fill(searchX, searchY, searchX + searchW, searchY + searchH, this.theme.slotBg());
+
+        boolean focused = this.searchBox != null && this.searchBox.isFocused();
+        int searchBorder = focused ? this.theme.accent() : this.theme.panelBorder();
+        guiGraphics.fill(searchX, searchY, searchX + searchW, searchY + 1, searchBorder);
+        guiGraphics.fill(searchX, searchY + searchH - 1, searchX + searchW, searchY + searchH, searchBorder);
+        guiGraphics.fill(searchX, searchY, searchX + 1, searchY + searchH, searchBorder);
+        guiGraphics.fill(searchX + searchW - 1, searchY, searchX + searchW, searchY + searchH, searchBorder);
+
+        // 背包上方分隔线
+        int dividerY = mainInvY() - INVENTORY_GAP;
+        if (dividerY > gridTop()) {
+            guiGraphics.fill(x + 1, dividerY, x + w - 1, dividerY + 1, this.theme.panelBorder());
+        }
     }
 
-    private void renderStorageContents(GuiGraphics guiGraphics) {
+    private void renderStorageContents(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         int x = storageX();
         int y = storageY();
 
-        guiGraphics.drawString(this.font, Component.translatable("screen.idlefactory.storage"),
-                x + STORAGE_PADDING, y + 10, COLOR_ACCENT, false);
-        guiGraphics.drawString(this.font, statusText(),
-                x + STORAGE_PADDING, y + 24, statusColor(), false);
+        guiGraphics.drawString(this.font, statusText(), x + STORAGE_PADDING, y + STATUS_TOP,
+                statusColor(), false);
 
-        if (this.snapshot.entries().isEmpty()) {
-            guiGraphics.drawCenteredString(this.font, emptyText(),
-                    x + STORAGE_WIDTH / 2, y + STORAGE_HEADER_HEIGHT + 30, COLOR_MUTED);
-        } else {
-            renderItemGrid(guiGraphics);
+        this.grid.render(guiGraphics, this.font, this.theme, mouseX, mouseY);
+        renderPlayerInventory(guiGraphics);
+
+        if (this.grid.isEmpty()) {
+            int centerX = gridX() + this.grid.width() / 2;
+            int centerY = gridTop() + this.grid.height() / 2 - 4;
+            guiGraphics.drawCenteredString(this.font, emptyText(), centerX, centerY, this.theme.textDim());
         }
     }
 
-    private void renderItemGrid(GuiGraphics guiGraphics) {
-        int gx = gridX();
-        int gy = gridY();
-        int rows = gridRows();
-        int maxScroll = maxScrollRow();
-        this.scrollRow = Mth.clamp(this.scrollRow, 0, maxScroll);
+    private void renderPlayerInventory(GuiGraphics guiGraphics) {
+        Player player = this.minecraft.player;
+        if (player == null) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
 
-        List<StorageSnapshotS2C.Entry> entries = this.snapshot.entries();
-        int start = this.scrollRow * COLUMNS;
-
-        guiGraphics.enableScissor(gx, gy, gx + COLUMNS * CELL_SIZE, gy + rows * CELL_SIZE);
-        for (int i = 0; i < rows * COLUMNS; i++) {
-            int index = start + i;
-            if (index >= entries.size()) {
-                break;
+        int invX = gridX();
+        int mainY = mainInvY();
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                drawInventorySlot(guiGraphics, inventory.getItem(9 + row * 9 + col),
+                        invX + col * ItemGrid.CELL_SIZE, mainY + row * ItemGrid.CELL_SIZE);
             }
-
-            int cellX = gx + (i % COLUMNS) * CELL_SIZE;
-            int cellY = gy + (i / COLUMNS) * CELL_SIZE;
-            StorageSnapshotS2C.Entry entry = entries.get(index);
-
-            guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, COLOR_SLOT);
-            ItemStack stack = toDisplayStack(entry.key());
-            guiGraphics.renderItem(stack, cellX + 1, cellY + 1);
-            guiGraphics.renderItemDecorations(this.font, stack, cellX + 1, cellY + 1,
-                    formatAmount(entry.amount()));
         }
-        guiGraphics.disableScissor();
 
-        // 条目超过一屏时画一个简单滚动条
-        if (maxScroll > 0) {
-            int trackX = gx + COLUMNS * CELL_SIZE + 2;
-            int trackY = gy;
-            int trackHeight = rows * CELL_SIZE;
-            guiGraphics.fill(trackX, trackY, trackX + 2, trackY + trackHeight, COLOR_BORDER);
-
-            int thumbHeight = Math.max(12, trackHeight * rows / (rows + maxScroll));
-            int thumbY = trackY + (trackHeight - thumbHeight) * this.scrollRow / maxScroll;
-            guiGraphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbHeight, COLOR_ACCENT);
+        int hotY = hotbarY();
+        for (int col = 0; col < 9; col++) {
+            drawInventorySlot(guiGraphics, inventory.getItem(col),
+                    invX + col * ItemGrid.CELL_SIZE, hotY);
         }
+    }
+
+    private void drawInventorySlot(GuiGraphics guiGraphics, ItemStack stack, int x, int y) {
+        ItemGrid.drawSlotBackground(guiGraphics, this.theme, x, y);
+        if (!stack.isEmpty()) {
+            guiGraphics.renderItem(stack, x + 1, y + 1);
+            guiGraphics.renderItemDecorations(this.font, stack, x + 1, y + 1);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 过滤 / 状态
+    // ------------------------------------------------------------------
+
+    private void refreshFilter() {
+        if (this.searchBox == null) {
+            return;
+        }
+        this.lastQuery = this.searchBox.getValue();
+        this.repoSearch.setSearchString(this.lastQuery);
+
+        List<StorageSnapshotS2C.Entry> filtered = new ArrayList<>();
+        for (StorageSnapshotS2C.Entry entry : this.snapshot.entries()) {
+            long serial = this.serials.computeIfAbsent(entry.key(), key -> this.nextSerial++);
+            GridInventoryEntry candidate = new GridInventoryEntry(serial, entry.key(), entry.amount(), 0, false);
+            if (this.repoSearch.matches(candidate)) {
+                filtered.add(entry);
+            }
+        }
+        this.grid.setEntries(List.copyOf(filtered));
     }
 
     private Component statusText() {
@@ -279,9 +394,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     private int statusColor() {
         if (!this.snapshot.equipped()) {
-            return COLOR_MUTED;
+            return this.theme.textDim();
         }
-        return this.snapshot.bound() ? COLOR_ACCENT : COLOR_ERROR;
+        return this.snapshot.bound() ? this.theme.accent() : this.theme.error();
     }
 
     private Component emptyText() {
@@ -291,34 +406,43 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (!this.snapshot.bound()) {
             return Component.translatable("screen.idlefactory.empty.no_network");
         }
-        return Component.translatable("screen.idlefactory.empty.no_stock");
+        if (this.snapshot.entries().isEmpty()) {
+            return Component.translatable("screen.idlefactory.empty.no_stock");
+        }
+        return Component.translatable("screen.idlefactory.empty.no_match");
     }
 
-    private static ItemStack toDisplayStack(AEKey key) {
-        return key instanceof AEItemKey itemKey ? itemKey.toStack(1) : key.wrapForDisplayOrFilter();
+    private ItemStack hoveredStack(int mouseX, int mouseY) {
+        StorageSnapshotS2C.Entry entry = this.grid.hoveredEntry(mouseX, mouseY);
+        if (entry != null) {
+            return ItemGrid.toDisplayStack(entry.key());
+        }
+
+        Player player = this.minecraft.player;
+        if (player == null) {
+            return ItemStack.EMPTY;
+        }
+        Inventory inventory = player.getInventory();
+        int invX = gridX();
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                if (isInside(mouseX, mouseY, invX + col * ItemGrid.CELL_SIZE,
+                        mainInvY() + row * ItemGrid.CELL_SIZE)) {
+                    return inventory.getItem(9 + row * 9 + col);
+                }
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            if (isInside(mouseX, mouseY, invX + col * ItemGrid.CELL_SIZE, hotbarY())) {
+                return inventory.getItem(col);
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
-    /**
-     * 库存数量简写：小于 1000 原样，1000–9999 用千分位，再大用 k / M / B。
-     */
-    private static String formatAmount(long amount) {
-        if (amount < 1_000L) {
-            return Long.toString(amount);
-        }
-        if (amount < 10_000L) {
-            return String.format(Locale.ROOT, "%,d", amount);
-        }
-        if (amount < 1_000_000L) {
-            return compact(amount / 1_000.0) + "k";
-        }
-        if (amount < 1_000_000_000L) {
-            return compact(amount / 1_000_000.0) + "M";
-        }
-        return compact(amount / 1_000_000_000.0) + "B";
-    }
-
-    private static String compact(double value) {
-        String text = String.format(Locale.ROOT, "%.1f", value);
-        return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
+    private static boolean isInside(double mouseX, double mouseY, int x, int y) {
+        return mouseX >= x && mouseX < x + ItemGrid.CELL_SIZE
+                && mouseY >= y && mouseY < y + ItemGrid.CELL_SIZE;
     }
 }
