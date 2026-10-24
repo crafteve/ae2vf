@@ -10,14 +10,16 @@ import net.minecraft.world.entity.player.Inventory;
 /**
  * 工厂工作台界面。
  *
- * <p>M0 只画一个 480×300 的深色空面板：深色底、细边框、青色标题。
- * ESC 关闭由 {@code Screen#keyPressed} 的默认行为处理，不需要额外代码。</p>
+ * <p>面板尺寸不写死，按当前 GUI 逻辑尺寸自适应：占满可用区域，四周只留 {@link #MARGIN} 的边距。
+ * 这样 GUI scale 调大（逻辑尺寸变小）时不会溢出，调小（逻辑尺寸变大）时也不会缩成一小块。</p>
  */
 public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
-    /** 面板宽度。 */
-    private static final int PANEL_WIDTH = 480;
-    /** 面板高度。 */
-    private static final int PANEL_HEIGHT = 300;
+    /** 面板四周留白（GUI 逻辑像素）。 */
+    private static final int MARGIN = 8;
+    /** 最小面板宽度，防止极端小窗口下面板消失。 */
+    private static final int MIN_WIDTH = 320;
+    /** 最小面板高度。 */
+    private static final int MIN_HEIGHT = 240;
 
     /** 深色底 #1a1a1c。 */
     private static final int COLOR_PANEL = 0xFF1A1A1C;
@@ -35,27 +37,38 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     public FactoryScreen(FactoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        // 父类只有固定 176×166 的构造函数，尺寸在这里覆盖
-        this.imageWidth = PANEL_WIDTH;
-        this.imageHeight = PANEL_HEIGHT;
+        // 先给一个默认值；真正的尺寸在 init() 里按屏幕算。
+        this.imageWidth = 480;
+        this.imageHeight = 300;
+    }
+
+    @Override
+    protected void init() {
+        // 自适应：占满屏幕逻辑尺寸，只留边距。
+        this.imageWidth = Math.max(MIN_WIDTH, this.width - MARGIN * 2);
+        this.imageHeight = Math.max(MIN_HEIGHT, this.height - MARGIN * 2);
+        // 父类会用新的 imageWidth/imageHeight 重算 leftPos/topPos。
+        super.init();
     }
 
     @Override
     protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         int x = this.leftPos;
         int y = this.topPos;
+        int w = this.imageWidth;
+        int h = this.imageHeight;
 
         // 深色面板底色
-        guiGraphics.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, COLOR_PANEL);
+        guiGraphics.fill(x, y, x + w, y + h, COLOR_PANEL);
 
         // 1px 细边框（上 / 下 / 左 / 右）
-        guiGraphics.fill(x, y, x + PANEL_WIDTH, y + 1, COLOR_BORDER);
-        guiGraphics.fill(x, y + PANEL_HEIGHT - 1, x + PANEL_WIDTH, y + PANEL_HEIGHT, COLOR_BORDER);
-        guiGraphics.fill(x, y, x + 1, y + PANEL_HEIGHT, COLOR_BORDER);
-        guiGraphics.fill(x + PANEL_WIDTH - 1, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, COLOR_BORDER);
+        guiGraphics.fill(x, y, x + w, y + 1, COLOR_BORDER);
+        guiGraphics.fill(x, y + h - 1, x + w, y + h, COLOR_BORDER);
+        guiGraphics.fill(x, y, x + 1, y + h, COLOR_BORDER);
+        guiGraphics.fill(x + w - 1, y, x + w, y + h, COLOR_BORDER);
 
         // 标题栏分隔线
-        guiGraphics.fill(x + 1, y + HEADER_HEIGHT, x + PANEL_WIDTH - 1, y + HEADER_HEIGHT + 1, COLOR_BORDER);
+        guiGraphics.fill(x + 1, y + HEADER_HEIGHT, x + w - 1, y + HEADER_HEIGHT + 1, COLOR_BORDER);
 
         // 标题左侧的青色竖条
         guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, COLOR_ACCENT);
@@ -63,7 +76,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // 不调用父类：父类会画菜单标题（物品名）和玩家物品栏标题，M0 都不需要。
+        // 不调用父类：父类会画菜单标题和玩家物品栏标题，M0 都不需要。
         // 这里的坐标相对面板左上角。
         guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, COLOR_ACCENT, false);
     }
