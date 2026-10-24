@@ -16,6 +16,7 @@ import appeng.api.stacks.AEKey;
 import net.minecraft.Util;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 
@@ -168,6 +169,21 @@ public final class ItemGrid {
     public StorageSnapshotS2C.Entry hoveredEntry(double mouseX, double mouseY) {
         int index = indexAt(mouseX, mouseY);
         return index >= 0 ? this.entries.get(index) : null;
+    }
+
+    /** 当前悬停格子的屏幕矩形（供 JEI 的 clickable ingredient 使用）；没悬停时为 null。 */
+    @Nullable
+    public Rect2i hoveredArea(double mouseX, double mouseY) {
+        int index = indexAt(mouseX, mouseY);
+        if (index < 0) {
+            return null;
+        }
+        int visible = index - this.scrollRow * COLUMNS;
+        return new Rect2i(
+                this.x + visible % COLUMNS * CELL_SIZE,
+                this.y + visible / COLUMNS * CELL_SIZE,
+                CELL_SIZE,
+                CELL_SIZE);
     }
 
     /** 滚轮：只在网格 / 滚动条上响应。 */

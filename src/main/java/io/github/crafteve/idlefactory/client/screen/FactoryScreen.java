@@ -20,6 +20,7 @@ import appeng.menu.me.common.GridInventoryEntry;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
@@ -450,5 +451,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     public ItemStack getHoveredStorageStack(double mouseX, double mouseY) {
         StorageSnapshotS2C.Entry entry = this.itemGrid.hoveredEntry(mouseX, mouseY);
         return entry == null ? null : ItemGrid.toDisplayStack(entry.key());
+    }
+
+    /**
+     * 当前鼠标下存储格子的屏幕矩形；没有时为 null。给 JEI 的 clickable ingredient 定位用。
+     */
+    @Nullable
+    public Rect2i getHoveredStorageArea(double mouseX, double mouseY) {
+        return this.itemGrid.hoveredArea(mouseX, mouseY);
     }
 }
