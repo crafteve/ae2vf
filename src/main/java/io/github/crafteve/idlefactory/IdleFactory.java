@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
+import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.registry.ModCreativeTabs;
 import io.github.crafteve.idlefactory.registry.ModItems;
 import io.github.crafteve.idlefactory.registry.ModMenus;
@@ -24,6 +25,9 @@ public class IdleFactory {
         ModItems.ITEMS.register(modEventBus);
         ModMenus.MENUS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
+
+        // 网络包注册（M0 只有一个占位的 PingPayload）
+        ModNetwork.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);

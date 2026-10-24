@@ -1,5 +1,8 @@
 package io.github.crafteve.idlefactory;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.registry.ModMenus;
+
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -7,6 +10,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
@@ -27,5 +31,15 @@ public class IdleFactoryClient {
         // Some client setup code
         IdleFactory.LOGGER.info("HELLO FROM CLIENT SETUP");
         IdleFactory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+    }
+
+    /**
+     * 把工厂工作台的 MenuType 与界面绑起来。
+     *
+     * <p>M0 只有这一个界面；后续新增界面都往这里加。</p>
+     */
+    @SubscribeEvent
+    static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
+        event.register(ModMenus.FACTORY.get(), FactoryScreen::new);
     }
 }
