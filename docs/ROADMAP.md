@@ -20,17 +20,17 @@
 
 阶段划分是**讨论产物**，不是承诺。每阶段结束都能跑、能看、能验。
 
-### M0 骨架
+### M0 骨架（详细计划见 [PLAN-M0-M1.md](PLAN-M0-M1.md)）
 
-- 清掉 MDK 示例残留（`Config` 里的示例配置、示例物品）
-- 注册终端物品 `IdleFactoryTerminalItem`
+- 清掉 MDK 示例残留
+- 注册终端物品 `TerminalItem`
 - 注册 `MenuType`（`FactoryMenu`）与 `FactoryScreen`
 - 网络包基础设施（`CustomPacketPayload` 注册）
 - `core` 包的图模型骨架（`FactoryGraph` / `FactoryNode` / `PortRef`）
 
-**验收**：手持终端右键，打开一个空的工作台界面，ESC 能关。
+**验收**：右键终端打开空工作台，ESC 能关。
 
-### M1 绑定与存储浏览
+### M1 绑定与存储浏览（详细计划见 [PLAN-M0-M1.md](PLAN-M0-M1.md)）
 
 - 奇点频率读取（`ENTANGLED_SINGULARITY_ID`）
 - `Locatables.quantumNetworkBridges()` 查询 → `IGrid`
@@ -93,7 +93,7 @@
 ### 目标结构
 
 ```
-src/main/java/dev/idlefactory/
+src/main/java/io/github/crafteve/idlefactory/
 ├── IdleFactory.java              主类
 ├── IdleFactoryClient.java        客户端入口
 ├── Config.java                   配置
