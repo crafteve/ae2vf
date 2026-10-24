@@ -1,4 +1,4 @@
-package dev.idlefactory;
+package io.github.crafteve.idlefactory;
 
 import java.util.List;
 import java.util.Set;

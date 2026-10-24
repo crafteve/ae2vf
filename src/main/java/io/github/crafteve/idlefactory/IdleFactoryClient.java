@@ -1,4 +1,4 @@
-package dev.idlefactory;
+package io.github.crafteve.idlefactory;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
