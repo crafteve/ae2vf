@@ -22,7 +22,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -31,9 +31,9 @@ import net.minecraft.world.item.ItemStack;
  * <p>面板尺寸不写死，按当前 GUI 逻辑尺寸自适应：占满可用区域，四周只留 {@link #MARGIN} 的边距。
  * 这样 GUI scale 调大（逻辑尺寸变小）时不会溢出，调小（逻辑尺寸变大）时也不会缩成一小块。</p>
  *
- * <p>右侧是 190px 宽的 AE2 终端风格存储栏：顶部搜索框（复用 AE2 的 {@link RepoSearch}）、
- * 奇点/网络状态、9 列物品网格，底部是玩家背包（3×9 主背包 + 1×9 快捷栏）。
- * 库存数据全部来自服务端的 {@link StorageSnapshotS2C}，客户端只做展示与过滤。</p>
+ * <p>右侧是 176px 宽的 AE2 终端风格存储栏：顶部搜索框（复用 AE2 的 {@link RepoSearch}）、
+ * 奇点/网络状态、9 列物品网格，底部是玩家背包（3×9 主背包 + 1×9 快捷栏，真实 {@link Slot}）。
+ * 库存数据来自服务端的 {@link StorageSnapshotS2C}，客户端只做展示与过滤。</p>
  *
  * <p>所有颜色来自 {@link GuiTheme}，切换主题时这里不用改代码。</p>
  */
@@ -48,16 +48,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 标题左侧标记的 x 偏移。 */
     private static final int TITLE_X = 20;
     /** 标题的 y 偏移。 */
-    private static final int TITLE_Y = 16;
+    private static final int TITLE_Y = 8;
     /** 标题栏高度，下方画分隔线。 */
-    private static final int HEADER_HEIGHT = 44;
+    private static final int HEADER_HEIGHT = 28;
 
     /** 右侧存储栏宽度。 */
-    private static final int STORAGE_WIDTH = 190;
+    private static final int STORAGE_WIDTH = 176;
     /** 存储栏与面板右/下边缘的距离。 */
     private static final int STORAGE_MARGIN = 12;
-    /** 存储栏左右内边距。 */
-    private static final int STORAGE_PADDING = 9;
+    /** 存储栏左内边距（网格 + 滚动条整体居中后的左侧留白）。 */
+    private static final int STORAGE_INSET = 4;
     /** 搜索框距存储栏顶部的距离。 */
     private static final int SEARCH_TOP = 8;
     /** 搜索框高度。 */
@@ -79,7 +79,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private SearchEditBox searchBox;
 
     /** 物品网格（滚动 / 悬停 / 选中都在里面）。 */
-    private final ItemGrid grid = new ItemGrid();
+    private final ItemGrid itemGrid = new ItemGrid();
 
     /** AE2 搜索语法解析器（@mod / #tag / *id / 拼音模组适配都继承自它）。 */
     private final RepoSearch repoSearch = new RepoSearch();
@@ -91,6 +91,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private StorageSnapshotS2C snapshot = ClientPacketHandler.snapshot();
     /** 上一次过滤用的搜索词。 */
     private String lastQuery = "";
+
+    /** 当前鼠标位置（renderSlot 里判断悬停用）。 */
+    private int mouseX;
+    private int mouseY;
 
     public FactoryScreen(FactoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -117,24 +121,56 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         this.searchBox.setValue(query);
         this.lastQuery = query;
 
-        this.grid.setBounds(gridX(), gridTop(), gridRows());
+        this.itemGrid.setBounds(gridX(), gridTop(), gridRows());
+        layoutSlots();
         refreshFilter();
+    }
+
+    /**
+     * 按当前面板高度重排背包槽位。
+     *
+     * <p>1.21.1 的 {@link Slot#x}/{@link Slot#y} 是 final，只能按新坐标重建 Slot；这里只替换
+     * 客户端菜单里的槽位对象，容器与容器索引保持一致，服务端槽位完全不受影响。</p>
+     */
+    private void layoutSlots() {
+        int count = Math.min(FactoryMenu.PLAYER_SLOTS, this.menu.slots.size());
+        for (int i = 0; i < count; i++) {
+            Slot old = this.menu.slots.get(i);
+            int x;
+            int y;
+            if (i < 9) {
+                x = gridX() + i * ItemGrid.CELL_SIZE + 1;
+                y = hotbarY() + 1;
+            } else {
+                int index = i - 9;
+                x = gridX() + index % 9 * ItemGrid.CELL_SIZE + 1;
+                y = mainInvY() + index / 9 * ItemGrid.CELL_SIZE + 1;
+            }
+
+            Slot slot = new Slot(old.container, old.getContainerSlot(), x, y);
+            slot.index = i;
+            this.menu.slots.set(i, slot);
+        }
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
+
         // 搜索词变化时重新过滤（输入法/粘贴/退格都走这条路）
         if (this.searchBox != null && !this.searchBox.getValue().equals(this.lastQuery)) {
             refreshFilter();
         }
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-        renderStorageContents(guiGraphics, mouseX, mouseY);
 
-        ItemStack hovered = hoveredStack(mouseX, mouseY);
-        if (!hovered.isEmpty()) {
-            guiGraphics.renderTooltip(this.font, hovered, mouseX, mouseY);
+        // 存储网格是自绘的，tooltip 自己画；背包槽位的 tooltip 交给父类
+        ItemStack hoveredStorage = getHoveredStorageStack(mouseX, mouseY);
+        if (hoveredStorage != null) {
+            guiGraphics.renderTooltip(this.font, hoveredStorage, mouseX, mouseY);
         }
+        this.renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
     @Override
@@ -158,6 +194,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, this.theme.accent());
 
         renderStoragePanel(guiGraphics);
+
+        // 存放在背景层画：这样玩家拖动物品时，悬浮物品会盖在网格上方
+        renderStorageContents(guiGraphics, mouseX, mouseY);
     }
 
     @Override
@@ -165,6 +204,29 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         // 不调用父类：父类会画菜单标题和玩家物品栏标题，这版都用自定义布局。
         // 这里的坐标相对面板左上角。
         guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, this.theme.accent(), false);
+    }
+
+    /**
+     * 完全接管槽位绘制：主题色内凹格子 + 物品 + 数量/耐久。
+     *
+     * <p>物品不会被父类再画一遍。悬停直接用当前鼠标位置判断（父类的 {@code hoveredSlot}
+     * 是渲染完当前槽位之后才赋值的，用它会有 1 帧延迟）。</p>
+     */
+    @Override
+    protected void renderSlot(GuiGraphics guiGraphics, Slot slot) {
+        boolean hovered = this.isHovering(slot.x, slot.y, 16, 16, this.mouseX, this.mouseY);
+        ItemGrid.drawSlotBackground(guiGraphics, this.theme, slot.x - 1, slot.y - 1, hovered);
+
+        ItemStack stack = slot.getItem();
+        if (!stack.isEmpty()) {
+            guiGraphics.renderItem(stack, slot.x, slot.y);
+            guiGraphics.renderItemDecorations(this.font, stack, slot.x, slot.y);
+        }
+    }
+
+    @Override
+    protected void renderSlotHighlight(GuiGraphics guiGraphics, Slot slot, int mouseX, int mouseY, float partialTick) {
+        // 悬停高亮已由 renderSlot 用主题色接管，不要再叠一层原版白框
     }
 
     /** 收到服务端库存快照时刷新界面。 */
@@ -199,12 +261,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        return this.grid.mouseClicked(mouseX, mouseY, button);
+        return this.itemGrid.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (this.grid.mouseScrolled(mouseX, mouseY, scrollY)) {
+        if (this.itemGrid.mouseScrolled(mouseX, mouseY, scrollY)) {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -212,7 +274,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (this.grid.mouseDragged(mouseY)) {
+        if (this.itemGrid.mouseDragged(mouseY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
@@ -220,7 +282,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.grid.mouseReleased()) {
+        if (this.itemGrid.mouseReleased()) {
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -243,7 +305,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int gridX() {
-        return storageX() + STORAGE_PADDING;
+        return storageX() + STORAGE_INSET;
     }
 
     private int gridTop() {
@@ -263,7 +325,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int searchBoxTextX() {
-        return storageX() + STORAGE_PADDING + 3;
+        return gridX() + 3;
     }
 
     private int searchBoxTextY() {
@@ -271,7 +333,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int searchBoxTextWidth() {
-        return STORAGE_WIDTH - STORAGE_PADDING * 2 - 6;
+        return ItemGrid.COLUMNS * ItemGrid.CELL_SIZE - 6;
     }
 
     // ------------------------------------------------------------------
@@ -291,10 +353,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         guiGraphics.fill(x, y, x + 1, y + h, this.theme.panelBorder());
         guiGraphics.fill(x + w - 1, y, x + w, y + h, this.theme.panelBorder());
 
-        // 搜索框用格子底色，与存储栏底色区分
-        int searchX = x + STORAGE_PADDING;
+        // 搜索框背景（与网格同宽）
+        int searchX = gridX();
         int searchY = y + SEARCH_TOP;
-        int searchW = STORAGE_WIDTH - STORAGE_PADDING * 2;
+        int searchW = ItemGrid.COLUMNS * ItemGrid.CELL_SIZE;
         int searchH = SEARCH_HEIGHT;
         guiGraphics.fill(searchX, searchY, searchX + searchW, searchY + searchH, this.theme.slotBg());
 
@@ -316,47 +378,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int x = storageX();
         int y = storageY();
 
-        guiGraphics.drawString(this.font, statusText(), x + STORAGE_PADDING, y + STATUS_TOP,
-                statusColor(), false);
+        guiGraphics.drawString(this.font, statusText(), gridX(), y + STATUS_TOP, statusColor(), false);
 
-        this.grid.render(guiGraphics, this.font, this.theme, mouseX, mouseY);
-        renderPlayerInventory(guiGraphics);
+        this.itemGrid.render(guiGraphics, this.font, this.theme, mouseX, mouseY);
 
-        if (this.grid.isEmpty()) {
-            int centerX = gridX() + this.grid.width() / 2;
-            int centerY = gridTop() + this.grid.height() / 2 - 4;
+        if (this.itemGrid.isEmpty()) {
+            int centerX = gridX() + this.itemGrid.width() / 2;
+            int centerY = gridTop() + this.itemGrid.height() / 2 - 4;
             guiGraphics.drawCenteredString(this.font, emptyText(), centerX, centerY, this.theme.textDim());
-        }
-    }
-
-    private void renderPlayerInventory(GuiGraphics guiGraphics) {
-        Player player = this.minecraft.player;
-        if (player == null) {
-            return;
-        }
-        Inventory inventory = player.getInventory();
-
-        int invX = gridX();
-        int mainY = mainInvY();
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                drawInventorySlot(guiGraphics, inventory.getItem(9 + row * 9 + col),
-                        invX + col * ItemGrid.CELL_SIZE, mainY + row * ItemGrid.CELL_SIZE);
-            }
-        }
-
-        int hotY = hotbarY();
-        for (int col = 0; col < 9; col++) {
-            drawInventorySlot(guiGraphics, inventory.getItem(col),
-                    invX + col * ItemGrid.CELL_SIZE, hotY);
-        }
-    }
-
-    private void drawInventorySlot(GuiGraphics guiGraphics, ItemStack stack, int x, int y) {
-        ItemGrid.drawSlotBackground(guiGraphics, this.theme, x, y);
-        if (!stack.isEmpty()) {
-            guiGraphics.renderItem(stack, x + 1, y + 1);
-            guiGraphics.renderItemDecorations(this.font, stack, x + 1, y + 1);
         }
     }
 
@@ -379,7 +408,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 filtered.add(entry);
             }
         }
-        this.grid.setEntries(List.copyOf(filtered));
+        this.itemGrid.setEntries(List.copyOf(filtered));
     }
 
     private Component statusText() {
@@ -412,37 +441,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return Component.translatable("screen.idlefactory.empty.no_match");
     }
 
-    private ItemStack hoveredStack(int mouseX, int mouseY) {
-        StorageSnapshotS2C.Entry entry = this.grid.hoveredEntry(mouseX, mouseY);
-        if (entry != null) {
-            return ItemGrid.toDisplayStack(entry.key());
-        }
-
-        Player player = this.minecraft.player;
-        if (player == null) {
-            return ItemStack.EMPTY;
-        }
-        Inventory inventory = player.getInventory();
-        int invX = gridX();
-
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                if (isInside(mouseX, mouseY, invX + col * ItemGrid.CELL_SIZE,
-                        mainInvY() + row * ItemGrid.CELL_SIZE)) {
-                    return inventory.getItem(9 + row * 9 + col);
-                }
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            if (isInside(mouseX, mouseY, invX + col * ItemGrid.CELL_SIZE, hotbarY())) {
-                return inventory.getItem(col);
-            }
-        }
-        return ItemStack.EMPTY;
-    }
-
-    private static boolean isInside(double mouseX, double mouseY, int x, int y) {
-        return mouseX >= x && mouseX < x + ItemGrid.CELL_SIZE
-                && mouseY >= y && mouseY < y + ItemGrid.CELL_SIZE;
+    /**
+     * 当前鼠标下的存储物品；没有时为 null。背包里的物品由原版 {@link Slot} + tooltip 处理。
+     *
+     * <p>供界面自身与 JEI 的 {@code IGuiContainerHandler} 复用。</p>
+     */
+    @Nullable
+    public ItemStack getHoveredStorageStack(double mouseX, double mouseY) {
+        StorageSnapshotS2C.Entry entry = this.itemGrid.hoveredEntry(mouseX, mouseY);
+        return entry == null ? null : ItemGrid.toDisplayStack(entry.key());
     }
 }

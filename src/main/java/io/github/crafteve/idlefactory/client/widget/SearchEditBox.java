@@ -29,6 +29,16 @@ public class SearchEditBox extends EditBox {
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 右键清空（AE2 终端同款习惯）
+        if (button == 1 && isMouseOver(mouseX, mouseY)) {
+            setValue("");
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
     public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
 

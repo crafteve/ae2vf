@@ -138,6 +138,24 @@ public final class ItemGrid {
 
     /** 画一个不含悬停效果的空槽位（玩家背包也复用）。 */
     public static void drawSlotBackground(GuiGraphics guiGraphics, GuiTheme theme, int cellX, int cellY) {
+        drawSlotBackground(guiGraphics, theme, cellX, cellY, false);
+    }
+
+    /**
+     * 画槽位：普通态用内凹边，悬停态直接切到主题的 hoverBg / slotBorderHover（背包槽位用）。
+     */
+    public static void drawSlotBackground(GuiGraphics guiGraphics, GuiTheme theme, int cellX, int cellY,
+            boolean hovered) {
+        if (hovered) {
+            guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, theme.hoverBg());
+            int edge = theme.slotBorderHover();
+            guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + 1, edge);
+            guiGraphics.fill(cellX, cellY, cellX + 1, cellY + CELL_SIZE, edge);
+            guiGraphics.fill(cellX, cellY + CELL_SIZE - 1, cellX + CELL_SIZE, cellY + CELL_SIZE, edge);
+            guiGraphics.fill(cellX + CELL_SIZE - 1, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, edge);
+            return;
+        }
+
         guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, theme.slotBg());
         guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + 1, theme.slotBorderDark());
         guiGraphics.fill(cellX, cellY, cellX + 1, cellY + CELL_SIZE, theme.slotBorderDark());

@@ -47,7 +47,7 @@ public record GuiTheme(
             0xFF4DD0E1, // accent
             0xFFE6E6E6, // textPrimary
             0xFF6B6B72, // textDim
-            0xFF232328, // hoverBg
+            0xFF2A2A30, // hoverBg
             0xFF4DD0E1, // selectedBorder
             0x554DD0E1, // selectedGlow
             0xFF4A4A52, // slotBorderHover
@@ -64,7 +64,7 @@ public record GuiTheme(
             0xFF2E86C1, // accent
             0xFF1F1F1F, // textPrimary
             0xFF5A5A5A, // textDim
-            0xFFAFAFAF, // hoverBg
+            0xFFC0C0C0, // hoverBg
             0xFF2E86C1, // selectedBorder
             0x552E86C1, // selectedGlow
             0xFFFFFFFF, // slotBorderHover
