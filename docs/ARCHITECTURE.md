@@ -146,7 +146,33 @@ Core 不假设某种资源类型一定存在。`IWarehouse.supports(type)` 由�
 
 ### 4.1 终端
 
-一个物品。右键打开界面。获取方式 TBD（开局给一个 / 合成 / 其他）。
+一个**无线物品**，不占方块位。右键打开界面。获取方式 TBD（开局给一个 / 合成 / 其他）。
+
+### 4.1.1 绑定方式（暂定）
+
+绑定载体是 AE2 的**量子纠缠奇点**。它本身就带一个 `long` 频率（`AEComponents.ENTANGLED_SINGULARITY_ID`），不需要我们扩展。
+
+流程：
+
+1. ME 网络侧建一个量子环，环里放一个奇点（频率 F）
+2. 终端 GUI 的绑定槽里放一个**同频**的奇点
+3. 终端读 F，用 `Locatables.quantumNetworkBridges().get(serverLevel, F)` 全局查到 `QuantumCluster`
+4. `QuantumCluster.getActionableNode().getGrid()` → 拿到 `IGrid`
+5. 拔掉奇点 = 解除绑定
+
+为什么能跨维度：`Locatables.quantumNetworkBridges()` 内部是一个**全局 `HashMap<Long, IActionHost>`**，不按维度分区；`get(Level, long)` 的 `Level` 参数只用来确保调用发生在服务端，不参与匹配。
+
+前提条件：
+
+- 量子环必须**已成型且有电**
+- **两个环都要放奇点**、且频率相同（AE2 的配对是 `+F` 和 `-F` 互相注册）
+- 环所在区块必须加载，否则 `QuantumCluster` 会注销
+
+待验证：
+
+- 服务器重启后环的注册时机
+- 环区块未加载时的降级提示
+- 玩家只有单个奇点（没有配对）时的行为
 
 ### 4.2 接入动作
 

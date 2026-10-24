@@ -77,6 +77,22 @@ Idle Factory: virtual pattern provider and global warehouse for tech modpacks.
     # Side this dependency is applied on - BOTH, CLIENT, or SERVER
     side="BOTH"
 
+# AE2 是必需依赖
+[[dependencies.${mod_id}]]
+    modId="ae2"
+    type="required"
+    versionRange="[19.2.10,)"
+    ordering="NONE"
+    side="BOTH"
+
+# JEI 是可选依赖
+[[dependencies.${mod_id}]]
+    modId="jei"
+    type="optional"
+    versionRange="[19,)"
+    ordering="NONE"
+    side="BOTH"
+
 # Here's another dependency
 [[dependencies.${mod_id}]]
     modId="minecraft"

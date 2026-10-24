@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Idle Factory · GUI 原型 v2</title>
+<style>
+  :root{
+    --bg:#0f0f10;
+    --panel:#1a1a1c;
+    --panel-2:#141416;
+    --border:#2a2a2e;
+    --text:#e6e6e6;
+    --muted:#8a8a8e;
+    --cyan:#4dd0e1;
+    --amber:#ffb74d;
+    --red:#e57373;
+    --gray:#5a5a60;
+    --font: "Cascadia Mono","JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:#08080a;
+    color:var(--text);
+    font:12px/1.45 var(--font);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    padding:26px 16px 48px;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- page chrome ---------- */
+  .page-head{width:1280px;display:flex;flex-direction:column;gap:5px}
+  .page-head .title{font-size:15px;letter-spacing:.08em;color:var(--text)}
+  .page-head .ver{font-size:9px;color:#062a2e;background:var(--cyan);padding:1px 5px;border-radius:2px;vertical-align:2px;margin-left:6px}
+  .page-head .sub{font-size:11px;color:var(--muted)}
+  .page-head .hint{
+    font-size:10px;color:#6b6b72;
+    border:1px solid #202024;background:#111113;border-radius:2px;
+    padding:5px 9px;
+  }
+  .page-head .hint b{color:var(--muted);font-weight:400;margin-right:6px}
+
+  .frame{
+    width:1280px;height:800px;flex:0 0 auto;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:2px;
+    display:flex;flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    height:40px;flex:0 0 40px;
+    display:flex;align-items:center;gap:10px;
+    padding:0 12px;
+    background:var(--panel-2);
+    border-bottom:1px solid var(--border);
+  }
+  .brand{font-size:10px;letter-spacing:.18em;color:var(--muted);margin-right:4px}
+  .line-select{
+    background:#101012;color:var(--text);border:1px solid var(--border);
+    border-radius:2px;padding:4px 6px;font:inherit;font-size:11px;outline:none;cursor:pointer;
+  }
+  .line-select:focus{border-color:var(--cyan)}
+  .seg{display:flex;border:1px solid var(--border);border-radius:2px;overflow:hidden}
+  .seg button{
+    background:transparent;border:0;color:var(--muted);
+    padding:4px 18px;font:inherit;font-size:11px;cursor:pointer;letter-spacing:.06em;
+  }
+  .seg button:hover{color:var(--text)}
+  .seg button.active{background:var(--cyan);color:#062a2e;font-weight:700}
+  .spacer{flex:1}
+  .qes{
+    width:28px;height:28px;border:1px dashed #3a3a42;border-radius:2px;
+    display:flex;align-items:center;justify-content:center;color:var(--muted);
+    font-size:14px;cursor:pointer;background:#101012;
+  }
+  .qes:hover{border-color:var(--cyan);color:var(--cyan)}
+  .icon-btn{
+    width:28px;height:28px;background:transparent;border:1px solid var(--border);
+    border-radius:2px;color:var(--muted);font:inherit;font-size:14px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{color:var(--text);border-color:#3a3a42}
+
+  /* ---------- body ---------- */
+  .body{flex:1;display:flex;min-height:0}
+  .statusbar{
+    height:24px;flex:0 0 24px;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 12px;background:var(--panel-2);
+    border-top:1px solid var(--border);
+    font-size:9px;color:var(--muted);letter-spacing:.04em;
+  }
+  .statusbar .st{display:flex;align-items:center;gap:16px}
+  .statusbar .dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin-right:5px}
+  .dot.backlog{background:var(--amber)}
+  .dot.shortage{background:var(--red)}
+  .dot.ok{background:var(--cyan)}
+
+  /* ---------- left machine bar ---------- */
+  .machines{
+    width:200px;flex:0 0 200px;
+    background:var(--panel-2);
+    border-right:1px solid var(--border);
+    padding:10px;display:flex;flex-direction:column;gap:6px;
+    overflow-y:auto;
+  }
+  .search{
+    width:100%;background:#101012;border:1px solid var(--border);border-radius:2px;
+    color:var(--text);font:inherit;font-size:11px;padding:5px 7px;outline:none;
+  }
+  .search::placeholder{color:#5c5c62}
+  .search:focus{border-color:var(--cyan)}
+  .group{margin-top:6px;display:flex;flex-direction:column;gap:2px}
+  .group-title{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:9px;letter-spacing:.12em;color:var(--muted);
+    padding:4px 2px 5px;border-bottom:1px solid #202024;margin-bottom:3px;
+  }
+  .group-title .count{color:#5f5f66}
+  .machine-item{
+    display:flex;align-items:center;gap:7px;
+    padding:5px 6px;border:1px solid transparent;border-radius:2px;
+    cursor:pointer;font-size:11px;color:#c9c9cd;
+  }
+  .machine-item:hover{background:var(--panel);border-color:var(--border);color:var(--text)}
+  .machine-item.selected{border-color:var(--cyan);background:rgba(77,208,225,.07);color:var(--text)}
+  .machine-item .mi{width:16px;text-align:center;font-size:13px}
+  .machine-item .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .machine-item .dot{width:5px;height:5px;border-radius:50%;background:#3a3a40}
+
+  /* ---------- work area ---------- */
+  .work{
+    flex:1;position:relative;min-width:0;
+    background-color:var(--bg);
+    background-image:
+      linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+    background-size:32px 32px;
+    overflow:hidden;
+  }
+  .view{position:absolute;inset:0}
+  .view.hidden{display:none}
+  .canvas-hud{
+    position:absolute;left:12px;top:10px;
+    font-size:10px;color:#5f5f66;letter-spacing:.06em;pointer-events:none;
+  }
+
+  /* ---------- edges ---------- */
+  .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .edge{fill:none;stroke:#55555f;stroke-width:1.5;stroke-dasharray:4 4;stroke-linecap:butt}
+  .edge.active{stroke:var(--cyan);stroke-width:2;stroke-dasharray:5 3}
+  .edge-label{
+    position:absolute;transform:translate(-50%,-50%);
+    font-size:8px;color:var(--muted);
+    background:rgba(15,15,16,.95);
+    border:1px solid var(--border);border-radius:2px;
+    padding:1px 4px;white-space:nowrap;pointer-events:none;
+  }
+
+  /* ---------- nodes ---------- */
+  .node{
+    position:absolute;width:180px;height:96px;
+    background:var(--panel);
+    border:1px solid var(--gray);
+    border-radius:2px;
+    padding:7px 9px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    cursor:grab;user-select:none;
+    transition:background .12s,border-color .12s,box-shadow .12s;
+  }
+  .node:active{cursor:grabbing}
+  .node:hover{background:#202024}
+  .node.dragging{z-index:40;opacity:.92;cursor:grabbing}
+  .node.expanded{height:260px;justify-content:flex-start;z-index:30;box-shadow:0 12px 34px rgba(0,0,0,.6)}
+  .node.running{border-color:rgba(77,208,225,.65)}
+  .node.starving{border-color:rgba(255,183,77,.75)}
+  .node.stopped{border-color:rgba(229,115,115,.8)}
+  .node.offline{border-color:#3a3a40;opacity:.7}
+  .node.selected{
+    border-color:var(--cyan);
+    box-shadow:0 0 0 1px var(--cyan),0 0 20px rgba(77,208,225,.24);
+    opacity:1;
+  }
+
+  .node-head{display:flex;align-items:center;gap:6px;height:16px;flex:0 0 auto}
+  .node-icon{font-size:12px;line-height:1}
+  .node-name{flex:1;font-size:10px;letter-spacing:.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .node-facing{font-size:9px;color:var(--muted);width:10px;text-align:center}
+
+  .node-summary{display:flex;align-items:center;gap:4px;height:14px;flex:0 0 auto;overflow:hidden}
+  .pchip{
+    font-size:8px;line-height:12px;color:var(--muted);
+    border:1px solid #2e2e34;border-radius:2px;padding:0 4px;white-space:nowrap;
+  }
+  .pchip b{color:#c9c9cd;font-weight:400}
+
+  .node-ports{display:none;flex:1;min-height:0;overflow:hidden;margin-top:2px}
+  .node.expanded .node-ports{display:flex;flex-direction:column;gap:2px;justify-content:space-between}
+
+  .port-group{display:flex;flex-direction:column;gap:1px;min-height:0}
+  .port-title{font-size:8px;line-height:10px;letter-spacing:.1em;color:#5f5f66}
+  .port-row{
+    display:flex;align-items:center;gap:5px;height:16px;
+    font-size:9px;border-radius:2px;padding:0 3px;cursor:help;
+  }
+  .port-row:hover{background:#232327}
+  .port-row .pi{width:12px;text-align:center;font-size:11px;line-height:1}
+  .port-row .pn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c9c9cd}
+  .port-row .pq{color:var(--muted);font-size:8px;font-variant-numeric:tabular-nums}
+  .port-row.cat .pn{color:#9a9aa0}
+
+  .node-foot{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
+  .node.expanded .node-foot{margin-top:auto}
+  .node-progress-row{display:flex;align-items:center;gap:6px;height:13px}
+  .progress{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+  .bar{flex:1;height:4px;background:#26262a;border-radius:1px;overflow:hidden}
+  .fill{height:100%;background:var(--cyan)}
+  .node.starving .fill{background:var(--amber)}
+  .node.stopped .fill{background:var(--red)}
+  .node.offline .fill{background:var(--gray)}
+  .pct{font-size:8px;color:var(--muted);min-width:24px;text-align:right}
+  .na{font-size:8px;color:#5f5f66;letter-spacing:.04em}
+
+  .stock-corner{
+    flex:0 0 auto;font-size:8px;line-height:12px;padding:0 4px;
+    border:1px solid;border-radius:2px;white-space:nowrap;
+    font-variant-numeric:tabular-nums;cursor:help;
+  }
+  .stock-corner.backlog{color:var(--amber);border-color:rgba(255,183,77,.45);background:rgba(255,183,77,.1)}
+  .stock-corner.shortage{color:var(--red);border-color:rgba(229,115,115,.45);background:rgba(229,115,115,.1)}
+
+  .node-stock{
+    display:none;align-items:center;gap:5px;
+    font-size:8px;line-height:1.3;color:var(--muted);
+    border-top:1px solid #242428;padding-top:2px;
+    font-variant-numeric:tabular-nums;
+  }
+  .node.expanded .node-stock{display:flex}
+  .node-stock .k{color:#5f5f66}
+  .node-stock .v{color:#c9c9cd}
+
+  /* ---------- table view ---------- */
+  .view-table{
+    padding:14px 16px;
+    display:flex;flex-direction:column;gap:10px;
+    overflow:hidden;
+  }
+  .table-scroll{flex:1;overflow:auto;min-height:0}
+  table{width:100%;border-collapse:collapse;table-layout:fixed}
+  thead th{
+    text-align:left;font-weight:400;font-size:9px;letter-spacing:.1em;
+    color:var(--muted);padding:7px 8px;border-bottom:1px solid var(--border);
+  }
+  tbody td{
+    padding:8px;border-bottom:1px solid #1e1e22;
+    font-size:11px;vertical-align:middle;height:38px;
+  }
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--panel)}
+  tbody tr.selected{background:rgba(77,208,225,.07)}
+  tbody tr.selected td:first-child{box-shadow:inset 2px 0 0 var(--cyan)}
+  .mcell{display:flex;align-items:center;gap:7px}
+  .mcell .mi{font-size:13px}
+  .editable{position:relative}
+  .editable .cell-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .editable:not(.editing):hover .cell-label{color:var(--cyan)}
+  .editable:not(.editing):hover{box-shadow:inset 0 -1px 0 #3a3a42}
+  .edit-ico{font-size:12px;margin-right:5px}
+  .cell-input{
+    background:#0b0b0d;border:1px solid var(--cyan);border-radius:2px;
+    color:var(--text);font:inherit;font-size:11px;padding:2px 5px;
+    width:calc(100% - 22px);outline:none;
+  }
+  .num{color:var(--muted);font-variant-numeric:tabular-nums}
+  .pill{
+    display:inline-flex;align-items:center;gap:5px;
+    padding:1px 7px;border-radius:2px;font-size:9px;border:1px solid;
+  }
+  .pill::before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor}
+  .pill.running{color:var(--cyan);border-color:rgba(77,208,225,.35);background:rgba(77,208,225,.07)}
+  .pill.starving{color:var(--amber);border-color:rgba(255,183,77,.35);background:rgba(255,183,77,.07)}
+  .pill.stopped{color:var(--red);border-color:rgba(229,115,115,.35);background:rgba(229,115,115,.07)}
+  .pill.offline{color:var(--muted);border-color:#3a3a40;background:rgba(255,255,255,.02)}
+  .stock-badge{
+    margin-left:5px;font-size:8px;line-height:12px;padding:0 4px;
+    border:1px solid;border-radius:2px;
+  }
+  .stock-badge.backlog{color:var(--amber);border-color:rgba(255,183,77,.4);background:rgba(255,183,77,.08)}
+  .stock-badge.shortage{color:var(--red);border-color:rgba(229,115,115,.4);background:rgba(229,115,115,.08)}
+  .table-foot{
+    margin-top:12px;padding-top:8px;border-top:1px solid #1e1e22;
+    display:flex;gap:16px;flex-wrap:wrap;
+    font-size:10px;color:#5f5f66;
+  }
+  .table-summary{
+    flex:0 0 auto;
+    display:flex;gap:22px;flex-wrap:wrap;
+    border-top:1px solid var(--border);padding-top:10px;
+    font-size:10px;color:var(--muted);
+  }
+  .table-summary .k{color:#5f5f66;margin-right:6px}
+  .table-summary .v{color:var(--text)}
+  .table-summary .c-cyan{color:var(--cyan)}
+  .table-summary .c-amber{color:var(--amber)}
+  .table-summary .c-red{color:var(--red)}
+
+  /* ---------- right panel ---------- */
+  .right{
+    width:260px;flex:0 0 260px;
+    background:var(--panel-2);
+    border-left:1px solid var(--border);
+    display:flex;flex-direction:column;
+    padding:10px;gap:8px;min-height:0;
+  }
+  .detail{
+    display:none;flex-direction:column;gap:4px;
+    border:1px solid rgba(77,208,225,.35);
+    background:rgba(77,208,225,.045);
+    border-radius:2px;padding:8px 9px;flex:0 0 auto;
+  }
+  .detail.show{display:flex}
+  .detail-title{display:flex;align-items:center;gap:7px;font-size:11px;margin-bottom:1px}
+  .detail .row{display:flex;justify-content:space-between;gap:10px;font-size:10px;line-height:1.45}
+  .detail .k{color:var(--muted);flex:0 0 auto}
+  .detail .v{text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .storage{flex:0 0 auto;display:flex;flex-direction:column;gap:7px;min-height:0}
+  .tabs{display:flex;border:1px solid var(--border);border-radius:2px;overflow:hidden;flex:0 0 auto}
+  .tabs button{
+    flex:1;background:transparent;border:0;color:var(--muted);
+    padding:5px 0;font:inherit;font-size:10px;cursor:pointer;letter-spacing:.04em;
+  }
+  .tabs button:hover{color:var(--text)}
+  .tabs button.active{background:#232327;color:var(--text)}
+  .grid{
+    display:grid;grid-template-columns:repeat(6,1fr);gap:4px;
+    overflow-y:auto;align-content:start;min-height:0;padding-right:2px;
+    flex:0 0 auto;max-height:320px;
+  }
+  .item{
+    position:relative;aspect-ratio:1/1;
+    border:1px solid var(--border);border-radius:2px;background:#101012;
+    display:flex;align-items:center;justify-content:center;
+    font-size:15px;cursor:pointer;
+  }
+  .item:hover{border-color:#3e3e46;background:#18181b}
+  .item .n{
+    position:absolute;right:2px;top:1px;font-size:8px;color:var(--text);
+    background:rgba(0,0,0,.6);padding:0 2px;border-radius:1px;
+  }
+  .empty-hint{grid-column:1/-1;color:var(--muted);font-size:10px;padding:10px 2px}
+  .storage-foot{
+    display:flex;justify-content:space-between;
+    font-size:9px;color:#5f5f66;
+    border-top:1px solid #202024;padding-top:6px;flex:0 0 auto;
+  }
+
+  .backpack{flex:0 0 auto;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:5px}
+  .right-fill{flex:1}
+  .bp-label{font-size:9px;letter-spacing:.1em;color:var(--muted)}
+  .star-row{display:flex;gap:3px}
+  .star-row .slot{width:30px;height:30px}
+  .hotbar{display:grid;grid-template-columns:repeat(9,1fr);gap:3px}
+  .hotbar .slot{width:100%;height:auto;aspect-ratio:1/1;font-size:12px}
+  .slot{
+    width:30px;height:30px;position:relative;
+    border:1px solid #2e2e34;border-radius:2px;
+    background:#101012;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;line-height:1;
+  }
+  .slot .cnt{
+    position:absolute;left:0;right:0;bottom:0;height:9px;
+    font-size:8px;line-height:9px;text-align:center;
+    color:#c9c9cd;background:rgba(0,0,0,.82);
+    border-top:1px solid rgba(255,255,255,.05);
+    overflow:hidden;white-space:nowrap;
+  }
+  .slot.empty{opacity:.35;border-style:dashed}
+
+  /* ---------- tooltip / menu / toast ---------- */
+  .tooltip{
+    position:fixed;z-index:200;pointer-events:none;
+    background:#1c1c20;border:1px solid #33333a;border-radius:2px;
+    padding:5px 8px;max-width:240px;
+    opacity:0;transition:opacity .1s;
+    box-shadow:0 6px 18px rgba(0,0,0,.5);
+  }
+  .tooltip.show{opacity:1}
+  .tt-title{font-size:10px;color:var(--text);white-space:nowrap}
+  .tt-sub{font-size:9px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+  .tt-note{font-size:9px;margin-top:3px}
+  .tt-note.backlog{color:var(--amber)}
+  .tt-note.shortage{color:var(--red)}
+
+  .ctx-menu{
+    position:fixed;z-index:210;min-width:140px;display:none;
+    background:#17171a;border:1px solid #33333a;border-radius:2px;padding:3px;
+    box-shadow:0 10px 28px rgba(0,0,0,.55);
+  }
+  .ctx-menu.show{display:block}
+  .ctx-title{
+    font-size:9px;color:var(--muted);padding:4px 7px 6px;
+    border-bottom:1px solid #26262b;margin-bottom:3px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ctx-item{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:5px 7px;font-size:10px;color:#c9c9cd;border-radius:2px;cursor:pointer;
+  }
+  .ctx-item:hover{background:#26262b;color:var(--text)}
+  .ctx-item.danger:hover{background:rgba(229,115,115,.12);color:var(--red)}
+  .ctx-sep{height:1px;background:#26262b;margin:3px 0}
+
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,8px);
+    background:#1c1c20;border:1px solid var(--border);border-radius:2px;
+    color:var(--text);font-size:11px;padding:7px 14px;
+    opacity:0;pointer-events:none;transition:opacity .15s,transform .15s;
+    z-index:250;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- notes ---------- */
+  .notes{
+    width:1280px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:2px;padding:16px 18px;
+  }
+  .notes h2{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:400;margin-bottom:10px}
+  .notes ol{list-style:none;counter-reset:n;display:flex;flex-direction:column;gap:8px}
+  .notes li{counter-increment:n;font-size:11px;color:#b9b9be;line-height:1.6;padding-left:26px;position:relative}
+  .notes li::before{
+    content:counter(n,decimal-leading-zero);
+    position:absolute;left:0;top:2px;
+    font-size:9px;color:var(--cyan);letter-spacing:.06em;
+  }
+  .notes b{color:var(--text);font-weight:400}
+  .notes .open{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+
+  /* scrollbars */
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#2c2c32;border-radius:0}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+
+<header class="page-head">
+  <div class="title">Idle Factory · 放置工厂 GUI 原型<span class="ver">v2</span></div>
+  <div class="sub">讨论用原型，非最终视觉；数据为演示假数据。本轮新增：逻辑边、端口展开、积压/缺料角标、拖拽与右键菜单。</div>
+  <div class="hint"><b>操作</b>拖动卡片移动（吸附 16px）· 点击卡片展开端口 · 右键卡片更多 · 切「表」编辑输入输出 · 右侧搜索物品 · Esc 取消选中 · F 切换视图</div>
+</header>
+
+<main class="frame">
+  <div class="topbar">
+    <div class="brand">IDLE FACTORY</div>
+    <select class="line-select" id="lineSelect" title="切换产线">
+      <option>产线 1 · 钢制框架</option>
+      <option>产线 2 · 电路板</option>
+    </select>
+    <div class="seg" id="viewSeg">
+      <button data-view="graph" class="active">图</button>
+      <button data-view="table">表</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="qes" id="qesSlot" title="量子纠缠奇点绑定槽（空）">◇</div>
+    <button class="icon-btn" id="settingsBtn" title="设置">⚙</button>
+    <button class="icon-btn" id="closeBtn" title="关闭">×</button>
+  </div>
+
+  <div class="body">
+    <aside class="machines">
+      <input class="search" id="machineSearch" placeholder="搜索机器…">
+      <div class="group">
+        <div class="group-title">已接入 <span class="count">6</span></div>
+        <div id="groupConnected"></div>
+      </div>
+      <div class="group">
+        <div class="group-title">未编组 <span class="count">3</span></div>
+        <div id="groupUnassigned"></div>
+      </div>
+    </aside>
+
+    <section class="work" id="work">
+      <div class="view" id="viewGraph">
+        <svg class="edges" id="edges" viewBox="0 0 820 736" preserveAspectRatio="none"></svg>
+        <div id="labels"></div>
+        <div id="nodes"></div>
+        <div class="canvas-hud" id="canvasHud">产线 1 · 6 节点 · 6 连接</div>
+      </div>
+      <div class="view view-table hidden" id="viewTable">
+        <div class="table-scroll">
+        <table>
+          <colgroup>
+            <col style="width:150px"><col style="width:280px"><col style="width:150px">
+            <col style="width:110px"><col style="width:98px">
+          </colgroup>
+          <thead>
+            <tr><th>机器</th><th>输入</th><th>输出</th><th>状态</th><th>吞吐</th></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div class="table-foot">
+          <span id="tableFootLeft">6 台机器 · 6 条连接</span>
+          <span>点击「输入 / 输出」编辑 · 回车保存 · ESC 取消</span>
+          <span>选中行后切回图视图，节点保持高亮</span>
+        </div>
+        </div>
+        <div class="table-summary" id="tableSummary"></div>
+      </div>
+    </section>
+
+    <aside class="right">
+      <div class="detail" id="detail"></div>
+      <div class="storage">
+        <div class="tabs" id="storageTabs">
+          <button data-tab="me" class="active">ME 库存</button>
+          <button data-tab="all">全部物品</button>
+        </div>
+        <input class="search" id="itemSearch" placeholder="搜索物品…">
+        <div class="grid" id="itemGrid"></div>
+        <div class="storage-foot" id="storageFoot"><span>12 种物品</span><span>容量 1,024 / 8,192</span></div>
+      </div>
+      <div class="backpack">
+        <div class="bp-label">星标</div>
+        <div class="star-row" id="starRow"></div>
+        <div class="bp-label">快捷栏</div>
+        <div class="hotbar" id="hotbar"></div>
+      </div>
+      <div class="right-fill"></div>
+    </aside>
+  </div>
+
+  <div class="statusbar">
+    <div class="st" id="statusLeft"></div>
+    <div class="st" id="statusRight"></div>
+  </div>
+</main>
+
+<footer class="notes">
+  <h2>设计备注 · v2 的取舍</h2>
+  <ol>
+    <li><b>边是逻辑依赖，不是管道。</b>从源卡片右侧的输出锚点到目标卡片左侧的输入锚点，细虚线；目标在左侧时从卡片上方绕行，避免线穿过卡片。</li>
+    <li><b>折叠 96 / 展开 260。</b>折叠态只保留「入 / 催 / 出」计数，展开才列端口；同一时间只展开一张，避免多个浮层互相遮挡。</li>
+    <li><b>积压 / 缺料用「当前/上限」角标。</b>折叠态在右下角显示库存与目标存量的比值，展开态每行端口也带 cur/max，两者格式呼应；悬停给出文字解释，不只靠颜色。</li>
+    <li><b>拖拽用 4px 阈值区分点击与拖动。</b>16px 吸附，拖动中只重绘边，松手才整体重渲染，避免卡片闪烁。</li>
+    <li><b>GT 组装机压测展开态。</b>5 输入 + 1 催化 + 1 输出，260px 刚好容纳 7 行端口 + 目标存量 + 进度。</li>
+  </ol>
+  <div class="open">待确认：齿轮机 #1 同时出现在画布和「未编组」——原型照抄需求，但这说明「机器归属分组」和「是否出现在当前画布」是两件事。</div>
+</footer>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="ctx-menu" id="ctxMenu"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= data ================= */
+
+  const ICONS = {
+    "铁矿石":"🪨","铁锭":"🔩","钢锭":"🔗","钢板":"▤","齿轮":"⚙️","机器框架":"🧱",
+    "精密机器框架":"🏗","电路板":"🔌","焊接合金":"🧫","煤":"⚫","圆石":"⬢",
+    "铜锭":"🟠","玻璃":"🟩","红石":"🔴","金锭":"🟡","钻石":"💎","青金石":"🔵",
+    "石英":"⬜","粘土":"🟤","沙子":"🟨","砂砾":"⬛","锡锭":"⚪","铅锭":"🔘",
+    "银锭":"⚪","镍锭":"🟢","铀锭":"🟩","铝锭":"⚫","青铜锭":"🟤","不锈钢":"🔘",
+    "钛锭":"⚪","扳手":"🔧","配置器":"📋"
+  };
+  const iconFor = n => ICONS[n] || "❔";
+  const STATUS_TEXT = { running:"运行", starving:"缺料", stopped:"停机", offline:"离线" };
+
+  const MACHINES = {
+    A:{
+      id:"A", name:"熔炉 #1", icon:"🔥", facing:"东", arrow:"▶",
+      status:"running", progress:60, throughput:"2.0/s", inputFace:"顶面",
+      inputs:[{ name:"铁矿石", icon:"🪨", cur:12, max:16 }],
+      catalysts:[],
+      outputs:[{ name:"铁锭", icon:"🔩", cur:64, max:64 }],
+      stock:{ name:"铁锭", icon:"🔩", cur:1080, cap:1000, low:200 }
+    },
+    B:{
+      id:"B", name:"合金炉 #1", icon:"🧪", facing:"南", arrow:"▼",
+      status:"running", progress:45, throughput:"1.0/s", inputFace:"顶面 + 北面",
+      inputs:[
+        { name:"铁锭", icon:"🔩", cur:12, max:16 },
+        { name:"煤", icon:"⚫", cur:32, max:64 }
+      ],
+      catalysts:[],
+      outputs:[{ name:"钢锭", icon:"🔗", cur:32, max:64 }],
+      stock:{ name:"钢锭", icon:"🔗", cur:320, cap:500, low:100 }
+    },
+    C:{
+      id:"C", name:"压板机 #1", icon:"🗜", facing:"东", arrow:"▶",
+      status:"starving", progress:0, throughput:"0/s", inputFace:"北面",
+      inputs:[{ name:"钢锭", icon:"🔗", cur:8, max:16 }],
+      catalysts:[],
+      outputs:[{ name:"钢板", icon:"▤", cur:16, max:32 }],
+      stock:{ name:"钢板", icon:"▤", cur:40, cap:300, low:80 }
+    },
+    D:{
+      id:"D", name:"组装机 #1", icon:"🛠", facing:"西", arrow:"◀",
+      status:"stopped", progress:80, throughput:"0/s", inputFace:"侧面",
+      inputs:[
+        { name:"钢板", icon:"▤", cur:4, max:16 },
+        { name:"齿轮", icon:"⚙️", cur:2, max:8 }
+      ],
+      catalysts:[],
+      outputs:[{ name:"机器框架", icon:"🧱", cur:4, max:16 }],
+      stock:{ name:"机器框架", icon:"🧱", cur:210, cap:200, low:40 }
+    },
+    E:{
+      id:"E", name:"齿轮机 #1", icon:"⚙️", facing:"北", arrow:"▲",
+      status:"offline", progress:null, throughput:"—", inputFace:"顶面",
+      inputs:[{ name:"铁锭", icon:"🔩", cur:16, max:32 }],
+      catalysts:[],
+      outputs:[{ name:"齿轮", icon:"⚙️", cur:8, max:32 }],
+      stock:{ name:"齿轮", icon:"⚙️", cur:120, cap:400, low:80 }
+    },
+    F:{
+      id:"F", name:"GT 组装机 #1", icon:"🏭", facing:"北", arrow:"▲",
+      status:"running", progress:35, throughput:"0.5/s", inputFace:"顶面",
+      inputs:[
+        { name:"钢板", icon:"▤", cur:4, max:16 },
+        { name:"齿轮", icon:"⚙️", cur:2, max:8 },
+        { name:"电路板", icon:"🔌", cur:1, max:4 },
+        { name:"钛锭", icon:"⚪", cur:0, max:8 },
+        { name:"不锈钢", icon:"🔘", cur:2, max:16 }
+      ],
+      catalysts:[{ name:"焊接合金", icon:"🧫", cur:1, max:1 }],
+      outputs:[{ name:"精密机器框架", icon:"🏗", cur:2, max:8 }],
+      stock:{ name:"精密机器框架", icon:"🏗", cur:18, cap:150, low:30 }
+    }
+  };
+
+  const LAYOUT = {
+    A:{ x:30,  y:110 },
+    B:{ x:250, y:110 },
+    C:{ x:470, y:110 },
+    E:{ x:250, y:320 },
+    D:{ x:560, y:320 },
+    F:{ x:560, y:460 }
+  };
+  const CARD_W = 180, CARD_H = 96, CARD_H_EXP = 260;
+  const WORK_W = 820, WORK_H = 736;
+
+  const EDGES = [
+    { from:"A", to:"B", item:"铁锭", icon:"🔩" },
+    { from:"B", to:"C", item:"钢锭", icon:"🔗" },
+    { from:"C", to:"D", item:"钢板", icon:"▤" },
+    { from:"B", to:"E", item:"铁锭", icon:"🔩" },
+    { from:"E", to:"D", item:"齿轮", icon:"⚙️" },
+    { from:"D", to:"F", item:"精密机器框架", icon:"🏗" }
+  ];
+
+  const CONNECTED = [
+    { id:"A", name:"熔炉 #1",     icon:"🔥", status:"running" },
+    { id:null, name:"熔炉 #2",    icon:"🔥", status:"" },
+    { id:"B", name:"合金炉 #1",   icon:"🧪", status:"running" },
+    { id:"C", name:"压板机 #1",   icon:"🗜", status:"starving" },
+    { id:"D", name:"组装机 #1",   icon:"🛠", status:"stopped" },
+    { id:"F", name:"GT 组装机 #1", icon:"🏭", status:"running" }
+  ];
+  const UNASSIGNED = [
+    { id:"E", name:"齿轮机 #1", icon:"⚙️", status:"offline" },
+    { id:null, name:"离心机 #1", icon:"🌀", status:"" },
+    { id:null, name:"搅拌机 #1", icon:"🥣", status:"" }
+  ];
+
+  const ME_ITEMS = [
+    { name:"铁矿石", icon:"🪨", n:128 },
+    { name:"铁锭",   icon:"🔩", n:1080 },
+    { name:"钢锭",   icon:"🔗", n:320 },
+    { name:"钢板",   icon:"▤", n:40 },
+    { name:"齿轮",   icon:"⚙️", n:120 },
+    { name:"机器框架", icon:"🧱", n:210 },
+    { name:"煤",     icon:"⚫", n:256 },
+    { name:"圆石",   icon:"⬢", n:1024 },
+    { name:"铜锭",   icon:"🟠", n:96 },
+    { name:"玻璃",   icon:"🟩", n:48 },
+    { name:"红石",   icon:"🔴", n:512 },
+    { name:"金锭",   icon:"🟡", n:24 }
+  ];
+
+  const ALL_ITEMS = [
+    { name:"铁矿石", icon:"🪨" }, { name:"铁锭", icon:"🔩" }, { name:"钢锭", icon:"🔗" },
+    { name:"钢板", icon:"▤" }, { name:"齿轮", icon:"⚙️" }, { name:"机器框架", icon:"🧱" },
+    { name:"精密机器框架", icon:"🏗" }, { name:"电路板", icon:"🔌" }, { name:"焊接合金", icon:"🧫" },
+    { name:"煤", icon:"⚫" }, { name:"圆石", icon:"⬢" }, { name:"铜锭", icon:"🟠" },
+    { name:"玻璃", icon:"🟩" }, { name:"红石", icon:"🔴" }, { name:"金锭", icon:"🟡" },
+    { name:"钻石", icon:"💎" }, { name:"青金石", icon:"🔵" }, { name:"石英", icon:"⬜" },
+    { name:"粘土", icon:"🟤" }, { name:"沙子", icon:"🟨" }, { name:"砂砾", icon:"⬛" },
+    { name:"锡锭", icon:"⚪" }, { name:"铅锭", icon:"🔘" }, { name:"银锭", icon:"⚪" },
+    { name:"镍锭", icon:"🟢" }, { name:"铀锭", icon:"🟩" }, { name:"铝锭", icon:"⚫" },
+    { name:"青铜锭", icon:"🟤" }, { name:"不锈钢", icon:"🔘" }, { name:"钛锭", icon:"⚪" }
+  ];
+
+  const STARRED = [
+    { name:"铁锭", icon:"🔩", n:1080 },
+    { name:"齿轮", icon:"⚙️", n:120 }
+  ];
+  const HOTBAR = [
+    { name:"扳手", icon:"🔧" },
+    { name:"配置器", icon:"📋" },
+    null,null,null,null,null,null,null
+  ];
+
+  const state = {
+    view:"graph",
+    selected:null,
+    expanded:null,
+    storageTab:"me",
+    search:"",
+    menuId:null
+  };
+
+  // 便于讨论时直接打开某个状态：?view=table&select=A&expand=F&tab=all
+  const qs = new URLSearchParams(location.search);
+  if(qs.get("view") === "table") state.view = "table";
+  if(qs.get("select") && MACHINES[qs.get("select")]) state.selected = qs.get("select");
+  if(qs.get("expand") && MACHINES[qs.get("expand")]){
+    state.expanded = qs.get("expand");
+    state.selected = state.expanded;
+  }
+  if(qs.get("tab") === "all") state.storageTab = "all";
+
+  /* ================= helpers ================= */
+
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+  const snap = v => Math.round(v/16)*16;
+
+  let toastTimer = null;
+  function toast(msg){
+    const el = $("#toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+  }
+
+  function rectOf(id){
+    const p = LAYOUT[id];
+    return { x:p.x, y:p.y, w:CARD_W, h:CARD_H };
+  }
+
+  function stockState(m){
+    const s = m.stock;
+    if(s.cur > s.cap) return "backlog";
+    if(s.cur < s.low) return "shortage";
+    return "ok";
+  }
+
+  function spread(i, n){
+    if(n <= 1) return 0;
+    const max = Math.min(24, (n-1)*12);
+    return -max/2 + i*(max/(n-1));
+  }
+
+  function anchorOut(edge){
+    const outs = EDGES.filter(x => x.from === edge.from);
+    const i = outs.indexOf(edge);
+    const r = rectOf(edge.from);
+    return { x:r.x + r.w, y:r.y + r.h/2 + spread(i, outs.length) };
+  }
+  function anchorIn(edge){
+    const ins = EDGES.filter(x => x.to === edge.to);
+    const i = ins.indexOf(edge);
+    const r = rectOf(edge.to);
+    return { x:r.x, y:r.y + r.h/2 + spread(i, ins.length) };
+  }
+
+  function route(edge){
+    const s = anchorOut(edge), t = anchorIn(edge);
+    const sx=s.x, sy=s.y, tx=t.x, ty=t.y;
+
+    // 目标在右侧：常规 H-V-H
+    if(tx - sx >= 24){
+      if(Math.abs(ty - sy) < 1) return [{x:sx,y:sy},{x:tx,y:ty}];
+      const mx = (sx + tx)/2;
+      return [{x:sx,y:sy},{x:mx,y:sy},{x:mx,y:ty},{x:tx,y:ty}];
+    }
+
+    // 目标在左侧：从卡片上方（或下方）绕行，再进入输入锚点
+    const up = ty >= sy;
+    const laneY = clamp(up ? ty - 58 : ty + 58, 8, WORK_H - 8);
+    const outX = sx + 12;
+    const inX = tx - 12;
+    return [
+      {x:sx, y:sy}, {x:outX, y:sy}, {x:outX, y:laneY},
+      {x:inX, y:laneY}, {x:inX, y:ty}, {x:tx, y:ty}
+    ];
+  }
+
+  function roundedPath(pts, r){
+    if(pts.length < 2) return "";
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for(let i=1;i<pts.length-1;i++){
+      const p0=pts[i-1], p1=pts[i], p2=pts[i+1];
+      const v1x=p1.x-p0.x, v1y=p1.y-p0.y, v2x=p2.x-p1.x, v2y=p2.y-p1.y;
+      const l1=Math.hypot(v1x,v1y) || 1, l2=Math.hypot(v2x,v2y) || 1;
+      const rr=Math.min(r, l1/2, l2/2);
+      const ax=p1.x - v1x/l1*rr, ay=p1.y - v1y/l1*rr;
+      const bx=p1.x + v2x/l2*rr, by=p1.y + v2y/l2*rr;
+      d += ` L ${ax.toFixed(2)} ${ay.toFixed(2)} Q ${p1.x} ${p1.y} ${bx.toFixed(2)} ${by.toFixed(2)}`;
+    }
+    const last = pts[pts.length-1];
+    d += ` L ${last.x} ${last.y}`;
+    return d;
+  }
+
+  function longestMid(pts){
+    let best = null, bestLen = -1;
+    for(let i=1;i<pts.length;i++){
+      const l = Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y);
+      if(l > bestLen){ bestLen = l; best = { a:pts[i-1], b:pts[i] }; }
+    }
+    if(!best) return { x:pts[0].x, y:pts[0].y, vertical:false };
+    return {
+      x:(best.a.x + best.b.x)/2,
+      y:(best.a.y + best.b.y)/2,
+      vertical: Math.abs(best.b.x-best.a.x) < Math.abs(best.b.y-best.a.y)
+    };
+  }
+
+  /* ================= render: edges ================= */
+
+  function renderEdges(){
+    const svg = $("#edges");
+    const defs = `
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#55555f"></path>
+        </marker>
+        <marker id="arrowActive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#4dd0e1"></path>
+        </marker>
+      </defs>`;
+
+    let paths = "", labels = "";
+    for(const e of EDGES){
+      if(!MACHINES[e.from] || !MACHINES[e.to]) continue;
+      const pts = route(e);
+      const d = roundedPath(pts, 4);
+      const active = state.selected === e.from || state.selected === e.to;
+      paths += `<path class="edge${active?" active":""}" d="${d}" marker-end="url(#${active?"arrowActive":"arrow"})"></path>`;
+
+      const mid = longestMid(pts);
+      const ox = mid.vertical ? 30 : 0;
+      const oy = mid.vertical ? 0 : -8;
+      labels += `<div class="edge-label" style="left:${mid.x+ox}px;top:${mid.y+oy}px">${e.icon} ${esc(e.item)}</div>`;
+    }
+    svg.innerHTML = defs + paths;
+    $("#labels").innerHTML = labels;
+  }
+
+  /* ================= render: nodes ================= */
+
+  function badgeHTML(m){
+    const st = stockState(m);
+    if(st === "ok") return "";
+    const ratio = `${m.stock.cur}/${m.stock.cap}`;
+    if(st === "backlog"){
+      return `<span class="stock-corner backlog" data-tip-title="目标存量 · ${esc(m.stock.name)}"
+        data-tip-sub="${ratio}" data-tip-note="超过目标存量，已停机" data-tip-kind="backlog"
+        >${ratio}</span>`;
+    }
+    return `<span class="stock-corner shortage" data-tip-title="目标存量 · ${esc(m.stock.name)}"
+      data-tip-sub="${ratio}" data-tip-note="低于下限 ${m.stock.low}，缺料中" data-tip-kind="shortage"
+      >${ratio}</span>`;
+  }
+
+  function progressHTML(m){
+    if(m.progress === null || m.progress === undefined){
+      return `<span class="na">进度不可用</span>`;
+    }
+    return `<div class="bar"><div class="fill" style="width:${m.progress}%"></div></div><span class="pct">${m.progress}%</span>`;
+  }
+
+  function portRow(it, cls){
+    const qty = it.max ? `${it.cur}/${it.max}` : `${it.cur}`;
+    return `<div class="port-row ${cls||""}" data-tip-title="${esc(it.name)}" data-tip-sub="${qty}"
+      ><span class="pi">${it.icon}</span><span class="pn">${esc(it.name)}</span><span class="pq">${qty}</span></div>`;
+  }
+
+  function portsHTML(m){
+    const group = (title, items, cls) => items.length ? `
+      <div class="port-group">
+        <div class="port-title">${title}</div>
+        ${items.map(it => portRow(it, cls)).join("")}
+      </div>` : "";
+    return group("输入", m.inputs) + group("催化", m.catalysts, "cat") + group("输出", m.outputs);
+  }
+
+  function nodeHTML(m){
+    const p = LAYOUT[m.id];
+    const expanded = state.expanded === m.id;
+    const sel = state.selected === m.id;
+    const st = stockState(m);
+    const badge = badgeHTML(m);
+    const stockLine = expanded ? `
+      <div class="node-stock">
+        <span class="k">目标存量</span>
+        <span>${m.stock.icon} ${esc(m.stock.name)}</span>
+        <span class="v">${m.stock.cur} / ${m.stock.cap}</span>
+      </div>` : "";
+
+    return `
+      <div class="node ${m.status}${sel?" selected":""}${expanded?" expanded":""}" data-id="${m.id}"
+           style="left:${p.x}px;top:${p.y}px">
+        <div class="node-head">
+          <span class="node-icon">${m.icon}</span>
+          <span class="node-name">${esc(m.name)}</span>
+          <span class="node-facing" title="朝向：${esc(m.facing)}">${m.arrow}</span>
+        </div>
+        <div class="node-summary">
+          <span class="pchip">入 <b>${m.inputs.length}</b></span>
+          <span class="pchip">催 <b>${m.catalysts.length}</b></span>
+          <span class="pchip">出 <b>${m.outputs.length}</b></span>
+        </div>
+        <div class="node-ports">${expanded ? portsHTML(m) : ""}</div>
+        <div class="node-foot">
+          <div class="node-progress-row">
+            <div class="progress">${progressHTML(m)}</div>
+            ${badge}
+          </div>
+          ${stockLine}
+        </div>
+      </div>`;
+  }
+
+  function renderNodes(){
+    $("#nodes").innerHTML = Object.values(MACHINES).map(nodeHTML).join("");
+  }
+
+  /* ================= render: table ================= */
+
+  function listText(items){
+    return items.map(i => `${i.icon} ${i.name} ${i.cur}/${i.max}`).join(" · ");
+  }
+  function listEdit(items){
+    return items.map(i => `${i.name} ${i.cur}/${i.max}`).join(" · ");
+  }
+
+  function renderTable(){
+    const tbody = $("#tableBody");
+    tbody.innerHTML = Object.values(MACHINES).map(m => {
+      return `
+        <tr data-id="${m.id}" class="${state.selected===m.id?"selected":""}">
+          <td><div class="mcell"><span class="mi">${m.icon}</span>${esc(m.name)}</div></td>
+          <td class="editable" data-id="${m.id}" data-field="inputs">
+            <span class="cell-label">${esc(listText(m.inputs))}</span></td>
+          <td class="editable" data-id="${m.id}" data-field="outputs">
+            <span class="cell-label">${esc(listText(m.outputs))}</span></td>
+          <td><span class="pill ${m.status}">${STATUS_TEXT[m.status]}</span></td>
+          <td class="num">${m.throughput}</td>
+        </tr>`;
+    }).join("");
+
+    $$(".editable", tbody).forEach(td => {
+      td.addEventListener("click", e => {
+        if(td.classList.contains("editing")) return;
+        e.stopPropagation();
+        beginEdit(td);
+      });
+    });
+    $$("tr", tbody).forEach(tr => {
+      tr.addEventListener("click", () => {
+        state.selected = state.selected === tr.dataset.id ? null : tr.dataset.id;
+        renderAll();
+      });
+    });
+
+    $("#tableFootLeft").textContent = `${Object.keys(MACHINES).length} 台机器 · ${EDGES.length} 条连接`;
+    renderTableSummary();
+  }
+
+  function renderTableSummary(){
+    const list = Object.values(MACHINES);
+    const total = list.reduce((a,m) => a + (parseFloat(m.throughput) || 0), 0);
+    const backlog = list.filter(m => stockState(m)==="backlog").length;
+    const shortage = list.filter(m => stockState(m)==="shortage").length;
+    const run = list.filter(m => m.status==="running").length;
+    const starve = list.filter(m => m.status==="starving").length;
+    const stop = list.filter(m => m.status==="stopped").length;
+    const off = list.filter(m => m.status==="offline").length;
+    document.getElementById("tableSummary").innerHTML = `
+      <div><span class="k">总吞吐</span><span class="v">${total.toFixed(1)}/s</span></div>
+      <div><span class="k">运行</span><span class="v c-cyan">${run}</span></div>
+      <div><span class="k">缺料</span><span class="v c-amber">${starve}</span></div>
+      <div><span class="k">停机</span><span class="v c-red">${stop}</span></div>
+      <div><span class="k">离线</span><span class="v">${off}</span></div>
+      <div><span class="k">积压/缺料</span><span class="v">${backlog} / ${shortage}</span></div>`;
+  }
+
+  function beginEdit(td){
+    const id = td.dataset.id;
+    const field = td.dataset.field;
+    const m = MACHINES[id];
+    const text = field === "inputs" ? listEdit(m.inputs) : listEdit(m.outputs);
+    const icon = field === "inputs" ? (m.inputs[0]?.icon || "") : (m.outputs[0]?.icon || "");
+
+    td.classList.add("editing");
+    td.innerHTML = `<span class="edit-ico">${icon}</span><input class="cell-input" value="${esc(text)}">`;
+    const input = td.querySelector(".cell-input");
+    input.focus();
+    input.setSelectionRange(0, input.value.length);
+
+    let finished = false;
+    const finish = save => {
+      if(finished) return;
+      finished = true;
+      td.classList.remove("editing");
+      if(save) applyEdit(id, field, input.value.trim());
+      renderAll();
+    };
+    input.addEventListener("mousedown", e => e.stopPropagation());
+    input.addEventListener("click", e => e.stopPropagation());
+    input.addEventListener("keydown", e => {
+      if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); finish(true); }
+      else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    input.addEventListener("blur", () => finish(true));
+  }
+
+  function applyEdit(id, field, text){
+    const m = MACHINES[id];
+    const parts = text.split(/[·,]/).map(s => s.trim()).filter(Boolean);
+    const parsed = parts.map(p => {
+      const mm = p.match(/^(.+?)\s+(\d+)(?:\s*\/\s*(\d+))?$/);
+      if(!mm) return { name:p, icon:iconFor(p), cur:0, max:0 };
+      const name = mm[1].trim();
+      return { name, icon:iconFor(name), cur:+mm[2], max:mm[3] ? +mm[3] : 0 };
+    });
+    if(field === "inputs") m.inputs = parsed;
+    else m.outputs = parsed;
+    toast(`${m.name} 已更新`);
+  }
+
+  /* ================= render: detail / status / storage ================= */
+
+  function renderDetail(){
+    const el = $("#detail");
+    if(!state.selected){
+      el.classList.remove("show");
+      el.innerHTML = "";
+      return;
+    }
+    const m = MACHINES[state.selected];
+    if(!m){ el.classList.remove("show"); return; }
+    const st = stockState(m);
+    const stText = st === "backlog" ? "积压" : st === "shortage" ? "缺料" : "正常";
+    el.innerHTML = `
+      <div class="detail-title"><span>${m.icon}</span>${esc(m.name)}</div>
+      <div class="row"><span class="k">状态</span><span class="v"><span class="pill ${m.status}">${STATUS_TEXT[m.status]}</span></span></div>
+      <div class="row"><span class="k">朝向</span><span class="v">${esc(m.facing)} ${m.arrow}</span></div>
+      <div class="row"><span class="k">输入面</span><span class="v">${esc(m.inputFace)}</span></div>
+      <div class="row"><span class="k">端口</span><span class="v">入 ${m.inputs.length} · 催 ${m.catalysts.length} · 出 ${m.outputs.length}</span></div>
+      <div class="row"><span class="k">目标存量</span><span class="v">${m.stock.name} ${m.stock.cur}/${m.stock.cap} · ${stText}</span></div>
+      <div class="row"><span class="k">进度</span><span class="v">${m.progress === null ? "—" : m.progress + "%"}</span></div>
+    `;
+    el.classList.add("show");
+  }
+
+  function renderStatusBar(){
+    const list = Object.values(MACHINES);
+    const backlog = list.filter(m => stockState(m)==="backlog").length;
+    const shortage = list.filter(m => stockState(m)==="shortage").length;
+    $("#statusLeft").innerHTML = `
+      <span><i class="dot backlog"></i>${backlog} 台积压</span>
+      <span><i class="dot shortage"></i>${shortage} 台缺料</span>`;
+    const sel = state.selected && MACHINES[state.selected] ? MACHINES[state.selected].name : null;
+    $("#statusRight").textContent = `${list.length} 台机器 · ${EDGES.length} 条连接` + (sel ? ` · 选中：${sel}` : " · 未选中");
+    $("#canvasHud").textContent = `产线 1 · ${list.length} 节点 · ${EDGES.length} 连接 · 拖拽卡片移动`;
+  }
+
+  function renderMachineBar(){
+    const q = $("#machineSearch").value.trim();
+    const match = m => !q || m.name.includes(q);
+    const itemHTML = m => `
+      <div class="machine-item${m.id && state.selected===m.id ? " selected":""}" data-id="${m.id || ""}">
+        <span class="mi">${m.icon}</span>
+        <span class="nm">${esc(m.name)}</span>
+        <span class="dot ${m.status || ""}"></span>
+      </div>`;
+    $("#groupConnected").innerHTML = CONNECTED.filter(match).map(itemHTML).join("");
+    $("#groupUnassigned").innerHTML = UNASSIGNED.filter(match).map(itemHTML).join("");
+
+    $$(".machine-item").forEach(el => {
+      el.addEventListener("click", () => {
+        const id = el.dataset.id;
+        if(id && MACHINES[id]){
+          state.selected = state.selected === id ? null : id;
+          renderAll();
+        } else {
+          toast(`${el.querySelector(".nm").textContent}：未加入当前产线`);
+        }
+      });
+    });
+  }
+
+  function renderStorage(){
+    const q = state.search.trim();
+    const src = state.storageTab === "me" ? ME_ITEMS : ALL_ITEMS;
+    const items = q ? src.filter(i => i.name.includes(q)) : src;
+    const grid = $("#itemGrid");
+    const foot = $("#storageFoot");
+    if(foot){
+      foot.innerHTML = state.storageTab === "me"
+        ? `<span>${items.length} / 12 种物品</span><span>容量 1,024 / 8,192</span>`
+        : `<span>${items.length} / 30 个已注册物品</span><span>JEI 全量</span>`;
+    }
+    if(!items.length){
+      grid.innerHTML = `<div class="empty-hint">没有匹配的物品</div>`;
+      return;
+    }
+    grid.innerHTML = items.map(i => `
+      <div class="item" title="${esc(i.name)}">
+        <span>${i.icon}</span>
+        ${state.storageTab === "me" ? `<span class="n">${i.n}</span>` : ""}
+      </div>`).join("");
+  }
+
+  function renderBackpack(){
+    $("#starRow").innerHTML = STARRED.map(s => `
+      <div class="slot" title="${esc(s.name)}"><span>${s.icon}</span><span class="cnt">${s.n}</span></div>
+    `).join("");
+    $("#hotbar").innerHTML = HOTBAR.map(s => s
+      ? `<div class="slot" title="${esc(s.name)}"><span>${s.icon}</span></div>`
+      : `<div class="slot empty"></div>`
+    ).join("");
+  }
+
+  function renderAll(){
+    $("#viewGraph").classList.toggle("hidden", state.view !== "graph");
+    $("#viewTable").classList.toggle("hidden", state.view !== "table");
+    $$("#viewSeg button").forEach(b => b.classList.toggle("active", b.dataset.view === state.view));
+    $$("#storageTabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === state.storageTab));
+
+    renderNodes();
+    renderEdges();
+    renderTable();
+    renderDetail();
+    renderMachineBar();
+    renderStatusBar();
+    bindNodeHover();
+  }
+
+  /* ================= expand / select ================= */
+
+  function toggleExpand(id){
+    if(state.expanded === id){
+      state.expanded = null;
+      state.selected = id;
+    } else {
+      state.expanded = id;
+      state.selected = id;
+    }
+    renderAll();
+  }
+
+  /* ================= drag ================= */
+
+  let drag = null;
+
+  function onPointerDown(e){
+    const card = e.target.closest(".node");
+    if(!card || e.button !== 0) return;
+    if(e.target.closest(".port-row")) return;
+
+    const id = card.dataset.id;
+    const p = LAYOUT[id];
+    drag = {
+      id, card,
+      startX:e.clientX, startY:e.clientY,
+      origX:p.x, origY:p.y,
+      moved:false
+    };
+    card.classList.add("dragging");
+    e.preventDefault();
+  }
+
+  function onPointerMove(e){
+    if(!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if(!drag.moved && Math.hypot(dx, dy) < 4) return;
+    drag.moved = true;
+
+    const h = state.expanded === drag.id ? CARD_H_EXP : CARD_H;
+    const nx = clamp(snap(drag.origX + dx), 0, WORK_W - CARD_W);
+    const ny = clamp(snap(drag.origY + dy), 0, WORK_H - h);
+
+    LAYOUT[drag.id].x = nx;
+    LAYOUT[drag.id].y = ny;
+    drag.card.style.left = nx + "px";
+    drag.card.style.top = ny + "px";
+    renderEdges();
+  }
+
+  function onPointerUp(){
+    if(!drag) return;
+    const { id, card, moved } = drag;
+    drag = null;
+    card.classList.remove("dragging");
+    if(moved){
+      renderAll();
+      toast(`${MACHINES[id].name} 已移动`);
+    } else {
+      toggleExpand(id);
+    }
+  }
+
+  /* ================= context menu ================= */
+
+  function openMenu(id, x, y){
+    state.menuId = id;
+    state.selected = id;
+    renderNodes();
+    bindNodeHover();
+    const m = MACHINES[id];
+    const menu = $("#ctxMenu");
+    menu.innerHTML = `
+      <div class="ctx-title">${m.icon} ${esc(m.name)}</div>
+      <div class="ctx-item" data-act="toggle"><span>${state.expanded===id?"折叠卡片":"展开卡片"}</span><span>↕</span></div>
+      <div class="ctx-item" data-act="open"><span>打开机器</span><span>↗</span></div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item danger" data-act="remove"><span>移除</span><span>⌫</span></div>`;
+    menu.classList.add("show");
+    menu.style.left = Math.min(x, innerWidth - 160) + "px";
+    menu.style.top = Math.min(y, innerHeight - 130) + "px";
+  }
+
+  function closeMenu(){
+    $("#ctxMenu").classList.remove("show");
+    state.menuId = null;
+  }
+
+  function removeMachine(id){
+    delete MACHINES[id];
+    delete LAYOUT[id];
+    for(let i=EDGES.length-1;i>=0;i--){
+      if(EDGES[i].from === id || EDGES[i].to === id) EDGES.splice(i, 1);
+    }
+    let idx = CONNECTED.findIndex(m => m.id === id);
+    if(idx >= 0) CONNECTED.splice(idx, 1);
+    idx = UNASSIGNED.findIndex(m => m.id === id);
+    if(idx >= 0) UNASSIGNED.splice(idx, 1);
+    if(state.selected === id) state.selected = null;
+    if(state.expanded === id) state.expanded = null;
+    renderAll();
+    toast(`${id} 已移除（刷新页面恢复）`);
+  }
+
+  /* ================= tooltip ================= */
+
+  let tipEl = null;
+
+  function bindNodeHover(){
+    $$("#nodes [data-tip-title]").forEach(el => {
+      el.addEventListener("mouseenter", e => showTip(el, e));
+      el.addEventListener("mousemove", moveTip);
+      el.addEventListener("mouseleave", hideTip);
+    });
+  }
+
+  function showTip(el, e){
+    const tip = $("#tooltip");
+    const note = el.dataset.tipNote;
+    const kind = el.dataset.tipKind || "";
+    tip.innerHTML = `
+      <div class="tt-title">${esc(el.dataset.tipTitle)}</div>
+      <div class="tt-sub">${esc(el.dataset.tipSub || "")}</div>
+      ${note ? `<div class="tt-note ${kind}">${esc(note)}</div>` : ""}`;
+    tip.classList.add("show");
+    tipEl = tip;
+    const r = el.getBoundingClientRect();
+    const pos = (e && (e.clientX || e.clientY))
+      ? e
+      : { clientX:r.right - 8, clientY:r.bottom - 4 };
+    moveTip(pos);
+  }
+
+  function moveTip(e){
+    if(!tipEl) return;
+    const pad = 12;
+    const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if(x + w > innerWidth - 8) x = e.clientX - w - 14;
+    if(y + h > innerHeight - 8) y = e.clientY - h - 14;
+    tipEl.style.left = x + "px";
+    tipEl.style.top = y + "px";
+  }
+
+  function hideTip(){
+    $("#tooltip").classList.remove("show");
+    tipEl = null;
+  }
+
+  /* ================= events ================= */
+
+  $("#viewSeg").addEventListener("click", e => {
+    const btn = e.target.closest("button[data-view]");
+    if(!btn) return;
+    state.view = btn.dataset.view;
+    renderAll();
+  });
+
+  $("#storageTabs").addEventListener("click", e => {
+    const btn = e.target.closest("button[data-tab]");
+    if(!btn) return;
+    state.storageTab = btn.dataset.tab;
+    $$("#storageTabs button").forEach(b => b.classList.toggle("active", b === btn));
+    renderStorage();
+  });
+
+  $("#itemSearch").addEventListener("input", e => {
+    state.search = e.target.value;
+    renderStorage();
+  });
+
+  $("#machineSearch").addEventListener("input", renderMachineBar);
+
+  $("#qesSlot").addEventListener("click", () => toast("绑定槽：需要放入量子纠缠奇点"));
+  $("#settingsBtn").addEventListener("click", () => toast("设置面板：原型未实现"));
+  $("#closeBtn").addEventListener("click", () => toast("关闭界面：原型不关闭窗口"));
+  $("#lineSelect").addEventListener("change", e => toast(`已切换到 ${e.target.value}`));
+
+  $("#nodes").addEventListener("pointerdown", onPointerDown);
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerUp);
+
+  // 画布空白处取消选中（只在图视图生效）
+  $("#work").addEventListener("pointerdown", e => {
+    if(state.view !== "graph") return;
+    if(e.target.closest(".node")) return;
+    closeMenu();
+    if(state.selected || state.expanded){
+      state.selected = null;
+      state.expanded = null;
+      renderAll();
+    }
+  });
+
+  // 右键菜单
+  $("#nodes").addEventListener("contextmenu", e => {
+    const card = e.target.closest(".node");
+    if(!card) return;
+    e.preventDefault();
+    openMenu(card.dataset.id, e.clientX, e.clientY);
+  });
+
+  $("#ctxMenu").addEventListener("pointerdown", e => {
+    const item = e.target.closest(".ctx-item");
+    if(!item) return;
+    e.stopPropagation();
+    const id = state.menuId;
+    const act = item.dataset.act;
+    closeMenu();
+    if(act === "toggle") toggleExpand(id);
+    else if(act === "open") toast(`打开 ${MACHINES[id].name} 的原生 GUI（原型占位）`);
+    else if(act === "remove") removeMachine(id);
+  });
+
+  document.addEventListener("pointerdown", e => {
+    if(!e.target.closest("#ctxMenu")) closeMenu();
+  });
+
+  // 键盘
+  document.addEventListener("keydown", e => {
+    if(e.target instanceof Element && e.target.matches("input,textarea,select")) return;
+    if(e.key === "Escape"){
+      if($("#ctxMenu").classList.contains("show")){ closeMenu(); return; }
+      if(state.selected || state.expanded){
+        state.selected = null;
+        state.expanded = null;
+        renderAll();
+      }
+      return;
+    }
+    if(e.key === "f" || e.key === "F"){
+      state.view = state.view === "graph" ? "table" : "graph";
+      renderAll();
+    }
+  });
+
+  /* ================= boot ================= */
+
+  renderAll();
+  renderStorage();
+  renderBackpack();
+
+})();
+</script>
+</body>
+</html>

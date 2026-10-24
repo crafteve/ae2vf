@@ -34,6 +34,13 @@ repositories {
             includeGroup("org.appliedenergistics")
         }
     }
+    maven {
+        name = "Jared maven"
+        url = uri("https://maven.blamejared.com")
+        content {
+            includeGroup("mezz.jei")
+        }
+    }
 }
 
 base {
@@ -124,6 +131,10 @@ configurations {
 dependencies {
     // Applied Energistics 2（1.21.1 线）
     implementation("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+
+    // JEI：可选依赖，编译期 + 开发运行期
+    compileOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
+    runtimeOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
