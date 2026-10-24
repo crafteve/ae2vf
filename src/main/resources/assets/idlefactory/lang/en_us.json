@@ -7,5 +7,8 @@
   "idlefactory.configuration.magicNumberIntroduction": "Magic Number Text",
   "idlefactory.configuration.magicNumber": "Magic Number",
   "item.idlefactory.terminal": "Idle Factory Terminal",
-  "itemGroup.idlefactory": "Idle Factory"
+  "itemGroup.idlefactory": "Idle Factory",
+  "message.idlefactory.singularity_equipped": "Singularity equipped",
+  "message.idlefactory.singularity_unequipped": "Singularity removed",
+  "message.idlefactory.singularity_dropped": "Inventory full, singularity dropped"
 }

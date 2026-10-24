@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.network;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.network.payload.UnequipSingularityC2S;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -14,12 +15,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>M0 只注册一个空的 {@link PingPayload}（S2C）来验证「通道能注册、能编解码」，
- * 真正的库存快照等负载在 M1 再加。</p>
+ * <p>M1 目前注册两个负载：占位 {@link PingPayload}（S2C，验证通道）与卸下奇点
+ * {@link UnequipSingularityC2S}（C2S）。库存快照随后接入。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "1";
+    public static final String PROTOCOL_VERSION = "2";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -44,14 +45,21 @@ public final class ModNetwork {
 
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         registrar = event.registrar(PROTOCOL_VERSION);
+
+        // M0：通道占位
         registrar.playToClient(PingPayload.TYPE, PingPayload.STREAM_CODEC, PingPayload::handle);
+
+        // M1：客户端 → 服务端的卸下请求
+        registrar.playToServer(UnequipSingularityC2S.TYPE, UnequipSingularityC2S.STREAM_CODEC,
+                UnequipSingularityC2S::handle);
+
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }
 
     /**
      * 占位负载：没有字段，编码后只带一个包 id。
      *
-     * <p>放在 {@code ModNetwork} 内部是因为 M0 只有一个包，等 M1 有真实负载时再拆成独立文件。</p>
+     * <p>留着它做通道自检；真正的业务负载在 {@code network.payload} 包里。</p>
      */
     public record PingPayload() implements CustomPacketPayload {
         /** 包类型 id：{@code idlefactory:ping}。 */
@@ -68,7 +76,7 @@ public final class ModNetwork {
         }
 
         /**
-         * 客户端处理器。M0 不做任何事，只证明包能被收下。
+         * 客户端处理器。不做任何事，只证明包能被收下。
          *
          * @param payload 负载
          * @param context 处理上下文

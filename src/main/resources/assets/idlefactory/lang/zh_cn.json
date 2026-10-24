@@ -1,4 +1,7 @@
 {
   "item.idlefactory.terminal": "放置工厂终端",
-  "itemGroup.idlefactory": "闲置工厂"
+  "itemGroup.idlefactory": "闲置工厂",
+  "message.idlefactory.singularity_equipped": "奇点已装备",
+  "message.idlefactory.singularity_unequipped": "奇点已卸下",
+  "message.idlefactory.singularity_dropped": "背包已满，奇点已掉落"
 }
