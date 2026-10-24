@@ -5,5 +5,7 @@
   "idlefactory.configuration.items": "Item List",
   "idlefactory.configuration.logDirtBlock": "Log Dirt Block",
   "idlefactory.configuration.magicNumberIntroduction": "Magic Number Text",
-  "idlefactory.configuration.magicNumber": "Magic Number"
+  "idlefactory.configuration.magicNumber": "Magic Number",
+  "item.idlefactory.terminal": "Idle Factory Terminal",
+  "itemGroup.idlefactory": "Idle Factory"
 }
