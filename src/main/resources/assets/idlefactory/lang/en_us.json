@@ -8,6 +8,13 @@
   "idlefactory.configuration.magicNumber": "Magic Number",
   "item.idlefactory.terminal": "Idle Factory Terminal",
   "itemGroup.idlefactory": "Idle Factory",
+  "screen.idlefactory.storage": "Storage",
+  "screen.idlefactory.status.equipped": "Singularity: Equipped",
+  "screen.idlefactory.status.not_equipped": "Singularity: Not equipped",
+  "screen.idlefactory.status.no_network": "Singularity: Network lost",
+  "screen.idlefactory.empty.not_equipped": "No singularity equipped",
+  "screen.idlefactory.empty.no_network": "No network bound",
+  "screen.idlefactory.empty.no_stock": "No storage",
   "message.idlefactory.singularity_equipped": "Singularity equipped",
   "message.idlefactory.singularity_unequipped": "Singularity removed",
   "message.idlefactory.singularity_dropped": "Inventory full, singularity dropped"
