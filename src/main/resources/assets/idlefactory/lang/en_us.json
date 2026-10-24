@@ -1,0 +1,9 @@
+{
+  "idlefactory.configuration.title": "Idle Factory Configs",
+  "idlefactory.configuration.section.idlefactory.common.toml": "Idle Factory Configs",
+  "idlefactory.configuration.section.idlefactory.common.toml.title": "Idle Factory Configs",
+  "idlefactory.configuration.items": "Item List",
+  "idlefactory.configuration.logDirtBlock": "Log Dirt Block",
+  "idlefactory.configuration.magicNumberIntroduction": "Magic Number Text",
+  "idlefactory.configuration.magicNumber": "Magic Number"
+}
