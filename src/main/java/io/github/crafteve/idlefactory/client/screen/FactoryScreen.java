@@ -36,6 +36,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.util.Mth;
 
+import org.lwjgl.glfw.GLFW;
+
 /**
  * 工厂工作台界面。
  *
@@ -103,6 +105,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
     /** 当前滚动行（{@link IScrollSource}）。 */
     private int scrollRow;
     private boolean draggingScrollbar;
+    /** 拖动滑块时的抓取偏移（鼠标 y - 滑块顶部），避免按下时滑块跳到鼠标中心。 */
+    private double scrollGrabOffset;
 
     /** 上一次过滤用的搜索词。 */
     private String lastQuery = "";
@@ -323,15 +327,27 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // 搜索框有焦点时吞掉所有按键（ESC 除外），否则输入 e 会触发原版「关闭容器」
-        if (this.searchBox != null && this.searchBox.isFocused() && keyCode != 256) {
-            if (keyCode == 257) {
+        // 搜索框有焦点时：ESC 先退出焦点（不关界面），再按一次才交给父类关闭
+        if (this.searchBox != null && this.searchBox.isFocused()) {
+            if (keyCode == 256 || keyCode == 257) {
                 this.searchBox.setFocused(false);
                 return true;
             }
+            // 其余按键全部吞掉，避免输入 e 触发原版「关闭容器」
             this.searchBox.keyPressed(keyCode, scanCode, modifiers);
             return true;
         }
+
+        // 焦点不在搜索框：PageUp / PageDown 按当前可见行数翻页
+        if (keyCode == GLFW.GLFW_KEY_PAGE_UP) {
+            scrollByPage(-1);
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_PAGE_DOWN) {
+            scrollByPage(1);
+            return true;
+        }
+
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -340,7 +356,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
         if (this.searchBox != null && !this.searchBox.isMouseOver(mouseX, mouseY)) {
             this.searchBox.setFocused(false);
         }
-        if (button == 0 && beginScrollbarDrag(mouseX, mouseY)) {
+        if (button == 0 && handleScrollbarClick(mouseX, mouseY)) {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -501,7 +517,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
     private void renderScrollbar(GuiGraphics guiGraphics) {
         int trackX = scrollbarX();
         int trackY = gridTop();
-        int trackHeight = gridRows() * ItemGrid.CELL_SIZE;
+        int trackHeight = trackHeight();
         guiGraphics.fill(trackX, trackY, trackX + SCROLLBAR_WIDTH, trackY + trackHeight, this.theme.slotBorderDark());
 
         int maxScroll = maxScrollRow();
@@ -509,11 +525,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
             return;
         }
 
-        int thumbHeight = thumbHeight(trackHeight, maxScroll);
-        int travel = trackHeight - thumbHeight;
-        int thumbY = trackY + travel * this.scrollRow / maxScroll;
+        int thumbHeight = thumbHeight();
+        int thumbTop = thumbY();
         boolean active = this.draggingScrollbar || isOverScrollbar(this.mouseX, this.mouseY);
-        guiGraphics.fill(trackX, thumbY, trackX + SCROLLBAR_WIDTH, thumbY + thumbHeight,
+        guiGraphics.fill(trackX, thumbTop, trackX + SCROLLBAR_WIDTH, thumbTop + thumbHeight,
                 active ? this.theme.accent() : this.theme.textDim());
     }
 
@@ -529,21 +544,50 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
         int x = scrollbarX();
         int y = gridTop();
         return mouseX >= x - 2 && mouseX < x + SCROLLBAR_WIDTH + 2
-                && mouseY >= y && mouseY < y + gridRows() * ItemGrid.CELL_SIZE;
+                && mouseY >= y && mouseY < y + trackHeight();
     }
 
     private boolean isOverStorageGridArea(double mouseX, double mouseY) {
         return mouseX >= gridX() && mouseX < gridX() + gridWidth()
-                && mouseY >= gridTop() && mouseY < gridTop() + gridRows() * ItemGrid.CELL_SIZE;
+                && mouseY >= gridTop() && mouseY < gridTop() + trackHeight();
     }
 
-    private boolean beginScrollbarDrag(double mouseX, double mouseY) {
-        if (!isOverScrollbar(mouseX, mouseY) || maxScrollRow() <= 0) {
+    /**
+     * 滚动条点击：按在滑块上开始拖拽；按在轨道空白处则向点击方向翻一页（翻页量 = 可见行数）。
+     */
+    private boolean handleScrollbarClick(double mouseX, double mouseY) {
+        if (!isOverScrollbar(mouseX, mouseY)) {
             return false;
         }
-        this.draggingScrollbar = true;
-        scrollToMouse(mouseY);
+
+        int maxScroll = maxScrollRow();
+        if (maxScroll <= 0) {
+            return true;
+        }
+
+        int thumbTop = thumbY();
+        int thumbHeight = thumbHeight();
+        if (mouseY >= thumbTop && mouseY < thumbTop + thumbHeight) {
+            this.draggingScrollbar = true;
+            this.scrollGrabOffset = mouseY - thumbTop;
+            return true;
+        }
+
+        int page = Math.max(1, gridRows());
+        int direction = mouseY < thumbTop ? -1 : 1;
+        this.scrollRow = Mth.clamp(this.scrollRow + direction * page, 0, maxScroll);
+        this.repo.updateView();
         return true;
+    }
+
+    private void scrollByPage(int direction) {
+        int maxScroll = maxScrollRow();
+        if (maxScroll <= 0) {
+            return;
+        }
+        int page = Math.max(1, gridRows());
+        this.scrollRow = Mth.clamp(this.scrollRow + direction * page, 0, maxScroll);
+        this.repo.updateView();
     }
 
     private void scrollToMouse(double mouseY) {
@@ -552,21 +596,39 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
             this.scrollRow = 0;
             return;
         }
-        int trackHeight = gridRows() * ItemGrid.CELL_SIZE;
-        int thumbHeight = thumbHeight(trackHeight, maxScroll);
-        int travel = trackHeight - thumbHeight;
+        int thumbHeight = thumbHeight();
+        int travel = trackHeight() - thumbHeight;
         if (travel <= 0) {
             this.scrollRow = 0;
             return;
         }
-        double ratio = (mouseY - gridTop() - thumbHeight / 2.0) / travel;
+        // 保持按下时鼠标相对滑块的位置，滑块不会跳到鼠标中心
+        double desiredThumbY = mouseY - this.scrollGrabOffset;
+        double ratio = (desiredThumbY - gridTop()) / travel;
         this.scrollRow = Mth.clamp((int) Math.round(ratio * maxScroll), 0, maxScroll);
         this.repo.updateView();
     }
 
-    private int thumbHeight(int trackHeight, int maxScroll) {
+    private int trackHeight() {
+        return gridRows() * ItemGrid.CELL_SIZE;
+    }
+
+    private int thumbHeight() {
+        int maxScroll = maxScrollRow();
+        if (maxScroll <= 0) {
+            return trackHeight();
+        }
         int usedRows = maxScroll + gridRows();
-        return Math.max(12, trackHeight * gridRows() / usedRows);
+        return Math.max(12, trackHeight() * gridRows() / usedRows);
+    }
+
+    private int thumbY() {
+        int maxScroll = maxScrollRow();
+        int travel = trackHeight() - thumbHeight();
+        if (maxScroll <= 0 || travel <= 0) {
+            return gridTop();
+        }
+        return gridTop() + travel * this.scrollRow / maxScroll;
     }
 
     private int maxScrollRow() {
