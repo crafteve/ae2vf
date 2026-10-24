@@ -42,7 +42,8 @@ import net.minecraft.util.Mth;
  * <p>面板尺寸不写死，按当前 GUI 逻辑尺寸自适应：占满可用区域，四周只留 {@link #MARGIN} 的边距。
  * 这样 GUI scale 调大（逻辑尺寸变小）时不会溢出，调小（逻辑尺寸变大）时也不会缩成一小块。</p>
  *
- * <p>右侧是 176px 宽的 AE2 终端风格存储栏：搜索框、奇点/网络状态、9 列物品网格、底部玩家背包。
+ * <p>右侧是 176px 宽的 AE2 终端风格存储栏：搜索框、9 列物品网格、底部玩家背包。
+ * 奇点/网络状态显示在顶部标题栏。
  * 存储网格直接用 AE2 的 {@link Repo} + {@link RepoSlot}（客户端只读虚拟槽位），
  * 所以 tooltip、JEI R/U、数量/耐久装饰都由原版/ AE2 逻辑免费提供；背包是真实 {@link Slot}。</p>
  *
@@ -50,7 +51,7 @@ import net.minecraft.util.Mth;
  */
 public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implements IScrollSource, ISortSource {
     /** 面板四周留白（GUI 逻辑像素）。 */
-    private static final int MARGIN = 8;
+    private static final int MARGIN = 4;
     /** 最小面板宽度，防止极端小窗口下面板消失。 */
     private static final int MIN_WIDTH = 320;
     /** 最小面板高度。 */
@@ -66,17 +67,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
     /** 右侧存储栏宽度。 */
     private static final int STORAGE_WIDTH = 176;
     /** 存储栏与面板右/下边缘的距离。 */
-    private static final int STORAGE_MARGIN = 12;
+    private static final int STORAGE_MARGIN = 8;
     /** 存储栏左内边距（网格 + 滚动条整体居中后的左侧留白）。 */
     private static final int STORAGE_INSET = 4;
     /** 搜索框距存储栏顶部的距离。 */
     private static final int SEARCH_TOP = 8;
     /** 搜索框高度。 */
     private static final int SEARCH_HEIGHT = 14;
-    /** 状态文字距存储栏顶部的距离。 */
-    private static final int STATUS_TOP = 26;
-    /** 网格距存储栏顶部的距离。 */
-    private static final int GRID_TOP = 38;
+    /** 网格距存储栏顶部的距离（奇点状态已移到标题栏，搜索框下面直接是网格）。 */
+    private static final int GRID_TOP = 28;
     /** 背包距存储栏底部的距离。 */
     private static final int INVENTORY_BOTTOM_PADDING = 9;
     /** 主背包与快捷栏之间、网格与背包之间的间距。 */
@@ -262,7 +261,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
         guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, this.theme.accent());
 
         renderStoragePanel(guiGraphics);
-        renderStorageHeader(guiGraphics);
         renderScrollbar(guiGraphics);
     }
 
@@ -271,28 +269,32 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
         // 不调用父类：父类会画菜单标题和玩家物品栏标题，这版都用自定义布局。
         // 这里的坐标相对面板左上角。
         guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, this.theme.accent(), false);
+        // 奇点/网络状态放在标题栏右侧，把存储栏顶部整行让给搜索框和网格
+        guiGraphics.drawString(this.font, statusText(), TITLE_X + 90, TITLE_Y + 1, statusColor(), false);
     }
 
     /**
-     * 完全接管槽位绘制：主题色内凹格子背景，然后交给父类画物品、数量、耐久等装饰。
+     * 完全接管槽位绘制：主题色内凹格子背景，然后画物品。
      *
-     * <p>{@link RepoSlot} 的 {@code getItem()} 只是数量为 1 的展示栈，库存数量需要自己补一行字。</p>
+     * <p>背包槽位交给父类（保留耐久条等原版装饰）；{@link RepoSlot} 的 {@code getItem()} 只是
+     * 数量为 1 的展示栈，不能交给父类（父类会按 count 再画一次数量），这里自己用
+     * {@code renderItemDecorations} 画库存数量，位置和背包数量完全一致。</p>
      */
     @Override
     protected void renderSlot(GuiGraphics guiGraphics, Slot slot) {
         boolean hovered = this.isHovering(slot.x, slot.y, 16, 16, this.mouseX, this.mouseY);
         ItemGrid.drawSlotBackground(guiGraphics, this.theme, slot.x - 1, slot.y - 1, hovered);
 
-        super.renderSlot(guiGraphics, slot);
-
         if (slot instanceof RepoSlot repoSlot) {
-            long amount = repoSlot.getStoredAmount();
-            if (amount > 0) {
-                String text = formatAmount(amount);
-                guiGraphics.drawString(this.font, text,
-                        slot.x + 17 - this.font.width(text), slot.y + 9,
-                        this.theme.textPrimary(), true);
+            ItemStack stack = repoSlot.getItem();
+            if (!stack.isEmpty()) {
+                guiGraphics.renderItem(stack, slot.x, slot.y);
+                long amount = repoSlot.getStoredAmount();
+                guiGraphics.renderItemDecorations(this.font, stack, slot.x, slot.y,
+                        amount > 0 ? formatAmount(amount) : null);
             }
+        } else {
+            super.renderSlot(guiGraphics, slot);
         }
     }
 
@@ -415,11 +417,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
     }
 
     private int storageY() {
-        return this.topPos + HEADER_HEIGHT + 10;
+        return this.topPos + HEADER_HEIGHT + 8;
     }
 
     private int storageHeight() {
-        return this.imageHeight - HEADER_HEIGHT - 10 - STORAGE_MARGIN;
+        return this.imageHeight - HEADER_HEIGHT - 8 - STORAGE_MARGIN;
     }
 
     private int gridX() {
@@ -494,10 +496,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implemen
         if (dividerY > gridTop()) {
             guiGraphics.fill(x + 1, dividerY, x + w - 1, dividerY + 1, this.theme.panelBorder());
         }
-    }
-
-    private void renderStorageHeader(GuiGraphics guiGraphics) {
-        guiGraphics.drawString(this.font, statusText(), gridX(), storageY() + STATUS_TOP, statusColor(), false);
     }
 
     private void renderScrollbar(GuiGraphics guiGraphics) {
