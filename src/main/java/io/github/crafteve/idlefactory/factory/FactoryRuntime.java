@@ -1,10 +1,17 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.factory.target.MachineChecks;
+import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -27,6 +34,8 @@ public final class FactoryRuntime {
     private static final int HEARTBEAT_INTERVAL = 100;
     /** 仓库状态刷新间隔（tick）：每秒重新解析一次，别让 online 变成启动时的快照。 */
     private static final int REFRESH_INTERVAL = 20;
+    /** 机器库对账间隔（tick）：每 5 秒清一次悬空引用。 */
+    private static final int RECONCILE_INTERVAL = 100;
 
     private static FactoryRuntime instance;
 
@@ -128,10 +137,48 @@ public final class FactoryRuntime {
                 factory.refreshStorage();
             }
         }
+        if (this.tickCounter % RECONCILE_INTERVAL == 0) {
+            for (Factory factory : this.manager.all()) {
+                reconcileMachines(factory);
+            }
+        }
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.debug("Idle Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
         }
+    }
+
+    /**
+     * 对账：把「方块已经不在了」的机器从机器库移除。
+     *
+     * <p>只对已加载区块判断——没加载不代表机器没了，删了会把玩家没到过的产线清空。
+     * 玩家破坏、爆炸、活塞、{@code /setblock} 造成的消失都能被这条兜底。</p>
+     *
+     * @param factory 工厂
+     */
+    private void reconcileMachines(Factory factory) {
+        List<UUID> stale = new ArrayList<>();
+        for (MachineTarget target : factory.machines().all()) {
+            ServerLevel level = this.server.getLevel(target.dimension());
+            if (level == null) {
+                stale.add(target.id());
+                continue;
+            }
+            if (!level.isLoaded(target.pos())) {
+                continue;
+            }
+            if (!MachineChecks.isSupported(level, target.pos())) {
+                stale.add(target.id());
+            }
+        }
+        if (stale.isEmpty()) {
+            return;
+        }
+        for (UUID id : stale) {
+            factory.machines().remove(id);
+        }
+        markDirty();
+        IdleFactory.LOGGER.info("Idle Factory: removed {} stale machine(s)", stale.size());
     }
 
     @SubscribeEvent

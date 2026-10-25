@@ -11,17 +11,25 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.target.MachineChecks;
+import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import appeng.api.ids.AEComponents;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 
 /**
- * 工厂行政窗口：创建 / 删除 / 绑定仓库 / 仓库调试。
+ * 工厂行政窗口：创建 / 删除 / 绑定仓库 / 机器库 / 仓库调试。
  *
  * <p>终端、指令、以后的 WebUI 都走这里。它负责权限（第一版只看 owner）和档案写入，
  * 不负责界面，也不负责搬运。</p>
@@ -29,6 +37,8 @@ import net.minecraft.world.item.ItemStack;
 public final class FactoryService {
     /** {@code storage info} 最多列出多少种物品。 */
     private static final int INFO_LIMIT = 30;
+    /** 准星操作的射线距离（格）。 */
+    private static final double REACH = 10.0D;
 
     private FactoryService() {
         // 纯静态工具类
@@ -91,10 +101,10 @@ public final class FactoryService {
     }
 
     /**
-     * 打印玩家自己的工厂摘要。
+     * 打印工厂摘要和机器库。
      *
      * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 有工厂，{@code 0} 没有）
+     * @return 命令结果
      */
     public static int info(ServerPlayer player) {
         Factory factory = ownedFactory(player);
@@ -104,11 +114,124 @@ public final class FactoryService {
         // 即时刷新一次，别让 online 停在 tick 定时器上一秒的状态
         factory.refreshStorage();
         msg(player, FactorySnapshotBuilder.describe(factory));
+
+        List<MachineTarget> machines = factory.machines().all();
+        if (machines.isEmpty()) {
+            msg(player, "机器库为空：准星对准机器执行 /idlefactory connect");
+            return 1;
+        }
+        msg(player, "机器库 " + machines.size() + " 台：");
+        for (MachineTarget target : machines) {
+            msg(player, "  [" + target.shortId() + "] " + target.dimension().location()
+                    + " " + target.pos().toShortString() + "  " + describeTarget(player, target));
+        }
         return 1;
     }
 
     // ------------------------------------------------------------------
-    // 绑定仓库
+    // 机器库
+    // ------------------------------------------------------------------
+
+    /**
+     * 把准星选中的机器接入玩家自己的工厂。
+     *
+     * <p>只接受「方块实体 + 至少提供 {@code IItemHandler} / {@code IFluidHandler}」的方块。
+     * id 由维度 + 坐标派生，重复接入会自然去重。</p>
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
+     */
+    public static int connectMachine(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        BlockPos pos = pickedBlock(player);
+        if (pos == null) {
+            msg(player, "没有对准方块（射线 " + (int) REACH + " 格）");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (blockEntity == null) {
+            msg(player, "这个方块没有方块实体");
+            return 0;
+        }
+        if (!MachineChecks.isSupported(level, pos)) {
+            msg(player, "这个方块没有可搬运的存储（需要 IItemHandler 或 IFluidHandler）");
+            return 0;
+        }
+        MachineTarget target = MachineTarget.of(level.dimension(), pos);
+        if (!factory.machines().add(target)) {
+            msg(player, "这台机器已经接入过了：" + target.shortId());
+            return 0;
+        }
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        msg(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
+                + " " + pos.toShortString() + " [" + MachineChecks.describeCapabilities(level, pos) + "]");
+        return 1;
+    }
+
+    /**
+     * 把准星选中的机器从机器库移除。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int disconnectMachine(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        BlockPos pos = pickedBlock(player);
+        if (pos == null) {
+            msg(player, "没有对准方块（射线 " + (int) REACH + " 格）");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!factory.machines().remove(level.dimension(), pos)) {
+            msg(player, "这个位置没有接入的机器");
+            return 0;
+        }
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        msg(player, "已移除机器：" + pos.toShortString());
+        return 1;
+    }
+
+    /**
+     * 按短 id 远程移除机器。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 短 id（前 8 位）
+     * @return 命令结果
+     */
+    public static int disconnectMachine(ServerPlayer player, String shortId) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        Optional<MachineTarget> target = factory.machines().byShortId(shortId);
+        if (target.isEmpty()) {
+            msg(player, "找不到目标 " + shortId + "（或前缀有歧义）");
+            return 0;
+        }
+        factory.machines().remove(target.get().id());
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        msg(player, "已移除机器：" + target.get().shortId());
+        return 1;
+    }
+
+    // ------------------------------------------------------------------
+    // 仓库（ME 存储）
     // ------------------------------------------------------------------
 
     /**
@@ -120,7 +243,7 @@ public final class FactoryService {
      * @param player 发起请求的玩家
      * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
      */
-    public static int connect(ServerPlayer player) {
+    public static int connectStorage(ServerPlayer player) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return 0;
@@ -152,10 +275,6 @@ public final class FactoryService {
         return 1;
     }
 
-    // ------------------------------------------------------------------
-    // 仓库调试
-    // ------------------------------------------------------------------
-
     /**
      * 列出工厂仓库里的物品和数量。
      *
@@ -173,7 +292,7 @@ public final class FactoryService {
         }
         Map<String, Long> snapshot = storage.snapshot();
         if (snapshot.isEmpty()) {
-            msg(player, "仓库是空的（或仓库未连接）");
+            msg(player, "仓库是空的");
             return 1;
         }
         List<Map.Entry<String, Long>> entries = new ArrayList<>(snapshot.entrySet());
@@ -310,7 +429,7 @@ public final class FactoryService {
     private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
         factory.refreshStorage();
         if (factory.storageLink().anchor() == null) {
-            msg(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory connect");
+            msg(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory storage connect");
             return null;
         }
         if (!factory.storageLink().online()) {
@@ -318,6 +437,43 @@ public final class FactoryService {
             return null;
         }
         return factory.storage();
+    }
+
+    /**
+     * 玩家准星指向的方块坐标。
+     *
+     * @param player 玩家
+     * @return 方块坐标；没对准方块时为 {@code null}
+     */
+    @Nullable
+    private static BlockPos pickedBlock(ServerPlayer player) {
+        HitResult hit = player.pick(REACH, 0.0F, false);
+        if (hit.getType() != HitResult.Type.BLOCK || !(hit instanceof BlockHitResult blockHit)) {
+            return null;
+        }
+        return blockHit.getBlockPos();
+    }
+
+    /**
+     * 给 {@code info} 用的一行目标状态。
+     *
+     * @param player 玩家（用来取服务端）
+     * @param target 目标
+     * @return 状态文本
+     */
+    private static String describeTarget(ServerPlayer player, MachineTarget target) {
+        MinecraftServer server = player.getServer();
+        ServerLevel level = server == null ? null : server.getLevel(target.dimension());
+        if (level == null) {
+            return "维度不存在";
+        }
+        if (!level.isLoaded(target.pos())) {
+            return "未加载";
+        }
+        if (!MachineChecks.isSupported(level, target.pos())) {
+            return "方块已消失";
+        }
+        return MachineChecks.describeCapabilities(level, target.pos());
     }
 
     /**

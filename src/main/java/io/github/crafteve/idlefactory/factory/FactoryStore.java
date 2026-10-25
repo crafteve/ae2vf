@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -31,6 +32,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_ID = "Id";
     private static final String TAG_OWNER = "Owner";
     private static final String TAG_ANCHOR = "Anchor";
+    private static final String TAG_TARGETS = "Targets";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -91,6 +93,13 @@ public final class FactoryStore extends SavedData {
             if (record.anchor() != null) {
                 entry.put(TAG_ANCHOR, record.anchor().save());
             }
+            if (!record.targets().isEmpty()) {
+                ListTag targets = new ListTag();
+                for (MachineTarget target : record.targets()) {
+                    targets.add(target.save());
+                }
+                entry.put(TAG_TARGETS, targets);
+            }
             list.add(entry);
         }
         tag.put(TAG_FACTORIES, list);
@@ -110,7 +119,16 @@ public final class FactoryStore extends SavedData {
             StorageAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
                     ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
                     : null;
-            loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor));
+            List<MachineTarget> targets = new ArrayList<>();
+            ListTag targetList = entry.getList(TAG_TARGETS, Tag.TAG_COMPOUND);
+            for (int j = 0; j < targetList.size(); j++) {
+                MachineTarget target = MachineTarget.load(targetList.getCompound(j));
+                if (target != null) {
+                    targets.add(target);
+                }
+            }
+            loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
+                    targets));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -118,12 +136,14 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 一条存档记录：工厂的身份与仓库地址。
+     * 一条存档记录：工厂的身份、仓库地址与机器库。
      *
-     * @param id     工厂 id
-     * @param owner  拥有者玩家 uuid
-     * @param anchor 仓库地址；未绑定为 {@code null}
+     * @param id      工厂 id
+     * @param owner   拥有者玩家 uuid
+     * @param anchor  仓库地址；未绑定为 {@code null}
+     * @param targets 机器库里的目标
      */
-    public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor) {
+    public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
+            List<MachineTarget> targets) {
     }
 }

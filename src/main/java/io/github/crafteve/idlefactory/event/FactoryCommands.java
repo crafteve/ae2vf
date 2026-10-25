@@ -14,6 +14,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 
@@ -24,7 +25,10 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
  * /idlefactory create
  * /idlefactory delete
  * /idlefactory info
- * /idlefactory connect
+ * /idlefactory connect                 准星选机器，接入机器库
+ * /idlefactory disconnect              准星选机器，移出机器库
+ * /idlefactory disconnect &lt;id&gt;         按短 id 远程移除
+ * /idlefactory storage connect         主手奇点绑定 ME 仓库
  * /idlefactory storage info
  * /idlefactory storage get &lt;item&gt; [count]
  * /idlefactory storage put &lt;item&gt; [count]
@@ -46,8 +50,15 @@ public final class FactoryCommands {
                 .then(Commands.literal("info")
                         .executes(context -> FactoryService.info(player(context))))
                 .then(Commands.literal("connect")
-                        .executes(context -> FactoryService.connect(player(context))))
+                        .executes(context -> FactoryService.connectMachine(player(context))))
+                .then(Commands.literal("disconnect")
+                        .executes(context -> FactoryService.disconnectMachine(player(context)))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(context -> FactoryService.disconnectMachine(
+                                        player(context), StringArgumentType.getString(context, "id")))))
                 .then(Commands.literal("storage")
+                        .then(Commands.literal("connect")
+                                .executes(context -> FactoryService.connectStorage(player(context))))
                         .then(Commands.literal("info")
                                 .executes(context -> FactoryService.storageInfo(player(context))))
                         .then(Commands.literal("get")
