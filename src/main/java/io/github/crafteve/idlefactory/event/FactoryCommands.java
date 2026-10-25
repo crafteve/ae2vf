@@ -24,11 +24,11 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
  * <pre>
  * /idlefactory create
  * /idlefactory delete
- * /idlefactory info
- * /idlefactory connect                 准星选机器，接入机器库
- * /idlefactory disconnect              准星选机器，移出机器库
- * /idlefactory disconnect &lt;id&gt;         按短 id 远程移除
- * /idlefactory storage connect         主手奇点绑定 ME 仓库
+ * /idlefactory factory connect                 准星选机器，接入机器库
+ * /idlefactory factory disconnect              准星选机器，移出机器库
+ * /idlefactory factory disconnect &lt;id&gt;         按短 id 远程移除
+ * /idlefactory factory info                    工厂摘要 + 机器库列表
+ * /idlefactory storage connect                 主手奇点绑定 ME 仓库
  * /idlefactory storage info
  * /idlefactory storage get &lt;item&gt; [count]
  * /idlefactory storage put &lt;item&gt; [count]
@@ -47,15 +47,17 @@ public final class FactoryCommands {
                         .executes(context -> FactoryService.create(player(context))))
                 .then(Commands.literal("delete")
                         .executes(context -> FactoryService.delete(player(context))))
-                .then(Commands.literal("info")
-                        .executes(context -> FactoryService.info(player(context))))
-                .then(Commands.literal("connect")
-                        .executes(context -> FactoryService.connectMachine(player(context))))
-                .then(Commands.literal("disconnect")
-                        .executes(context -> FactoryService.disconnectMachine(player(context)))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(context -> FactoryService.disconnectMachine(
-                                        player(context), StringArgumentType.getString(context, "id")))))
+                .then(Commands.literal("factory")
+                        .then(Commands.literal("connect")
+                                .executes(context -> FactoryService.connectMachine(player(context))))
+                        .then(Commands.literal("disconnect")
+                                .executes(context -> FactoryService.disconnectMachine(player(context)))
+                                .then(Commands.argument("id", StringArgumentType.word())
+                                        .executes(context -> FactoryService.disconnectMachine(
+                                                player(context),
+                                                StringArgumentType.getString(context, "id")))))
+                        .then(Commands.literal("info")
+                                .executes(context -> FactoryService.info(player(context)))))
                 .then(Commands.literal("storage")
                         .then(Commands.literal("connect")
                                 .executes(context -> FactoryService.connectStorage(player(context))))
