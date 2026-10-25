@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.factory.target.MachineChecks;
 import io.github.crafteve.idlefactory.factory.target.MachineTarget;
@@ -176,6 +177,9 @@ public final class FactoryRuntime {
         }
         for (UUID id : stale) {
             factory.machines().remove(id);
+        }
+        for (PassiveLine line : factory.lines().all()) {
+            line.removeGroupsFor(stale);
         }
         markDirty();
         IdleFactory.LOGGER.info("Idle Factory: removed {} stale machine(s)", stale.size());

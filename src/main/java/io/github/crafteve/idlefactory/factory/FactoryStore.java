@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 
@@ -33,6 +34,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_OWNER = "Owner";
     private static final String TAG_ANCHOR = "Anchor";
     private static final String TAG_TARGETS = "Targets";
+    private static final String TAG_LINES = "Lines";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -100,6 +102,13 @@ public final class FactoryStore extends SavedData {
                 }
                 entry.put(TAG_TARGETS, targets);
             }
+            if (!record.lines().isEmpty()) {
+                ListTag lines = new ListTag();
+                for (PassiveLine line : record.lines()) {
+                    lines.add(line.save());
+                }
+                entry.put(TAG_LINES, lines);
+            }
             list.add(entry);
         }
         tag.put(TAG_FACTORIES, list);
@@ -127,8 +136,16 @@ public final class FactoryStore extends SavedData {
                     targets.add(target);
                 }
             }
+            List<PassiveLine> lines = new ArrayList<>();
+            ListTag lineList = entry.getList(TAG_LINES, Tag.TAG_COMPOUND);
+            for (int j = 0; j < lineList.size(); j++) {
+                PassiveLine line = PassiveLine.load(lineList.getCompound(j));
+                if (line != null) {
+                    lines.add(line);
+                }
+            }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    targets));
+                    targets, lines));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -136,14 +153,15 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 一条存档记录：工厂的身份、仓库地址与机器库。
+     * 一条存档记录：工厂的身份、仓库地址、机器库与被动产线库。
      *
      * @param id      工厂 id
      * @param owner   拥有者玩家 uuid
      * @param anchor  仓库地址；未绑定为 {@code null}
      * @param targets 机器库里的目标
+     * @param lines   被动产线
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            List<MachineTarget> targets) {
+            List<MachineTarget> targets, List<PassiveLine> lines) {
     }
 }

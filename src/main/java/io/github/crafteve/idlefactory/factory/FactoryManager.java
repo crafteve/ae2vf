@@ -33,6 +33,7 @@ public final class FactoryManager {
             Factory factory = new Factory(record.id(), record.owner());
             factory.bindAnchor(record.anchor());
             factory.machines().addAll(record.targets());
+            factory.lines().addAll(record.lines());
             add(factory);
         }
     }
@@ -45,7 +46,8 @@ public final class FactoryManager {
     public List<FactoryRecord> toRecords() {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.owner(),
-                        factory.storageLink().anchor(), factory.machines().all()))
+                        factory.storageLink().anchor(), factory.machines().all(),
+                        factory.lines().all()))
                 .toList();
     }
 

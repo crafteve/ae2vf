@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.line.LineLibrary;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
@@ -27,6 +28,8 @@ public final class Factory {
     private final StorageLink storageLink = new StorageLink();
     /** 机器库：这台工厂接管的 IO 目标。 */
     private final MachineLibrary machines = new MachineLibrary();
+    /** 被动产线库。 */
+    private final LineLibrary lines = new LineLibrary();
     /** 运行状态，只由工厂主体和仓库解析结果改变。 */
     private FactoryState state = FactoryState.CREATED;
 
@@ -57,6 +60,11 @@ public final class Factory {
     /** 机器库。 */
     public MachineLibrary machines() {
         return this.machines;
+    }
+
+    /** 被动产线库。 */
+    public LineLibrary lines() {
+        return this.lines;
     }
 
     /** 当前仓库，永远非 null。 */
