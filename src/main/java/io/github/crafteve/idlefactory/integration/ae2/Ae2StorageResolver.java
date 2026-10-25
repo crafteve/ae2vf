@@ -36,7 +36,8 @@ public final class Ae2StorageResolver implements StorageResolver {
             return null;
         }
         IGridNode node = Ae2Binder.node(level, anchor.frequency());
-        if (node == null) {
+        if (node == null || !node.isActive()) {
+            // 节点存在但没电 / 没启动 / 频道不够：仓库不可用
             return null;
         }
         IGrid grid;

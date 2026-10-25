@@ -101,6 +101,8 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
+        // 即时刷新一次，别让 online 停在 tick 定时器上一秒的状态
+        factory.refreshStorage();
         msg(player, FactorySnapshotBuilder.describe(factory));
         return 1;
     }
@@ -165,7 +167,11 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Map<String, Long> snapshot = factory.storage().snapshot();
+        Storage storage = requireOnlineStorage(player, factory);
+        if (storage == null) {
+            return 0;
+        }
+        Map<String, Long> snapshot = storage.snapshot();
         if (snapshot.isEmpty()) {
             msg(player, "仓库是空的（或仓库未连接）");
             return 1;
@@ -197,7 +203,11 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        long extracted = factory.storage().extract(sample, count, false);
+        Storage storage = requireOnlineStorage(player, factory);
+        if (storage == null) {
+            return 0;
+        }
+        long extracted = storage.extract(sample, count, false);
         if (extracted <= 0) {
             msg(player, "仓库里没有 " + itemId(sample));
             return 0;
@@ -228,7 +238,10 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Storage storage = factory.storage();
+        Storage storage = requireOnlineStorage(player, factory);
+        if (storage == null) {
+            return 0;
+        }
         ItemStack template = sample.copy();
         template.setCount(1);
 
@@ -282,6 +295,29 @@ public final class FactoryService {
             return null;
         }
         return factory.get();
+    }
+
+    /**
+     * 取一个当前确实可用的仓库；没绑地址、没电、环离线都给出明确提示。
+     *
+     * <p>指令是即时的，这里先刷新一次，不等 {@code FactoryRuntime} 的定时刷新。</p>
+     *
+     * @param player  玩家
+     * @param factory 工厂
+     * @return 可用仓库；不可用时为 {@code null}
+     */
+    @Nullable
+    private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
+        factory.refreshStorage();
+        if (factory.storageLink().anchor() == null) {
+            msg(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory connect");
+            return null;
+        }
+        if (!factory.storageLink().online()) {
+            msg(player, "仓库未连接（网络没电或量子环离线）");
+            return null;
+        }
+        return factory.storage();
     }
 
     /**

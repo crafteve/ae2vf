@@ -24,6 +24,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class FactoryRuntime {
     /** 心跳日志间隔（tick）。 */
     private static final int HEARTBEAT_INTERVAL = 100;
+    /** 仓库状态刷新间隔（tick）：每秒重新解析一次，别让 online 变成启动时的快照。 */
+    private static final int REFRESH_INTERVAL = 20;
 
     private static FactoryRuntime instance;
 
@@ -115,10 +117,15 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 每 tick 推进一次。第一版只打心跳日志。
+     * 每 tick 推进一次。第一版只刷新仓库状态、打心跳日志。
      */
     public void tick() {
         this.tickCounter++;
+        if (this.tickCounter % REFRESH_INTERVAL == 0) {
+            for (Factory factory : this.manager.all()) {
+                factory.refreshStorage();
+            }
+        }
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.debug("Idle Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
