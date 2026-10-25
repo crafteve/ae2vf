@@ -9,8 +9,14 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
+import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.factory.storage.ContainerStorage;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.factory.target.MachineChecks;
 import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
@@ -23,10 +29,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import net.neoforged.neoforge.capabilities.Capabilities;
 
 /**
  * 工厂行政窗口：创建 / 删除 / 绑定仓库 / 机器库 / 仓库调试。
@@ -57,23 +65,23 @@ public final class FactoryService {
     public static int create(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            msg(player, "Idle Factory 尚未启动（服务端未就绪）");
+            err(player, "Idle Factory 尚未启动（服务端未就绪）");
             return 0;
         }
         Optional<Factory> existing = runtime.manager().byOwner(player.getUUID());
         if (existing.isPresent()) {
-            msg(player, "你已经有工厂了：" + existing.get().id());
+            err(player, "你已经有工厂了：" + existing.get().id());
             return 0;
         }
 
         UUID id = nextId(runtime, player.getUUID());
         Factory factory = new Factory(id, player.getUUID());
         if (!runtime.manager().add(factory)) {
-            msg(player, "工厂创建失败：id 或拥有者冲突");
+            err(player, "工厂创建失败：id 或拥有者冲突");
             return 0;
         }
         runtime.markDirty();
-        msg(player, "工厂已创建：" + id);
+        ok(player, "工厂已创建：" + id);
         return 1;
     }
 
@@ -86,17 +94,17 @@ public final class FactoryService {
     public static int delete(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            msg(player, "Idle Factory 尚未启动（服务端未就绪）");
+            err(player, "Idle Factory 尚未启动（服务端未就绪）");
             return 0;
         }
         Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
         if (factory.isEmpty()) {
-            msg(player, "你还没有工厂，先执行 /idlefactory create");
+            err(player, "你还没有工厂，先执行 /idlefactory create");
             return 0;
         }
         runtime.manager().remove(factory.get().id());
         runtime.markDirty();
-        msg(player, "工厂已删除：" + factory.get().id());
+        ok(player, "工厂已删除：" + factory.get().id());
         return 1;
     }
 
@@ -113,17 +121,22 @@ public final class FactoryService {
         }
         // 即时刷新一次，别让 online 停在 tick 定时器上一秒的状态
         factory.refreshStorage();
-        msg(player, FactorySnapshotBuilder.describe(factory));
+        info(player, FactorySnapshotBuilder.describe(factory));
 
         List<MachineTarget> machines = factory.machines().all();
         if (machines.isEmpty()) {
-            msg(player, "机器库为空：准星对准机器执行 /idlefactory connect");
+            info(player, "机器库为空：准星对准机器执行 /idf factory connect");
             return 1;
         }
-        msg(player, "机器库 " + machines.size() + " 台：");
+        info(player, "机器库 " + machines.size() + " 台：");
         for (MachineTarget target : machines) {
-            msg(player, "  [" + target.shortId() + "] " + target.dimension().location()
-                    + " " + target.pos().toShortString() + "  " + describeTarget(player, target));
+            String where = target.dimension().location() + " " + target.pos().toShortString();
+            String status = describeTarget(player, target);
+            Component row = Component.empty()
+                    .append(FactoryMessages.text("  ", FactoryMessages.INFO))
+                    .append(FactoryMessages.hover(target.shortId(), where + "\n" + status))
+                    .append(FactoryMessages.text(" " + where + "  " + status, FactoryMessages.INFO));
+            FactoryMessages.send(player, row);
         }
         return 1;
     }
@@ -148,29 +161,29 @@ public final class FactoryService {
         }
         BlockPos pos = pickedBlock(player);
         if (pos == null) {
-            msg(player, "没有对准方块（射线 " + (int) REACH + " 格）");
+            err(player, "没有对准方块（射线 " + (int) REACH + " 格）");
             return 0;
         }
         ServerLevel level = player.serverLevel();
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity == null) {
-            msg(player, "这个方块没有方块实体");
+            err(player, "这个方块没有方块实体");
             return 0;
         }
         if (!MachineChecks.isSupported(level, pos)) {
-            msg(player, "这个方块没有可搬运的存储（需要 IItemHandler 或 IFluidHandler）");
+            err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;
         }
         MachineTarget target = MachineTarget.of(level.dimension(), pos);
         if (!factory.machines().add(target)) {
-            msg(player, "这台机器已经接入过了：" + target.shortId());
+            err(player, "这台机器已经接入过了：" + target.shortId());
             return 0;
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
             runtime.markDirty();
         }
-        msg(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
+        ok(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
                 + " " + pos.toShortString() + " [" + MachineChecks.describeCapabilities(level, pos) + "]");
         return 1;
     }
@@ -188,19 +201,19 @@ public final class FactoryService {
         }
         BlockPos pos = pickedBlock(player);
         if (pos == null) {
-            msg(player, "没有对准方块（射线 " + (int) REACH + " 格）");
+            err(player, "没有对准方块（射线 " + (int) REACH + " 格）");
             return 0;
         }
         ServerLevel level = player.serverLevel();
         if (!factory.machines().remove(level.dimension(), pos)) {
-            msg(player, "这个位置没有接入的机器");
+            err(player, "这个位置没有接入的机器");
             return 0;
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
             runtime.markDirty();
         }
-        msg(player, "已移除机器：" + pos.toShortString());
+        ok(player, "已移除机器：" + pos.toShortString());
         return 1;
     }
 
@@ -218,7 +231,7 @@ public final class FactoryService {
         }
         Optional<MachineTarget> target = factory.machines().byShortId(shortId);
         if (target.isEmpty()) {
-            msg(player, "找不到目标 " + shortId + "（或前缀有歧义）");
+            err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
         }
         factory.machines().remove(target.get().id());
@@ -226,7 +239,7 @@ public final class FactoryService {
         if (runtime != null) {
             runtime.markDirty();
         }
-        msg(player, "已移除机器：" + target.get().shortId());
+        ok(player, "已移除机器：" + target.get().shortId());
         return 1;
     }
 
@@ -250,33 +263,186 @@ public final class FactoryService {
         }
         ItemStack held = player.getMainHandItem();
         if (!Ae2Binder.isSingularity(held)) {
-            msg(player, "主手请拿量子纠缠奇点");
+            err(player, "主手请拿量子纠缠奇点");
             return 0;
         }
         long frequency = held.getOrDefault(AEComponents.ENTANGLED_SINGULARITY_ID, 0L);
         if (frequency == 0L) {
-            msg(player, "奇点没有有效频率");
+            err(player, "奇点没有有效频率");
             return 0;
         }
-        StorageAnchor anchor = Ae2Binder.anchor(player.serverLevel(), frequency);
+        StorageAnchor current = factory.storageLink().anchor();
+        if (current instanceof ContainerAnchor) {
+            err(player, "当前已绑定容器仓库，先执行 /idf storage unbind 再连 AE2");
+            return 0;
+        }
+        // 已是 AE2 时允许覆盖：换网络是常见操作，旧奇点已经消耗掉，重绑消耗新的
+        Ae2Anchor anchor = Ae2Binder.anchor(player.serverLevel(), frequency);
         if (anchor == null) {
-            msg(player, "找不到对应的量子环（环的区块加载了吗？）");
+            err(player, "找不到对应的量子环（环的区块加载了吗？）");
             return 0;
         }
         factory.bindAnchor(anchor);
         held.shrink(1);
         player.getInventory().setChanged();
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.markDirty();
-        }
-        msg(player, "已绑定仓库：freq=" + frequency + " @ " + anchor.dimension().location()
+        markDirty();
+        ok(player, "已绑定仓库：freq=" + frequency + " @ " + anchor.dimension().location()
                 + " " + anchor.ringPos().toShortString());
         return 1;
     }
 
+    // ------------------------------------------------------------------
+    // 仓库（方块容器）
+    // ------------------------------------------------------------------
+
     /**
-     * 列出工厂仓库里的物品和数量。
+     * 把准星选中的方块容器加入工厂仓库。
+     *
+     * <p>主路径是 NeoForge 的方块能力（原版箱子、木桶、熔炉都已注册），{@link Container}
+     * 包装只作兜底。已有 AE2 仓库时拒绝——当前阶段两者互斥。</p>
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int bindContainer(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        BlockPos pos = pickedBlock(player);
+        if (pos == null) {
+            err(player, "没有对准方块（射线 " + (int) REACH + " 格）");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!level.isLoaded(pos)) {
+            err(player, "这个位置区块未加载");
+            return 0;
+        }
+        if (!isAnyContainer(level, pos)) {
+            err(player, "这个方块不是仓库容器（物品 / 流体 / 能量）");
+            return 0;
+        }
+
+        ContainerRef ref = ContainerRef.of(level.dimension(), pos);
+        StorageAnchor current = factory.storageLink().anchor();
+        ContainerAnchor anchor;
+        if (current == null) {
+            anchor = new ContainerAnchor(List.of(ref));
+        } else if (current instanceof ContainerAnchor containerAnchor) {
+            if (containerAnchor.contains(ref.id())) {
+                err(player, "这个容器已经绑过了");
+                return 0;
+            }
+            if (containerAnchor.containers().size() >= ContainerAnchor.MAX_CONTAINERS) {
+                err(player, "一个仓库最多 " + ContainerAnchor.MAX_CONTAINERS + " 个容器");
+                return 0;
+            }
+            anchor = containerAnchor.with(ref);
+        } else {
+            err(player, "当前已绑定 AE2 仓库，先执行 /idf storage unbind 再绑容器");
+            return 0;
+        }
+
+        factory.bindAnchor(anchor);
+        markDirty();
+        ok(player, "已加入仓库容器 [" + ref.shortId() + "] " + level.dimension().location()
+                + " " + pos.toShortString() + "（共 " + anchor.containers().size() + " 个）");
+        return 1;
+    }
+
+    /**
+     * 解绑整个仓库。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int unbindStorage(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.storageLink().anchor() == null) {
+            err(player, "还没有绑定仓库");
+            return 0;
+        }
+        factory.bindAnchor(null);
+        markDirty();
+        ok(player, "已解绑仓库");
+        return 1;
+    }
+
+    /**
+     * 从容器仓库里移除一个容器。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 容器短 id
+     * @return 命令结果
+     */
+    public static int unbindContainer(ServerPlayer player, String shortId) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+            err(player, "当前没有容器仓库");
+            return 0;
+        }
+        Optional<ContainerRef> ref = anchor.byShortId(shortId);
+        if (ref.isEmpty()) {
+            err(player, "找不到容器 " + shortId);
+            return 0;
+        }
+        ContainerAnchor next = anchor.without(ref.get().id());
+        factory.bindAnchor(next.isEmpty() ? null : next);
+        markDirty();
+        ok(player, "已移除容器 [" + ref.get().shortId() + "]");
+        return 1;
+    }
+
+    /**
+     * 设置容器优先级。高的先填、低的先抽。
+     *
+     * @param player   发起请求的玩家
+     * @param shortId  容器短 id
+     * @param priority 新优先级
+     * @return 命令结果
+     */
+    public static int setContainerPriority(ServerPlayer player, String shortId, int priority) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+            err(player, "当前没有容器仓库");
+            return 0;
+        }
+        Optional<ContainerRef> ref = anchor.byShortId(shortId);
+        if (ref.isEmpty()) {
+            err(player, "找不到容器 " + shortId);
+            return 0;
+        }
+        factory.bindAnchor(anchor.withPriority(ref.get().id(), priority));
+        markDirty();
+        ok(player, "容器 [" + ref.get().shortId() + "] 优先级 → " + priority);
+        return 1;
+    }
+
+    private static boolean isAnyContainer(ServerLevel level, BlockPos pos) {
+        if (level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null) {
+            return true;
+        }
+        if (level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null) != null) {
+            return true;
+        }
+        if (level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null) != null) {
+            return true;
+        }
+        return level.getBlockEntity(pos) instanceof Container;
+    }
+
+    /**
+     * 仓库摘要：类型、容器列表、物品。
      *
      * @param player 发起请求的玩家
      * @return 命令结果
@@ -286,26 +452,54 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Storage storage = requireOnlineStorage(player, factory);
-        if (storage == null) {
+        factory.refreshStorage();
+        StorageLink link = factory.storageLink();
+        StorageAnchor anchor = link.anchor();
+        if (anchor == null) {
+            err(player, "还没有绑定仓库");
+            info(player, "容器：准星对准箱子执行 /idf storage bind；AE2：主手拿量子纠缠奇点执行 /idf storage connect");
             return 0;
         }
-        Map<String, Long> snapshot = storage.snapshot();
-        if (snapshot.isEmpty()) {
-            msg(player, "仓库是空的");
+        info(player, "仓库：" + anchor.describe() + " · " + (link.online() ? "在线" : "离线"));
+
+        if (anchor instanceof ContainerAnchor containerAnchor) {
+            MinecraftServer server = player.getServer();
+            for (ContainerRef ref : containerAnchor.containers()) {
+                boolean usable = server != null && ContainerStorage.available(server, ref);
+                Component row = Component.empty()
+                        .append(FactoryMessages.text("  ", FactoryMessages.INFO))
+                        .append(FactoryMessages.hover(ref.shortId(),
+                                ref.dimension().location() + " " + ref.pos().toShortString()))
+                        .append(FactoryMessages.text(" " + ref.dimension().location() + " "
+                                + ref.pos().toShortString()
+                                + " · " + (usable ? "可用" : "缺失/未加载")
+                                + " · 优先级 " + ref.priority(), FactoryMessages.INFO));
+                FactoryMessages.send(player, row);
+            }
+        }
+
+        if (!link.online()) {
+            warn(player, "仓库当前离线，产线不会搬运");
             return 1;
         }
-        List<Map.Entry<String, Long>> entries = new ArrayList<>(snapshot.entrySet());
-        entries.sort(Map.Entry.<String, Long>comparingByValue().reversed());
+
+        Storage storage = factory.storage();
+        Map<ResourceKey, Long> snapshot = storage.snapshot();
+        if (snapshot.isEmpty()) {
+            info(player, "仓库是空的");
+            return 1;
+        }
+        List<Map.Entry<ResourceKey, Long>> entries = new ArrayList<>(snapshot.entrySet());
+        entries.sort(Map.Entry.<ResourceKey, Long>comparingByValue().reversed());
         int shown = Math.min(entries.size(), INFO_LIMIT);
         for (int i = 0; i < shown; i++) {
-            Map.Entry<String, Long> entry = entries.get(i);
-            msg(player, "  " + entry.getKey() + " x " + entry.getValue());
+            Map.Entry<ResourceKey, Long> entry = entries.get(i);
+            msg(player, "  " + describeResource(entry.getKey()) + " x " + entry.getValue());
         }
         if (entries.size() > shown) {
             msg(player, "  ... 还有 " + (entries.size() - shown) + " 种");
         }
-        msg(player, "共 " + entries.size() + " 种物品");
+        info(player, "共 " + entries.size() + " 种资源");
         return 1;
     }
 
@@ -326,9 +520,9 @@ public final class FactoryService {
         if (storage == null) {
             return 0;
         }
-        long extracted = storage.extract(sample, count, false);
+        long extracted = storage.extract(ResourceKey.item(sample), count, false);
         if (extracted <= 0) {
-            msg(player, "仓库里没有 " + itemId(sample));
+            err(player, "仓库里没有 " + itemId(sample));
             return 0;
         }
         ItemStack give = sample.copy();
@@ -337,7 +531,7 @@ public final class FactoryService {
             // 背包放不下就掉地上，和 /give 一致
             player.drop(give, false);
         }
-        msg(player, "取出 " + extracted + " 个 " + itemId(sample));
+        ok(player, "取出 " + extracted + " 个 " + itemId(sample));
         return 1;
     }
 
@@ -365,29 +559,29 @@ public final class FactoryService {
         template.setCount(1);
 
         if (player.isCreative()) {
-            long inserted = storage.insert(template, count, false);
+            long inserted = storage.insert(ResourceKey.item(template), count, false);
             if (inserted <= 0) {
-                msg(player, "仓库收不下 " + itemId(sample));
+                err(player, "仓库收不下 " + itemId(sample));
                 return 0;
             }
-            msg(player, "存入 " + inserted + " 个 " + itemId(sample) + "（创造模式）");
+            ok(player, "存入 " + inserted + " 个 " + itemId(sample) + "（创造模式）");
             return 1;
         }
 
         int available = countInInventory(player, template);
         if (available <= 0) {
-            msg(player, "背包里没有 " + itemId(sample));
+            err(player, "背包里没有 " + itemId(sample));
             return 0;
         }
         int want = Math.min(count, available);
-        long accepted = storage.insert(template, want, true);
+        long accepted = storage.insert(ResourceKey.item(template), want, true);
         if (accepted <= 0) {
-            msg(player, "仓库收不下 " + itemId(sample));
+            err(player, "仓库收不下 " + itemId(sample));
             return 0;
         }
-        long inserted = storage.insert(template, accepted, false);
+        long inserted = storage.insert(ResourceKey.item(template), accepted, false);
         int removed = removeFromInventory(player, template, (int) inserted);
-        msg(player, "存入 " + removed + " 个 " + itemId(sample));
+        ok(player, "存入 " + removed + " 个 " + itemId(sample));
         return removed > 0 ? 1 : 0;
     }
 
@@ -405,12 +599,12 @@ public final class FactoryService {
     private static Factory ownedFactory(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            msg(player, "Idle Factory 尚未启动（服务端未就绪）");
+            err(player, "Idle Factory 尚未启动（服务端未就绪）");
             return null;
         }
         Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
         if (factory.isEmpty()) {
-            msg(player, "你还没有工厂，先执行 /idlefactory create");
+            err(player, "你还没有工厂，先执行 /idlefactory create");
             return null;
         }
         return factory.get();
@@ -429,11 +623,11 @@ public final class FactoryService {
     private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
         factory.refreshStorage();
         if (factory.storageLink().anchor() == null) {
-            msg(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory storage connect");
+            err(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory storage connect");
             return null;
         }
         if (!factory.storageLink().online()) {
-            msg(player, "仓库未连接（网络没电或量子环离线）");
+            err(player, "仓库未连接（网络没电或量子环离线）");
             return null;
         }
         return factory.storage();
@@ -528,8 +722,45 @@ public final class FactoryService {
         return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
     }
 
+    /** 仓库条目的一行显示，按类型补单位。 */
+    private static String describeResource(ResourceKey key) {
+        return switch (key.kind()) {
+            case FLUID -> key.describe() + "（mB）";
+            case ENERGY -> key.describe() + "（FE）";
+            default -> key.describe();
+        };
+    }
+
     /** 给玩家发一条系统消息。 */
     private static void msg(ServerPlayer player, String text) {
-        player.sendSystemMessage(Component.literal(text));
+        FactoryMessages.send(player, FactoryMessages.plain(text));
+    }
+
+    /** 成功回执。 */
+    private static void ok(ServerPlayer player, String text) {
+        FactoryMessages.send(player, FactoryMessages.ok(text));
+    }
+
+    /** 失败回执。 */
+    private static void err(ServerPlayer player, String text) {
+        FactoryMessages.send(player, FactoryMessages.err(text));
+    }
+
+    /** 说明性输出。 */
+    private static void info(ServerPlayer player, String text) {
+        FactoryMessages.send(player, FactoryMessages.info(text));
+    }
+
+    /** 警告输出。 */
+    private static void warn(ServerPlayer player, String text) {
+        FactoryMessages.send(player, FactoryMessages.warn(text));
+    }
+
+    /** 把档案写回存档容器。 */
+    private static void markDirty() {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
     }
 }

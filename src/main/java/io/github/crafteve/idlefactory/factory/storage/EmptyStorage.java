@@ -2,7 +2,8 @@ package io.github.crafteve.idlefactory.factory.storage;
 
 import java.util.Map;
 
-import net.minecraft.world.item.ItemStack;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 /**
  * 空仓库：什么都没装，也什么都收不下。
@@ -19,13 +20,18 @@ public final class EmptyStorage implements Storage {
     }
 
     @Override
-    public long insert(ItemStack stack, long amount, boolean simulate) {
-        return 0;
+    public long insert(ResourceKey key, long amount, boolean simulate) {
+        return 0L;
     }
 
     @Override
-    public long extract(ItemStack stack, long amount, boolean simulate) {
-        return 0;
+    public long extract(ResourceKey key, long amount, boolean simulate) {
+        return 0L;
+    }
+
+    @Override
+    public boolean supports(ResourceKind kind) {
+        return false;
     }
 
     @Override
@@ -34,7 +40,7 @@ public final class EmptyStorage implements Storage {
     }
 
     @Override
-    public Map<String, Long> snapshot() {
+    public Map<ResourceKey, Long> snapshot() {
         return Map.of();
     }
 }

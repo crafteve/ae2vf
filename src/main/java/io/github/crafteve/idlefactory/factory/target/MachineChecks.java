@@ -8,8 +8,8 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 /**
  * 机器方块的能力检查。
  *
- * <p>「能接入机器库」的判定：方块实体存在，且至少提供一个 {@code IItemHandler} 或
- * {@code IFluidHandler}。检查永远现查，不缓存——方块随时可能被换成别的东西。</p>
+ * <p>「能接入机器库」的判定：方块实体存在，且至少提供一个 {@code IItemHandler}、
+ * {@code IFluidHandler} 或 {@code IEnergyStorage}。检查永远现查，不缓存——方块随时可能被换成别的东西。</p>
  */
 public final class MachineChecks {
     private MachineChecks() {
@@ -27,7 +27,7 @@ public final class MachineChecks {
         if (level.getBlockEntity(pos) == null) {
             return false;
         }
-        return supportsItems(level, pos) || supportsFluids(level, pos);
+        return supportsItems(level, pos) || supportsFluids(level, pos) || supportsEnergy(level, pos);
     }
 
     /** 是否提供物品能力。 */
@@ -40,6 +40,11 @@ public final class MachineChecks {
         return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null) != null;
     }
 
+    /** 是否提供能量能力。 */
+    public static boolean supportsEnergy(Level level, BlockPos pos) {
+        return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null) != null;
+    }
+
     /**
      * 给界面用的能力摘要。
      *
@@ -50,15 +55,17 @@ public final class MachineChecks {
     public static String describeCapabilities(Level level, BlockPos pos) {
         boolean items = supportsItems(level, pos);
         boolean fluids = supportsFluids(level, pos);
-        if (items && fluids) {
-            return "item+fluid";
-        }
+        boolean energy = supportsEnergy(level, pos);
+        StringBuilder builder = new StringBuilder();
         if (items) {
-            return "item";
+            builder.append("item");
         }
         if (fluids) {
-            return "fluid";
+            builder.append(builder.length() > 0 ? "+fluid" : "fluid");
         }
-        return "none";
+        if (energy) {
+            builder.append(builder.length() > 0 ? "+energy" : "energy");
+        }
+        return builder.length() == 0 ? "none" : builder.toString();
     }
 }

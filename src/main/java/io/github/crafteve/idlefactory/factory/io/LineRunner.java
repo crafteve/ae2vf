@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
@@ -62,7 +61,7 @@ public final class LineRunner {
                     continue;
                 }
                 groupState.sleeping = false;
-                groupState.idleRounds = 0;
+                groupState.idleSince = -1L;
             }
             anyAwake = true;
 
@@ -77,11 +76,11 @@ public final class LineRunner {
                 continue;
             }
 
-            IoResult result = GroupRunner.run(storage, level, target.pos(), group);
+            GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group);
             if (result.movedAnything()) {
-                IdleFactory.LOGGER.debug("Idle Factory IO: line={} machine={} moved={} reason={}",
-                        line.shortId(), target.shortId(), result.moved(), result.reason());
-                groupState.idleRounds = 0;
+                // 成功搬运只进计数器，不进事件流：一次搬运一条事件会把 tail 淹掉
+                factory.diagnostics().line(line.id()).addMoved(result.fed(), result.pulled(), now);
+                groupState.idleSince = -1L;
                 groupState.sleeping = false;
             } else {
                 sleepIfIdle(groupState, now);
@@ -99,8 +98,11 @@ public final class LineRunner {
     }
 
     private static void sleepIfIdle(RunnerState.GroupState groupState, long now) {
-        groupState.idleRounds++;
-        if (groupState.idleRounds >= RunnerState.SLEEP_AFTER_ROUNDS) {
+        if (groupState.idleSince < 0L) {
+            groupState.idleSince = now;
+            return;
+        }
+        if (now - groupState.idleSince >= RunnerState.SLEEP_AFTER_TICKS) {
             groupState.sleeping = true;
             groupState.wakeAt = now + RunnerState.WAKE_INTERVAL;
         }
@@ -123,6 +125,20 @@ public final class LineRunner {
      */
     public void wakeGroup(UUID lineId, UUID groupId) {
         this.state.wakeGroup(lineId, groupId);
+    }
+
+    /**
+     * 这条线睡到什么时候。
+     *
+     * @param lineId 产线 id
+     * @return 唤醒时间；没在睡时为 {@code 0}
+     */
+    public long sleepUntil(UUID lineId) {
+        RunnerState.LineState state = this.state.peek(lineId);
+        if (state == null || !state.sleeping) {
+            return 0L;
+        }
+        return state.wakeAt;
     }
 
     /**

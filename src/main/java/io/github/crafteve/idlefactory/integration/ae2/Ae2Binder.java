@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.integration.ae2;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 
 import appeng.api.features.Locatables;
 import appeng.api.ids.AEComponents;
@@ -96,7 +96,7 @@ public final class Ae2Binder {
      * @return 仓库地址；环不在线时返回 {@code null}
      */
     @Nullable
-    public static StorageAnchor anchor(ServerLevel level, long frequency) {
+    public static Ae2Anchor anchor(ServerLevel level, long frequency) {
         QuantumCluster cluster = findCluster(level, frequency);
         if (cluster == null && frequency != Long.MIN_VALUE) {
             cluster = findCluster(level, -frequency);
@@ -111,7 +111,7 @@ public final class Ae2Binder {
         } catch (RuntimeException e) {
             ringPos = cluster.getBoundsMin();
         }
-        return new StorageAnchor(frequency, level.dimension(), ringPos);
+        return new Ae2Anchor(frequency, level.dimension(), ringPos);
     }
 
     @Nullable

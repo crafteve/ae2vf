@@ -4,22 +4,26 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
  * IO 执行器的睡眠状态。
  *
  * <p>只有运行时，不写存档。服务器停止、产线启停、配置变更都会清掉。</p>
  *
  * <ul>
- *   <li>组连续 {@link #SLEEP_AFTER_ROUNDS} 轮没搬动 → 组睡眠；</li>
+ *   <li>组连续 {@link #SLEEP_AFTER_TICKS} tick 没搬动 → 组睡眠；</li>
  *   <li>一条产线的组全睡 → 产线睡眠；</li>
  *   <li>睡眠单位每 {@link #WAKE_INTERVAL} tick 醒一次。</li>
  * </ul>
+ *
+ * <p>睡眠按 tick 算而不是按轮数：IO 间隔可调，按轮数会在 1 tick 时过于敏感。</p>
  */
 public final class RunnerState {
-    /** 连续多少轮没搬动就睡眠。 */
-    public static final int SLEEP_AFTER_ROUNDS = 20;
+    /** 连续多少 tick 没搬动就睡眠。 */
+    public static final long SLEEP_AFTER_TICKS = 100L;
     /** 睡眠后多久醒一次（tick）。 */
-    public static final long WAKE_INTERVAL = 100;
+    public static final long WAKE_INTERVAL = 200L;
 
     private final Map<UUID, LineState> lines = new HashMap<>();
 
@@ -31,6 +35,17 @@ public final class RunnerState {
      */
     public LineState line(UUID lineId) {
         return this.lines.computeIfAbsent(lineId, id -> new LineState());
+    }
+
+    /**
+     * 只看一眼状态，不创建。
+     *
+     * @param lineId 产线 id
+     * @return 状态；还没跑过时为 {@code null}
+     */
+    @Nullable
+    public LineState peek(UUID lineId) {
+        return this.lines.get(lineId);
     }
 
     /**
@@ -46,7 +61,7 @@ public final class RunnerState {
         line.sleeping = false;
         for (GroupState group : line.groups.values()) {
             group.sleeping = false;
-            group.idleRounds = 0;
+            group.idleSince = -1L;
         }
     }
 
@@ -65,7 +80,7 @@ public final class RunnerState {
         GroupState group = line.groups.get(groupId);
         if (group != null) {
             group.sleeping = false;
-            group.idleRounds = 0;
+            group.idleSince = -1L;
         }
     }
 
@@ -105,8 +120,8 @@ public final class RunnerState {
 
     /** 一个组的睡眠状态。 */
     public static final class GroupState {
-        /** 连续没搬动的轮数。 */
-        public int idleRounds;
+        /** 本轮没搬动是从什么时候开始的；{@code -1} 表示还没开始计时。 */
+        public long idleSince = -1L;
         /** 是否睡眠。 */
         public boolean sleeping;
         /** 下次唤醒时间（game time）。 */

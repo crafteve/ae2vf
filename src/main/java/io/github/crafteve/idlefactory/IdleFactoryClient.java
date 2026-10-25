@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
-import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -28,9 +27,7 @@ public class IdleFactoryClient {
 
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
-        // Some client setup code
-        IdleFactory.LOGGER.info("HELLO FROM CLIENT SETUP");
-        IdleFactory.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
+        IdleFactory.LOGGER.debug("Idle Factory client setup");
     }
 
     /**

@@ -6,6 +6,9 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -13,7 +16,7 @@ import net.minecraft.nbt.Tag;
 /**
  * 一个 IO 组：一台机器 + 它的输入清单和输出清单。
  *
- * <p>组只记机器库里的机器 id，不重复存坐标。同一个物品在同一侧只允许一条规则；
+ * <p>组只记机器库里的机器 id，不重复存坐标。同一个资源在同一侧只允许一条规则；
  * 输入和输出各自独立。</p>
  */
 public final class IoGroup {
@@ -24,8 +27,8 @@ public final class IoGroup {
 
     private final UUID id;
     private final UUID machineId;
-    private final List<ItemSpec> inputs = new ArrayList<>();
-    private final List<ItemSpec> outputs = new ArrayList<>();
+    private final List<ResourceSpec> inputs = new ArrayList<>();
+    private final List<ResourceSpec> outputs = new ArrayList<>();
 
     /**
      * @param id        组 id
@@ -47,12 +50,12 @@ public final class IoGroup {
     }
 
     /** 输入清单（只读）。 */
-    public List<ItemSpec> inputs() {
+    public List<ResourceSpec> inputs() {
         return List.copyOf(this.inputs);
     }
 
     /** 输出清单（只读）。 */
-    public List<ItemSpec> outputs() {
+    public List<ResourceSpec> outputs() {
         return List.copyOf(this.outputs);
     }
 
@@ -60,10 +63,10 @@ public final class IoGroup {
      * 加一条输入规则。
      *
      * @param spec 规则
-     * @return 是否加入；同物品已有规则时返回 {@code false}
+     * @return 是否加入；同资源已有规则时返回 {@code false}
      */
-    public boolean addInput(ItemSpec spec) {
-        if (find(this.inputs, spec.itemId()) != null) {
+    public boolean addInput(ResourceSpec spec) {
+        if (find(this.inputs, spec.key()) != null) {
             return false;
         }
         this.inputs.add(spec);
@@ -71,23 +74,23 @@ public final class IoGroup {
     }
 
     /**
-     * 按物品 id 移除输入规则。
+     * 按资源移除输入规则。
      *
-     * @param itemId 物品注册名
+     * @param key 资源
      * @return 是否真的移除了
      */
-    public boolean removeInput(String itemId) {
-        return this.inputs.removeIf(spec -> spec.itemId().equals(itemId));
+    public boolean removeInput(ResourceKey key) {
+        return this.inputs.removeIf(spec -> spec.key().equals(key));
     }
 
     /**
      * 加一条输出规则。
      *
      * @param spec 规则
-     * @return 是否加入；同物品已有规则时返回 {@code false}
+     * @return 是否加入；同资源已有规则时返回 {@code false}
      */
-    public boolean addOutput(ItemSpec spec) {
-        if (find(this.outputs, spec.itemId()) != null) {
+    public boolean addOutput(ResourceSpec spec) {
+        if (find(this.outputs, spec.key()) != null) {
             return false;
         }
         this.outputs.add(spec);
@@ -95,19 +98,19 @@ public final class IoGroup {
     }
 
     /**
-     * 按物品 id 移除输出规则。
+     * 按资源移除输出规则。
      *
-     * @param itemId 物品注册名
+     * @param key 资源
      * @return 是否真的移除了
      */
-    public boolean removeOutput(String itemId) {
-        return this.outputs.removeIf(spec -> spec.itemId().equals(itemId));
+    public boolean removeOutput(ResourceKey key) {
+        return this.outputs.removeIf(spec -> spec.key().equals(key));
     }
 
     @Nullable
-    private static ItemSpec find(List<ItemSpec> specs, String itemId) {
-        for (ItemSpec spec : specs) {
-            if (spec.itemId().equals(itemId)) {
+    private static ResourceSpec find(List<ResourceSpec> specs, ResourceKey key) {
+        for (ResourceSpec spec : specs) {
+            if (spec.key().equals(key)) {
                 return spec;
             }
         }
@@ -145,17 +148,17 @@ public final class IoGroup {
         return group;
     }
 
-    private static ListTag saveSpecs(List<ItemSpec> specs) {
+    private static ListTag saveSpecs(List<ResourceSpec> specs) {
         ListTag list = new ListTag();
-        for (ItemSpec spec : specs) {
+        for (ResourceSpec spec : specs) {
             list.add(spec.save());
         }
         return list;
     }
 
-    private static void readSpecs(ListTag list, List<ItemSpec> target) {
+    private static void readSpecs(ListTag list, List<ResourceSpec> target) {
         for (int i = 0; i < list.size(); i++) {
-            ItemSpec spec = ItemSpec.load(list.getCompound(i));
+            ResourceSpec spec = ResourceSpec.load(list.getCompound(i));
             if (spec != null) {
                 target.add(spec);
             }

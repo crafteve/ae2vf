@@ -25,6 +25,10 @@ public final class StorageLink {
     /** 上一次解析是否真的拿到了仓库。 */
     private boolean online;
 
+    /** 上一次解析抛的异常；没抛过就是 {@code null}。只用于诊断。 */
+    @Nullable
+    private String lastError;
+
     /**
      * 注入全局解析器。只应在服务器启动、适配层就绪后调用一次。
      *
@@ -51,14 +55,17 @@ public final class StorageLink {
         if (this.anchor == null) {
             this.storage = EmptyStorage.INSTANCE;
             this.online = false;
+            this.lastError = null;
             return;
         }
         Storage resolved;
         try {
             resolved = resolver.resolve(this.anchor);
+            this.lastError = null;
         } catch (RuntimeException e) {
-            // 适配层炸了也不能把工厂带崩，降级成空仓库
+            // 适配层炸了也不能把工厂带崩，降级成空仓库；异常留给诊断面板
             resolved = null;
+            this.lastError = e.getClass().getSimpleName() + ": " + e.getMessage();
         }
         if (resolved == null) {
             this.storage = EmptyStorage.INSTANCE;
@@ -83,5 +90,11 @@ public final class StorageLink {
     @Nullable
     public StorageAnchor anchor() {
         return this.anchor;
+    }
+
+    /** 上一次解析抛的异常；没抛过就是 {@code null}。 */
+    @Nullable
+    public String lastError() {
+        return this.lastError;
     }
 }

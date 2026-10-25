@@ -25,10 +25,7 @@ public final class FactorySnapshotBuilder {
     public static String describe(Factory factory) {
         StorageLink link = factory.storageLink();
         StorageAnchor anchor = link.anchor();
-        String anchorText = anchor == null
-                ? "unbound"
-                : "freq=" + anchor.frequency() + " @ " + anchor.dimension().location()
-                        + " " + anchor.ringPos().toShortString();
+        String anchorText = anchor == null ? "unbound" : anchor.describe();
         return "工厂 " + factory.id()
                 + " | owner=" + factory.owner()
                 + " | state=" + factory.state()

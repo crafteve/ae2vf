@@ -8,14 +8,22 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.FactoryMessages;
+import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
@@ -23,8 +31,10 @@ import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 /**
  * 被动产线的指令逻辑。
  *
- * <p>第一版只做「管理」：产线、IO 组、输入输出规则。不执行搬运，{@code start} / {@code end}
- * 只改开关，真正的 IO 血肉下一版再填。</p>
+ * <p>只做「管理」：产线、IO 组、输入输出规则。{@code start} / {@code end} 只改开关，搬运由
+ * {@code factory.io} 的执行器负责。</p>
+ *
+ * <p>引用解析统一走 {@link FactoryRefs}，消息统一走 {@link FactoryMessages}。</p>
  */
 public final class LineService {
     private LineService() {
@@ -34,6 +44,35 @@ public final class LineService {
     // ------------------------------------------------------------------
     // 产线
     // ------------------------------------------------------------------
+
+    /**
+     * 列出玩家自己的所有产线。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int list(ServerPlayer player) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        List<PassiveLine> lines = factory.lines().all();
+        if (lines.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.info("还没有产线。先执行 /idf line create <名字>"));
+            return 1;
+        }
+        FactoryMessages.send(player, FactoryMessages.info("产线 " + lines.size() + " 条："));
+        for (PassiveLine line : lines) {
+            MutableComponent row = Component.empty()
+                    .append(FactoryMessages.lineLink(line.shortId()))
+                    .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
+                    .append(FactoryMessages.text(line.running() ? "运行" : "停止",
+                            line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
+                    .append(FactoryMessages.text(" · " + line.groups().size() + " 台", FactoryMessages.INFO));
+            FactoryMessages.send(player, row);
+        }
+        return 1;
+    }
 
     /**
      * 新建一条被动产线。
@@ -49,17 +88,22 @@ public final class LineService {
         }
         String trimmed = name.trim();
         if (trimmed.isEmpty()) {
-            msg(player, "产线名不能为空");
+            FactoryMessages.send(player, FactoryMessages.err("产线名不能为空"));
+            return 0;
+        }
+        if (FactoryRefs.isReservedName(trimmed)) {
+            FactoryMessages.send(player, FactoryMessages.err("「" + trimmed + "」是保留字，换个名字"));
+            FactoryMessages.send(player, FactoryMessages.info("保留字：" + FactoryRefs.describeReservedNames()));
             return 0;
         }
         if (factory.lines().byName(trimmed).isPresent()) {
-            msg(player, "已有同名产线：" + trimmed);
+            FactoryMessages.send(player, FactoryMessages.err("已有同名产线：" + trimmed));
             return 0;
         }
         PassiveLine line = new PassiveLine(UUID.randomUUID(), trimmed);
         factory.lines().add(line);
         markDirty();
-        msg(player, "已创建产线 [" + line.shortId() + "] " + trimmed);
+        FactoryMessages.send(player, FactoryMessages.ok("已创建产线 [" + line.shortId() + "] " + trimmed));
         return 1;
     }
 
@@ -82,7 +126,7 @@ public final class LineService {
         factory.lines().remove(line.id());
         forgetLine(line.id());
         markDirty();
-        msg(player, "已删除产线 [" + line.shortId() + "] " + line.name());
+        FactoryMessages.send(player, FactoryMessages.ok("已删除产线 [" + line.shortId() + "] " + line.name()));
         return 1;
     }
 
@@ -120,7 +164,8 @@ public final class LineService {
         line.setRunning(running);
         wakeLine(line.id());
         markDirty();
-        msg(player, "产线 [" + line.shortId() + "] " + line.name() + " → " + (running ? "running" : "stopped"));
+        FactoryMessages.send(player, FactoryMessages.ok("产线 [" + line.shortId() + "] " + line.name()
+                + " → " + (running ? "运行" : "停止")));
         return 1;
     }
 
@@ -140,17 +185,32 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        msg(player, "产线 [" + line.shortId() + "] " + line.name()
-                + " | " + (line.running() ? "running" : "stopped")
-                + " | 机器 " + line.groups().size() + " 台");
+        MutableComponent head = Component.empty()
+                .append(FactoryMessages.lineLink(line.shortId()))
+                .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
+                .append(FactoryMessages.text(line.running() ? "运行" : "停止",
+                        line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
+                .append(FactoryMessages.text(" · " + line.groups().size() + " 台", FactoryMessages.INFO));
+        FactoryMessages.send(player, head);
+
         for (IoGroup group : line.groups()) {
-            String machineText = factory.machines().byId(group.machineId())
-                    .map(target -> "[" + target.shortId() + "] " + target.dimension().location()
-                            + " " + target.pos().toShortString())
-                    .orElse("[缺失] " + group.machineId());
-            msg(player, "  " + machineText);
-            msg(player, "    输入: " + describeSpecs(group.inputs()));
-            msg(player, "    输出: " + describeSpecs(group.outputs()));
+            Optional<MachineTarget> target = factory.machines().byId(group.machineId());
+            if (target.isEmpty()) {
+                FactoryMessages.send(player, FactoryMessages.err(
+                        "  机器 " + group.machineId() + " 已不在机器库"));
+                continue;
+            }
+            MachineTarget machine = target.get();
+            String where = machine.dimension().location() + " " + machine.pos().toShortString();
+            MutableComponent row = Component.empty()
+                    .append(FactoryMessages.text("  ", FactoryMessages.INFO))
+                    .append(FactoryMessages.hover(machine.shortId(), where))
+                    .append(FactoryMessages.text(" " + where, FactoryMessages.INFO));
+            FactoryMessages.send(player, row);
+            FactoryMessages.send(player, FactoryMessages.text(
+                    "    输入: " + describeSpecs(group.inputs()), FactoryMessages.PLAIN));
+            FactoryMessages.send(player, FactoryMessages.text(
+                    "    输出: " + describeSpecs(group.outputs()), FactoryMessages.PLAIN));
         }
         return 1;
     }
@@ -181,19 +241,23 @@ public final class LineService {
             return 0;
         }
         if (line.groupByMachine(machine.id()).isPresent()) {
-            msg(player, "这台机器已经在产线 " + line.name() + " 里了");
+            FactoryMessages.send(player, FactoryMessages.err(
+                    "这台机器已经在产线 " + line.name() + " 里了"));
             return 0;
         }
         for (PassiveLine other : factory.lines().all()) {
             if (!other.id().equals(line.id()) && other.groupByMachine(machine.id()).isPresent()) {
-                msg(player, "这台机器已经属于产线 " + other.name());
+                FactoryMessages.send(player, FactoryMessages.err("这台机器已经属于产线 " + other.name()));
+                FactoryMessages.send(player, FactoryMessages.info("先执行 /idf line " + other.shortId()
+                        + " remove " + machine.shortId() + "，再加到别的线"));
                 return 0;
             }
         }
         line.addGroup(new IoGroup(UUID.randomUUID(), machine.id()));
         wakeLine(line.id());
         markDirty();
-        msg(player, "已把机器 [" + machine.shortId() + "] 加入产线 " + line.name());
+        FactoryMessages.send(player, FactoryMessages.ok(
+                "已把机器 [" + machine.shortId() + "] 加入产线 " + line.name()));
         return 1;
     }
 
@@ -219,12 +283,14 @@ public final class LineService {
             return 0;
         }
         if (!line.removeGroupByMachine(machine.id())) {
-            msg(player, "这台机器不在产线 " + line.name() + " 里");
+            FactoryMessages.send(player, FactoryMessages.err(
+                    "这台机器不在产线 " + line.name() + " 里"));
             return 0;
         }
         wakeLine(line.id());
         markDirty();
-        msg(player, "已把机器 [" + machine.shortId() + "] 移出产线 " + line.name());
+        FactoryMessages.send(player, FactoryMessages.ok(
+                "已把机器 [" + machine.shortId() + "] 移出产线 " + line.name()));
         return 1;
     }
 
@@ -257,15 +323,18 @@ public final class LineService {
         if (group == null) {
             return 0;
         }
-        msg(player, "产线 " + line.name() + " / 机器 [" + machine.shortId() + "] "
-                + machine.dimension().location() + " " + machine.pos().toShortString());
-        msg(player, "  输入: " + describeSpecs(group.inputs()));
-        msg(player, "  输出: " + describeSpecs(group.outputs()));
+        String where = machine.dimension().location() + " " + machine.pos().toShortString();
+        FactoryMessages.send(player, FactoryMessages.info(
+                "产线 " + line.name() + " / 机器 [" + machine.shortId() + "] " + where));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  输入: " + describeSpecs(group.inputs()), FactoryMessages.PLAIN));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  输出: " + describeSpecs(group.outputs()), FactoryMessages.PLAIN));
         return 1;
     }
 
     /**
-     * 加一条输入规则。
+     * 加一条输入规则（物品）。
      *
      * @param player     发起请求的玩家
      * @param lineRef    产线短 id 或名字
@@ -276,11 +345,43 @@ public final class LineService {
      */
     public static int manageInputAdd(ServerPlayer player, String lineRef, String machineRef,
             ItemStack item, @Nullable String face) throws CommandSyntaxException {
-        return manageAdd(player, lineRef, machineRef, item, parseFace(face), true);
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(ResourceKey.item(item), parseFace(face), 0L), true);
     }
 
     /**
-     * 移除一条输入规则。
+     * 加一条输入规则（流体）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int manageInputAddFluid(ServerPlayer player, String lineRef, String machineRef,
+            String fluidId, @Nullable String face) throws CommandSyntaxException {
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(parseFluid(fluidId), parseFace(face), 0L), true);
+    }
+
+    /**
+     * 加一条输入规则（能量）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int manageInputAddEnergy(ServerPlayer player, String lineRef, String machineRef,
+            @Nullable String face) throws CommandSyntaxException {
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(ResourceKey.ENERGY, parseFace(face), 0L), true);
+    }
+
+    /**
+     * 移除一条输入规则（物品）。
      *
      * @param player     发起请求的玩家
      * @param lineRef    产线短 id 或名字
@@ -290,26 +391,84 @@ public final class LineService {
      */
     public static int manageInputRemove(ServerPlayer player, String lineRef, String machineRef,
             ItemStack item) {
-        return manageRemove(player, lineRef, machineRef, item, true);
+        return manageRemove(player, lineRef, machineRef, ResourceKey.item(item), true);
     }
 
     /**
-     * 加一条输出规则。
+     * 移除一条输入规则（流体）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @return 命令结果
+     */
+    public static int manageInputRemoveFluid(ServerPlayer player, String lineRef, String machineRef,
+            String fluidId) throws CommandSyntaxException {
+        return manageRemove(player, lineRef, machineRef, parseFluid(fluidId), true);
+    }
+
+    /**
+     * 移除一条输入规则（能量）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int manageInputRemoveEnergy(ServerPlayer player, String lineRef, String machineRef) {
+        return manageRemove(player, lineRef, machineRef, ResourceKey.ENERGY, true);
+    }
+
+    /**
+     * 加一条输出规则（物品）。
      *
      * @param player     发起请求的玩家
      * @param lineRef    产线短 id 或名字
      * @param machineRef 机器短 id
      * @param item       物品样本
-     * @param face       面名；{@code null} 或 {@code any} 表示不限
+     * @param face       面名
      * @return 命令结果
      */
     public static int manageOutputAdd(ServerPlayer player, String lineRef, String machineRef,
             ItemStack item, @Nullable String face) throws CommandSyntaxException {
-        return manageAdd(player, lineRef, machineRef, item, parseFace(face), false);
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(ResourceKey.item(item), parseFace(face), 0L), false);
     }
 
     /**
-     * 移除一条输出规则。
+     * 加一条输出规则（流体）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int manageOutputAddFluid(ServerPlayer player, String lineRef, String machineRef,
+            String fluidId, @Nullable String face) throws CommandSyntaxException {
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(parseFluid(fluidId), parseFace(face), 0L), false);
+    }
+
+    /**
+     * 加一条输出规则（能量）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int manageOutputAddEnergy(ServerPlayer player, String lineRef, String machineRef,
+            @Nullable String face) throws CommandSyntaxException {
+        return manageAdd(player, lineRef, machineRef,
+                new ResourceSpec(ResourceKey.ENERGY, parseFace(face), 0L), false);
+    }
+
+    /**
+     * 移除一条输出规则（物品）。
      *
      * @param player     发起请求的玩家
      * @param lineRef    产线短 id 或名字
@@ -319,11 +478,37 @@ public final class LineService {
      */
     public static int manageOutputRemove(ServerPlayer player, String lineRef, String machineRef,
             ItemStack item) {
-        return manageRemove(player, lineRef, machineRef, item, false);
+        return manageRemove(player, lineRef, machineRef, ResourceKey.item(item), false);
+    }
+
+    /**
+     * 移除一条输出规则（流体）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @return 命令结果
+     */
+    public static int manageOutputRemoveFluid(ServerPlayer player, String lineRef, String machineRef,
+            String fluidId) throws CommandSyntaxException {
+        return manageRemove(player, lineRef, machineRef, parseFluid(fluidId), false);
+    }
+
+    /**
+     * 移除一条输出规则（能量）。
+     *
+     * @param player     发起请求的玩家
+     * @param lineRef    产线短 id 或名字
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int manageOutputRemoveEnergy(ServerPlayer player, String lineRef, String machineRef) {
+        return manageRemove(player, lineRef, machineRef, ResourceKey.ENERGY, false);
     }
 
     private static int manageAdd(ServerPlayer player, String lineRef, String machineRef,
-            ItemStack item, @Nullable Direction face, boolean input) {
+            ResourceSpec spec, boolean input) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
@@ -340,22 +525,21 @@ public final class LineService {
         if (group == null) {
             return 0;
         }
-        String itemId = itemId(item);
-        ItemSpec spec = new ItemSpec(itemId, face);
         boolean added = input ? group.addInput(spec) : group.addOutput(spec);
         if (!added) {
-            msg(player, (input ? "输入" : "输出") + "里已经有 " + itemId + " 了");
+            FactoryMessages.send(player, FactoryMessages.err(
+                    (input ? "输入" : "输出") + "里已经有 " + spec.key().describe() + " 了"));
             return 0;
         }
         markDirty();
         wakeGroup(line.id(), group.id());
-        msg(player, "已加" + (input ? "输入" : "输出") + "：" + itemId
-                + " face=" + spec.faceName());
+        FactoryMessages.send(player, FactoryMessages.ok(
+                "已加" + (input ? "输入" : "输出") + "：" + spec.describe()));
         return 1;
     }
 
     private static int manageRemove(ServerPlayer player, String lineRef, String machineRef,
-            ItemStack item, boolean input) {
+            ResourceKey key, boolean input) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
@@ -372,15 +556,16 @@ public final class LineService {
         if (group == null) {
             return 0;
         }
-        String itemId = itemId(item);
-        boolean removed = input ? group.removeInput(itemId) : group.removeOutput(itemId);
+        boolean removed = input ? group.removeInput(key) : group.removeOutput(key);
         if (!removed) {
-            msg(player, (input ? "输入" : "输出") + "里没有 " + itemId);
+            FactoryMessages.send(player, FactoryMessages.err(
+                    (input ? "输入" : "输出") + "里没有 " + key.describe()));
             return 0;
         }
         markDirty();
         wakeGroup(line.id(), group.id());
-        msg(player, "已移除" + (input ? "输入" : "输出") + "：" + itemId);
+        FactoryMessages.send(player, FactoryMessages.ok(
+                "已移除" + (input ? "输入" : "输出") + "：" + key.describe()));
         return 1;
     }
 
@@ -392,12 +577,13 @@ public final class LineService {
     private static Factory requireFactory(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            msg(player, "Idle Factory 尚未启动（服务端未就绪）");
+            FactoryMessages.send(player, FactoryMessages.err("Idle Factory 尚未启动（服务端未就绪）"));
             return null;
         }
         Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
         if (factory.isEmpty()) {
-            msg(player, "你还没有工厂，先执行 /idf create");
+            FactoryMessages.send(player, FactoryMessages.err("你还没有工厂"));
+            FactoryMessages.send(player, FactoryMessages.info("先执行 /idf create"));
             return null;
         }
         return factory.get();
@@ -405,12 +591,11 @@ public final class LineService {
 
     @Nullable
     private static PassiveLine requireLine(ServerPlayer player, Factory factory, String ref) {
-        Optional<PassiveLine> line = factory.lines().byShortId(ref);
+        Optional<PassiveLine> line = FactoryRefs.line(factory, ref);
         if (line.isEmpty()) {
-            line = factory.lines().byName(ref);
-        }
-        if (line.isEmpty()) {
-            msg(player, "找不到产线 " + ref + "（用短 id 或名字）");
+            FactoryMessages.send(player, FactoryMessages.err("找不到产线 " + ref));
+            FactoryMessages.send(player, FactoryMessages.info(
+                    "现有 " + factory.lines().size() + " 条，用 /idf line 查看（短 id 或名字都能填）"));
             return null;
         }
         return line.get();
@@ -418,9 +603,10 @@ public final class LineService {
 
     @Nullable
     private static MachineTarget requireMachine(ServerPlayer player, Factory factory, String ref) {
-        Optional<MachineTarget> target = factory.machines().byShortId(ref);
+        Optional<MachineTarget> target = FactoryRefs.machine(factory, ref);
         if (target.isEmpty()) {
-            msg(player, "找不到机器 " + ref + "（先用 /idf factory connect 接入）");
+            FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + ref));
+            FactoryMessages.send(player, FactoryMessages.info("用 /idf factory info 查看机器库（短 id 8 位）"));
             return null;
         }
         return target.get();
@@ -430,7 +616,10 @@ public final class LineService {
     private static IoGroup requireGroup(ServerPlayer player, PassiveLine line, MachineTarget machine) {
         Optional<IoGroup> group = line.groupByMachine(machine.id());
         if (group.isEmpty()) {
-            msg(player, "这台机器不在产线 " + line.name() + " 里（先用 /idf line add）");
+            FactoryMessages.send(player, FactoryMessages.err(
+                    "机器 " + machine.shortId() + " 不在产线 " + line.name() + " 里"));
+            FactoryMessages.send(player, FactoryMessages.info(
+                    "先用 /idf line " + line.shortId() + " add " + machine.shortId()));
             return null;
         }
         return group.get();
@@ -438,7 +627,7 @@ public final class LineService {
 
     @Nullable
     private static Direction parseFace(@Nullable String face) throws CommandSyntaxException {
-        if (face == null || face.isEmpty() || ItemSpec.ANY.equalsIgnoreCase(face)) {
+        if (face == null || face.isEmpty() || ResourceSpec.ANY.equalsIgnoreCase(face)) {
             return null;
         }
         Direction direction = Direction.byName(face.toLowerCase(Locale.ROOT));
@@ -449,16 +638,26 @@ public final class LineService {
         return direction;
     }
 
-    private static String describeSpecs(List<ItemSpec> specs) {
+    private static ResourceKey parseFluid(String fluidId) throws CommandSyntaxException {
+        ResourceLocation id = ResourceLocation.tryParse(fluidId);
+        Fluid fluid = id == null ? Fluids.EMPTY : BuiltInRegistries.FLUID.get(id);
+        if (fluid == Fluids.EMPTY) {
+            throw new SimpleCommandExceptionType(Component.literal(
+                    "未知流体：" + fluidId)).create();
+        }
+        return ResourceKey.fluid(fluid);
+    }
+
+    private static String describeSpecs(List<ResourceSpec> specs) {
         if (specs.isEmpty()) {
             return "(空)";
         }
         StringBuilder builder = new StringBuilder();
-        for (ItemSpec spec : specs) {
+        for (ResourceSpec spec : specs) {
             if (builder.length() > 0) {
                 builder.append(", ");
             }
-            builder.append(spec.itemId()).append('[').append(spec.faceName()).append(']');
+            builder.append(spec.describe());
         }
         return builder.toString();
     }
@@ -493,9 +692,5 @@ public final class LineService {
         if (runtime != null) {
             runtime.lineRunner().forget(lineId);
         }
-    }
-
-    private static void msg(ServerPlayer player, String text) {
-        player.sendSystemMessage(Component.literal(text));
     }
 }

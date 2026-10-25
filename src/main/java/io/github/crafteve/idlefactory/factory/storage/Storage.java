@@ -2,46 +2,53 @@ package io.github.crafteve.idlefactory.factory.storage;
 
 import java.util.Map;
 
-import net.minecraft.world.item.ItemStack;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 /**
- * 工厂眼中的「仓库」：一个只进不出的容器接口。
+ * 工厂眼中的「仓库」。
  *
- * <p>工厂不实现存储，也不关心仓库背后是 AE2、是别的模组、还是空实现。它只会问两件事：
- * 「这些物品你能收多少」「这些物品你能给多少」。所有实现都必须是<b>事务安全</b>的：
- * {@code simulate} 为 {@code true} 时不得产生任何副作用。</p>
+ * <p>工厂不实现存储，也不关心仓库背后是 AE2、方块容器还是空实现。它只问三件事：
+ * 这个资源你能收多少、能给我多少、你支不支持这类资源。</p>
  *
- * <p>第一版只支持物品；以后扩流体 / 能量时，把方法签名换成 {@code ResourceType + amount}
- * 即可，工厂主体不用动。</p>
+ * <p>所有实现都必须是<b>事务安全</b>的：{@code simulate} 为 {@code true} 时不得产生任何副作用。</p>
  */
 public interface Storage {
     /**
      * 往仓库里放东西。
      *
-     * @param stack    物品样本（数量会被忽略）
-     * @param amount   想放几个，必须为正
+     * @param key      资源
+     * @param amount   想放多少，必须为正
      * @param simulate 为 {@code true} 时只回报能收多少，不产生副作用
      * @return 实际收下的数量（{@code 0..amount}）
      */
-    long insert(ItemStack stack, long amount, boolean simulate);
+    long insert(ResourceKey key, long amount, boolean simulate);
 
     /**
      * 从仓库里拿东西。
      *
-     * @param stack    物品样本（数量会被忽略）
-     * @param amount   想拿几个，必须为正
+     * @param key      资源
+     * @param amount   想拿多少，必须为正
      * @param simulate 为 {@code true} 时只回报能拿多少，不产生副作用
      * @return 实际拿出的数量（{@code 0..amount}）
      */
-    long extract(ItemStack stack, long amount, boolean simulate);
+    long extract(ResourceKey key, long amount, boolean simulate);
+
+    /**
+     * 这个仓库后端支不支持某类资源。
+     *
+     * @param kind 类型
+     * @return 支持时为 {@code true}
+     */
+    boolean supports(ResourceKind kind);
 
     /** 仓库当前是否完全没有内容（只用于界面展示，不参与搬运判断）。 */
     boolean isEmpty();
 
     /**
-     * 仓库里所有物品的快照。
+     * 仓库里所有资源的快照。
      *
-     * @return 物品注册名 → 数量；只含物品，不含流体
+     * @return 资源 → 数量
      */
-    Map<String, Long> snapshot();
+    Map<ResourceKey, Long> snapshot();
 }

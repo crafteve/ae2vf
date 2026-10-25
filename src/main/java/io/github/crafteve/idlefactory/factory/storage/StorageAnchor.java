@@ -1,57 +1,51 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
+import org.jetbrains.annotations.Nullable;
+
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
 
 /**
- * 仓库地址：工厂自己的仓库插在哪。
+ * 仓库地址：工厂的仓库插在哪。
  *
- * <p>工厂不能依赖「玩家在线 + 玩家身上有奇点」，否则玩家一离线工厂就找不到仓库。所以工厂把
- * 插头的地址记下来，重启后照着重插。</p>
+ * <p>工厂不能依赖「玩家在线」，所以把插头的地址记下来，重启后照着重插。地址现在有两种：
+ * AE2 量子环（{@link Ae2Anchor}）和方块容器组（{@link ContainerAnchor}）。</p>
  *
- * @param frequency 量子纠缠奇点的 {@code long} 频率，AE2 用它做全局查找键
- * @param dimension 环所在维度
- * @param ringPos   环的方块坐标，用来强制加载环所在区块
+ * <p>当前阶段两者互斥，一个工厂只挂一种；未来要组合时新增一个复合地址即可，旧存档不受影响。</p>
  */
-public record StorageAnchor(long frequency, ResourceKey<Level> dimension, BlockPos ringPos) {
-
-    private static final String TAG_FREQUENCY = "Frequency";
-    private static final String TAG_DIMENSION = "Dimension";
-    private static final String TAG_RING_POS = "RingPos";
+public sealed interface StorageAnchor permits Ae2Anchor, ContainerAnchor {
+    /** AE2 量子环。 */
+    String TYPE_AE2 = "ae2";
+    /** 方块容器组。 */
+    String TYPE_CONTAINER = "container";
 
     /**
      * 序列化成 NBT。
      *
      * @return 新标签
      */
-    public CompoundTag save() {
-        CompoundTag tag = new CompoundTag();
-        tag.putLong(TAG_FREQUENCY, this.frequency);
-        tag.putString(TAG_DIMENSION, this.dimension.location().toString());
-        tag.putLong(TAG_RING_POS, this.ringPos.asLong());
-        return tag;
-    }
+    CompoundTag save();
+
+    /**
+     * 给界面和日志用的一句话描述。
+     *
+     * @return 描述文本
+     */
+    String describe();
 
     /**
      * 从 NBT 读回来。
      *
+     * <p>只认带 {@code Type} 的新格式；当前阶段不兼容旧存档。</p>
+     *
      * @param tag 存档标签
-     * @return 地址；字段缺失或维度名非法时返回 {@code null}
+     * @return 地址；类型未知或字段缺失时返回 {@code null}
      */
-    public static StorageAnchor load(CompoundTag tag) {
-        if (!tag.contains(TAG_FREQUENCY) || !tag.contains(TAG_DIMENSION) || !tag.contains(TAG_RING_POS)) {
-            return null;
-        }
-        ResourceLocation id = ResourceLocation.tryParse(tag.getString(TAG_DIMENSION));
-        if (id == null) {
-            return null;
-        }
-        return new StorageAnchor(tag.getLong(TAG_FREQUENCY),
-                ResourceKey.create(Registries.DIMENSION, id),
-                BlockPos.of(tag.getLong(TAG_RING_POS)));
+    @Nullable
+    static StorageAnchor load(CompoundTag tag) {
+        return switch (tag.getString("Type")) {
+            case TYPE_AE2 -> Ae2Anchor.load(tag);
+            case TYPE_CONTAINER -> ContainerAnchor.load(tag);
+            default -> null;
+        };
     }
 }

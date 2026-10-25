@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.diag.Diagnostics;
 import io.github.crafteve.idlefactory.factory.line.LineLibrary;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
@@ -32,6 +33,8 @@ public final class Factory {
     private final LineLibrary lines = new LineLibrary();
     /** 运行状态，只由工厂主体和仓库解析结果改变。 */
     private FactoryState state = FactoryState.CREATED;
+    /** 诊断数据：事件环 + 搬运计数。纯运行时，不写存档。 */
+    private final Diagnostics diagnostics = new Diagnostics();
 
     /**
      * @param id    工厂 id
@@ -67,6 +70,11 @@ public final class Factory {
         return this.lines;
     }
 
+    /** 诊断数据。 */
+    public Diagnostics diagnostics() {
+        return this.diagnostics;
+    }
+
     /** 当前仓库，永远非 null。 */
     public Storage storage() {
         return this.storageLink.storage();
@@ -94,10 +102,15 @@ public final class Factory {
 
     /**
      * 重新解析仓库地址并同步状态。服务器启动、界面刷新、定时重试时调。
+     *
+     * @return 在线状态是否发生了变化
      */
-    public void refreshStorage() {
+    public boolean refreshStorage() {
+        boolean before = this.storageLink.online();
         this.storageLink.refresh();
+        boolean after = this.storageLink.online();
         updateStateFromStorage();
+        return before != after;
     }
 
     private void updateStateFromStorage() {

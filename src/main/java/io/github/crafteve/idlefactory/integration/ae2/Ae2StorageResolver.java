@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.integration.ae2;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
@@ -31,11 +32,14 @@ public final class Ae2StorageResolver implements StorageResolver {
     @Override
     @Nullable
     public Storage resolve(StorageAnchor anchor) {
-        ServerLevel level = this.server.getLevel(anchor.dimension());
+        if (!(anchor instanceof Ae2Anchor ae2)) {
+            return null;
+        }
+        ServerLevel level = this.server.getLevel(ae2.dimension());
         if (level == null) {
             return null;
         }
-        IGridNode node = Ae2Binder.node(level, anchor.frequency());
+        IGridNode node = Ae2Binder.node(level, ae2.frequency());
         if (node == null || !node.isActive()) {
             // 节点存在但没电 / 没启动 / 频道不够：仓库不可用
             return null;

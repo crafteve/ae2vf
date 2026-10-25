@@ -41,6 +41,13 @@ repositories {
             includeGroup("mezz.jei")
         }
     }
+    maven {
+        name = "Modrinth"
+        url = uri("https://api.modrinth.com/maven")
+        content {
+            includeGroup("maven.modrinth")
+        }
+    }
 }
 
 base {
@@ -135,6 +142,9 @@ dependencies {
     // JEI：可选依赖，编译期 + 开发运行期
     compileOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
     runtimeOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
+
+    // Mekanism：只用于本地运行期测试流体机器，不做编译依赖
+    localRuntime("maven.modrinth:mekanism:${mekanism_version}")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime

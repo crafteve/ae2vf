@@ -5,8 +5,12 @@ import java.util.List;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.diag.DiagEvent;
+import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.LineRunner;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
+import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.factory.target.MachineChecks;
 import io.github.crafteve.idlefactory.factory.target.MachineTarget;
@@ -38,8 +42,10 @@ public final class FactoryRuntime {
     private static final int REFRESH_INTERVAL = 20;
     /** 机器库对账间隔（tick）：每 5 秒清一次悬空引用。 */
     private static final int RECONCILE_INTERVAL = 100;
-    /** IO 执行间隔（tick）：每 5 tick 一轮，参考 AE2 bus 的 tickRate。 */
-    private static final int IO_INTERVAL = 5;
+    /** IO 执行间隔（tick）的下限。 */
+    public static final int MIN_IO_INTERVAL = 1;
+    /** IO 执行间隔（tick）的上限。 */
+    public static final int MAX_IO_INTERVAL = 20;
 
     private static FactoryRuntime instance;
 
@@ -48,6 +54,8 @@ public final class FactoryRuntime {
     private final LineRunner lineRunner = new LineRunner();
     private FactoryStore store;
     private int tickCounter;
+    /** IO 执行间隔（tick），默认每 tick 一轮；可由 /idf diag io 调整。 */
+    private int ioInterval = 1;
 
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
@@ -75,6 +83,7 @@ public final class FactoryRuntime {
         }
         runtime.save();
         runtime.lineRunner.clear();
+        DiagService.clearWatches();
         StorageLink.setResolver(null);
         instance = null;
     }
@@ -97,6 +106,20 @@ public final class FactoryRuntime {
     /** 服务端实例。 */
     public MinecraftServer server() {
         return this.server;
+    }
+
+    /** 当前 IO 间隔（tick）。 */
+    public int ioInterval() {
+        return this.ioInterval;
+    }
+
+    /**
+     * 设置 IO 间隔。
+     *
+     * @param ticks 间隔，会被夹到 {@link #MIN_IO_INTERVAL}..{@link #MAX_IO_INTERVAL}
+     */
+    public void setIoInterval(int ticks) {
+        this.ioInterval = Math.max(MIN_IO_INTERVAL, Math.min(MAX_IO_INTERVAL, ticks));
     }
 
     /**
@@ -130,7 +153,9 @@ public final class FactoryRuntime {
 
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
-        StorageLink.setResolver(new Ae2StorageResolver(this.server));
+        StorageLink.setResolver(new DispatchingStorageResolver(
+                new Ae2StorageResolver(this.server),
+                new ContainerStorageResolver(this.server)));
         this.manager.loadFrom(this.store.records());
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage();
@@ -144,20 +169,30 @@ public final class FactoryRuntime {
     public void tick() {
         this.tickCounter++;
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
+            long now = this.server.overworld().getGameTime();
             for (Factory factory : this.manager.all()) {
-                factory.refreshStorage();
+                String beforeError = factory.storageLink().lastError();
+                if (factory.refreshStorage()) {
+                    recordStorage(factory, now);
+                }
+                String afterError = factory.storageLink().lastError();
+                if (afterError != null && !afterError.equals(beforeError)) {
+                    factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.WARN,
+                            DiagEvent.Category.STOR, null, null, null, "仓库解析异常：" + afterError));
+                }
             }
+            DiagService.tick(this.server);
         }
         if (this.tickCounter % RECONCILE_INTERVAL == 0) {
             for (Factory factory : this.manager.all()) {
                 reconcileMachines(factory);
             }
         }
-        if (this.tickCounter % IO_INTERVAL == 0) {
+        if (this.tickCounter % this.ioInterval == 0) {
             this.lineRunner.tick(this.server, this.manager);
         }
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
-            IdleFactory.LOGGER.debug("Idle Factory heartbeat: {} factory instance(s), tick {}",
+            IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
         }
     }
@@ -171,11 +206,14 @@ public final class FactoryRuntime {
      * @param factory 工厂
      */
     private void reconcileMachines(Factory factory) {
+        long now = this.server.overworld().getGameTime();
         List<UUID> stale = new ArrayList<>();
         for (MachineTarget target : factory.machines().all()) {
             ServerLevel level = this.server.getLevel(target.dimension());
             if (level == null) {
                 stale.add(target.id());
+                factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
+                        DiagEvent.Category.MACH, null, target.id(), null, "维度不存在，自动移出机器库"));
                 continue;
             }
             if (!level.isLoaded(target.pos())) {
@@ -183,6 +221,8 @@ public final class FactoryRuntime {
             }
             if (!MachineChecks.isSupported(level, target.pos())) {
                 stale.add(target.id());
+                factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
+                        DiagEvent.Category.MACH, null, target.id(), null, "方块已消失，自动移出机器库"));
             }
         }
         if (stale.isEmpty()) {
@@ -196,6 +236,20 @@ public final class FactoryRuntime {
         }
         markDirty();
         IdleFactory.LOGGER.info("Idle Factory: removed {} stale machine(s)", stale.size());
+    }
+
+    /**
+     * 记一条仓库状态迁移。
+     *
+     * @param factory 工厂
+     * @param now     当前游戏时间
+     */
+    private static void recordStorage(Factory factory, long now) {
+        boolean online = factory.storageLink().online();
+        factory.diagnostics().record(DiagEvent.of(now,
+                online ? DiagEvent.Level.OK : DiagEvent.Level.WARN,
+                DiagEvent.Category.STOR, null, null, null,
+                online ? "仓库上线" : "仓库离线"));
     }
 
     @SubscribeEvent
