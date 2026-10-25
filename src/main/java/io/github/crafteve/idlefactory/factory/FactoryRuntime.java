@@ -9,6 +9,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -79,12 +80,13 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 标记档案已变化，下一次停止时写盘。
+     * 标记档案已变化，立即同步进存档容器。
+     *
+     * <p>不能只 {@code setDirty()}：{@code FactoryStore.save()} 写的是它自己的 {@code records}，
+     * 而 {@code records} 只在 {@code setRecords(...)} 时更新。先同步，再让存档去写盘。</p>
      */
     public void markDirty() {
-        if (this.store != null) {
-            this.store.setDirty();
-        }
+        save();
     }
 
     /**
@@ -135,6 +137,20 @@ public final class FactoryRuntime {
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
         start(event.getServer());
+    }
+
+    /**
+     * 世界保存之前调一次。
+     *
+     * <p>这是<b>唯一可靠的写盘时机</b>：{@code MinecraftServer#stopServer} 会先
+     * {@code saveEverything()} 再发 {@link ServerStoppedEvent}，等后者再标脏就没人写盘了。</p>
+     */
+    @SubscribeEvent
+    public static void onServerStopping(ServerStoppingEvent event) {
+        FactoryRuntime runtime = instance;
+        if (runtime != null) {
+            runtime.save();
+        }
     }
 
     @SubscribeEvent
