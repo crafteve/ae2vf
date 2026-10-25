@@ -80,6 +80,7 @@ public final class LineService {
             return 0;
         }
         factory.lines().remove(line.id());
+        forgetLine(line.id());
         markDirty();
         msg(player, "已删除产线 [" + line.shortId() + "] " + line.name());
         return 1;
@@ -117,6 +118,7 @@ public final class LineService {
             return 0;
         }
         line.setRunning(running);
+        wakeLine(line.id());
         markDirty();
         msg(player, "产线 [" + line.shortId() + "] " + line.name() + " → " + (running ? "running" : "stopped"));
         return 1;
@@ -189,6 +191,7 @@ public final class LineService {
             }
         }
         line.addGroup(new IoGroup(UUID.randomUUID(), machine.id()));
+        wakeLine(line.id());
         markDirty();
         msg(player, "已把机器 [" + machine.shortId() + "] 加入产线 " + line.name());
         return 1;
@@ -219,6 +222,7 @@ public final class LineService {
             msg(player, "这台机器不在产线 " + line.name() + " 里");
             return 0;
         }
+        wakeLine(line.id());
         markDirty();
         msg(player, "已把机器 [" + machine.shortId() + "] 移出产线 " + line.name());
         return 1;
@@ -344,6 +348,7 @@ public final class LineService {
             return 0;
         }
         markDirty();
+        wakeGroup(line.id(), group.id());
         msg(player, "已加" + (input ? "输入" : "输出") + "：" + itemId
                 + " face=" + spec.faceName());
         return 1;
@@ -374,6 +379,7 @@ public final class LineService {
             return 0;
         }
         markDirty();
+        wakeGroup(line.id(), group.id());
         msg(player, "已移除" + (input ? "输入" : "输出") + "：" + itemId);
         return 1;
     }
@@ -465,6 +471,27 @@ public final class LineService {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
             runtime.markDirty();
+        }
+    }
+
+    private static void wakeLine(UUID lineId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.lineRunner().wake(lineId);
+        }
+    }
+
+    private static void wakeGroup(UUID lineId, UUID groupId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.lineRunner().wakeGroup(lineId, groupId);
+        }
+    }
+
+    private static void forgetLine(UUID lineId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.lineRunner().forget(lineId);
         }
     }
 

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.io.LineRunner;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.factory.target.MachineChecks;
@@ -37,11 +38,14 @@ public final class FactoryRuntime {
     private static final int REFRESH_INTERVAL = 20;
     /** 机器库对账间隔（tick）：每 5 秒清一次悬空引用。 */
     private static final int RECONCILE_INTERVAL = 100;
+    /** IO 执行间隔（tick）：每 5 tick 一轮，参考 AE2 bus 的 tickRate。 */
+    private static final int IO_INTERVAL = 5;
 
     private static FactoryRuntime instance;
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
+    private final LineRunner lineRunner = new LineRunner();
     private FactoryStore store;
     private int tickCounter;
 
@@ -70,6 +74,7 @@ public final class FactoryRuntime {
             return;
         }
         runtime.save();
+        runtime.lineRunner.clear();
         StorageLink.setResolver(null);
         instance = null;
     }
@@ -82,6 +87,11 @@ public final class FactoryRuntime {
     /** 档案柜。 */
     public FactoryManager manager() {
         return this.manager;
+    }
+
+    /** IO 执行器。 */
+    public LineRunner lineRunner() {
+        return this.lineRunner;
     }
 
     /** 服务端实例。 */
@@ -142,6 +152,9 @@ public final class FactoryRuntime {
             for (Factory factory : this.manager.all()) {
                 reconcileMachines(factory);
             }
+        }
+        if (this.tickCounter % IO_INTERVAL == 0) {
+            this.lineRunner.tick(this.server, this.manager);
         }
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.debug("Idle Factory heartbeat: {} factory instance(s), tick {}",
