@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -34,11 +35,15 @@ public final class GroupRunner {
     /**
      * 一次组级搬运的结果。
      *
-     * @param fed        补进机器的数量
-     * @param pulled     从机器抽出的数量
-     * @param lastReason 没搬动时的最后一个原因
+     * @param fed         补进机器的总数
+     * @param pulled      从机器抽出的总数
+     * @param fedByKey    按资源拆分的补料量
+     * @param pulledByKey 按资源拆分的抽取量
+     * @param lastReason  没搬动时的最后一个原因
      */
-    public record GroupRun(long fed, long pulled, IoResult.Reason lastReason) {
+    public record GroupRun(long fed, long pulled,
+            Map<ResourceKey, Long> fedByKey, Map<ResourceKey, Long> pulledByKey,
+            IoResult.Reason lastReason) {
         /** 一共搬了多少。 */
         public long moved() {
             return this.fed + this.pulled;
@@ -66,6 +71,8 @@ public final class GroupRunner {
     public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, IoGroup group) {
         long fed = 0L;
         long pulled = 0L;
+        Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
+        Map<ResourceKey, Long> pulledByKey = new LinkedHashMap<>();
         IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
 
         for (ResourceSpec spec : group.inputs()) {
@@ -77,6 +84,9 @@ public final class GroupRunner {
             }
             IoResult result = IoTransfer.feed(storage, adapter);
             fed += result.moved();
+            if (result.moved() > 0L) {
+                fedByKey.merge(spec.key(), result.moved(), Long::sum);
+            }
             if (result.reason() != IoResult.Reason.OK) {
                 lastReason = result.reason();
             }
@@ -95,6 +105,9 @@ public final class GroupRunner {
             }
             IoResult result = IoTransfer.pull(storage, adapter);
             pulled += result.moved();
+            if (result.moved() > 0L) {
+                pulledByKey.merge(spec.key(), result.moved(), Long::sum);
+            }
             if (result.reason() != IoResult.Reason.OK) {
                 lastReason = result.reason();
             }
@@ -104,7 +117,7 @@ public final class GroupRunner {
             }
         }
 
-        return new GroupRun(fed, pulled, lastReason);
+        return new GroupRun(fed, pulled, fedByKey, pulledByKey, lastReason);
     }
 
     private static ResourceAdapter adapter(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input) {

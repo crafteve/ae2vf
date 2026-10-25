@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
+import io.github.crafteve.idlefactory.factory.diag.Diagnostics;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
@@ -77,12 +78,13 @@ public final class LineRunner {
             }
 
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group);
+            Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
             if (result.movedAnything()) {
-                // 成功搬运只进计数器，不进事件流：一次搬运一条事件会把 tail 淹掉
-                factory.diagnostics().line(line.id()).addMoved(result.fed(), result.pulled(), now);
+                stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(), now);
                 groupState.idleSince = -1L;
                 groupState.sleeping = false;
             } else {
+                stats.markBlocked(target.id(), result.lastReason(), now);
                 sleepIfIdle(groupState, now);
             }
         }
@@ -92,8 +94,12 @@ public final class LineRunner {
             lineState.wakeAt = earliestWake == Long.MAX_VALUE
                     ? now + RunnerState.WAKE_INTERVAL
                     : earliestWake;
+            if (lineState.sleepSince < 0L) {
+                lineState.sleepSince = now;
+            }
         } else {
             lineState.sleeping = false;
+            lineState.sleepSince = -1L;
         }
     }
 
@@ -139,6 +145,17 @@ public final class LineRunner {
             return 0L;
         }
         return state.wakeAt;
+    }
+
+    /**
+     * 这条线是什么时候开始睡的。
+     *
+     * @param lineId 产线 id
+     * @return 睡眠起点；没在睡时为 {@code -1}
+     */
+    public long sleepSince(UUID lineId) {
+        RunnerState.LineState state = this.state.peek(lineId);
+        return state == null ? -1L : state.sleepSince;
     }
 
     /**

@@ -106,8 +106,7 @@ public final class DiagService {
                 .append(FactoryMessages.text(line.running() ? "运行" : "停止",
                         line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
                 .append(FactoryMessages.text(" · " + line.groups().size() + " 组 · "
-                        + stats.ratePerSecond() + "/s（入" + stats.rateIn()
-                        + " 出" + stats.rateOut() + "）", FactoryMessages.INFO));
+                        + stats.totalRate() + "/s", FactoryMessages.INFO));
         long sleepUntil = runtime.lineRunner().sleepUntil(line.id());
         if (sleepUntil > now) {
             row.append(FactoryMessages.text(" · 睡眠 " + seconds(sleepUntil - now) + "s",
@@ -229,14 +228,15 @@ public final class DiagService {
     }
 
     /**
-     * 开关实时监控：打开后按设定间隔往 actionbar 推一行，不刷聊天栏。
+     * 开关实时监控：汇总走 actionbar，详情走聊天栏。
      *
      * @param player  玩家
      * @param lineRef 产线引用
      * @param seconds 推送间隔（秒，1–60）
+     * @param detail  是否推详情（聊天栏多行）
      * @return 命令结果
      */
-    public static int watch(ServerPlayer player, String lineRef, int seconds) {
+    public static int watch(ServerPlayer player, String lineRef, int seconds, boolean detail) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
@@ -257,10 +257,12 @@ public final class DiagService {
             return 0;
         }
         int clamped = Math.max(1, Math.min(60, seconds));
-        Watch watch = new Watch(factory.id(), line.id(), clamped * 20L, now(FactoryRuntime.get().server()));
+        Watch watch = new Watch(factory.id(), line.id(), clamped * 20L,
+                now(FactoryRuntime.get().server()), detail);
         WATCHES.put(player.getUUID(), watch);
         FactoryMessages.send(player, FactoryMessages.ok("开始监控 " + line.shortId()
-                + "，每 " + clamped + " 秒推到 actionbar，再执行一次关闭"));
+                + (detail ? "（详情，每 " + clamped + " 秒）" : "（汇总，每 " + clamped + " 秒）")
+                + "，再执行一次关闭"));
         return 1;
     }
 
@@ -406,30 +408,67 @@ public final class DiagService {
                 continue;
             }
             watch.nextPush = now + watch.intervalTicks;
-            player.displayClientMessage(watchRow(factory.get(), line.get(), now), true);
+            long sleepUntil = runtime.lineRunner().sleepUntil(line.get().id());
+            long sleepSince = runtime.lineRunner().sleepSince(line.get().id());
+            if (watch.detail) {
+                for (Component row : DiagRender.watchDetail(server, factory.get(), line.get(),
+                        now, sleepUntil, sleepSince)) {
+                    FactoryMessages.send(player, row);
+                }
+            } else {
+                player.displayClientMessage(DiagRender.watchSummary(factory.get(), line.get(),
+                        now, sleepUntil, sleepSince), true);
+            }
         }
-    }
-
-    private static Component watchRow(Factory factory, PassiveLine line, long now) {
-        Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
-        long sleepUntil = FactoryRuntime.get().lineRunner().sleepUntil(line.id());
-        MutableComponent row = Component.empty()
-                .append(FactoryMessages.text(line.shortId() + " " + line.name() + " · ",
-                        FactoryMessages.INFO))
-                .append(FactoryMessages.text(line.running() ? "运行" : "停止",
-                        line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + stats.ratePerSecond() + "/s", FactoryMessages.PLAIN))
-                .append(FactoryMessages.text(" · 入" + stats.rateIn() + " 出" + stats.rateOut(),
-                        FactoryMessages.PLAIN));
-        if (sleepUntil > now) {
-            row.append(FactoryMessages.text(" · 睡", FactoryMessages.DIM));
-        }
-        return row;
     }
 
     /** 玩家下线、服务器停止时清掉监控。 */
     public static void clearWatches() {
         WATCHES.clear();
+    }
+
+    // ------------------------------------------------------------------
+    // IO 耗时
+    // ------------------------------------------------------------------
+
+    /** 最近多少个 IO 轮次的耗时。 */
+    private static final int IO_COST_SAMPLES = 20;
+    private static final long[] IO_COST = new long[IO_COST_SAMPLES];
+    private static int ioCostIndex;
+    private static int ioCostCount;
+
+    /**
+     * 记一次 IO 轮次的耗时。
+     *
+     * @param nanos 纳秒
+     */
+    public static void recordIoCost(long nanos) {
+        IO_COST[ioCostIndex] = nanos;
+        ioCostIndex = (ioCostIndex + 1) % IO_COST_SAMPLES;
+        if (ioCostCount < IO_COST_SAMPLES) {
+            ioCostCount++;
+        }
+    }
+
+    /** 最近 IO 轮次的平均耗时（毫秒）。 */
+    public static double ioCostAvgMs() {
+        if (ioCostCount == 0) {
+            return 0.0D;
+        }
+        long total = 0L;
+        for (int i = 0; i < ioCostCount; i++) {
+            total += IO_COST[i];
+        }
+        return total / (double) ioCostCount / 1_000_000.0D;
+    }
+
+    /** 最近 IO 轮次的最大耗时（毫秒）。 */
+    public static double ioCostMaxMs() {
+        long max = 0L;
+        for (int i = 0; i < ioCostCount; i++) {
+            max = Math.max(max, IO_COST[i]);
+        }
+        return max / 1_000_000.0D;
     }
 
     // ------------------------------------------------------------------
@@ -476,13 +515,15 @@ public final class DiagService {
         private final UUID factoryId;
         private final UUID lineId;
         private final long intervalTicks;
+        private final boolean detail;
         private long nextPush;
 
-        private Watch(UUID factoryId, UUID lineId, long intervalTicks, long nextPush) {
+        private Watch(UUID factoryId, UUID lineId, long intervalTicks, long nextPush, boolean detail) {
             this.factoryId = factoryId;
             this.lineId = lineId;
             this.intervalTicks = intervalTicks;
             this.nextPush = nextPush;
+            this.detail = detail;
         }
     }
 }

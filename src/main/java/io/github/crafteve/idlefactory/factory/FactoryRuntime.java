@@ -189,7 +189,9 @@ public final class FactoryRuntime {
             }
         }
         if (this.tickCounter % this.ioInterval == 0) {
+            long start = System.nanoTime();
             this.lineRunner.tick(this.server, this.manager);
+            DiagService.recordIoCost(System.nanoTime() - start);
         }
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",

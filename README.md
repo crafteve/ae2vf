@@ -88,7 +88,8 @@
 /idf diag                            健康摘要
 /idf diag why <line> [machine]       体检：这条线为什么不动
 /idf diag tail [n]                   最近 n 条事件（默认 10，上限 20）
-/idf diag watch <line> [秒]          实时速率推到 actionbar，再敲一次关闭
+/idf diag watch <line> [秒]          汇总：资源速率 / 卡住组 / IO 耗时 / 睡眠
+/idf diag watch <line> detail [秒]   详情：资源明细 + 每台机器的阻塞原因
 /idf diag io [ticks]                 查看 / 调整 IO 间隔（1–20 tick）
 /idf diag export                     把事件导出到 logs/idlefactory/
 ```
@@ -106,6 +107,8 @@ Tab 补全按上下文过滤：`add` 只补还没进任何产线的机器，`rem
 `/idf diag why <line>` 是现场体检，不回放历史：机器还在吗、区块加载了吗、面有对应能力吗、仓库有料吗、机器收得下吗、输出槽有东西吗。六问按固定顺序答，「为什么不动」不用猜。
 
 事件只存内存，每个工厂 200 条，不写存档；要留证据用 `/idf diag export`，导到 `logs/idlefactory/`。
+
+`/idf diag watch <line>` 每秒一行汇总：按类型分开的资源速率、卡住组数、IO 轮次耗时（类似 MSPT）、睡眠状态。`detail` 模式每 N 秒推 3–5 行：资源明细 + 每台机器卡在哪一步。
 
 ## 资源类型
 

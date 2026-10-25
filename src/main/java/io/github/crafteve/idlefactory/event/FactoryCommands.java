@@ -325,10 +325,15 @@ public final class FactoryCommands {
                 .then(Commands.literal("watch")
                         .then(Commands.argument("line", StringArgumentType.word())
                                 .suggests(LINE_SUGGESTIONS)
-                                .executes(context -> DiagService.watch(player(context), lineRef(context), 1))
+                                .executes(context -> DiagService.watch(player(context), lineRef(context), 1, false))
+                                .then(Commands.literal("detail")
+                                        .executes(context -> DiagService.watch(player(context), lineRef(context), 5, true))
+                                        .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
+                                                .executes(context -> DiagService.watch(player(context), lineRef(context),
+                                                        IntegerArgumentType.getInteger(context, "seconds"), true))))
                                 .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
                                         .executes(context -> DiagService.watch(player(context), lineRef(context),
-                                                IntegerArgumentType.getInteger(context, "seconds"))))))
+                                                IntegerArgumentType.getInteger(context, "seconds"), false)))))
                 .then(Commands.literal("io")
                         .executes(context -> DiagService.io(player(context)))
                         .then(Commands.argument("ticks", IntegerArgumentType.integer(

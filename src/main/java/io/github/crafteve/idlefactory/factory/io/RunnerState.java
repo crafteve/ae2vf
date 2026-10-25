@@ -59,6 +59,7 @@ public final class RunnerState {
             return;
         }
         line.sleeping = false;
+        line.sleepSince = -1L;
         for (GroupState group : line.groups.values()) {
             group.sleeping = false;
             group.idleSince = -1L;
@@ -77,6 +78,7 @@ public final class RunnerState {
             return;
         }
         line.sleeping = false;
+        line.sleepSince = -1L;
         GroupState group = line.groups.get(groupId);
         if (group != null) {
             group.sleeping = false;
@@ -102,6 +104,8 @@ public final class RunnerState {
     public static final class LineState {
         /** 整条产线是否睡眠。 */
         public boolean sleeping;
+        /** 进入睡眠的时间；{@code -1} 表示没在睡。 */
+        public long sleepSince = -1L;
         /** 下次唤醒时间（game time）。 */
         public long wakeAt;
         /** 组状态。 */
