@@ -1,13 +1,20 @@
 package io.github.crafteve.idlefactory.event;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.line.LineService;
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.target.MachineTarget;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.commands.arguments.item.ItemInput;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -19,37 +26,43 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 
 /**
  * 工厂指令入口。第一版不做 UI，所有调试都走这里。
  *
- * <pre>
- * /idf create
- * /idf delete
- * /idf factory connect
- * /idf factory disconnect [id]
- * /idf factory info
- * /idf line create &lt;name&gt;
- * /idf line delete &lt;line&gt;
- * /idf line add &lt;line&gt; &lt;machine&gt;
- * /idf line remove &lt;line&gt; &lt;machine&gt;
- * /idf line start &lt;line&gt;
- * /idf line end &lt;line&gt;
- * /idf line info &lt;line&gt;
- * /idf line manage &lt;line&gt; &lt;machine&gt; info
- * /idf line manage &lt;line&gt; &lt;machine&gt; input  add &lt;item&gt; [face]
- * /idf line manage &lt;line&gt; &lt;machine&gt; input  remove &lt;item&gt;
- * /idf line manage &lt;line&gt; &lt;machine&gt; output add &lt;item&gt; [face]
- * /idf line manage &lt;line&gt; &lt;machine&gt; output remove &lt;item&gt;
- * /idf storage connect
- * /idf storage info
- * /idf storage get &lt;item&gt; [count]
- * /idf storage put &lt;item&gt; [count]
- * </pre>
+ * <p>{@code <line>} 和 {@code <machine>} 都带 Tab 补全：产线补短 id / 名字，机器补短 id 并带
+ * 坐标 tooltip。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryCommands {
+    /** 产线参数补全。 */
+    private static final SuggestionProvider<CommandSourceStack> LINE_SUGGESTIONS = (context, builder) -> {
+        Factory factory = resolveFactory(context.getSource());
+        if (factory != null) {
+            for (PassiveLine line : factory.lines().all()) {
+                builder.suggest(line.shortId());
+                if (!line.name().contains(" ")) {
+                    builder.suggest(line.name());
+                }
+            }
+        }
+        return builder.buildFuture();
+    };
+
+    /** 机器参数补全：短 id + 坐标 tooltip。 */
+    private static final SuggestionProvider<CommandSourceStack> MACHINE_SUGGESTIONS = (context, builder) -> {
+        Factory factory = resolveFactory(context.getSource());
+        if (factory != null) {
+            for (MachineTarget target : factory.machines().all()) {
+                builder.suggest(target.shortId(), Component.literal(
+                        target.dimension().location() + " " + target.pos().toShortString()));
+            }
+        }
+        return builder.buildFuture();
+    };
+
     private FactoryCommands() {
         // 纯静态事件处理器
     }
@@ -79,6 +92,7 @@ public final class FactoryCommands {
                 .then(Commands.literal("disconnect")
                         .executes(context -> FactoryService.disconnectMachine(player(context)))
                         .then(Commands.argument("id", StringArgumentType.word())
+                                .suggests(MACHINE_SUGGESTIONS)
                                 .executes(context -> FactoryService.disconnectMachine(
                                         player(context), StringArgumentType.getString(context, "id")))))
                 .then(Commands.literal("info")
@@ -93,29 +107,39 @@ public final class FactoryCommands {
                                         StringArgumentType.getString(context, "name")))))
                 .then(Commands.literal("delete")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .executes(context -> LineService.delete(player(context), lineRef(context)))))
                 .then(Commands.literal("add")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .then(Commands.argument("machine", StringArgumentType.word())
+                                        .suggests(MACHINE_SUGGESTIONS)
                                         .executes(context -> LineService.add(player(context),
                                                 lineRef(context), machineRef(context))))))
                 .then(Commands.literal("remove")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .then(Commands.argument("machine", StringArgumentType.word())
+                                        .suggests(MACHINE_SUGGESTIONS)
                                         .executes(context -> LineService.remove(player(context),
                                                 lineRef(context), machineRef(context))))))
                 .then(Commands.literal("start")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .executes(context -> LineService.start(player(context), lineRef(context)))))
                 .then(Commands.literal("end")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .executes(context -> LineService.end(player(context), lineRef(context)))))
                 .then(Commands.literal("info")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .executes(context -> LineService.info(player(context), lineRef(context)))))
                 .then(Commands.literal("manage")
                         .then(Commands.argument("line", StringArgumentType.word())
+                                .suggests(LINE_SUGGESTIONS)
                                 .then(Commands.argument("machine", StringArgumentType.word())
+                                        .suggests(MACHINE_SUGGESTIONS)
                                         .then(Commands.literal("info")
                                                 .executes(context -> LineService.manageInfo(
                                                         player(context), lineRef(context), machineRef(context))))
@@ -123,13 +147,6 @@ public final class FactoryCommands {
                                         .then(manageSide(event, false)))));
     }
 
-    /**
-     * 构建 manage 的 input / output 子树。
-     *
-     * @param event 注册事件（取 build context）
-     * @param input 是输入侧还是输出侧
-     * @return 子树
-     */
     private static LiteralArgumentBuilder<CommandSourceStack> manageSide(RegisterCommandsEvent event,
             boolean input) {
         String side = input ? "input" : "output";
@@ -185,6 +202,20 @@ public final class FactoryCommands {
                                         .executes(context -> FactoryService.storagePut(
                                                 player(context), item(context),
                                                 IntegerArgumentType.getInteger(context, "count"))))));
+    }
+
+    @Nullable
+    private static Factory resolveFactory(CommandSourceStack source) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return null;
+        }
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            return runtime.manager().byOwner(player.getUUID()).orElse(null);
+        } catch (CommandSyntaxException e) {
+            return null;
+        }
     }
 
     private static ServerPlayer player(CommandContext<CommandSourceStack> context)
