@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -55,6 +57,7 @@ public final class FactoryRuntime {
             return;
         }
         runtime.save();
+        StorageLink.setResolver(null);
         instance = null;
     }
 
@@ -103,7 +106,11 @@ public final class FactoryRuntime {
 
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
+        StorageLink.setResolver(new Ae2StorageResolver(this.server));
         this.manager.loadFrom(this.store.records());
+        for (Factory factory : this.manager.all()) {
+            factory.refreshStorage();
+        }
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
 

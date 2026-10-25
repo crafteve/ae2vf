@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.storage.WarehouseAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -107,8 +107,8 @@ public final class FactoryStore extends SavedData {
             if (!entry.hasUUID(TAG_ID) || !entry.hasUUID(TAG_OWNER)) {
                 continue;
             }
-            WarehouseAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
-                    ? WarehouseAnchor.load(entry.getCompound(TAG_ANCHOR))
+            StorageAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
+                    ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
                     : null;
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor));
         }
@@ -124,6 +124,6 @@ public final class FactoryStore extends SavedData {
      * @param owner  拥有者玩家 uuid
      * @param anchor 仓库地址；未绑定为 {@code null}
      */
-    public record FactoryRecord(UUID id, UUID owner, @Nullable WarehouseAnchor anchor) {
+    public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor) {
     }
 }

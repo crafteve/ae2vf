@@ -3,24 +3,24 @@ package io.github.crafteve.idlefactory.factory.storage;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * 仓库插头：把「地址」翻译成「仓库」，并且永远对外给出一个非 null 的 {@link Warehouse}。
+ * 仓库插头：把「地址」翻译成「仓库」，并且永远对外给出一个非 null 的 {@link Storage}。
  *
- * <p>工厂主体只调 {@link #warehouse()}，永远不查「网络在不在线」。仓库连不上时插头交出的就是
- * {@link EmptyWarehouse}，于是工厂表现为「没料」和「没地方放」，而不是「网络断线」。</p>
+ * <p>工厂主体只调 {@link #storage()}，永远不查「网络在不在线」。仓库连不上时插头交出的就是
+ * {@link EmptyStorage}，于是工厂表现为「没料」和「没地方放」，而不是「网络断线」。</p>
  *
- * <p>具体怎么从地址找到仓库，由启动时注入的 {@link WarehouseResolver} 决定。
+ * <p>具体怎么从地址找到仓库，由启动时注入的 {@link StorageResolver} 决定。
  * 第一版注入的是空解析器，接 AE2 之前所有仓库都是空的。</p>
  */
-public final class WarehouseLink {
+public final class StorageLink {
     /** 全局解析器；由 {@code FactoryRuntime} 在服务器启动时替换成真实实现。 */
-    private static WarehouseResolver resolver = anchor -> null;
+    private static StorageResolver resolver = anchor -> null;
 
     /** 仓库地址；未绑定时为 {@code null}。 */
     @Nullable
-    private WarehouseAnchor anchor;
+    private StorageAnchor anchor;
 
     /** 当前交给工厂的仓库，永远非 null。 */
-    private Warehouse warehouse = EmptyWarehouse.INSTANCE;
+    private Storage storage = EmptyStorage.INSTANCE;
 
     /** 上一次解析是否真的拿到了仓库。 */
     private boolean online;
@@ -30,7 +30,7 @@ public final class WarehouseLink {
      *
      * @param newResolver 新解析器，传 {@code null} 会退回空解析器
      */
-    public static void setResolver(@Nullable WarehouseResolver newResolver) {
+    public static void setResolver(@Nullable StorageResolver newResolver) {
         resolver = newResolver == null ? (anchor -> null) : newResolver;
     }
 
@@ -39,7 +39,7 @@ public final class WarehouseLink {
      *
      * @param newAnchor 新地址；传 {@code null} 表示解绑
      */
-    public void bind(@Nullable WarehouseAnchor newAnchor) {
+    public void bind(@Nullable StorageAnchor newAnchor) {
         this.anchor = newAnchor;
         refresh();
     }
@@ -49,11 +49,11 @@ public final class WarehouseLink {
      */
     public void refresh() {
         if (this.anchor == null) {
-            this.warehouse = EmptyWarehouse.INSTANCE;
+            this.storage = EmptyStorage.INSTANCE;
             this.online = false;
             return;
         }
-        Warehouse resolved;
+        Storage resolved;
         try {
             resolved = resolver.resolve(this.anchor);
         } catch (RuntimeException e) {
@@ -61,17 +61,17 @@ public final class WarehouseLink {
             resolved = null;
         }
         if (resolved == null) {
-            this.warehouse = EmptyWarehouse.INSTANCE;
+            this.storage = EmptyStorage.INSTANCE;
             this.online = false;
         } else {
-            this.warehouse = resolved;
+            this.storage = resolved;
             this.online = true;
         }
     }
 
     /** 当前仓库，永远非 null。 */
-    public Warehouse warehouse() {
-        return this.warehouse;
+    public Storage storage() {
+        return this.storage;
     }
 
     /** 上一次解析是否成功拿到仓库。只用于界面诊断，不参与搬运判断。 */
@@ -81,7 +81,7 @@ public final class WarehouseLink {
 
     /** 当前地址；未绑定时为 {@code null}。 */
     @Nullable
-    public WarehouseAnchor anchor() {
+    public StorageAnchor anchor() {
         return this.anchor;
     }
 }

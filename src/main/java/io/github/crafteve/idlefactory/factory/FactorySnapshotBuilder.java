@@ -2,8 +2,8 @@ package io.github.crafteve.idlefactory.factory;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.storage.WarehouseAnchor;
-import io.github.crafteve.idlefactory.factory.storage.WarehouseLink;
+import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 
 /**
  * 把工厂当前状态整理成「前端能直接用的东西」。
@@ -23,8 +23,8 @@ public final class FactorySnapshotBuilder {
      * @return 摘要文本
      */
     public static String describe(Factory factory) {
-        WarehouseLink link = factory.warehouse();
-        WarehouseAnchor anchor = link.anchor();
+        StorageLink link = factory.storageLink();
+        StorageAnchor anchor = link.anchor();
         String anchorText = anchor == null
                 ? "unbound"
                 : "freq=" + anchor.frequency() + " @ " + anchor.dimension().location()
@@ -32,21 +32,21 @@ public final class FactorySnapshotBuilder {
         return "工厂 " + factory.id()
                 + " | owner=" + factory.owner()
                 + " | state=" + factory.state()
-                + " | warehouse=" + (link.online() ? "online" : "offline")
+                + " | storage=" + (link.online() ? "online" : "offline")
                 + " | anchor=" + anchorText;
     }
 
     /**
      * 工厂摘要的结构化版本，留给以后的 S2C 包。
      *
-     * @param id              工厂 id
-     * @param owner           拥有者
-     * @param state           状态
-     * @param warehouseOnline 仓库是否在线
-     * @param anchor          仓库地址
+     * @param id           工厂 id
+     * @param owner        拥有者
+     * @param state        状态
+     * @param storageOnline 仓库是否在线
+     * @param anchor       仓库地址
      */
     public record Summary(java.util.UUID id, java.util.UUID owner, FactoryState state,
-            boolean warehouseOnline, @Nullable WarehouseAnchor anchor) {
+            boolean storageOnline, @Nullable StorageAnchor anchor) {
     }
 
     /**
@@ -57,6 +57,6 @@ public final class FactorySnapshotBuilder {
      */
     public static Summary build(Factory factory) {
         return new Summary(factory.id(), factory.owner(), factory.state(),
-                factory.warehouse().online(), factory.warehouse().anchor());
+                factory.storageLink().online(), factory.storageLink().anchor());
     }
 }

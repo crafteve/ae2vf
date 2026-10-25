@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -16,7 +17,7 @@ import net.minecraft.world.level.Level;
  * @param dimension 环所在维度
  * @param ringPos   环的方块坐标，用来强制加载环所在区块
  */
-public record WarehouseAnchor(long frequency, ResourceKey<Level> dimension, BlockPos ringPos) {
+public record StorageAnchor(long frequency, ResourceKey<Level> dimension, BlockPos ringPos) {
 
     private static final String TAG_FREQUENCY = "Frequency";
     private static final String TAG_DIMENSION = "Dimension";
@@ -41,7 +42,7 @@ public record WarehouseAnchor(long frequency, ResourceKey<Level> dimension, Bloc
      * @param tag 存档标签
      * @return 地址；字段缺失或维度名非法时返回 {@code null}
      */
-    public static WarehouseAnchor load(CompoundTag tag) {
+    public static StorageAnchor load(CompoundTag tag) {
         if (!tag.contains(TAG_FREQUENCY) || !tag.contains(TAG_DIMENSION) || !tag.contains(TAG_RING_POS)) {
             return null;
         }
@@ -49,8 +50,8 @@ public record WarehouseAnchor(long frequency, ResourceKey<Level> dimension, Bloc
         if (id == null) {
             return null;
         }
-        return new WarehouseAnchor(tag.getLong(TAG_FREQUENCY),
-                ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, id),
+        return new StorageAnchor(tag.getLong(TAG_FREQUENCY),
+                ResourceKey.create(Registries.DIMENSION, id),
                 BlockPos.of(tag.getLong(TAG_RING_POS)));
     }
 }

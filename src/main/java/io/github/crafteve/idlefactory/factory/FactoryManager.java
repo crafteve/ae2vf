@@ -44,7 +44,7 @@ public final class FactoryManager {
     public List<FactoryRecord> toRecords() {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.owner(),
-                        factory.warehouse().anchor()))
+                        factory.storageLink().anchor()))
                 .toList();
     }
 

@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
+import java.util.Map;
+
 import net.minecraft.world.item.ItemStack;
 
 /**
@@ -12,7 +14,7 @@ import net.minecraft.world.item.ItemStack;
  * <p>第一版只支持物品；以后扩流体 / 能量时，把方法签名换成 {@code ResourceType + amount}
  * 即可，工厂主体不用动。</p>
  */
-public interface Warehouse {
+public interface Storage {
     /**
      * 往仓库里放东西。
      *
@@ -35,4 +37,11 @@ public interface Warehouse {
 
     /** 仓库当前是否完全没有内容（只用于界面展示，不参与搬运判断）。 */
     boolean isEmpty();
+
+    /**
+     * 仓库里所有物品的快照。
+     *
+     * @return 物品注册名 → 数量；只含物品，不含流体
+     */
+    Map<String, Long> snapshot();
 }

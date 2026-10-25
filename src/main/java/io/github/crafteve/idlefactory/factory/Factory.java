@@ -4,9 +4,9 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.storage.Warehouse;
-import io.github.crafteve.idlefactory.factory.storage.WarehouseAnchor;
-import io.github.crafteve.idlefactory.factory.storage.WarehouseLink;
+import io.github.crafteve.idlefactory.factory.storage.Storage;
+import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 
 /**
  * 一个工厂实例。
@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.factory.storage.WarehouseLink;
  * 终端打开与否、玩家在不在线，都不影响它的生命周期。</p>
  *
  * <p>工厂<b>拥有</b>一个仓库，但<b>不实现</b>仓库。物品永远现读现写
- * {@link WarehouseLink#warehouse()}，工厂自己不缓存一个物品。</p>
+ * {@link StorageLink#storage()}，工厂自己不缓存一个物品。</p>
  */
 public final class Factory {
     /** 工厂唯一 id。 */
@@ -23,7 +23,7 @@ public final class Factory {
     /** 拥有者玩家 uuid；第一版一人一个工厂，鉴权只看这个字段。 */
     private final UUID owner;
     /** 仓库插头：永远对外给出非 null 的仓库。 */
-    private final WarehouseLink warehouse = new WarehouseLink();
+    private final StorageLink storageLink = new StorageLink();
     /** 运行状态，只由工厂主体和仓库解析结果改变。 */
     private FactoryState state = FactoryState.CREATED;
 
@@ -47,8 +47,13 @@ public final class Factory {
     }
 
     /** 仓库插头。 */
-    public WarehouseLink warehouse() {
-        return this.warehouse;
+    public StorageLink storageLink() {
+        return this.storageLink;
+    }
+
+    /** 当前仓库，永远非 null。 */
+    public Storage storage() {
+        return this.storageLink.storage();
     }
 
     /** 当前状态。 */
@@ -66,10 +71,25 @@ public final class Factory {
      *
      * @param anchor 新地址；{@code null} 表示解绑
      */
-    public void bindAnchor(@Nullable WarehouseAnchor anchor) {
-        this.warehouse.bind(anchor);
-        this.state = anchor == null ? FactoryState.CREATED
-                : (this.warehouse.online() ? FactoryState.RUNNING : FactoryState.PAUSED);
+    public void bindAnchor(@Nullable StorageAnchor anchor) {
+        this.storageLink.bind(anchor);
+        updateStateFromStorage();
+    }
+
+    /**
+     * 重新解析仓库地址并同步状态。服务器启动、界面刷新、定时重试时调。
+     */
+    public void refreshStorage() {
+        this.storageLink.refresh();
+        updateStateFromStorage();
+    }
+
+    private void updateStateFromStorage() {
+        if (this.storageLink.anchor() == null) {
+            this.state = FactoryState.CREATED;
+        } else {
+            this.state = this.storageLink.online() ? FactoryState.RUNNING : FactoryState.PAUSED;
+        }
     }
 
     /**
