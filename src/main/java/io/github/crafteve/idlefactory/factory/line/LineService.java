@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.factory.line;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -8,12 +9,14 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.FactoryBin;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -123,10 +126,21 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
+        List<UUID> machineIds = new ArrayList<>(line.groups().size());
+        for (IoGroup group : line.groups()) {
+            machineIds.add(group.machineId());
+        }
         factory.lines().remove(line.id());
         forgetLine(line.id());
+        int purged = 0;
+        for (UUID machineId : machineIds) {
+            if (FactoryBin.purgeIfOrphaned(factory, observations(), machineId)) {
+                purged++;
+            }
+        }
         markDirty();
-        FactoryMessages.send(player, FactoryMessages.ok("已删除产线 [" + line.shortId() + "] " + line.name()));
+        FactoryMessages.send(player, FactoryMessages.ok("已删除产线 [" + line.shortId() + "] " + line.name()
+                + (purged > 0 ? " · 顺带清理了 " + purged + " 台回收站里的机器" : "")));
         return 1;
     }
 
@@ -288,9 +302,11 @@ public final class LineService {
             return 0;
         }
         wakeLine(line.id());
+        boolean purged = FactoryBin.purgeIfOrphaned(factory, observations(), machine.id());
         markDirty();
         FactoryMessages.send(player, FactoryMessages.ok(
-                "已把机器 [" + machine.shortId() + "] 移出产线 " + line.name()));
+                "已把机器 [" + machine.shortId() + "] 移出产线 " + line.name()
+                        + (purged ? " · 它在回收站且已无引用，已从机器库删除" : "")));
         return 1;
     }
 
@@ -671,6 +687,17 @@ public final class LineService {
         if (runtime != null) {
             runtime.markDirty();
         }
+    }
+
+    /**
+     * 取观测服务；服务端未就绪时为 {@code null}（此时清理逻辑保守不动）。
+     *
+     * @return 观测服务
+     */
+    @Nullable
+    private static ObservationService observations() {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        return runtime == null ? null : runtime.observations();
     }
 
     private static void wakeLine(UUID lineId) {

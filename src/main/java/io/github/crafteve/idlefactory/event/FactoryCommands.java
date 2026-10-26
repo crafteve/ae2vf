@@ -12,10 +12,13 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
+import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.LineService;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
@@ -159,7 +162,27 @@ public final class FactoryCommands {
                                         context -> FactoryService.disconnectMachine(
                                                 player(context), StringArgumentType.getString(context, "id"))))))
                 .then(Commands.literal("info")
-                        .executes(context -> FactoryService.info(player(context))));
+                        .executes(context -> FactoryService.info(player(context))))
+                .then(bin());
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> bin() {
+        return Commands.literal("bin")
+                .executes(context -> FactoryService.binInfo(player(context)))
+                .then(Commands.literal("restore")
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .suggests(binIds())
+                                .executes(audit("factory.bin.restore",
+                                        context -> FactoryService.binRestore(player(context),
+                                                StringArgumentType.getString(context, "id"))))))
+                .then(Commands.literal("purge")
+                        .executes(audit("factory.bin.purge",
+                                context -> FactoryService.binPurge(player(context))))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .suggests(binIds())
+                                .executes(audit("factory.bin.purge",
+                                        context -> FactoryService.binPurge(player(context),
+                                                StringArgumentType.getString(context, "id"))))));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> line(RegisterCommandsEvent event) {
@@ -356,7 +379,7 @@ public final class FactoryCommands {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
                 for (MachineRef target : factory.machines().all()) {
-                    builder.suggest(target.shortId(), machineTooltip(target));
+                    builder.suggest(target.shortId(), machineTooltip(factory, target));
                 }
             }
             return builder.buildFuture();
@@ -371,7 +394,7 @@ public final class FactoryCommands {
                 Set<UUID> assigned = FactoryRefs.assignedMachines(factory);
                 for (MachineRef target : factory.machines().all()) {
                     if (!assigned.contains(target.id())) {
-                        builder.suggest(target.shortId(), machineTooltip(target));
+                        builder.suggest(target.shortId(), machineTooltip(factory, target));
                     }
                 }
             }
@@ -387,8 +410,29 @@ public final class FactoryCommands {
             if (factory != null && line != null) {
                 for (IoGroup group : line.groups()) {
                     factory.machines().byId(group.machineId())
-                            .ifPresent(target -> builder.suggest(target.shortId(), machineTooltip(target)));
+                            .ifPresent(target -> builder.suggest(target.shortId(),
+                                    machineTooltip(factory, target)));
                 }
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    /** 回收站里的机器（{@code bin restore/purge} 用）。 */
+    private static SuggestionProvider<CommandSourceStack> binIds() {
+        return (context, builder) -> {
+            Factory factory = factoryFor(context.getSource());
+            if (factory == null) {
+                return builder.buildFuture();
+            }
+            FactoryRuntime runtime = FactoryRuntime.get();
+            ObservationService observations = runtime == null ? null : runtime.observations();
+            for (FactorySnapshotBuilder.MachineView view
+                    : FactorySnapshotBuilder.bin(factory, observations)) {
+                MachineRef ref = view.ref();
+                builder.suggest(ref.shortId(), Component.literal(
+                        ref.dimension().location() + " " + ref.pos().toShortString()
+                                + " · " + FactorySnapshotBuilder.describe(view)));
             }
             return builder.buildFuture();
         };
@@ -613,8 +657,18 @@ public final class FactoryCommands {
         return null;
     }
 
-    private static Component machineTooltip(MachineRef target) {
-        return Component.literal(target.dimension().location() + " " + target.pos().toShortString());
+    private static Component machineTooltip(Factory factory, MachineRef target) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        ObservationService observations = runtime == null ? null : runtime.observations();
+        StringBuilder text = new StringBuilder(target.dimension().location().toString())
+                .append(' ').append(target.pos().toShortString());
+        if (observations != null) {
+            text.append('\n').append(observations.observe(target).health().describe());
+        }
+        if (factory.machines().isDetached(target.id())) {
+            text.append("\n回收站");
+        }
+        return Component.literal(text.toString());
     }
 
     private static ServerPlayer player(CommandContext<CommandSourceStack> context)

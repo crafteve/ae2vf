@@ -5,13 +5,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.BlockProbe;
 import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
@@ -140,6 +143,12 @@ public final class FactoryService {
         }
         info(player, FactorySnapshotBuilder.health(factory, machines).describe());
 
+        int binCount = 0;
+        for (FactorySnapshotBuilder.MachineView view : machines) {
+            if (view.binned()) {
+                binCount++;
+            }
+        }
         int shown = 0;
         for (FactorySnapshotBuilder.MachineView view : machines) {
             if (shown >= INFO_MACHINE_LIMIT) {
@@ -148,6 +157,9 @@ public final class FactoryService {
             }
             sendMachineRow(player, view);
             shown++;
+        }
+        if (binCount > 0) {
+            info(player, "回收站 " + binCount + " 台 · /idf factory bin 查看");
         }
         return 1;
     }
@@ -208,6 +220,20 @@ public final class FactoryService {
             err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;
         }
+        Optional<MachineRef> existing = factory.machines().byId(target.id());
+        if (existing.isPresent()) {
+            MachineRef ref = existing.get();
+            if (!factory.machines().isDetached(ref.id())) {
+                err(player, "这台机器已经接入过了：" + ref.shortId());
+                return 0;
+            }
+            factory.machines().setDetached(ref.id(), false);
+            refreshObservation(ref);
+            wakeLines(factory, ref.id());
+            markDirty();
+            ok(player, "已从回收站取回：" + ref.shortId() + " · 规则已恢复");
+            return 1;
+        }
         if (!factory.machines().add(target)) {
             err(player, "这台机器已经接入过了：" + target.shortId());
             return 0;
@@ -220,7 +246,10 @@ public final class FactoryService {
     }
 
     /**
-     * 把准星选中的机器从机器库移除。
+     * 把准星选中的机器断开。
+     *
+     * <p>规则只有一条：<b>没配过规则就直接删，配过规则就移入回收站</b>。前者零损失（玩家随时可以
+     * 重新 connect），后者保住规则（误拆不用重设）。</p>
      *
      * @param player 发起请求的玩家
      * @return 命令结果
@@ -236,20 +265,16 @@ public final class FactoryService {
             return 0;
         }
         ServerLevel level = player.serverLevel();
-        if (!factory.machines().remove(level.dimension(), pos)) {
+        MachineRef target = factory.machines().byPosition(level.dimension(), pos);
+        if (target == null) {
             err(player, "这个位置没有接入的机器");
             return 0;
         }
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.markDirty();
-        }
-        ok(player, "已移除机器：" + pos.toShortString());
-        return 1;
+        return detachOrPurge(player, factory, target);
     }
 
     /**
-     * 按短 id 远程移除机器。
+     * 按短 id 远程断开机器。
      *
      * @param player  发起请求的玩家
      * @param shortId 短 id（前 8 位）
@@ -265,12 +290,187 @@ public final class FactoryService {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        factory.machines().remove(target.get().id());
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.markDirty();
+        return detachOrPurge(player, factory, target.get());
+    }
+
+    /**
+     * 断开的唯一出口。
+     *
+     * @param player  发起请求的玩家
+     * @param factory 工厂
+     * @param target  机器
+     * @return 命令结果
+     */
+    private static int detachOrPurge(ServerPlayer player, Factory factory, MachineRef target) {
+        if (factory.machines().isDetached(target.id())) {
+            info(player, "这台机器已经在回收站里了（/idf factory bin 查看）");
+            return 1;
         }
-        ok(player, "已移除机器：" + target.get().shortId());
+        Set<UUID> referenced = FactoryBin.referenced(factory);
+        if (!referenced.contains(target.id())) {
+            FactoryBin.purge(factory, target.id());
+            markDirty();
+            ok(player, "已删除机器 [" + target.shortId() + "]（这台机器没有配过规则，随时可以 connect 回来）");
+            return 1;
+        }
+        factory.machines().setDetached(target.id(), true);
+        markDirty();
+        String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, target.id()));
+        int rules = FactoryRefs.ruleCountOf(factory, target.id());
+        ok(player, "已移入回收站 [" + target.shortId() + "] · 规则保留（" + lines
+                + " · " + rules + " 条）· /idf factory connect 可恢复");
+        return 1;
+    }
+
+    // ------------------------------------------------------------------
+    // 回收站
+    // ------------------------------------------------------------------
+
+    /**
+     * 列出回收站。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int binInfo(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        ObservationService observations = observations();
+        List<FactorySnapshotBuilder.MachineView> bin =
+                FactorySnapshotBuilder.bin(factory, observations);
+        if (bin.isEmpty()) {
+            info(player, "回收站是空的");
+            return 1;
+        }
+        info(player, "回收站 " + bin.size() + " 台（规则都保留着）：");
+        Set<UUID> referenced = FactoryBin.referenced(factory);
+        int orphaned = 0;
+        for (FactorySnapshotBuilder.MachineView view : bin) {
+            MachineRef ref = view.ref();
+            String where = ref.dimension().location() + " " + ref.pos().toShortString();
+            String reason = view.detached() ? "你断开的" : view.health().describe();
+            String rules = view.lineNames().isEmpty()
+                    ? "没挂产线"
+                    : String.join(" / ", view.lineNames()) + " · " + view.ruleCount() + " 条规则";
+            if (!referenced.contains(ref.id())) {
+                orphaned++;
+            }
+            Component row = Component.empty()
+                    .append(FactoryMessages.text("  ", FactoryMessages.INFO))
+                    .append(FactoryMessages.link(ref.shortId(),
+                            "/idf factory bin restore " + ref.shortId(), "取回这台机器"))
+                    .append(FactoryMessages.text(" " + where + " · " + reason + " · " + rules,
+                            FactoryMessages.INFO));
+            FactoryMessages.send(player, row);
+        }
+        if (orphaned > 0) {
+            info(player, "其中 " + orphaned + " 台已无引用 · /idf factory bin purge 可清理");
+        }
+        return 1;
+    }
+
+    /**
+     * 把一台机器从回收站取回（只对「玩家断开」的条目有效）。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 机器短 id
+     * @return 命令结果
+     */
+    public static int binRestore(ServerPlayer player, String shortId) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        Optional<MachineRef> target = factory.machines().byShortId(shortId);
+        if (target.isEmpty()) {
+            err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
+            return 0;
+        }
+        MachineRef ref = target.get();
+        if (!factory.machines().isDetached(ref.id())) {
+            err(player, "这台机器不在回收站（它只是失联了；方块回来会自动恢复）");
+            return 0;
+        }
+        factory.machines().setDetached(ref.id(), false);
+        Observation observation = refreshObservation(ref);
+        wakeLines(factory, ref.id());
+        markDirty();
+        if (observation != null && !observation.health().alive()) {
+            warn(player, "已恢复 [" + ref.shortId() + "]，但方块现在不在（"
+                    + observation.health().describe() + "）；放回机器后会自动恢复");
+        } else {
+            ok(player, "已从回收站取回 [" + ref.shortId() + "] · 规则已恢复");
+        }
+        return 1;
+    }
+
+    /**
+     * 清理回收站里所有「已无引用」的条目。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int binPurge(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        ObservationService observations = observations();
+        List<FactorySnapshotBuilder.MachineView> bin =
+                FactorySnapshotBuilder.bin(factory, observations);
+        Set<UUID> referenced = FactoryBin.referenced(factory);
+        int purged = 0;
+        int skipped = 0;
+        for (FactorySnapshotBuilder.MachineView view : bin) {
+            if (referenced.contains(view.ref().id())) {
+                skipped++;
+                continue;
+            }
+            FactoryBin.purge(factory, view.ref().id());
+            purged++;
+        }
+        if (purged > 0) {
+            markDirty();
+        }
+        ok(player, "已清理 " + purged + " 条"
+                + (skipped > 0 ? " · " + skipped + " 条仍有引用（先 line <线> remove <机器>）" : ""));
+        return 1;
+    }
+
+    /**
+     * 清理回收站里的一条。仍有引用时拒绝——删规则是 {@code line remove} 的工作。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 机器短 id
+     * @return 命令结果
+     */
+    public static int binPurge(ServerPlayer player, String shortId) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        Optional<MachineRef> target = factory.machines().byShortId(shortId);
+        if (target.isEmpty()) {
+            err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
+            return 0;
+        }
+        MachineRef ref = target.get();
+        Health health = FactoryBin.healthOf(factory, observations(), ref.id());
+        if (!FactoryBin.binned(factory.machines().isDetached(ref.id()),
+                health == null ? Health.UNKNOWN : health)) {
+            err(player, "这台机器不在回收站");
+            return 0;
+        }
+        if (FactoryBin.referenced(factory).contains(ref.id())) {
+            String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, ref.id()));
+            err(player, "这台机器还配在 " + lines + " 上；先 /idf line <线> remove " + ref.shortId());
+            return 0;
+        }
+        FactoryBin.purge(factory, ref.id());
+        markDirty();
+        ok(player, "已清理回收站条目 [" + ref.shortId() + "]");
         return 1;
     }
 
@@ -694,11 +894,29 @@ public final class FactoryService {
      * 立刻刷新一台机器的观测（接入、取回之后调，别让 {@code info} 看到 UNKNOWN）。
      *
      * @param target 机器
+     * @return 刷新后的观测；观测服务未就绪时为 {@code null}
      */
-    private static void refreshObservation(MachineRef target) {
+    @Nullable
+    private static Observation refreshObservation(MachineRef target) {
         ObservationService observations = observations();
-        if (observations != null) {
-            observations.refresh(target);
+        return observations == null ? null : observations.refresh(target);
+    }
+
+    /**
+     * 唤醒一台机器所在的所有产线（取回、恢复之后调）。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     */
+    private static void wakeLines(Factory factory, UUID machineId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return;
+        }
+        for (PassiveLine line : factory.lines().all()) {
+            if (line.groupByMachine(machineId).isPresent()) {
+                runtime.lineRunner().wake(line.id());
+            }
         }
     }
 

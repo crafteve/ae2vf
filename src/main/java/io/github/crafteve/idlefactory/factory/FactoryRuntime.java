@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,6 +23,7 @@ import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -48,6 +51,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class FactoryRuntime {
     /** 心跳日志间隔（tick）。 */
     private static final int HEARTBEAT_INTERVAL = 100;
+    /** 同一种失联/恢复通知的最短间隔（tick）：10 秒。 */
+    private static final int NOTICE_INTERVAL = 200;
     /** 仓库状态刷新间隔（tick）：每秒重新解析一次，别让 online 变成启动时的快照。 */
     private static final int REFRESH_INTERVAL = 20;
     /** IO 执行间隔（tick）的下限。 */
@@ -62,6 +67,11 @@ public final class FactoryRuntime {
     private final LineRunner lineRunner = new LineRunner();
     /** 每 tick 复用的「被引用位置集合」，避免反复分配。 */
     private final Set<ObservationKey> observedKeys = new HashSet<>();
+    /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组；actionbar 用。 */
+    private final Map<UUID, Integer> missingNotices = new HashMap<>();
+    private final Map<UUID, Integer> restoredNotices = new HashMap<>();
+    /** 每个工厂上一次弹 actionbar 的时刻，用来节流。 */
+    private final Map<UUID, Long> lastNoticeTick = new HashMap<>();
     private FactoryStore store;
     @Nullable
     private ObservationService observations;
@@ -99,6 +109,9 @@ public final class FactoryRuntime {
         StorageLink.setResolver(null);
         runtime.observations = null;
         runtime.observedKeys.clear();
+        runtime.missingNotices.clear();
+        runtime.restoredNotices.clear();
+        runtime.lastNoticeTick.clear();
         instance = null;
     }
 
@@ -243,10 +256,11 @@ public final class FactoryRuntime {
         for (ObservationService.Transition transition : this.observations.drainTransitions()) {
             this.handleTransition(transition);
         }
+        this.flushNotices();
     }
 
     /**
-     * 消费一次状态迁移：记事件，必要时唤醒产线。
+     * 消费一次状态迁移：记事件、按回收站规则清理、必要时唤醒产线。
      *
      * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
      * 未加载只在 {@code diag observe} 里看得到。</p>
@@ -262,20 +276,80 @@ public final class FactoryRuntime {
                 continue;
             }
             switch (transition.to()) {
-                case MISSING, NO_DIMENSION -> factory.stats().record(DiagEvent.of(now,
-                        DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
-                        transition.to().describe() + "，已进回收站"));
+                case MISSING, NO_DIMENSION -> {
+                    factory.stats().record(DiagEvent.of(now,
+                            DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
+                            transition.to().describe() + "，已进回收站"));
+                    boolean referenced = FactoryBin.referenced(factory).contains(ref.id());
+                    boolean detached = factory.machines().isDetached(ref.id());
+                    if (FactoryBin.purgeable(referenced, detached, transition.to())) {
+                        // 没配过规则，直接删——玩家随时可以 connect 回来
+                        FactoryBin.purge(factory, ref.id());
+                        this.save();
+                    } else if (!detached) {
+                        // 玩家自己断开的机器不再提醒：他已经说过不要了
+                        this.missingNotices.merge(factory.id(), 1, Integer::sum);
+                    }
+                }
                 case PRESENT -> {
                     if (transition.from() != Health.UNKNOWN) {
                         factory.stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
                         this.wakeLines(factory, ref.id());
+                        this.restoredNotices.merge(factory.id(), 1, Integer::sum);
                     }
                 }
                 default -> {
                     // UNLOADED / UNKNOWN 不记
                 }
             }
+        }
+    }
+
+    /**
+     * 把本 tick 累计的失联/恢复数量弹成 actionbar。
+     *
+     * <p>按工厂聚合，且 10 秒内只弹一次——一次爆炸拆掉 20 台机器也只应该看到一行。</p>
+     */
+    private void flushNotices() {
+        if (this.missingNotices.isEmpty() && this.restoredNotices.isEmpty()) {
+            return;
+        }
+        long now = this.server.overworld().getGameTime();
+        Set<UUID> factoryIds = new HashSet<>();
+        factoryIds.addAll(this.missingNotices.keySet());
+        factoryIds.addAll(this.restoredNotices.keySet());
+        for (UUID factoryId : factoryIds) {
+            Factory factory = this.manager.byId(factoryId).orElse(null);
+            if (factory == null) {
+                this.missingNotices.remove(factoryId);
+                this.restoredNotices.remove(factoryId);
+                continue;
+            }
+            ServerPlayer player = this.server.getPlayerList().getPlayer(factory.owner());
+            if (player == null) {
+                // 拥有者不在线，通知没有意义，计数直接丢
+                this.missingNotices.remove(factoryId);
+                this.restoredNotices.remove(factoryId);
+                continue;
+            }
+            Long last = this.lastNoticeTick.get(factoryId);
+            if (last != null && now - last < NOTICE_INTERVAL) {
+                // 节流：计数留着，攒到下一次
+                continue;
+            }
+            int missing = this.missingNotices.getOrDefault(factoryId, 0);
+            int restored = this.restoredNotices.getOrDefault(factoryId, 0);
+            if (missing > 0) {
+                player.displayClientMessage(FactoryMessages.warn(
+                        missing + " 台机器失联 · /idf factory bin"), true);
+            } else if (restored > 0) {
+                player.displayClientMessage(FactoryMessages.ok(
+                        restored + " 台机器回来了 · 规则已恢复"), true);
+            }
+            this.missingNotices.remove(factoryId);
+            this.restoredNotices.remove(factoryId);
+            this.lastNoticeTick.put(factoryId, now);
         }
     }
 

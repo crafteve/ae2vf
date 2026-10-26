@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -35,6 +37,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_ANCHOR = "Anchor";
     private static final String TAG_TARGETS = "Targets";
     private static final String TAG_LINES = "Lines";
+    private static final String TAG_DETACHED = "Detached";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -109,6 +112,10 @@ public final class FactoryStore extends SavedData {
                 }
                 entry.put(TAG_LINES, lines);
             }
+            if (!record.detached().isEmpty()) {
+                // 只在非空时写，保持文件干净；旧存档没有这个字段 → 全部活跃
+                entry.putIntArray(TAG_DETACHED, encodeUuids(record.detached()));
+            }
             list.add(entry);
         }
         tag.put(TAG_FACTORIES, list);
@@ -145,7 +152,7 @@ public final class FactoryStore extends SavedData {
                 }
             }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    targets, lines));
+                    targets, lines, decodeUuids(entry.getIntArray(TAG_DETACHED))));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -153,15 +160,57 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 一条存档记录：工厂的身份、仓库地址、机器库与被动产线库。
+     * 一条存档记录：工厂的身份、仓库地址、机器库、被动产线库与回收站。
      *
-     * @param id      工厂 id
-     * @param owner   拥有者玩家 uuid
-     * @param anchor  仓库地址；未绑定为 {@code null}
-     * @param targets 机器库里的目标
-     * @param lines   被动产线
+     * @param id       工厂 id
+     * @param owner    拥有者玩家 uuid
+     * @param anchor   仓库地址；未绑定为 {@code null}
+     * @param targets  机器库里的目标
+     * @param lines    被动产线
+     * @param detached 玩家已断开、仍留在库里的机器 id（意图，必须写档）
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            List<MachineRef> targets, List<PassiveLine> lines) {
+            List<MachineRef> targets, List<PassiveLine> lines, Set<UUID> detached) {
+    }
+
+    /**
+     * 把一组 uuid 编成 int 数组（每个 uuid 占 4 个 int）。
+     *
+     * @param ids uuid 集合
+     * @return 扁平数组
+     */
+    private static int[] encodeUuids(Set<UUID> ids) {
+        List<UUID> sorted = new ArrayList<>(ids);
+        sorted.sort(java.util.Comparator.comparing(UUID::toString));
+        int[] raw = new int[sorted.size() * 4];
+        int index = 0;
+        for (UUID id : sorted) {
+            long most = id.getMostSignificantBits();
+            long least = id.getLeastSignificantBits();
+            raw[index++] = (int) (most >> 32);
+            raw[index++] = (int) most;
+            raw[index++] = (int) (least >> 32);
+            raw[index++] = (int) least;
+        }
+        return raw;
+    }
+
+    /**
+     * 解回 uuid 集合。长度不合法时返回空集（宁可当没有，也不要崩存档）。
+     *
+     * @param raw 扁平数组
+     * @return uuid 集合
+     */
+    private static Set<UUID> decodeUuids(int[] raw) {
+        if (raw == null || raw.length == 0 || raw.length % 4 != 0) {
+            return Set.of();
+        }
+        Set<UUID> ids = new HashSet<>(raw.length / 4);
+        for (int i = 0; i < raw.length; i += 4) {
+            long most = ((long) raw[i] << 32) | (raw[i + 1] & 0xFFFFFFFFL);
+            long least = ((long) raw[i + 2] << 32) | (raw[i + 3] & 0xFFFFFFFFL);
+            ids.add(new UUID(most, least));
+        }
+        return ids;
     }
 }
