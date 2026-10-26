@@ -179,4 +179,14 @@ public final class Observation {
     void applyFaces(FaceTable table) {
         this.faces = table;
     }
+
+    /**
+     * 让缓存的面表作废。
+     *
+     * <p>能力失效事件（模组改了面配置）不会改变方块 id，所以 {@link #applyProbe} 的
+     * 「身份变了」判断抓不到它——靠这个方法显式清。</p>
+     */
+    void invalidateFaces() {
+        this.faces = null;
+    }
 }

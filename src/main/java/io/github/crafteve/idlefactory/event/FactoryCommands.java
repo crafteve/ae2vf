@@ -295,6 +295,9 @@ public final class FactoryCommands {
                                 .executes(audit("storage.unbind",
                                         context -> FactoryService.unbindContainer(
                                                 player(context), containerRef(context))))))
+                .then(Commands.literal("prune")
+                        .executes(audit("storage.prune",
+                                context -> FactoryService.pruneStorage(player(context)))))
                 .then(Commands.literal("priority")
                         .then(Commands.argument("container", StringArgumentType.word())
                                 .suggests(containerIds())

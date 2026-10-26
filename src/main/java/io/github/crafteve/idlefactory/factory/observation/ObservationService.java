@@ -2,13 +2,18 @@ package io.github.crafteve.idlefactory.factory.observation;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 
 /**
  * 全局观测服务。
@@ -25,10 +30,16 @@ import net.minecraft.server.level.ServerLevel;
 public final class ObservationService {
     /** 每 tick 最多主动探测几个到期条目。 */
     private static final int PROBE_BUDGET_PER_TICK = 8;
+    /** 每 tick 最多处理几个「被失效事件标脏」的条目。 */
+    private static final int DIRTY_BUDGET_PER_TICK = 32;
 
     private final MinecraftServer server;
     /** 键 → 观测。插入顺序稳定，便于诊断输出。 */
     private final Map<ObservationKey, Observation> observations = new LinkedHashMap<>();
+    /** 维度 → 能力句柄缓存（P3）。 */
+    private final Map<ResourceKey<Level>, LevelCapabilityCache> capabilityCaches = new HashMap<>();
+    /** 能力失效事件标脏的位置，下一 tick 优先重探。 */
+    private final Set<ObservationKey> dirty = new HashSet<>();
     /** 本 tick 产生的迁移，取走即清空。 */
     private final List<Transition> transitions = new ArrayList<>();
 
@@ -55,6 +66,23 @@ public final class ObservationService {
             this.observations.computeIfAbsent(key, ignored -> new Observation());
         }
 
+        // 1) 事件标脏的优先：能力变了，面表一定过期
+        int dirtyBudget = DIRTY_BUDGET_PER_TICK;
+        Iterator<ObservationKey> dirtyIterator = this.dirty.iterator();
+        while (dirtyIterator.hasNext() && dirtyBudget > 0) {
+            ObservationKey key = dirtyIterator.next();
+            dirtyIterator.remove();
+            Observation observation = this.observations.get(key);
+            if (observation == null) {
+                continue;
+            }
+            observation.invalidateFaces();
+            probe(key, observation);
+            this.probesLastTick++;
+            dirtyBudget--;
+        }
+
+        // 2) 到期复探
         int budget = PROBE_BUDGET_PER_TICK;
         for (Map.Entry<ObservationKey, Observation> entry : this.observations.entrySet()) {
             if (budget <= 0) {
@@ -69,7 +97,39 @@ public final class ObservationService {
             this.probesLastTick++;
         }
 
-        this.observations.keySet().retainAll(referenced);
+        // 3) mark-sweep：不再被引用的位置，连能力缓存一起丢
+        this.observations.keySet().removeIf(key -> {
+            if (referenced.contains(key)) {
+                return false;
+            }
+            LevelCapabilityCache cache = this.capabilityCaches.get(key.dimension());
+            if (cache != null) {
+                cache.forget(key.pos());
+            }
+            return true;
+        });
+    }
+
+    /**
+     * 标记一个位置「能力可能变了」，下一 tick 优先重探。
+     *
+     * <p>只由 {@link LevelCapabilityCache} 的失效监听器调用；监听器里不许查世界，所以这里只记一笔。</p>
+     *
+     * @param key 位置
+     */
+    public void markDirty(ObservationKey key) {
+        this.dirty.add(key);
+    }
+
+    /**
+     * 取某个维度的能力句柄缓存。
+     *
+     * @param level 维度
+     * @return 缓存；维度未注册时为 {@code null}
+     */
+    public LevelCapabilityCache capabilities(ServerLevel level) {
+        return this.capabilityCaches.computeIfAbsent(level.dimension(),
+                ignored -> new LevelCapabilityCache(level, this::markDirty));
     }
 
     /**

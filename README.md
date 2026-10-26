@@ -29,7 +29,8 @@
 
 - **工厂实例**：一人一个，确定性 UUID，`FactoryStore` 存档级持久化
 - **仓库**：AE2 量子环或方块容器组，支持物品 / 流体 / FE，离线降级为空仓库
-- **机器库**：准星接入 / 解除，校验 `IItemHandler` / `IFluidHandler`，每 5 秒对账清悬空引用
+- **机器库**：准星接入 / 断开。断开与失联都进回收站，规则保留；只有没配过规则的机器才直接删
+- **观测层**：全局方块观测（机器与容器共用一张表），预算 8 次/tick、指数退避、能力失效事件标脏；读路径不探世界
 - **被动产线**：create / delete / add / remove / start / end / info / manage
 - **IO 规则**：资源类型 + 注册名 + 绝对六向面，输入输出各自独立
 - **IO 执行**：每 tick 一轮（`/idf diag io` 可调 1–20），`feed` / `pull` 事务，组 / 线两级睡眠
@@ -40,6 +41,8 @@
 - 终端 UI（M1 的空界面还在，没接新架构）
 - 化学品（Mekanism 的 gas 等，只留枚举位）
 - 主动模式（pattern / CPU）
+- 面级路由表（当前每次按面探测都走能力缓存，还没记住「上次哪个面通了」）
+- 区块强制加载（玩家走远后机器与容器所在区块会卸载，产线随之停）
 
 **阶段收尾：多类型（物品 / 流体 / FE）**
 
@@ -55,9 +58,12 @@
 /idf create
 /idf delete
 
-/idf factory connect                 准星选机器，接入机器库
-/idf factory disconnect [id]         准星移除 / 按短 id 远程移除
-/idf factory info                    工厂摘要 + 机器库
+/idf factory connect                 准星选机器，接入机器库（命中回收站时直接取回）
+/idf factory disconnect [id]         准星断开 / 按短 id 断开
+/idf factory info                    工厂摘要 + 机器库 + 回收站计数
+/idf factory bin                     回收站列表（规则都保留着）
+/idf factory bin restore <id>        从回收站取回
+/idf factory bin purge [id]          清理回收站（无参 = 清理所有已无引用的）
 
 /idf line                            列出所有产线
 /idf line create <name>              新建产线
@@ -80,6 +86,7 @@
 /idf storage connect                主手奇点绑 AE2 仓库
 /idf storage bind                   准星选容器，加入仓库
 /idf storage unbind [容器]          解绑整个仓库 / 移除一个容器
+/idf storage prune                  清理已缺失的容器（未加载的不算）
 /idf storage priority <容器> <数字>  容器优先级（高的先填、低的先抽）
 /idf storage info                   仓库类型、容器列表、资源
 /idf storage get <item> [count]
@@ -87,6 +94,7 @@
 
 /idf diag                            健康摘要
 /idf diag why <line> [machine]       体检：这条线为什么不动
+/idf diag observe                    观测层状态（条目 / 预算 / 异常机器）
 /idf diag tail [n]                   最近 n 条事件（默认 10，上限 20）
 /idf diag watch <line> [秒]          汇总：资源速率 / 卡住组 / IO 耗时 / 睡眠
 /idf diag watch <line> detail [秒]   详情：资源明细 + 每台机器的阻塞原因
@@ -130,21 +138,26 @@ Mekanism 的 NeoForge 能量适配器 `canExtract` / `canReceive` 恒为 true，
 factory/                        工厂主体（服务端权威）
 ├── Factory / FactoryManager / FactoryStore / FactoryRuntime
 ├── FactoryService              指令入口
+├── FactoryBin                  回收站：谓词 + 级联清理
 ├── FactoryRefs / FactoryMessages / FactorySnapshotBuilder
 ├── resource/                   资源模型
 │   └── ResourceKind / ResourceKey / ResourceSpec
+├── observation/                世界观测层（L1）
+│   └── Observation / ObservationKey / ObservationService
+│   └── BlockProbe / FaceTable / Health / Located
+│   └── LevelCapabilityCache    能力句柄缓存（失效事件驱动）
 ├── storage/                    仓库抽象与地址
 │   └── Storage / StorageLink / StorageAnchor（AE2 / 容器）
 │   └── Ae2Storage / ContainerStorage / DispatchingStorageResolver
-├── target/                     机器库
-│   └── MachineLibrary / MachineTarget / MachineChecks
+├── machine/                    机器库
+│   └── MachineLibrary / MachineRef
 ├── line/                       被动产线
 │   └── PassiveLine / IoGroup / LineLibrary / LineService
 ├── io/                         IO 执行
 │   └── IoTransfer / GroupRunner / LineRunner / RunnerState / IoResult
 │   └── ResourceAdapter / ItemAdapter / FluidAdapter / EnergyAdapter
 └── diag/                       诊断
-    └── DiagEvent / Diagnostics / LineDiagnostics / DiagRender / DiagService
+    └── DiagEvent / DiagStats / DiagChecks / DiagRender / DiagService
 
 integration/ae2/                AE2 适配（物品 / 流体）
 integration/appflux/            Applied Flux 的 FE key（占位）
@@ -156,6 +169,9 @@ menu/ client/                   M1 遗留的终端界面，尚未接新架构
 - 工厂主体只认 `Storage` 接口，不 import `appeng`
 - IO 只有一条写路径 `IoTransfer`：搬不进去的东西，永远不离开来源
 - 仓库离线 = 空仓库，工厂表现为「没料」，不是「网络断线」
+- **三层事实**：配置（写档）→ 观测（可重建）→ 路由/执行（瞬态）。读路径只读观测，不探世界
+- **`observation` 包零工厂依赖**：它只认 `Located`（位置），机器和容器都是它的消费者
+- **未加载 ≠ 不存在**：存在性判断必须先过 `isLoaded`；失联只进回收站，不删配置
 
 ## 构建
 

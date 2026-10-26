@@ -1,12 +1,17 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.observation.FaceTable;
+import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
@@ -49,6 +54,9 @@ public final class ContainerStorage implements Storage {
     private final List<ContainerRef> containers;
     /** 绑定时声明的容器总数（含当前不可用的）。 */
     private final int totalContainers;
+    /** 观测服务：给能力缓存与「哪个面有流体/能量」的窄化用；可为 {@code null}。 */
+    @Nullable
+    private final ObservationService observations;
 
     /**
      * @param server          服务端
@@ -56,9 +64,21 @@ public final class ContainerStorage implements Storage {
      * @param totalContainers 声明的容器总数
      */
     public ContainerStorage(MinecraftServer server, List<ContainerRef> containers, int totalContainers) {
+        this(server, containers, totalContainers, null);
+    }
+
+    /**
+     * @param server          服务端
+     * @param containers      可用容器，按优先级从高到低
+     * @param totalContainers 声明的容器总数
+     * @param observations    观测服务；可为 {@code null}（退回直接查世界）
+     */
+    public ContainerStorage(MinecraftServer server, List<ContainerRef> containers, int totalContainers,
+            @Nullable ObservationService observations) {
         this.server = server;
         this.containers = List.copyOf(containers);
         this.totalContainers = totalContainers;
+        this.observations = observations;
     }
 
     /** 声明的容器总数。 */
@@ -316,7 +336,7 @@ public final class ContainerStorage implements Storage {
         long remaining = amount;
         List<IFluidHandler> handlers = new ArrayList<>(group.size());
         for (ContainerRef ref : group) {
-            IFluidHandler handler = fluidHandler(this.server, ref, fluid, false);
+            IFluidHandler handler = fluidHandler(this.server, ref, fluid, false, this.observations);
             if (handler != null) {
                 handlers.add(handler);
             }
@@ -379,7 +399,7 @@ public final class ContainerStorage implements Storage {
                 if (taken >= amount) {
                     break;
                 }
-                IFluidHandler handler = fluidHandler(this.server, ref, fluid, true);
+                IFluidHandler handler = fluidHandler(this.server, ref, fluid, true, this.observations);
                 if (handler == null) {
                     continue;
                 }
@@ -409,7 +429,7 @@ public final class ContainerStorage implements Storage {
                 if (remaining <= 0L) {
                     break;
                 }
-                IEnergyStorage handler = energyHandler(this.server, ref, false);
+                IEnergyStorage handler = energyHandler(this.server, ref, false, this.observations);
                 if (handler == null) {
                     continue;
                 }
@@ -435,7 +455,7 @@ public final class ContainerStorage implements Storage {
                 if (taken >= amount) {
                     break;
                 }
-                IEnergyStorage handler = energyHandler(this.server, ref, true);
+                IEnergyStorage handler = energyHandler(this.server, ref, true, this.observations);
                 if (handler == null) {
                     continue;
                 }
@@ -550,12 +570,31 @@ public final class ContainerStorage implements Storage {
      */
     @Nullable
     public static IFluidHandler fluidHandler(MinecraftServer server, ContainerRef ref, Fluid fluid, boolean forExtract) {
+        return fluidHandler(server, ref, fluid, forExtract, null);
+    }
+
+    /**
+     * 取一个方向明确可抽 / 可灌的流体能力（带观测窄化）。
+     *
+     * <p>候选面来自观测：只试「观测到有流体能力」的面。观测还没就绪、或者方块已经不在时退回全六面，
+     * 保证冷启动和异常情况下行为不变。</p>
+     *
+     * @param server       服务端
+     * @param ref          容器
+     * @param fluid        流体
+     * @param forExtract   {@code true} 找可抽取的面，{@code false} 找可灌入的面
+     * @param observations 观测服务；可为 {@code null}
+     * @return 流体能力；都不可用时退回无方向查询
+     */
+    @Nullable
+    public static IFluidHandler fluidHandler(MinecraftServer server, ContainerRef ref, Fluid fluid,
+            boolean forExtract, @Nullable ObservationService observations) {
         ServerLevel level = level(server, ref);
         if (level == null) {
             return null;
         }
         FluidStack probe = new FluidStack(fluid, 1);
-        for (Direction side : Direction.values()) {
+        for (Direction side : faceCandidates(observations, ref, ResourceKind.FLUID)) {
             IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, ref.pos(), side);
             if (handler == null) {
                 continue;
@@ -602,11 +641,28 @@ public final class ContainerStorage implements Storage {
      */
     @Nullable
     public static IEnergyStorage energyHandler(MinecraftServer server, ContainerRef ref, boolean forExtract) {
+        return energyHandler(server, ref, forExtract, null);
+    }
+
+    /**
+     * 取一个方向明确可抽 / 可收的能量能力（带观测窄化）。
+     *
+     * <p>候选面来自观测：只试「观测到有能量能力」的面；观测未就绪时退回全六面。</p>
+     *
+     * @param server       服务端
+     * @param ref          容器
+     * @param forExtract   {@code true} 找可抽取的面，{@code false} 找可接收的面
+     * @param observations 观测服务；可为 {@code null}
+     * @return 能量能力；都不可用时退回无方向查询
+     */
+    @Nullable
+    public static IEnergyStorage energyHandler(MinecraftServer server, ContainerRef ref, boolean forExtract,
+            @Nullable ObservationService observations) {
         ServerLevel level = level(server, ref);
         if (level == null) {
             return null;
         }
-        for (Direction side : Direction.values()) {
+        for (Direction side : faceCandidates(observations, ref, ResourceKind.ENERGY)) {
             IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, ref.pos(), side);
             if (handler == null) {
                 continue;
@@ -619,6 +675,28 @@ public final class ContainerStorage implements Storage {
             }
         }
         return energyHandler(server, ref);
+    }
+
+    /**
+     * 某个资源类型该试哪些面。
+     *
+     * <p>观测没就绪（{@link Health#UNKNOWN}）或方块不在了就退回全六面——宁可多试，不能因为
+     * 一次没探到就断定「这个容器不搬流体」。</p>
+     */
+    private static EnumSet<Direction> faceCandidates(@Nullable ObservationService observations,
+            ContainerRef ref, ResourceKind kind) {
+        if (observations == null) {
+            return EnumSet.allOf(Direction.class);
+        }
+        Observation observation = observations.observe(ref);
+        if (observation.health() != Health.PRESENT) {
+            return EnumSet.allOf(Direction.class);
+        }
+        FaceTable table = observations.faces(ref);
+        if (!table.any()) {
+            return EnumSet.allOf(Direction.class);
+        }
+        return table.facesFor(kind);
     }
 
     private static ItemStack itemSample(ResourceKey key) {

@@ -17,6 +17,8 @@ import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
@@ -187,10 +189,11 @@ public final class FactoryRuntime {
 
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
+        // 观测先于仓库解析：容器仓库要借观测做面窄化与可用性判断
+        this.observations = new ObservationService(this.server);
         StorageLink.setResolver(new DispatchingStorageResolver(
                 new Ae2StorageResolver(this.server),
-                new ContainerStorageResolver(this.server)));
-        this.observations = new ObservationService(this.server);
+                new ContainerStorageResolver(this.server, this.observations)));
         this.manager.loadFrom(this.store.records());
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage();
@@ -251,6 +254,12 @@ public final class FactoryRuntime {
             for (MachineRef ref : factory.machines().all()) {
                 this.observedKeys.add(ObservationKey.of(ref));
             }
+            // 仓库容器和机器共用同一张方块级观测
+            if (factory.storageLink().anchor() instanceof ContainerAnchor anchor) {
+                for (ContainerRef container : anchor.containers()) {
+                    this.observedKeys.add(ObservationKey.of(container));
+                }
+            }
         }
         this.observations.tick(this.observedKeys);
         for (ObservationService.Transition transition : this.observations.drainTransitions()) {
@@ -302,6 +311,37 @@ public final class FactoryRuntime {
                 default -> {
                     // UNLOADED / UNKNOWN 不记
                 }
+            }
+        }
+        this.handleContainerTransition(transition, now);
+    }
+
+    /**
+     * 容器迁移：记一条仓库事件。
+     *
+     * <p>容器和机器共用观测表，但它们的消费方式不同：机器进回收站，容器只能被
+     * {@code storage prune} 清理。所以这里只负责让「箱子没了」在事件流里看得见。</p>
+     *
+     * @param transition 迁移
+     * @param now        当前游戏时间
+     */
+    private void handleContainerTransition(ObservationService.Transition transition, long now) {
+        if (transition.to() == Health.UNLOADED || transition.to() == Health.UNKNOWN) {
+            return;
+        }
+        for (Factory factory : this.manager.all()) {
+            if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+                continue;
+            }
+            for (ContainerRef ref : anchor.containers()) {
+                if (!ref.dimension().equals(transition.key().dimension())
+                        || !ref.pos().equals(transition.key().pos())) {
+                    continue;
+                }
+                factory.stats().record(DiagEvent.of(now,
+                        transition.to() == Health.PRESENT ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
+                        DiagEvent.Category.STOR, null, null, null,
+                        "容器 [" + ref.shortId() + "] " + transition.to().describe()));
             }
         }
     }

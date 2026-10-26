@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.observation.Located;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -24,7 +26,8 @@ import net.minecraft.world.level.Level;
  * @param pos       方块坐标
  * @param priority  优先级
  */
-public record ContainerRef(UUID id, ResourceKey<Level> dimension, BlockPos pos, int priority) {
+public record ContainerRef(UUID id, ResourceKey<Level> dimension, BlockPos pos, int priority)
+        implements Located {
 
     private static final String TAG_ID = "Id";
     private static final String TAG_DIMENSION = "Dimension";

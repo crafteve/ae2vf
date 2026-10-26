@@ -21,7 +21,6 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.factory.storage.ContainerStorage;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
@@ -659,6 +658,84 @@ public final class FactoryService {
         return 1;
     }
 
+    /**
+     * 清理容器仓库里「已缺失」的容器（被拆、维度没了）。
+     *
+     * <p>只删<b>确认不在</b>的；未加载的一律保留——那是「不知道」，不是「没了」。</p>
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int pruneStorage(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+            err(player, "当前没有容器仓库（AE2 仓库不需要清理）");
+            return 0;
+        }
+        ObservationService observations = observations();
+        if (observations == null) {
+            err(player, "观测服务未就绪");
+            return 0;
+        }
+        List<ContainerRef> keep = new ArrayList<>(anchor.containers().size());
+        int removed = 0;
+        for (ContainerRef ref : anchor.containers()) {
+            if (observations.observe(ref).health().gone()) {
+                removed++;
+            } else {
+                keep.add(ref);
+            }
+        }
+        if (removed == 0) {
+            info(player, "没有已缺失的容器（未加载的不算）");
+            return 1;
+        }
+        factory.bindAnchor(keep.isEmpty() ? null : new ContainerAnchor(keep));
+        markDirty();
+        ok(player, "已清理 " + removed + " 个已缺失的容器"
+                + (keep.isEmpty() ? " · 仓库已解绑" : " · 剩 " + keep.size() + " 个"));
+        return 1;
+    }
+
+    /**
+     * 容器状态的一句话。
+     *
+     * @param health 观测结论
+     * @return 展示文本
+     */
+    private static String containerState(Health health) {
+        return switch (health) {
+            case PRESENT -> "可用";
+            case UNLOADED -> "未加载";
+            case MISSING, NO_DIMENSION -> "已缺失";
+            case UNKNOWN -> "未探测";
+        };
+    }
+
+    /**
+     * AE2 仓库离线时尽量说清楚「为什么」。
+     *
+     * @param server 服务端
+     * @param anchor 地址
+     * @return 原因文本
+     */
+    private static String ae2Issue(MinecraftServer server, Ae2Anchor anchor) {
+        ServerLevel level = server.getLevel(anchor.dimension());
+        if (level == null) {
+            return "维度不存在";
+        }
+        if (!level.isLoaded(anchor.ringPos())) {
+            return "量子环所在区块未加载";
+        }
+        if (Ae2Binder.node(level, anchor.frequency()) == null) {
+            return "找不到该频率的量子环（环被拆了？奇点没配对？）";
+        }
+        return "量子环未供电 / 未成型 / 频道不足";
+    }
+
     private static boolean isAnyContainer(ServerLevel level, BlockPos pos) {
         if (level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null) {
             return true;
@@ -693,19 +770,39 @@ public final class FactoryService {
         }
         info(player, "仓库：" + anchor.describe() + " · " + (link.online() ? "在线" : "离线"));
 
+        ObservationService observations = observations();
         if (anchor instanceof ContainerAnchor containerAnchor) {
-            MinecraftServer server = player.getServer();
+            int present = 0;
+            int unloaded = 0;
+            int missing = 0;
             for (ContainerRef ref : containerAnchor.containers()) {
-                boolean usable = server != null && ContainerStorage.available(server, ref);
+                Health health = observations == null ? Health.UNKNOWN : observations.observe(ref).health();
+                switch (health) {
+                    case PRESENT -> present++;
+                    case UNLOADED -> unloaded++;
+                    case MISSING, NO_DIMENSION -> missing++;
+                    default -> {
+                        // UNKNOWN 不计
+                    }
+                }
                 Component row = Component.empty()
                         .append(FactoryMessages.text("  ", FactoryMessages.INFO))
                         .append(FactoryMessages.hover(ref.shortId(),
                                 ref.dimension().location() + " " + ref.pos().toShortString()))
                         .append(FactoryMessages.text(" " + ref.dimension().location() + " "
                                 + ref.pos().toShortString()
-                                + " · " + (usable ? "可用" : "缺失/未加载")
+                                + " · " + containerState(health)
                                 + " · 优先级 " + ref.priority(), FactoryMessages.INFO));
                 FactoryMessages.send(player, row);
+            }
+            info(player, "容器 " + containerAnchor.containers().size() + " 个（可用 " + present
+                    + (unloaded > 0 ? " · 未加载 " + unloaded : "")
+                    + (missing > 0 ? " · 已缺失 " + missing : "") + "）"
+                    + (missing > 0 ? " · /idf storage prune 清理已缺失" : ""));
+        } else if (anchor instanceof Ae2Anchor ae2 && !link.online()) {
+            MinecraftServer server = player.getServer();
+            if (server != null) {
+                warn(player, "AE2 仓库离线：" + ae2Issue(server, ae2));
             }
         }
 

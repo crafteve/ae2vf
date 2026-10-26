@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
+import io.github.crafteve.idlefactory.factory.observation.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
@@ -66,9 +67,11 @@ public final class GroupRunner {
      * @param level   机器所在维度
      * @param pos     机器坐标
      * @param group   IO 组
+     * @param caps    能力句柄缓存；{@code null} 时直接查世界
      * @return 本轮结果
      */
-    public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, IoGroup group) {
+    public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, IoGroup group,
+            @Nullable LevelCapabilityCache caps) {
         long fed = 0L;
         long pulled = 0L;
         Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
@@ -76,7 +79,7 @@ public final class GroupRunner {
         IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
 
         for (ResourceSpec spec : group.inputs()) {
-            ResourceAdapter adapter = adapter(level, pos, spec, true);
+            ResourceAdapter adapter = adapter(level, pos, spec, true, caps);
             if (adapter == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
@@ -97,7 +100,7 @@ public final class GroupRunner {
         }
 
         for (ResourceSpec spec : group.outputs()) {
-            ResourceAdapter adapter = adapter(level, pos, spec, false);
+            ResourceAdapter adapter = adapter(level, pos, spec, false, caps);
             if (adapter == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
@@ -120,21 +123,23 @@ public final class GroupRunner {
         return new GroupRun(fed, pulled, fedByKey, pulledByKey, lastReason);
     }
 
-    private static ResourceAdapter adapter(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input) {
+    private static ResourceAdapter adapter(ServerLevel level, BlockPos pos, ResourceSpec spec,
+            boolean input, @Nullable LevelCapabilityCache caps) {
         return switch (spec.key().kind()) {
             case ITEM -> {
                 ItemStack sample = itemSample(spec.key());
-                IItemHandler handler = level.getCapability(
-                        Capabilities.ItemHandler.BLOCK, pos, spec.face());
+                IItemHandler handler = caps == null
+                        ? level.getCapability(Capabilities.ItemHandler.BLOCK, pos, spec.face())
+                        : caps.item(pos, spec.face());
                 yield handler == null || sample.isEmpty() ? null : new ItemAdapter(handler, sample);
             }
             case FLUID -> {
                 Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
-                IFluidHandler handler = fluidHandler(level, pos, spec.face(), fluid, input);
+                IFluidHandler handler = fluidHandler(level, pos, spec.face(), fluid, input, caps);
                 yield handler == null || fluid == Fluids.EMPTY ? null : new FluidAdapter(handler, fluid);
             }
             case ENERGY -> {
-                IEnergyStorage handler = energyInput(level, pos, spec.face());
+                IEnergyStorage handler = energyInput(level, pos, spec.face(), caps);
                 yield handler == null ? null : new EnergyAdapter(handler);
             }
             case CHEMICAL -> null;
@@ -144,17 +149,22 @@ public final class GroupRunner {
     /**
      * 取机器的流体面。
      *
-     * <p>规则没指定面时逐面「模拟灌/抽 1 mB」探测：Mekanism 的流体 capability 也受面配置控制。</p>
+     * <p>规则没指定面时逐面「模拟灌/抽 1 mB」探测：Mekanism 的流体 capability 也受面配置控制。
+     * 有缓存时每一次面查询都走 hash 表，不再进 {@code getCapability}。</p>
      */
     @Nullable
     private static IFluidHandler fluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction face,
-            Fluid fluid, boolean input) {
+            Fluid fluid, boolean input, @Nullable LevelCapabilityCache caps) {
         if (face != null) {
-            return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face);
+            return caps == null
+                    ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face)
+                    : caps.fluid(pos, face);
         }
         FluidStack probe = new FluidStack(fluid, 1);
         for (Direction side : Direction.values()) {
-            IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side);
+            IFluidHandler handler = caps == null
+                    ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side)
+                    : caps.fluid(pos, side);
             if (handler == null) {
                 continue;
             }
@@ -165,7 +175,9 @@ public final class GroupRunner {
                 return handler;
             }
         }
-        return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
+        return caps == null
+                ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null)
+                : caps.fluid(pos, null);
     }
 
     /**
@@ -175,17 +187,24 @@ public final class GroupRunner {
      * 真正的输入面限制在按面筛选后的 handler 里。</p>
      */
     @Nullable
-    private static IEnergyStorage energyInput(ServerLevel level, BlockPos pos, @Nullable Direction face) {
+    private static IEnergyStorage energyInput(ServerLevel level, BlockPos pos, @Nullable Direction face,
+            @Nullable LevelCapabilityCache caps) {
         if (face != null) {
-            return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face);
+            return caps == null
+                    ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face)
+                    : caps.energy(pos, face);
         }
         for (Direction side : Direction.values()) {
-            IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side);
+            IEnergyStorage handler = caps == null
+                    ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side)
+                    : caps.energy(pos, side);
             if (handler != null && handler.receiveEnergy(1000, true) > 0) {
                 return handler;
             }
         }
-        return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null);
+        return caps == null
+                ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null)
+                : caps.energy(pos, null);
     }
 
     private static ItemStack itemSample(ResourceKey key) {
