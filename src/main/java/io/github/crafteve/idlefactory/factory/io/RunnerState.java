@@ -130,5 +130,7 @@ public final class RunnerState {
         public boolean sleeping;
         /** 下次唤醒时间（game time）。 */
         public long wakeAt;
+        /** 这个组的面路由表。 */
+        public final RouteTable routes = new RouteTable();
     }
 }

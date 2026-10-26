@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -9,6 +10,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.observation.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
@@ -30,9 +32,23 @@ import net.neoforged.neoforge.items.IItemHandler;
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
  *
- * <p>按资源类型取对应的方块能力，取不到就跳过该规则，不报错。</p>
+ * <p>三层取面策略，从便宜到贵：</p>
+ * <ol>
+ *   <li><b>玩家配了面</b>：直接用，不查路由、不扫面（配置优先）；</li>
+ *   <li><b>路由表里有记录</b>：直接按上次搬通的面取 handler，一次查表；</li>
+ *   <li><b>都没有</b>：扫面。流体/能量逐面「模拟搬一点」，物品按无向语义（见下）。</li>
+ * </ol>
+ *
+ * <p>搬成功就记住这个面；{@link IoResult.Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
+ * 玩家改规则、方块被换、能力失效都会让路由整体作废（观测层的面表代数 +1）。</p>
+ *
+ * <p><b>物品保持无向语义</b>：{@code getCapability(..., null)} 才是「整个库存」，符合仓库对容器的
+ * 直觉；改成按面会悄悄改变既有玩法。流体和能量才需要尊重机器的面配置。</p>
  */
 public final class GroupRunner {
+    /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
+    private static final int ENERGY_PROBE = 1000;
+
     /**
      * 一次组级搬运的结果。
      *
@@ -56,6 +72,10 @@ public final class GroupRunner {
         }
     }
 
+    /** 解析出来的搬运通道：适配器 + 实际用的面（{@code null} = 无向）。 */
+    private record Resolved(ResourceAdapter adapter, @Nullable Direction face) {
+    }
+
     private GroupRunner() {
         // 纯静态工具类
     }
@@ -63,15 +83,17 @@ public final class GroupRunner {
     /**
      * 跑一台机器的一轮。
      *
-     * @param storage 仓库
-     * @param level   机器所在维度
-     * @param pos     机器坐标
-     * @param group   IO 组
-     * @param caps    能力句柄缓存；{@code null} 时直接查世界
+     * @param storage    仓库
+     * @param level      机器所在维度
+     * @param pos        机器坐标
+     * @param group      IO 组
+     * @param caps       能力句柄缓存；{@code null} 时直接查世界
+     * @param routes     面路由表；{@code null} 时每次扫面
+     * @param generation 观测层的面表代数
      * @return 本轮结果
      */
     public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, IoGroup group,
-            @Nullable LevelCapabilityCache caps) {
+            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation) {
         long fed = 0L;
         long pulled = 0L;
         Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
@@ -79,37 +101,45 @@ public final class GroupRunner {
         IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
 
         for (ResourceSpec spec : group.inputs()) {
-            ResourceAdapter adapter = adapter(level, pos, spec, true, caps);
-            if (adapter == null) {
+            Resolved resolved = resolve(level, pos, spec, true, caps, routes, generation);
+            if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 continue;
             }
-            IoResult result = IoTransfer.feed(storage, adapter);
+            IoResult result = IoTransfer.feed(storage, resolved.adapter());
             fed += result.moved();
             if (result.moved() > 0L) {
                 fedByKey.merge(spec.key(), result.moved(), Long::sum);
+                remember(routes, spec, true, resolved, generation);
+            } else if (result.reason() == IoResult.Reason.REJECTED) {
+                // 有容量却不收：这个面不对，下次重扫
+                clear(routes, spec, true);
             }
             if (result.reason() != IoResult.Reason.OK) {
                 lastReason = result.reason();
             }
             if (!result.movedAnything()) {
                 IdleFactory.LOGGER.debug("IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
-                        pos.toShortString(), spec.describe(), result.reason(), adapter.capacity());
+                        pos.toShortString(), spec.describe(), result.reason(),
+                        resolved.adapter().capacity());
             }
         }
 
         for (ResourceSpec spec : group.outputs()) {
-            ResourceAdapter adapter = adapter(level, pos, spec, false, caps);
-            if (adapter == null) {
+            Resolved resolved = resolve(level, pos, spec, false, caps, routes, generation);
+            if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 continue;
             }
-            IoResult result = IoTransfer.pull(storage, adapter);
+            IoResult result = IoTransfer.pull(storage, resolved.adapter());
             pulled += result.moved();
             if (result.moved() > 0L) {
                 pulledByKey.merge(spec.key(), result.moved(), Long::sum);
+                remember(routes, spec, false, resolved, generation);
+            } else if (result.reason() == IoResult.Reason.REJECTED) {
+                clear(routes, spec, false);
             }
             if (result.reason() != IoResult.Reason.OK) {
                 lastReason = result.reason();
@@ -123,88 +153,157 @@ public final class GroupRunner {
         return new GroupRun(fed, pulled, fedByKey, pulledByKey, lastReason);
     }
 
-    private static ResourceAdapter adapter(ServerLevel level, BlockPos pos, ResourceSpec spec,
-            boolean input, @Nullable LevelCapabilityCache caps) {
+    /**
+     * 解析一条规则该用哪个面、哪个 handler。
+     *
+     * <p>配置的面优先（不查路由）；其次查路由；最后扫面。</p>
+     */
+    @Nullable
+    private static Resolved resolve(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation) {
+        if (spec.face() == null && routes != null) {
+            Optional<RouteTable.Route> route = routes.route(spec, input, generation);
+            if (route.isPresent()) {
+                Resolved direct = build(level, pos, spec, caps, route.get().face());
+                if (direct != null) {
+                    return direct;
+                }
+                // 记录的面已经没有 handler（能力没了 / 方块换了）：踢掉重扫
+                routes.clear(spec, input);
+            }
+        }
+        return sweep(level, pos, spec, input, caps);
+    }
+
+    /**
+     * 按指定面构建适配器（不扫面、不模拟）。
+     *
+     * @param face 面；{@code null} 表示无向
+     */
+    @Nullable
+    private static Resolved build(ServerLevel level, BlockPos pos, ResourceSpec spec,
+            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
         return switch (spec.key().kind()) {
             case ITEM -> {
                 ItemStack sample = itemSample(spec.key());
-                IItemHandler handler = caps == null
-                        ? level.getCapability(Capabilities.ItemHandler.BLOCK, pos, spec.face())
-                        : caps.item(pos, spec.face());
-                yield handler == null || sample.isEmpty() ? null : new ItemAdapter(handler, sample);
+                IItemHandler handler = item(level, pos, caps, face);
+                yield handler == null || sample.isEmpty()
+                        ? null
+                        : new Resolved(new ItemAdapter(handler, sample), face);
             }
             case FLUID -> {
                 Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
-                IFluidHandler handler = fluidHandler(level, pos, spec.face(), fluid, input, caps);
-                yield handler == null || fluid == Fluids.EMPTY ? null : new FluidAdapter(handler, fluid);
+                IFluidHandler handler = fluid(level, pos, caps, face);
+                yield handler == null || fluid == Fluids.EMPTY
+                        ? null
+                        : new Resolved(new FluidAdapter(handler, fluid), face);
             }
             case ENERGY -> {
-                IEnergyStorage handler = energyInput(level, pos, spec.face(), caps);
-                yield handler == null ? null : new EnergyAdapter(handler);
+                IEnergyStorage handler = energy(level, pos, caps, face);
+                yield handler == null ? null : new Resolved(new EnergyAdapter(handler), face);
             }
             case CHEMICAL -> null;
         };
     }
 
     /**
-     * 取机器的流体面。
-     *
-     * <p>规则没指定面时逐面「模拟灌/抽 1 mB」探测：Mekanism 的流体 capability 也受面配置控制。
-     * 有缓存时每一次面查询都走 hash 表，不再进 {@code getCapability}。</p>
+     * 扫面：配置优先，其次逐面模拟，最后无向兜底。
      */
     @Nullable
-    private static IFluidHandler fluidHandler(ServerLevel level, BlockPos pos, @Nullable Direction face,
-            Fluid fluid, boolean input, @Nullable LevelCapabilityCache caps) {
-        if (face != null) {
-            return caps == null
-                    ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face)
-                    : caps.fluid(pos, face);
+    private static Resolved sweep(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+            @Nullable LevelCapabilityCache caps) {
+        Direction configured = spec.face();
+        if (configured != null) {
+            return build(level, pos, spec, caps, configured);
+        }
+        return switch (spec.key().kind()) {
+            case ITEM -> build(level, pos, spec, caps, null);
+            case FLUID -> sweepFluid(level, pos, spec, input, caps);
+            case ENERGY -> sweepEnergy(level, pos, spec, input, caps);
+            case CHEMICAL -> null;
+        };
+    }
+
+    @Nullable
+    private static Resolved sweepFluid(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+            @Nullable LevelCapabilityCache caps) {
+        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
+        if (fluid == Fluids.EMPTY) {
+            return null;
         }
         FluidStack probe = new FluidStack(fluid, 1);
         for (Direction side : Direction.values()) {
-            IFluidHandler handler = caps == null
-                    ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side)
-                    : caps.fluid(pos, side);
+            IFluidHandler handler = fluid(level, pos, caps, side);
             if (handler == null) {
                 continue;
             }
-            int result = input
+            int amount = input
                     ? handler.fill(probe, IFluidHandler.FluidAction.SIMULATE)
                     : handler.drain(probe, IFluidHandler.FluidAction.SIMULATE).getAmount();
-            if (result > 0) {
-                return handler;
+            if (amount > 0) {
+                return new Resolved(new FluidAdapter(handler, fluid), side);
             }
         }
-        return caps == null
-                ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null)
-                : caps.fluid(pos, null);
+        IFluidHandler fallback = fluid(level, pos, caps, null);
+        return fallback == null ? null : new Resolved(new FluidAdapter(fallback, fluid), null);
     }
 
-    /**
-     * 取机器的能量输入面。
-     *
-     * <p>规则没指定面时逐面「模拟接收 1 FE」探测：Mekanism 的 {@code canReceive} 恒为 true，
-     * 真正的输入面限制在按面筛选后的 handler 里。</p>
-     */
     @Nullable
-    private static IEnergyStorage energyInput(ServerLevel level, BlockPos pos, @Nullable Direction face,
+    private static Resolved sweepEnergy(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
             @Nullable LevelCapabilityCache caps) {
-        if (face != null) {
-            return caps == null
-                    ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face)
-                    : caps.energy(pos, face);
-        }
         for (Direction side : Direction.values()) {
-            IEnergyStorage handler = caps == null
-                    ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, side)
-                    : caps.energy(pos, side);
-            if (handler != null && handler.receiveEnergy(1000, true) > 0) {
-                return handler;
+            IEnergyStorage handler = energy(level, pos, caps, side);
+            if (handler == null) {
+                continue;
+            }
+            // 输入看能不能收，输出看能不能抽——旧代码两边都用 receiveEnergy，是错的
+            int probe = input
+                    ? handler.receiveEnergy(ENERGY_PROBE, true)
+                    : handler.extractEnergy(ENERGY_PROBE, true);
+            if (probe > 0) {
+                return new Resolved(new EnergyAdapter(handler), side);
             }
         }
+        IEnergyStorage fallback = energy(level, pos, caps, null);
+        return fallback == null ? null : new Resolved(new EnergyAdapter(fallback), null);
+    }
+
+    private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,
+            Resolved resolved, long generation) {
+        if (routes == null || spec.face() != null || spec.key().kind() == ResourceKind.ITEM) {
+            return;
+        }
+        routes.remember(spec, input, new RouteTable.Route(resolved.face()), generation);
+    }
+
+    private static void clear(@Nullable RouteTable routes, ResourceSpec spec, boolean input) {
+        if (routes != null && spec.face() == null) {
+            routes.clear(spec, input);
+        }
+    }
+
+    @Nullable
+    private static IItemHandler item(ServerLevel level, BlockPos pos,
+            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
         return caps == null
-                ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null)
-                : caps.energy(pos, null);
+                ? level.getCapability(Capabilities.ItemHandler.BLOCK, pos, face)
+                : caps.item(pos, face);
+    }
+
+    @Nullable
+    private static IFluidHandler fluid(ServerLevel level, BlockPos pos,
+            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
+        return caps == null
+                ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face)
+                : caps.fluid(pos, face);
+    }
+
+    @Nullable
+    private static IEnergyStorage energy(ServerLevel level, BlockPos pos,
+            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
+        return caps == null
+                ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face)
+                : caps.energy(pos, face);
     }
 
     private static ItemStack itemSample(ResourceKey key) {

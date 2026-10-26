@@ -34,7 +34,8 @@ public final class IoTransfer {
         // 0) 先模拟机器到底收不收，收不下就一个子儿都不动仓库
         long accepted = adapter.insert(capacity, true);
         if (accepted <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_SPACE);
+            // 有位置却不收：面不对（面配置不允许这个方向），不是「满了」
+            return new IoResult(0L, IoResult.Reason.REJECTED);
         }
 
         // 1) 只按机器点头的量从仓库扣
@@ -83,7 +84,8 @@ public final class IoTransfer {
         long want = Math.min(available, accepted);
         long taken = adapter.extract(want, false);
         if (taken <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_ITEM);
+            // 模拟说抽得出来、真抽却为零：这个面不对
+            return new IoResult(0L, IoResult.Reason.REJECTED);
         }
 
         // 3) 真塞；塞不进的退回机器

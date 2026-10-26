@@ -44,6 +44,8 @@ public final class Observation {
     private boolean legacyContainer;
     @Nullable
     private FaceTable faces;
+    /** 面表代数：每次作废 +1。路由表靠它判断自己是否过期。 */
+    private long facesGeneration;
     private long observedAtTick = -1L;
     private long missingSince = -1L;
     private long nextProbeTick;
@@ -85,6 +87,11 @@ public final class Observation {
     @Nullable
     public FaceTable faces() {
         return this.faces;
+    }
+
+    /** 面表代数。每次作废 +1，路由表用它判过期。 */
+    public long facesGeneration() {
+        return this.facesGeneration;
     }
 
     /** 最后一次探测的 tick；从没探过为 {@code -1}。 */
@@ -166,7 +173,7 @@ public final class Observation {
 
         if (before != result.health() || identityChanged) {
             // 方块换过／可用性变了：面表一定过期
-            this.faces = null;
+            this.invalidateFaces();
         }
         this.nextProbeTick = tick + this.probeInterval;
     }
@@ -188,5 +195,6 @@ public final class Observation {
      */
     void invalidateFaces() {
         this.faces = null;
+        this.facesGeneration++;
     }
 }

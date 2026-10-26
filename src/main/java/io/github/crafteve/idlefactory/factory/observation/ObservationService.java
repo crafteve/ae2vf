@@ -187,6 +187,17 @@ public final class ObservationService {
     }
 
     /**
+     * 面表代数：每次面表被作废都会 +1，路由表拿它判断自己过没过期。
+     *
+     * @param located 机器引用或容器引用
+     * @return 代数；没登记过时为 {@code 0}
+     */
+    public long facesGeneration(Located located) {
+        Observation observation = this.observations.get(ObservationKey.of(located));
+        return observation == null ? 0L : observation.facesGeneration();
+    }
+
+    /**
      * 取走本 tick 的状态迁移。
      *
      * @return 迁移列表；没有时为空列表

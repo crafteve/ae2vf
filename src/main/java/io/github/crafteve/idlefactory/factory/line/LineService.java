@@ -548,6 +548,7 @@ public final class LineService {
             return 0;
         }
         markDirty();
+        forgetRoutes(line.id(), group.id());
         wakeGroup(line.id(), group.id());
         FactoryMessages.send(player, FactoryMessages.ok(
                 "已加" + (input ? "输入" : "输出") + "：" + spec.describe()));
@@ -579,6 +580,7 @@ public final class LineService {
             return 0;
         }
         markDirty();
+        forgetRoutes(line.id(), group.id());
         wakeGroup(line.id(), group.id());
         FactoryMessages.send(player, FactoryMessages.ok(
                 "已移除" + (input ? "输入" : "输出") + "：" + key.describe()));
@@ -711,6 +713,19 @@ public final class LineService {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
             runtime.lineRunner().wakeGroup(lineId, groupId);
+        }
+    }
+
+    /**
+     * 丢掉一个组的面路由（规则变了，面可能跟着变）。
+     *
+     * @param lineId  产线 id
+     * @param groupId 组 id
+     */
+    private static void forgetRoutes(UUID lineId, UUID groupId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.lineRunner().forgetRoutes(lineId, groupId);
         }
     }
 

@@ -126,6 +126,11 @@ public final class DiagService {
                         + " · 未加载 " + stats.unloaded() + " · 失联 " + stats.missing()
                         + " · 未探测 " + stats.unknown()
                         + " · 本 tick 探测 " + stats.probesLastTick()));
+        int routes = 0;
+        for (PassiveLine line : factory.lines().all()) {
+            routes += runtime.lineRunner().routeCount(line.id());
+        }
+        FactoryMessages.send(player, FactoryMessages.info("面路由 " + routes + " 条（搬通过的面）"));
 
         long now = observations.currentTick();
         int shown = 0;

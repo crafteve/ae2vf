@@ -98,7 +98,9 @@ public final class LineRunner {
             }
 
             LevelCapabilityCache caps = observations == null ? null : observations.capabilities(level);
-            GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps);
+            long generation = observations == null ? 0L : observations.facesGeneration(target);
+            GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
+                    groupState.routes, generation);
             DiagStats.LineStats stats = factory.stats().line(line.id());
             if (result.movedAnything()) {
                 stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(), now);
@@ -188,6 +190,41 @@ public final class LineRunner {
     public long sleepSince(UUID lineId) {
         RunnerState.LineState state = this.state.peek(lineId);
         return state == null ? -1L : state.sleepSince;
+    }
+
+    /**
+     * 丢掉一个组的面路由。玩家改规则（加/删输入输出）时调——面可能跟着变了。
+     *
+     * @param lineId  产线 id
+     * @param groupId 组 id
+     */
+    public void forgetRoutes(UUID lineId, UUID groupId) {
+        RunnerState.LineState line = this.state.peek(lineId);
+        if (line == null) {
+            return;
+        }
+        RunnerState.GroupState group = line.groups.get(groupId);
+        if (group != null) {
+            group.routes.clearAll();
+        }
+    }
+
+    /**
+     * 一条产线记住的面路由条数（诊断用）。
+     *
+     * @param lineId 产线 id
+     * @return 路由条数
+     */
+    public int routeCount(UUID lineId) {
+        RunnerState.LineState line = this.state.peek(lineId);
+        if (line == null) {
+            return 0;
+        }
+        int total = 0;
+        for (RunnerState.GroupState group : line.groups.values()) {
+            total += group.routes.size();
+        }
+        return total;
     }
 
     /**
