@@ -26,8 +26,8 @@ public final class FactoryLayout {
     public static final int PAD = 4;
     /** 顶栏高度。 */
     public static final int HEADER_H = 22;
-    /** 右区宽度（仓库/机器）。 */
-    public static final int RIGHT_W = 196;
+    /** 右区宽度（仓库/机器）。等于物品网格宽 162 + 两侧各 4 的边距，格子贴着面板边框。 */
+    public static final int RIGHT_W = 170;
     /** 右区最小可用宽度。低于它就不再压缩，转而压缩左表。 */
     public static final int MIN_RIGHT_W = 170;
     /** 左右区之间的间隙。 */
@@ -209,10 +209,11 @@ public final class FactoryLayout {
 
         layoutColumns(this.tableW);
 
-        this.tabY = this.bodyY;
-        this.searchY = this.tabY + TAB_H + 4;
+        // tab 条不占主体高度：它就是顶栏的右端，和面板顶边齐平。
+        this.tabY = this.headerY;
+        this.searchY = this.bodyY;
         this.gridX = this.rightX + (this.rightW - GRID_COLS * CELL) / 2;
-        this.gridY = this.searchY + SEARCH_H + 6;
+        this.gridY = this.searchY + SEARCH_H + 4;
 
         // 从底部往上钉：快捷栏 → 背包 → 合成，物品网格吃掉剩下的高度。
         // 这样无论面板多高，玩家背包都在固定位置，只有仓库可见行数会变。

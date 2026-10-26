@@ -142,9 +142,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         NineSlice.panel(graphics, this.leftPos, this.topPos, this.imageWidth, this.imageHeight);
 
-        // 顶栏下沿
+        // 顶栏下沿：画到右区左边缘为止，右边让 tab 条自己收边
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
-                l.headerX, l.headerY + FactoryLayout.HEADER_H, l.headerW, 1);
+                l.headerX, l.headerY + FactoryLayout.HEADER_H, l.rightX - l.headerX, 1);
 
         // 左右两区分隔线
         NineSlice.fill(graphics, GuiTextures.DIVIDER,
@@ -175,11 +175,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawRightChrome(GuiGraphics graphics) {
         FactoryLayout l = this.layout;
 
+        // tab 条：顶栏右端，和面板顶边齐平，宽度正好等于右区
         int tabWidth = l.rightW / FactoryLayout.TAB_COUNT;
         for (int i = 0; i < FactoryLayout.TAB_COUNT; i++) {
             int x = l.rightX + i * tabWidth;
             int w = i == FactoryLayout.TAB_COUNT - 1 ? l.rightW - i * tabWidth : tabWidth;
-            NineSlice.button(graphics, x, l.tabY, w, FactoryLayout.TAB_H);
+            NineSlice.button(graphics, x, l.tabY, w, FactoryLayout.HEADER_H);
         }
         // 选中 tab 的上沿强调
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
@@ -230,12 +231,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         x += buttonW + 8;
 
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, textY + 2, DOT, DOT);
-        graphics.drawString(this.font, "运行", x + DOT + 4, textY, this.theme.statusRun(), false);
+        String status = "运行";
+        graphics.drawString(this.font, status, x + DOT + 4, textY, this.theme.statusRun(), false);
+        int statusEnd = x + DOT + 4 + this.font.width(status);
 
+        // 右侧统计与关闭按钮：关闭按钮贴着 tab 条左边，统计只在放得下时才画。
+        // 窄屏（640 逻辑宽）下顶栏要同时塞标题、下拉、状态、统计、关闭和两个 tab，
+        // 统计是最不重要的一项，优先让它让位，而不是让文字压在一起。
         String stats = "12 台 · 3 线 · 仓库在线";
-        int closeX = l.headerX + l.headerW - 6 - CLOSE_SIZE;
+        int closeX = l.rightX - 6 - CLOSE_SIZE;
         int statsX = closeX - 8 - this.font.width(stats);
-        graphics.drawString(this.font, stats, statsX, textY, this.theme.textDim(), false);
+        if (statsX > statusEnd + 8) {
+            graphics.drawString(this.font, stats, statsX, textY, this.theme.textDim(), false);
+        }
 
         NineSlice.button(graphics, closeX, l.headerY + 4, CLOSE_SIZE, CLOSE_SIZE);
         graphics.drawString(this.font, "x",
@@ -327,7 +335,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             int x = l.rightX + i * tabWidth;
             graphics.drawString(this.font, tabs[i],
                     x + (tabWidth - this.font.width(tabs[i])) / 2,
-                    l.tabY + (FactoryLayout.TAB_H - 9) / 2,
+                    l.tabY + (FactoryLayout.HEADER_H - 9) / 2,
                     i == 0 ? this.theme.textPrimary() : this.theme.textDim(), false);
         }
 
