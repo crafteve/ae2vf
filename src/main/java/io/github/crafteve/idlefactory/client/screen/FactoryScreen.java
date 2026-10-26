@@ -4,6 +4,7 @@ import java.util.List;
 
 import io.github.crafteve.idlefactory.client.screen.DemoRows.Row;
 import io.github.crafteve.idlefactory.client.screen.DemoRows.State;
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
@@ -63,6 +64,30 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         // 父类按 imageWidth/imageHeight 居中，正好等于 layout 里算的 panelX/panelY
         super.init();
         positionSlots();
+        logLayout();
+    }
+
+    /**
+     * 把当前布局打进日志。
+     *
+     * <p>尺寸问题（挤压配方查看器、列被裁掉）只有在具体分辨率 + GUI 缩放下才复现得出来，
+     * 而从截图里反推缩放很不可靠。所以直接把这一组数字打出来，让排障只需要看一行日志。</p>
+     */
+    private void logLayout() {
+        FactoryLayout l = this.layout;
+        StringBuilder columns = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            if (i > 0) {
+                columns.append(' ');
+            }
+            columns.append(l.columnW(i) == 0 ? "-" : String.valueOf(l.columnW(i)));
+        }
+        double guiScale = this.minecraft == null ? -1.0D : this.minecraft.getWindow().getGuiScale();
+        IdleFactory.LOGGER.info(
+                "Idle Factory UI: screen={}x{} guiScale={} gutter={} panel={}x{} left={} right={}"
+                        + " rows={} gridRows={} columns=[{}]",
+                this.width, this.height, guiScale, FactoryLayout.gutter(this.width),
+                l.panelW, l.panelH, l.leftW, l.rightW, l.rowsVisible, l.gridRows, columns);
     }
 
     /**
@@ -223,8 +248,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         int headerY = l.tableHeaderY + (FactoryLayout.TABLE_HEADER_H - 9) / 2;
         String[] headers = { "机器", "状态", "输入", "输出", "速率" };
-        for (int i = 0; i < headers.length; i++) {
-            graphics.drawString(this.font, headers[i], l.columnX(i) + 4, headerY,
+        // 按「显示顺序 → 逻辑列下标」取表头，不能假设显示的就是前 N 列：
+        // 窄屏时丢的是输入/输出，第三列可能是速率。
+        for (int slot = 0; slot < l.columnCount; slot++) {
+            int id = l.columnId(slot);
+            graphics.drawString(this.font, headers[id], l.columnX(id) + 4, headerY,
                     this.theme.textDim(), false);
         }
 
@@ -250,20 +278,28 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
                 l.leftX + 1, y, TRACK_W, FactoryLayout.ROW_H - 2);
 
-        int iconX = l.columnX(0) + 4;
+        int iconX = l.columnX(FactoryLayout.COL_NAME) + 4;
         graphics.renderItem(new ItemStack(Items.BLAST_FURNACE), iconX, y + 5);
         graphics.drawString(this.font, row.name(), iconX + FactoryLayout.CELL + 2, textY,
                 this.theme.textPrimary(), false);
 
-        int dotX = l.columnX(1) + 4;
+        int dotX = l.columnX(FactoryLayout.COL_STATE) + 4;
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, dotX, textY + 2, DOT, DOT);
         graphics.drawString(this.font, row.detail(), dotX + DOT + 4, textY, colorOf(row.state()), false);
 
-        drawIcons(graphics, row.inputs(), l.columnX(2) + 2, y + 5, l.columnW(2) - 6);
-        drawIcons(graphics, row.outputs(), l.columnX(3) + 2, y + 5, l.columnW(3) - 6);
+        if (l.hasColumn(FactoryLayout.COL_INPUT)) {
+            drawIcons(graphics, row.inputs(), l.columnX(FactoryLayout.COL_INPUT) + 2, y + 5,
+                    l.columnW(FactoryLayout.COL_INPUT) - 6);
+        }
+        if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
+            drawIcons(graphics, row.outputs(), l.columnX(FactoryLayout.COL_OUTPUT) + 2, y + 5,
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 6);
+        }
 
-        graphics.drawString(this.font, row.rate(), l.columnX(4) + 4, textY,
-                "—".equals(row.rate()) ? this.theme.textDim() : this.theme.textPrimary(), false);
+        if (l.hasColumn(FactoryLayout.COL_RATE)) {
+            graphics.drawString(this.font, row.rate(), l.columnX(FactoryLayout.COL_RATE) + 4, textY,
+                    "—".equals(row.rate()) ? this.theme.textDim() : this.theme.textPrimary(), false);
+        }
     }
 
     private void drawIcons(GuiGraphics graphics, List<ItemStack> stacks, int x, int y, int maxWidth) {

@@ -1,16 +1,25 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import java.util.Arrays;
+
 /**
  * 工作台的几何：一处算完，界面只读。
  *
  * <p>界面里没有「按剩余空间自动分配」的布局器——所有位置都是常量算出来的整数。原因是 GUI 必须
  * 像素对齐，flex 式的自动分配很容易算出半像素，最后表现为边框糊成两格。</p>
  *
- * <p>唯一的输入是屏幕逻辑尺寸和两侧留白。留白给配方查看器（JEI/EMI/REI），可以用系统属性
- * {@code -Didlefactory.gutter=NN} 临时改，方便进游戏实测「留多少才不打架」。</p>
+ * <p>但「固定」不等于「不会溢出去」。三种 GUI 缩放下的可用逻辑尺寸差一倍多（1280×684 / 853×456 /
+ * 640×342），所以有两处必须能收：</p>
  *
- * <p>右区宽度固定（{@link #RIGHT_W}），左区吸收剩余宽度。这样以后改窗口宽度，右区的几何常量
- * 一个都不用动。</p>
+ * <ul>
+ *   <li><b>两侧留白</b>：给配方查看器（JEI/EMI/REI）让位，但不能大到把面板挤没——上限是
+ *       「屏幕宽减去面板最小宽」。</li>
+ *   <li><b>表格列</b>：五列有最小宽度，放不下就按优先级丢列（速率 → 输入输出 → 只剩机器+状态），
+ *       <b>绝不允许列被画到右区上面</b>。被丢的列宽度记为 0，绘制方跳过。</li>
+ * </ul>
+ *
+ * <p>右区宽度固定（{@link #RIGHT_W}），左区吸收剩余宽度。这样换分辨率只让表格变宽变窄，右区的
+ * 几何常量一个都不用动。</p>
  */
 public final class FactoryLayout {
     /** 面板内边距。 */
@@ -19,6 +28,8 @@ public final class FactoryLayout {
     public static final int HEADER_H = 22;
     /** 右区宽度（仓库/机器）。 */
     public static final int RIGHT_W = 196;
+    /** 右区最小可用宽度。低于它就不再压缩，转而压缩左表。 */
+    public static final int MIN_RIGHT_W = 170;
     /** 左右区之间的间隙。 */
     public static final int GAP = 4;
     /** 左区表头高度。 */
@@ -48,27 +59,42 @@ public final class FactoryLayout {
     /** 小标题（合成 / 背包）与内容的间距。 */
     public static final int LABEL_GAP = 12;
 
-    /** 默认两侧留白（像素）。改成 0 就是不留给配方查看器。 */
-    public static final int DEFAULT_GUTTER = 48;
+    /** 默认两侧留白（像素）。刚好够配方查看器的一列原料，又不会在 853 宽下把面板挤没。 */
+    public static final int DEFAULT_GUTTER = 96;
     /** 面板最大宽（屏幕再大也不无限拉长）。 */
     public static final int MAX_PANEL_W = 900;
     /** 面板最大高。 */
     public static final int MAX_PANEL_H = 540;
-    /** 面板最小宽。 */
+    /** 面板最小宽。低于它说明屏幕太窄，留白优先让路。 */
     public static final int MIN_PANEL_W = 480;
     /** 面板最小高。 */
     public static final int MIN_PANEL_H = 320;
 
-    /** 左区状态列宽。 */
-    private static final int COL_STATE = 104;
-    /** 左区输入列宽。 */
-    private static final int COL_IN = 112;
-    /** 左区输出列宽。 */
-    private static final int COL_OUT = 112;
-    /** 左区速率列宽。 */
-    private static final int COL_RATE = 93;
-    /** 机器列的最小宽度。 */
-    private static final int COL_NAME_MIN = 80;
+    /** 列下标：机器。 */
+    public static final int COL_NAME = 0;
+    /** 列下标：状态。 */
+    public static final int COL_STATE = 1;
+    /** 列下标：输入。 */
+    public static final int COL_INPUT = 2;
+    /** 列下标：输出。 */
+    public static final int COL_OUTPUT = 3;
+    /** 列下标：速率。 */
+    public static final int COL_RATE = 4;
+
+    /** 五列全要时的最小宽度（顺序同上）。 */
+    private static final int[] MIN_ALL = { 80, 88, 76, 76, 64 };
+    /** 五列全要时的理想宽度。 */
+    private static final int[] PREF_ALL = { 263, 104, 112, 112, 93 };
+    /** 去掉速率后的最小宽度。 */
+    private static final int[] MIN_NO_RATE = { 80, 88, 76, 76 };
+    /** 只剩下 ICON 侧时的最小宽度。 */
+    private static final int[] MIN_NO_IO = { 80, 88, 64 };
+    /** 只剩机器+状态时的最小宽度。 */
+    private static final int[] MIN_BASIC = { 80, 88 };
+    /** 三列模式的理想宽度。 */
+    private static final int[] PREF_NO_IO = { 200, 104, 93 };
+    /** 两列模式的理想宽度。 */
+    private static final int[] PREF_BASIC = { 300, 120 };
 
     /** 面板左上角 x。 */
     public final int panelX;
@@ -142,13 +168,17 @@ public final class FactoryLayout {
     /** 快捷栏上边。 */
     public final int hotbarY;
 
-    /** 五列的 x 坐标。 */
-    private final int[] columnX;
-    /** 五列的宽度。 */
-    private final int[] columnW;
+    /** 五列的 x 坐标（按列下标，不看可见性）。 */
+    private final int[] columnX = new int[5];
+    /** 五列的宽度；{@code 0} 表示这一列被丢掉了。 */
+    private final int[] columnW = new int[5];
+    /** 当前显示的列，按显示顺序排列，元素是逻辑列下标。构造期由 {@link #layoutColumns} 填入。 */
+    private int[] columnIds = new int[0];
+    /** 当前显示几列。 */
+    public int columnCount;
 
     private FactoryLayout(int screenW, int screenH) {
-        int gutter = gutter();
+        int gutter = gutter(screenW);
         this.panelW = clamp(screenW - gutter * 2, MIN_PANEL_W, MAX_PANEL_W);
         this.panelH = clamp(screenH, MIN_PANEL_H, MAX_PANEL_H);
         this.panelX = (screenW - this.panelW) / 2;
@@ -161,8 +191,12 @@ public final class FactoryLayout {
         this.bodyY = this.headerY + HEADER_H + 3;
         this.bodyH = this.panelY + this.panelH - PAD - this.bodyY;
 
-        this.rightX = this.panelX + this.panelW - PAD - RIGHT_W;
-        this.rightW = RIGHT_W;
+        // 右区先按理想宽度要，但至少给左表留出五列的最小宽度；实在挤不下就压右区到下限，
+        // 让左表退化成三列或两列——总之两边都要能用，谁也不许画到对方头上。
+        int available = this.panelW - PAD * 2;
+        int rightWanted = Math.min(RIGHT_W, available - sum(MIN_ALL) - GAP);
+        this.rightW = Math.max(MIN_RIGHT_W, Math.min(RIGHT_W, rightWanted));
+        this.rightX = this.panelX + this.panelW - PAD - this.rightW;
         this.leftX = this.panelX + PAD;
         this.leftW = this.rightX - GAP - this.leftX;
 
@@ -173,14 +207,7 @@ public final class FactoryLayout {
         this.footerY = this.bodyY + this.bodyH - FOOTER_H;
         this.rowsVisible = Math.max(1, (this.footerY - this.rowTop) / ROW_H);
 
-        int nameW = Math.max(COL_NAME_MIN, this.tableW - (COL_STATE + COL_IN + COL_OUT + COL_RATE));
-        this.columnW = new int[] { nameW, COL_STATE, COL_IN, COL_OUT, COL_RATE };
-        this.columnX = new int[this.columnW.length];
-        int cursor = this.tableX;
-        for (int i = 0; i < this.columnW.length; i++) {
-            this.columnX[i] = cursor;
-            cursor += this.columnW[i];
-        }
+        layoutColumns(this.tableW);
 
         this.tabY = this.bodyY;
         this.searchY = this.tabY + TAB_H + 4;
@@ -188,7 +215,7 @@ public final class FactoryLayout {
         this.gridY = this.searchY + SEARCH_H + 6;
 
         // 从底部往上钉：快捷栏 → 背包 → 合成，物品网格吃掉剩下的高度。
-        // 这样右区无论多高，玩家背包都在拇指习惯的位置，只有仓库可见行数会变。
+        // 这样无论面板多高，玩家背包都在固定位置，只有仓库可见行数会变。
         this.hotbarY = this.bodyY + this.bodyH - 6 - CELL;
         this.invY = this.hotbarY - 3 - 3 * CELL;
         this.invX = this.gridX;
@@ -217,18 +244,24 @@ public final class FactoryLayout {
     }
 
     /**
-     * 两侧留白。可用 {@code -Didlefactory.gutter=NN} 覆盖，进游戏实测用。
+     * 两侧留白。
      *
+     * <p>可以用 {@code -Didlefactory.gutter=NN} 覆盖（{@code ./gradlew runClient -Pgutter=NN}）。
+     * 但屏幕太窄时会自动收敛到「至少留 {@link #MIN_PANEL_W} 给面板」，否则面板会被留白挤成一条。</p>
+     *
+     * @param screenWidth 屏幕逻辑宽
      * @return 每侧留白像素
      */
-    public static int gutter() {
-        return Math.max(0, Integer.getInteger("idlefactory.gutter", DEFAULT_GUTTER));
+    public static int gutter(int screenWidth) {
+        int wanted = Math.max(0, Integer.getInteger("idlefactory.gutter", DEFAULT_GUTTER));
+        int allowed = Math.max(0, (screenWidth - MIN_PANEL_W) / 2);
+        return Math.min(wanted, allowed);
     }
 
     /**
      * 某一列的 x。
      *
-     * @param index 0=机器 1=状态 2=输入 3=输出 4=速率
+     * @param index 列下标
      * @return x 坐标
      */
     public int columnX(int index) {
@@ -236,13 +269,23 @@ public final class FactoryLayout {
     }
 
     /**
-     * 某一列的宽。
+     * 某一列的宽；{@code 0} 表示这一列在当前尺寸下被丢掉了，绘制方必须跳过。
      *
      * @param index 列下标
      * @return 宽度
      */
     public int columnW(int index) {
         return this.columnW[index];
+    }
+
+    /**
+     * 当前是否还能显示某一列。
+     *
+     * @param index 列下标
+     * @return 宽度大于 0 时为 {@code true}
+     */
+    public boolean hasColumn(int index) {
+        return this.columnW[index] > 0;
     }
 
     /**
@@ -253,6 +296,102 @@ public final class FactoryLayout {
      */
     public int rowY(int row) {
         return this.rowTop + row * ROW_H;
+    }
+
+    /**
+     * 按优先级挑一组能放下的列，并把宽度按比例分配。
+     *
+     * <p>丢列的顺序是固定的：先丢速率，再丢输入/输出这一对（它们只有一边没意义），
+     * 最后退化成「机器 + 状态」。这样任何宽度下都不会有列被画到右区上面。</p>
+     *
+     * <p>注意三列模式是「机器 / 状态 / 速率」——所以必须显式记下列的下标，
+     * 不能让绘制方按「前 N 个表头」去猜，否则表头会写成「机器/状态/输入」而内容是速率。</p>
+     */
+    private void layoutColumns(int tableWidth) {
+        int[] ids;
+        int[] min;
+        int[] pref;
+        if (tableWidth >= sum(MIN_ALL)) {
+            ids = new int[] { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT, COL_RATE };
+            min = MIN_ALL;
+            pref = PREF_ALL;
+        } else if (tableWidth >= sum(MIN_NO_RATE)) {
+            ids = new int[] { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT };
+            min = MIN_NO_RATE;
+            pref = new int[] { PREF_ALL[0], PREF_ALL[1], PREF_ALL[2], PREF_ALL[3] };
+        } else if (tableWidth >= sum(MIN_NO_IO)) {
+            ids = new int[] { COL_NAME, COL_STATE, COL_RATE };
+            min = MIN_NO_IO;
+            pref = PREF_NO_IO;
+        } else {
+            ids = new int[] { COL_NAME, COL_STATE };
+            min = MIN_BASIC;
+            pref = PREF_BASIC;
+        }
+
+        int[] widths = distribute(tableWidth, min, pref);
+        Arrays.fill(this.columnW, 0);
+        int cursor = this.tableX;
+        for (int i = 0; i < ids.length; i++) {
+            this.columnX[ids[i]] = cursor;
+            this.columnW[ids[i]] = widths[i];
+            cursor += widths[i];
+        }
+        this.columnIds = ids;
+        this.columnCount = ids.length;
+    }
+
+    /**
+     * 第 {@code slot} 个显示列对应的逻辑列下标。
+     *
+     * @param slot 显示顺序（0 起）
+     * @return 逻辑列下标，见 {@link #COL_NAME} 等常量
+     */
+    public int columnId(int slot) {
+        return this.columnIds[slot];
+    }
+
+    /**
+     * 按「最小 + 剩余按理想比例分配」算一组整数宽度，总和严格等于 {@code total}。
+     */
+    private static int[] distribute(int total, int[] min, int[] pref) {
+        int n = min.length;
+        int[] result = new int[n];
+        int minSum = sum(min);
+        if (total <= minSum) {
+            return min.clone();
+        }
+        int prefSum = 0;
+        for (int i = 0; i < n; i++) {
+            prefSum += Math.max(pref[i], min[i]);
+        }
+        if (total >= prefSum) {
+            for (int i = 0; i < n; i++) {
+                result[i] = Math.max(pref[i], min[i]);
+            }
+            result[0] += total - prefSum;
+            return result;
+        }
+
+        int extra = total - minSum;
+        int weightSum = prefSum - minSum;
+        int used = 0;
+        for (int i = 0; i < n; i++) {
+            int weight = Math.max(pref[i], min[i]) - min[i];
+            result[i] = min[i] + (weightSum <= 0 ? 0 : extra * weight / weightSum);
+            used += result[i];
+        }
+        // 整除残差补给第一列，保证总和精确
+        result[0] += total - used;
+        return result;
+    }
+
+    private static int sum(int[] values) {
+        int total = 0;
+        for (int value : values) {
+            total += value;
+        }
+        return total;
     }
 
     private static int clamp(int value, int min, int max) {
