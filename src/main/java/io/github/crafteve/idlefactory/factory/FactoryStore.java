@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -97,7 +97,7 @@ public final class FactoryStore extends SavedData {
             }
             if (!record.targets().isEmpty()) {
                 ListTag targets = new ListTag();
-                for (MachineTarget target : record.targets()) {
+                for (MachineRef target : record.targets()) {
                     targets.add(target.save());
                 }
                 entry.put(TAG_TARGETS, targets);
@@ -128,10 +128,10 @@ public final class FactoryStore extends SavedData {
             StorageAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
                     ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
                     : null;
-            List<MachineTarget> targets = new ArrayList<>();
+            List<MachineRef> targets = new ArrayList<>();
             ListTag targetList = entry.getList(TAG_TARGETS, Tag.TAG_COMPOUND);
             for (int j = 0; j < targetList.size(); j++) {
-                MachineTarget target = MachineTarget.load(targetList.getCompound(j));
+                MachineRef target = MachineRef.load(targetList.getCompound(j));
                 if (target != null) {
                     targets.add(target);
                 }
@@ -162,6 +162,6 @@ public final class FactoryStore extends SavedData {
      * @param lines   被动产线
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            List<MachineTarget> targets, List<PassiveLine> lines) {
+            List<MachineRef> targets, List<PassiveLine> lines) {
     }
 }

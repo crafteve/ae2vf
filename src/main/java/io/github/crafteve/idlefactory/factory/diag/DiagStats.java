@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
  * <p>统计分两层：按资源（每秒窗口，用来显示「在搬什么、多快」）和按机器（最后搬运 tick、
  * 连续阻塞起点，用来回答「哪台卡了、卡了多久」）。</p>
  */
-public final class Diagnostics {
+public final class DiagStats {
     /** 事件容量。 */
     private static final int CAPACITY = 200;
 

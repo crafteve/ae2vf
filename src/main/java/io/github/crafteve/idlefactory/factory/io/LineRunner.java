@@ -4,11 +4,11 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.diag.Diagnostics;
+import io.github.crafteve.idlefactory.factory.diag.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -66,7 +66,7 @@ public final class LineRunner {
             }
             anyAwake = true;
 
-            MachineTarget target = factory.machines().byId(group.machineId()).orElse(null);
+            MachineRef target = factory.machines().byId(group.machineId()).orElse(null);
             if (target == null) {
                 sleepIfIdle(groupState, now);
                 continue;
@@ -78,7 +78,7 @@ public final class LineRunner {
             }
 
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group);
-            Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
+            DiagStats.LineStats stats = factory.stats().line(line.id());
             if (result.movedAnything()) {
                 stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(), now);
                 groupState.idleSince = -1L;

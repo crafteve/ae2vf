@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -96,7 +96,7 @@ public final class DiagRender {
      * @param now   当前游戏时间（保留参数，方便以后加「卡了多久」）
      * @return 组件
      */
-    public static Component check(LineDiagnostics.GroupCheck check, long now) {
+    public static Component check(DiagChecks.GroupCheck check, long now) {
         MutableComponent detail = FactoryMessages.text(" " + check.detail(), FactoryMessages.PLAIN);
         if (check.problems().size() > 1) {
             // 一行写不下所有问题，悬停看全量
@@ -158,7 +158,7 @@ public final class DiagRender {
      */
     public static Component watchSummary(Factory factory, PassiveLine line, long now,
             long sleepUntil, long sleepSince) {
-        Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
+        DiagStats.LineStats stats = factory.stats().line(line.id());
         List<Map.Entry<ResourceKey, Long>> rates = topRates(stats, 2);
 
         MutableComponent row = Component.empty()
@@ -206,7 +206,7 @@ public final class DiagRender {
     public static List<Component> watchDetail(MinecraftServer server, Factory factory, PassiveLine line,
             long now, long sleepUntil, long sleepSince) {
         List<Component> rows = new ArrayList<>();
-        Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
+        DiagStats.LineStats stats = factory.stats().line(line.id());
 
         rows.add(Component.empty()
                 .append(FactoryMessages.text("[watch] ", FactoryMessages.DIM))
@@ -223,7 +223,7 @@ public final class DiagRender {
                 FactoryMessages.PLAIN));
 
         Map<UUID, String> reasons = new HashMap<>();
-        for (LineDiagnostics.GroupCheck check : LineDiagnostics.check(server, factory, line)) {
+        for (DiagChecks.GroupCheck check : DiagChecks.check(server, factory, line)) {
             reasons.put(check.machineId(), check.detail());
         }
 
@@ -240,11 +240,11 @@ public final class DiagRender {
         return rows;
     }
 
-    private static Component machineRow(Factory factory, IoGroup group, Diagnostics.LineStats stats,
+    private static Component machineRow(Factory factory, IoGroup group, DiagStats.LineStats stats,
             Map<UUID, String> reasons, long now) {
-        MachineTarget machine = factory.machines().byId(group.machineId()).orElse(null);
+        MachineRef machine = factory.machines().byId(group.machineId()).orElse(null);
         String id = machine == null ? shortId(group.machineId()) : machine.shortId();
-        Diagnostics.GroupStats groupStats = stats.group(group.machineId());
+        DiagStats.GroupStats groupStats = stats.group(group.machineId());
 
         if (groupStats.blockedSince() >= 0L) {
             long blockedSeconds = Math.max(0L, (now - groupStats.blockedSince()) / 20L);
@@ -268,9 +268,9 @@ public final class DiagRender {
         return "睡 " + slept + "s（醒于 " + remain + "s）";
     }
 
-    private static int blockedGroups(Diagnostics.LineStats stats) {
+    private static int blockedGroups(DiagStats.LineStats stats) {
         int blocked = 0;
-        for (Diagnostics.GroupStats group : stats.groups().values()) {
+        for (DiagStats.GroupStats group : stats.groups().values()) {
             if (group.blockedSince() >= 0L) {
                 blocked++;
             }
@@ -278,7 +278,7 @@ public final class DiagRender {
         return blocked;
     }
 
-    private static List<Map.Entry<ResourceKey, Long>> allRates(Diagnostics.LineStats stats) {
+    private static List<Map.Entry<ResourceKey, Long>> allRates(DiagStats.LineStats stats) {
         Map<ResourceKey, Long> merged = new HashMap<>();
         for (Map.Entry<ResourceKey, Long> entry : stats.rateIn().entrySet()) {
             merged.merge(entry.getKey(), entry.getValue(), Long::sum);
@@ -291,7 +291,7 @@ public final class DiagRender {
         return list;
     }
 
-    private static List<Map.Entry<ResourceKey, Long>> topRates(Diagnostics.LineStats stats, int limit) {
+    private static List<Map.Entry<ResourceKey, Long>> topRates(DiagStats.LineStats stats, int limit) {
         List<Map.Entry<ResourceKey, Long>> all = allRates(stats);
         return all.size() <= limit ? all : all.subList(0, limit);
     }

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.target;
+package io.github.crafteve.idlefactory.factory.machine;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;

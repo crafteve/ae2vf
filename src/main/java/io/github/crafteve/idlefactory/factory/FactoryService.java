@@ -17,8 +17,8 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerStorage;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
-import io.github.crafteve.idlefactory.factory.target.MachineChecks;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineChecks;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import appeng.api.ids.AEComponents;
@@ -123,13 +123,13 @@ public final class FactoryService {
         factory.refreshStorage();
         info(player, FactorySnapshotBuilder.describe(factory));
 
-        List<MachineTarget> machines = factory.machines().all();
+        List<MachineRef> machines = factory.machines().all();
         if (machines.isEmpty()) {
             info(player, "机器库为空：准星对准机器执行 /idf factory connect");
             return 1;
         }
         info(player, "机器库 " + machines.size() + " 台：");
-        for (MachineTarget target : machines) {
+        for (MachineRef target : machines) {
             String where = target.dimension().location() + " " + target.pos().toShortString();
             String status = describeTarget(player, target);
             Component row = Component.empty()
@@ -174,7 +174,7 @@ public final class FactoryService {
             err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;
         }
-        MachineTarget target = MachineTarget.of(level.dimension(), pos);
+        MachineRef target = MachineRef.of(level.dimension(), pos);
         if (!factory.machines().add(target)) {
             err(player, "这台机器已经接入过了：" + target.shortId());
             return 0;
@@ -229,7 +229,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineTarget> target = factory.machines().byShortId(shortId);
+        Optional<MachineRef> target = factory.machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
@@ -655,7 +655,7 @@ public final class FactoryService {
      * @param target 目标
      * @return 状态文本
      */
-    private static String describeTarget(ServerPlayer player, MachineTarget target) {
+    private static String describeTarget(ServerPlayer player, MachineRef target) {
         MinecraftServer server = player.getServer();
         ServerLevel level = server == null ? null : server.getLevel(target.dimension());
         if (level == null) {

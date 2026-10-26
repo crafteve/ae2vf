@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -84,7 +84,7 @@ public final class FactoryCommands {
     private static final SuggestionProvider<CommandSourceStack> FACE_SUGGESTIONS = (context, builder) -> {        builder.suggest(ResourceSpec.ANY, Component.literal("不限面，按顺序尝试所有面"));
         Direction[] directions = Direction.values();
         Factory factory = factoryFor(context.getSource());
-        MachineTarget machine = machineFrom(context, factory);
+        MachineRef machine = machineFrom(context, factory);
         if (factory == null || machine == null) {
             for (Direction direction : directions) {
                 builder.suggest(direction.getName());
@@ -353,7 +353,7 @@ public final class FactoryCommands {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
-                for (MachineTarget target : factory.machines().all()) {
+                for (MachineRef target : factory.machines().all()) {
                     builder.suggest(target.shortId(), machineTooltip(target));
                 }
             }
@@ -367,7 +367,7 @@ public final class FactoryCommands {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
                 Set<UUID> assigned = FactoryRefs.assignedMachines(factory);
-                for (MachineTarget target : factory.machines().all()) {
+                for (MachineRef target : factory.machines().all()) {
                     if (!assigned.contains(target.id())) {
                         builder.suggest(target.shortId(), machineTooltip(target));
                     }
@@ -397,7 +397,7 @@ public final class FactoryCommands {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             PassiveLine line = lineFrom(context, factory);
-            MachineTarget machine = machineFrom(context, factory);
+            MachineRef machine = machineFrom(context, factory);
             if (factory != null && line != null && machine != null) {
                 line.groupByMachine(machine.id()).ifPresent(group -> {
                     for (ResourceSpec spec : input ? group.inputs() : group.outputs()) {
@@ -544,7 +544,7 @@ public final class FactoryCommands {
 
     /** 从已解析的命令上下文里读机器参数；读不到返回 {@code null}。 */
     @Nullable
-    private static MachineTarget machineFrom(CommandContext<CommandSourceStack> context,
+    private static MachineRef machineFrom(CommandContext<CommandSourceStack> context,
             @Nullable Factory factory) {
         if (factory == null) {
             return null;
@@ -611,7 +611,7 @@ public final class FactoryCommands {
         return null;
     }
 
-    private static Component machineTooltip(MachineTarget target) {
+    private static Component machineTooltip(MachineRef target) {
         return Component.literal(target.dimension().location() + " " + target.pos().toShortString());
     }
 

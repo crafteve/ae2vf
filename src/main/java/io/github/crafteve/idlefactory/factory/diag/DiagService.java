@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
@@ -87,7 +87,7 @@ public final class DiagService {
                     "… 还有 " + (lines.size() - shown) + " 条，用 /idf line 查看"));
         }
 
-        List<DiagEvent> recent = factory.diagnostics().recent(1);
+        List<DiagEvent> recent = factory.stats().recent(1);
         if (!recent.isEmpty()) {
             FactoryMessages.send(player, DiagRender.event(recent.get(0), now));
         }
@@ -96,7 +96,7 @@ public final class DiagService {
 
     private static Component statusRow(Factory factory, PassiveLine line, long now,
             FactoryRuntime runtime) {
-        Diagnostics.LineStats stats = factory.diagnostics().line(line.id());
+        DiagStats.LineStats stats = factory.stats().line(line.id());
         MutableComponent row = Component.empty()
                 .append(DiagRender.levelTag(line.running()
                         ? DiagEvent.Level.OK : DiagEvent.Level.IDLE))
@@ -153,7 +153,7 @@ public final class DiagService {
             return 1;
         }
 
-        for (LineDiagnostics.GroupCheck check : LineDiagnostics.check(runtime.server(), factory, line)) {
+        for (DiagChecks.GroupCheck check : DiagChecks.check(runtime.server(), factory, line)) {
             FactoryMessages.send(player, DiagRender.check(check, now));
         }
         return 1;
@@ -177,7 +177,7 @@ public final class DiagService {
             return 0;
         }
         UUID machineId;
-        Optional<MachineTarget> machine = FactoryRefs.machine(factory, machineRef);
+        Optional<MachineRef> machine = FactoryRefs.machine(factory, machineRef);
         if (machine.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
             FactoryMessages.send(player, FactoryMessages.info("用 /idf factory info 查看机器库"));
@@ -191,7 +191,7 @@ public final class DiagService {
         machineId = machine.get().id();
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        for (LineDiagnostics.GroupCheck check : LineDiagnostics.check(runtime.server(), factory, line)) {
+        for (DiagChecks.GroupCheck check : DiagChecks.check(runtime.server(), factory, line)) {
             if (check.machineId().equals(machineId)) {
                 FactoryMessages.send(player, DiagRender.check(check, now));
                 return 1;
@@ -214,13 +214,13 @@ public final class DiagService {
         }
         int wanted = Math.min(Math.max(count, 1), TAIL_MAX);
         long now = now(FactoryRuntime.get().server());
-        List<DiagEvent> events = factory.diagnostics().recent(wanted);
+        List<DiagEvent> events = factory.stats().recent(wanted);
         if (events.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.info("还没有事件"));
             return 1;
         }
         FactoryMessages.send(player, FactoryMessages.info("── 最近 " + events.size()
-                + " 条 / 共 " + factory.diagnostics().size() + " ──"));
+                + " 条 / 共 " + factory.stats().size() + " ──"));
         for (DiagEvent event : events) {
             FactoryMessages.send(player, DiagRender.event(event, now));
         }
@@ -282,9 +282,9 @@ public final class DiagService {
         Path directory = runtime.server().getServerDirectory().resolve("logs").resolve("idlefactory");
         Path file = directory.resolve("diag-" + LocalDateTime.now().format(STAMP) + ".log");
         List<String> lines = new ArrayList<>();
-        lines.add("# Idle Factory diagnostics");
+        lines.add("# Idle Factory DiagStats");
         lines.add("# factory=" + factory.id() + " owner=" + factory.owner());
-        for (DiagEvent event : factory.diagnostics().recent(200)) {
+        for (DiagEvent event : factory.stats().recent(200)) {
             lines.add(DiagRender.plain(event, now));
         }
         try {
@@ -363,7 +363,7 @@ public final class DiagService {
         }
         long now = now(runtime.server());
         String text = player.getGameProfile().getName() + " " + action + (success ? "" : " 失败");
-        factory.get().diagnostics().record(DiagEvent.of(now,
+        factory.get().stats().record(DiagEvent.of(now,
                 success ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
                 DiagEvent.Category.CMD, null, null, null, text));
     }
@@ -379,7 +379,7 @@ public final class DiagService {
             return;
         }
         for (Factory factory : runtime.manager().all()) {
-            factory.diagnostics().sample();
+            factory.stats().sample();
         }
         if (WATCHES.isEmpty()) {
             return;

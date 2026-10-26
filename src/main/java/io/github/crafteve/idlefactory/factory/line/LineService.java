@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -194,13 +194,13 @@ public final class LineService {
         FactoryMessages.send(player, head);
 
         for (IoGroup group : line.groups()) {
-            Optional<MachineTarget> target = factory.machines().byId(group.machineId());
+            Optional<MachineRef> target = factory.machines().byId(group.machineId());
             if (target.isEmpty()) {
                 FactoryMessages.send(player, FactoryMessages.err(
                         "  机器 " + group.machineId() + " 已不在机器库"));
                 continue;
             }
-            MachineTarget machine = target.get();
+            MachineRef machine = target.get();
             String where = machine.dimension().location() + " " + machine.pos().toShortString();
             MutableComponent row = Component.empty()
                     .append(FactoryMessages.text("  ", FactoryMessages.INFO))
@@ -236,7 +236,7 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        MachineTarget machine = requireMachine(player, factory, machineRef);
+        MachineRef machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
@@ -278,7 +278,7 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        MachineTarget machine = requireMachine(player, factory, machineRef);
+        MachineRef machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
@@ -315,7 +315,7 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        MachineTarget machine = requireMachine(player, factory, machineRef);
+        MachineRef machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
@@ -517,7 +517,7 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        MachineTarget machine = requireMachine(player, factory, machineRef);
+        MachineRef machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
@@ -548,7 +548,7 @@ public final class LineService {
         if (line == null) {
             return 0;
         }
-        MachineTarget machine = requireMachine(player, factory, machineRef);
+        MachineRef machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
@@ -602,8 +602,8 @@ public final class LineService {
     }
 
     @Nullable
-    private static MachineTarget requireMachine(ServerPlayer player, Factory factory, String ref) {
-        Optional<MachineTarget> target = FactoryRefs.machine(factory, ref);
+    private static MachineRef requireMachine(ServerPlayer player, Factory factory, String ref) {
+        Optional<MachineRef> target = FactoryRefs.machine(factory, ref);
         if (target.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + ref));
             FactoryMessages.send(player, FactoryMessages.info("用 /idf factory info 查看机器库（短 id 8 位）"));
@@ -613,7 +613,7 @@ public final class LineService {
     }
 
     @Nullable
-    private static IoGroup requireGroup(ServerPlayer player, PassiveLine line, MachineTarget machine) {
+    private static IoGroup requireGroup(ServerPlayer player, PassiveLine line, MachineRef machine) {
         Optional<IoGroup> group = line.groupByMachine(machine.id());
         if (group.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err(

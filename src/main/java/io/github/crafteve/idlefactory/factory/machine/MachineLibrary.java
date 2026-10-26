@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.target;
+package io.github.crafteve.idlefactory.factory.machine;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -18,7 +18,7 @@ import net.minecraft.world.level.Level;
  * 远程清理。</p>
  */
 public final class MachineLibrary {
-    private final Map<UUID, MachineTarget> byId = new LinkedHashMap<>();
+    private final Map<UUID, MachineRef> byId = new LinkedHashMap<>();
 
     /**
      * 加一个目标。
@@ -26,7 +26,7 @@ public final class MachineLibrary {
      * @param target 目标
      * @return 是否真的加入；已存在时返回 {@code false}
      */
-    public boolean add(MachineTarget target) {
+    public boolean add(MachineRef target) {
         if (this.byId.containsKey(target.id())) {
             return false;
         }
@@ -39,8 +39,8 @@ public final class MachineLibrary {
      *
      * @param targets 目标集合
      */
-    public void addAll(Collection<MachineTarget> targets) {
-        for (MachineTarget target : targets) {
+    public void addAll(Collection<MachineRef> targets) {
+        for (MachineRef target : targets) {
             add(target);
         }
     }
@@ -73,9 +73,9 @@ public final class MachineLibrary {
      * @param shortId 短 id
      * @return 目标；找不到或前缀有歧义时返回空
      */
-    public Optional<MachineTarget> byShortId(String shortId) {
-        MachineTarget found = null;
-        for (MachineTarget target : this.byId.values()) {
+    public Optional<MachineRef> byShortId(String shortId) {
+        MachineRef found = null;
+        for (MachineRef target : this.byId.values()) {
             if (target.shortId().equalsIgnoreCase(shortId)) {
                 if (found != null) {
                     // 前缀撞了，宁可报错也不要删错
@@ -88,12 +88,12 @@ public final class MachineLibrary {
     }
 
     /** 按 id 查。 */
-    public Optional<MachineTarget> byId(UUID id) {
+    public Optional<MachineRef> byId(UUID id) {
         return Optional.ofNullable(this.byId.get(id));
     }
 
     /** 所有目标（登记顺序）。 */
-    public List<MachineTarget> all() {
+    public List<MachineRef> all() {
         return List.copyOf(this.byId.values());
     }
 

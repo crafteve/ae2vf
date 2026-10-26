@@ -12,8 +12,8 @@ import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
-import io.github.crafteve.idlefactory.factory.target.MachineChecks;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineChecks;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
@@ -177,7 +177,7 @@ public final class FactoryRuntime {
                 }
                 String afterError = factory.storageLink().lastError();
                 if (afterError != null && !afterError.equals(beforeError)) {
-                    factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.WARN,
+                    factory.stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
                             DiagEvent.Category.STOR, null, null, null, "仓库解析异常：" + afterError));
                 }
             }
@@ -210,11 +210,11 @@ public final class FactoryRuntime {
     private void reconcileMachines(Factory factory) {
         long now = this.server.overworld().getGameTime();
         List<UUID> stale = new ArrayList<>();
-        for (MachineTarget target : factory.machines().all()) {
+        for (MachineRef target : factory.machines().all()) {
             ServerLevel level = this.server.getLevel(target.dimension());
             if (level == null) {
                 stale.add(target.id());
-                factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
+                factory.stats().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
                         DiagEvent.Category.MACH, null, target.id(), null, "维度不存在，自动移出机器库"));
                 continue;
             }
@@ -223,7 +223,7 @@ public final class FactoryRuntime {
             }
             if (!MachineChecks.isSupported(level, target.pos())) {
                 stale.add(target.id());
-                factory.diagnostics().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
+                factory.stats().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
                         DiagEvent.Category.MACH, null, target.id(), null, "方块已消失，自动移出机器库"));
             }
         }
@@ -248,7 +248,7 @@ public final class FactoryRuntime {
      */
     private static void recordStorage(Factory factory, long now) {
         boolean online = factory.storageLink().online();
-        factory.diagnostics().record(DiagEvent.of(now,
+        factory.stats().record(DiagEvent.of(now,
                 online ? DiagEvent.Level.OK : DiagEvent.Level.WARN,
                 DiagEvent.Category.STOR, null, null, null,
                 online ? "仓库上线" : "仓库离线"));

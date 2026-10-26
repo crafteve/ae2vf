@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -42,8 +42,8 @@ import net.neoforged.neoforge.items.IItemHandler;
  * <p>「槽满」是 warning 不是「空闲」：没读机器状态就不能假设它在加工——塞满煤炭却不工作的
  * 熔炉和正在烧的熔炉，从 IO 这一侧看是一样的。</p>
  */
-public final class LineDiagnostics {
-    private LineDiagnostics() {
+public final class DiagChecks {
+    private DiagChecks() {
         // 纯静态工具类
     }
 
@@ -71,7 +71,7 @@ public final class LineDiagnostics {
         Storage storage = factory.storage();
         boolean online = factory.storageLink().online();
         for (IoGroup group : line.groups()) {
-            Optional<MachineTarget> target = factory.machines().byId(group.machineId());
+            Optional<MachineRef> target = factory.machines().byId(group.machineId());
             if (target.isEmpty()) {
                 result.add(simple(group.machineId(), DiagEvent.Level.ERROR, "机器已不在机器库"));
                 continue;
@@ -82,7 +82,7 @@ public final class LineDiagnostics {
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,
-            MachineTarget machine, IoGroup group) {
+            MachineRef machine, IoGroup group) {
         ServerLevel level = server.getLevel(machine.dimension());
         if (level == null) {
             return simple(machine.id(), DiagEvent.Level.ERROR, "维度不存在");
@@ -127,7 +127,7 @@ public final class LineDiagnostics {
     }
 
     private static DiagEvent.Level checkInput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         return switch (spec.key().kind()) {
             case ITEM -> checkItemInput(level, storage, online, machine, spec, problems);
             case FLUID -> checkFluidInput(level, storage, online, machine, spec, problems);
@@ -140,7 +140,7 @@ public final class LineDiagnostics {
     }
 
     private static CheckResult checkOutput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         return switch (spec.key().kind()) {
             case ITEM -> checkItemOutput(level, storage, online, machine, spec, problems);
             case FLUID -> checkFluidOutput(level, storage, online, machine, spec, problems);
@@ -157,7 +157,7 @@ public final class LineDiagnostics {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkItemInput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
             problems.add("物品 id 无法解析：" + spec.key().id());
@@ -186,7 +186,7 @@ public final class LineDiagnostics {
     }
 
     private static CheckResult checkItemOutput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
             problems.add("物品 id 无法解析：" + spec.key().id());
@@ -212,7 +212,7 @@ public final class LineDiagnostics {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkFluidInput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
         if (fluid == Fluids.EMPTY) {
             problems.add("流体 id 无法解析：" + spec.key().id());
@@ -241,7 +241,7 @@ public final class LineDiagnostics {
     }
 
     private static CheckResult checkFluidOutput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
         if (fluid == Fluids.EMPTY) {
             problems.add("流体 id 无法解析：" + spec.key().id());
@@ -267,7 +267,7 @@ public final class LineDiagnostics {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkEnergyInput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         IEnergyStorage handler = energyReceiver(level, machine.pos(), spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有能量能力");
@@ -313,7 +313,7 @@ public final class LineDiagnostics {
     }
 
     private static CheckResult checkEnergyOutput(ServerLevel level, Storage storage, boolean online,
-            MachineTarget machine, ResourceSpec spec, List<String> problems) {
+            MachineRef machine, ResourceSpec spec, List<String> problems) {
         IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, machine.pos(), spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有能量能力");

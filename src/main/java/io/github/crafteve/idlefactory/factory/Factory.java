@@ -4,12 +4,12 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.diag.Diagnostics;
+import io.github.crafteve.idlefactory.factory.diag.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.LineLibrary;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
-import io.github.crafteve.idlefactory.factory.target.MachineLibrary;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 
 /**
  * 一个工厂实例。
@@ -34,7 +34,7 @@ public final class Factory {
     /** 运行状态，只由工厂主体和仓库解析结果改变。 */
     private FactoryState state = FactoryState.CREATED;
     /** 诊断数据：事件环 + 搬运计数。纯运行时，不写存档。 */
-    private final Diagnostics diagnostics = new Diagnostics();
+    private final DiagStats stats = new DiagStats();
 
     /**
      * @param id    工厂 id
@@ -71,8 +71,8 @@ public final class Factory {
     }
 
     /** 诊断数据。 */
-    public Diagnostics diagnostics() {
-        return this.diagnostics;
+    public DiagStats stats() {
+        return this.stats;
     }
 
     /** 当前仓库，永远非 null。 */

@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
-import io.github.crafteve.idlefactory.factory.target.MachineTarget;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 /**
  * 产线 / 机器的引用解析。
@@ -56,7 +56,7 @@ public final class FactoryRefs {
      * @param ref     短 id，可为 {@code null}
      * @return 机器；找不到或前缀有歧义时为空
      */
-    public static Optional<MachineTarget> machine(@Nullable Factory factory, @Nullable String ref) {
+    public static Optional<MachineRef> machine(@Nullable Factory factory, @Nullable String ref) {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }

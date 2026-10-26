@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.target;
+package io.github.crafteve.idlefactory.factory.machine;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -22,7 +22,7 @@ import net.minecraft.world.level.Level;
  * @param dimension 机器所在维度
  * @param pos       机器方块坐标
  */
-public record MachineTarget(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
+public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
 
     private static final String TAG_ID = "Id";
     private static final String TAG_DIMENSION = "Dimension";
@@ -35,10 +35,10 @@ public record MachineTarget(UUID id, ResourceKey<Level> dimension, BlockPos pos)
      * @param pos       方块坐标
      * @return 新目标
      */
-    public static MachineTarget of(ResourceKey<Level> dimension, BlockPos pos) {
+    public static MachineRef of(ResourceKey<Level> dimension, BlockPos pos) {
         String key = dimension.location() + ":" + pos.asLong();
         UUID id = UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
-        return new MachineTarget(id, dimension, pos);
+        return new MachineRef(id, dimension, pos);
     }
 
     /**
@@ -61,7 +61,7 @@ public record MachineTarget(UUID id, ResourceKey<Level> dimension, BlockPos pos)
      * @return 目标；字段缺失或维度名非法时返回 {@code null}
      */
     @Nullable
-    public static MachineTarget load(CompoundTag tag) {
+    public static MachineRef load(CompoundTag tag) {
         if (!tag.hasUUID(TAG_ID) || !tag.contains(TAG_DIMENSION) || !tag.contains(TAG_POS)) {
             return null;
         }
@@ -69,7 +69,7 @@ public record MachineTarget(UUID id, ResourceKey<Level> dimension, BlockPos pos)
         if (dimension == null) {
             return null;
         }
-        return new MachineTarget(tag.getUUID(TAG_ID),
+        return new MachineRef(tag.getUUID(TAG_ID),
                 ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(tag.getLong(TAG_POS)));
     }
