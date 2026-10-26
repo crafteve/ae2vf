@@ -1,22 +1,4 @@
 {
-  "idlefactory.configuration.title": "Idle Factory Configs",
-  "idlefactory.configuration.section.idlefactory.common.toml": "Idle Factory Configs",
-  "idlefactory.configuration.section.idlefactory.common.toml.title": "Idle Factory Configs",
-  "idlefactory.configuration.items": "Item List",
-  "idlefactory.configuration.logDirtBlock": "Log Dirt Block",
-  "idlefactory.configuration.magicNumberIntroduction": "Magic Number Text",
-  "idlefactory.configuration.magicNumber": "Magic Number",
-  "item.idlefactory.terminal": "Idle Factory Terminal",
-  "itemGroup.idlefactory": "Idle Factory",
-  "screen.idlefactory.search_hint": "Search items…",
-  "screen.idlefactory.status.equipped": "Singularity: Equipped",
-  "screen.idlefactory.status.not_equipped": "Singularity: Not equipped",
-  "screen.idlefactory.status.no_network": "Singularity: Network lost",
-  "screen.idlefactory.empty.not_equipped": "No singularity equipped",
-  "screen.idlefactory.empty.no_network": "No network bound",
-  "screen.idlefactory.empty.no_stock": "No storage",
-  "screen.idlefactory.empty.no_match": "No matching items",
-  "message.idlefactory.singularity_equipped": "Singularity equipped",
-  "message.idlefactory.singularity_unequipped": "Singularity removed",
-  "message.idlefactory.singularity_dropped": "Inventory full, singularity dropped"
+  "screen.idlefactory.title": "Idle Factory",
+  "screen.idlefactory.search_hint": "Search…"
 }

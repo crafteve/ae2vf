@@ -1,8 +1,6 @@
 package io.github.crafteve.idlefactory.network;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.network.payload.StorageSnapshotS2C;
-import io.github.crafteve.idlefactory.network.payload.UnequipSingularityC2S;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,12 +14,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>M1 注册三个负载：占位 {@link PingPayload}（S2C，验证通道）、库存快照
- * {@link StorageSnapshotS2C}（S2C）、卸下奇点 {@link UnequipSingularityC2S}（C2S）。</p>
+ * <p>P0 只注册占位 {@link PingPayload}（S2C）：它没有业务含义，只用来证明通道能通。
+ * 真正的工厂快照与意图包在 P1 加，届时记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "2";
+    public static final String PROTOCOL_VERSION = "3";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -47,15 +45,8 @@ public final class ModNetwork {
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         registrar = event.registrar(PROTOCOL_VERSION);
 
-        // M0：通道占位
+        // P0：通道自检（无业务含义）
         registrar.playToClient(PingPayload.TYPE, PingPayload.STREAM_CODEC, PingPayload::handle);
-
-        // M1：服务端 → 客户端的库存快照
-        registrar.playToClient(StorageSnapshotS2C.TYPE, StorageSnapshotS2C.STREAM_CODEC, StorageSnapshotS2C::handle);
-
-        // M1：客户端 → 服务端的卸下请求
-        registrar.playToServer(UnequipSingularityC2S.TYPE, UnequipSingularityC2S.STREAM_CODEC,
-                UnequipSingularityC2S::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }

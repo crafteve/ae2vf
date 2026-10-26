@@ -12,7 +12,8 @@
 
 ## 当前状态
 
-早期实现，**没有 UI，全部靠指令调试**。已经跑通的链路：
+核心逻辑（工厂 / 仓库 / 观测 / 产线 / 搬运）已经跑通，**界面处于 P0 阶段**：能打开、能看骨架，
+但还没接数据。开发调试仍以指令为主，界面正在把配置与观测搬进去。
 
 ```
 /idf create
@@ -36,10 +37,11 @@
 - **IO 执行**：每 tick 一轮（`/idf diag io` 可调 1–20），`feed` / `pull` 事务，组 / 线两级睡眠
 - **面路由**：记住每条规则上次搬通的面（玩家配了面就用配置，没配才查路由/扫面）；`REJECTED` 时重扫
 - **诊断**：事件流（命令 / 产线 / 机器 / 仓库）+ 每条产线的搬运计数，`/idf diag` 查
+- **界面 P0**：`/idf gui` 打开工作台骨架（底图 + 假数据），用于定尺寸与配方查看器留白
 
 **未实现**
 
-- 终端 UI（M1 的空界面还在，没接新架构）
+- 界面数据链路（P1：快照包 + 真实表格 + 规则编辑）
 - 化学品（Mekanism 的 gas 等，只留枚举位）
 - 主动模式（pattern / CPU）
 - 区块强制加载（玩家走远后机器与容器所在区块会卸载，产线随之停）
@@ -48,13 +50,14 @@
 
 - 已跑通：容器仓库（箱子、储罐、能量立方）与 AE2 仓库（物品、流体）
 - 已知限制：AE2 的 FE 仍等 Applied Flux；化学品只有枚举位；旧存档不兼容
-- 下一步候选：化学品、Applied Flux FE、终端 UI
+- 下一步：界面 P1（详见 [docs/ui/P0.md](docs/ui/P0.md)）
 
 ## 指令
 
 所有指令挂在 `/idlefactory` 下，短别名 `/idf`。**产线是主语**：`/idf line <线> <动作> <对象>`。
 
 ```
+/idf gui                             打开工作台（P0：只有骨架，不含数据）
 /idf create
 /idf delete
 
@@ -161,8 +164,18 @@ factory/                        工厂主体（服务端权威）
 
 integration/ae2/                AE2 适配（物品 / 流体）
 integration/appflux/            Applied Flux 的 FE key（占位）
-menu/ client/                   M1 遗留的终端界面，尚未接新架构
+menu/                           FactoryMenu（只持有 36 个玩家槽位）
+client/
+├── screen/FactoryScreen        工作台绘制（P0：骨架 + 假数据）
+├── screen/FactoryLayout        全部几何，一处算完
+├── screen/DemoRows             P0 假数据（P1 删）
+├── widget/NineSlice            九宫格 blit
+├── widget/GuiTextures          贴图 id 与边框宽度
+└── theme/GuiTheme              文字色与状态色（静态外观在贴图里）
 ```
+
+界面贴图不在手画：由 `tools/gui/gen_textures.py` 离线生成到
+`assets/idlefactory/textures/gui/`，色值与 `GuiTheme` 一一对应。
 
 核心约束：
 
@@ -172,6 +185,7 @@ menu/ client/                   M1 遗留的终端界面，尚未接新架构
 - **三层事实**：配置（写档）→ 观测（可重建）→ 路由/执行（瞬态）。读路径只读观测，不探世界
 - **`observation` 包零工厂依赖**：它只认 `Located`（位置），机器和容器都是它的消费者
 - **未加载 ≠ 不存在**：存在性判断必须先过 `isLoaded`；失联只进回收站，不删配置
+- **界面的静态外观来自贴图**：Java 只 blit 九宫格，不画边框与斜边
 
 ## 构建
 

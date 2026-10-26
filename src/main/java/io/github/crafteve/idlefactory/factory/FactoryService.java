@@ -25,6 +25,7 @@ import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
+import io.github.crafteve.idlefactory.menu.FactoryMenu;
 
 import appeng.api.ids.AEComponents;
 
@@ -35,6 +36,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
@@ -57,6 +59,29 @@ public final class FactoryService {
 
     private FactoryService() {
         // 纯静态工具类
+    }
+
+    // ------------------------------------------------------------------
+    // 界面入口
+    // ------------------------------------------------------------------
+
+    /**
+     * 打开工厂工作台。
+     *
+     * <p>P0 起界面不再挂在物品上：没有终端物品、没有玩家附件，打开方式只有一个 {@code /idf gui}。
+     * 这样"打不开界面"只剩一种可能，排查成本从三条路径降到一条。</p>
+     *
+     * <p>不要求玩家已经有工厂——P0 界面里还是假数据，先让人看得到比先让人建好更重要。真正的
+     * 空状态（没有工厂时提示创建）留到 P1。</p>
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果（{@code 1} 已请求打开）
+     */
+    public static int openGui(ServerPlayer player) {
+        player.openMenu(new SimpleMenuProvider(
+                (containerId, playerInventory, ignored) -> new FactoryMenu(containerId, playerInventory),
+                Component.translatable("screen.idlefactory.title")));
+        return 1;
     }
 
     // ------------------------------------------------------------------

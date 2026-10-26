@@ -56,9 +56,12 @@ import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 
 /**
- * 工厂指令入口。第一版不做 UI，所有调试都走这里。
+ * 工厂指令入口。
  *
  * <p>命令树以产线为主语：{@code /idf line <line> add <machine>}，而不是先动词后对象。</p>
+ *
+ * <p>界面从 P0 起只有一个入口：{@code /idf gui}。没有终端物品，也没有"装备奇点才能打开"这条链，
+ * 所以"为什么打不开"只剩一种可能。</p>
  *
  * <p>Tab 补全按上下文过滤：{@code add} 只补还没进任何产线的机器，{@code remove} / {@code manage}
  * 只补这条线里的机器，{@code remove} 的物品只补已经配过的。补全面时会顺带探一下这个面有没有物品
@@ -137,6 +140,8 @@ public final class FactoryCommands {
 
     private static LiteralArgumentBuilder<CommandSourceStack> idleFactory(RegisterCommandsEvent event) {
         return Commands.literal("idlefactory")
+                .then(Commands.literal("gui")
+                        .executes(context -> FactoryService.openGui(player(context))))
                 .then(Commands.literal("create")
                         .executes(context -> FactoryService.create(player(context))))
                 .then(Commands.literal("delete")

@@ -1,701 +1,355 @@
 package io.github.crafteve.idlefactory.client.screen;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
-import org.jetbrains.annotations.Nullable;
-
-import io.github.crafteve.idlefactory.client.ClientPacketHandler;
+import io.github.crafteve.idlefactory.client.screen.DemoRows.Row;
+import io.github.crafteve.idlefactory.client.screen.DemoRows.State;
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.ItemGrid;
-import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
+import io.github.crafteve.idlefactory.client.widget.GuiTextures;
+import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
-import io.github.crafteve.idlefactory.network.payload.StorageSnapshotS2C;
-
-import appeng.api.config.SortDir;
-import appeng.api.config.SortOrder;
-import appeng.api.config.ViewItems;
-import appeng.api.stacks.AEKey;
-import appeng.api.stacks.AEKeyType;
-import appeng.client.gui.me.common.Repo;
-import appeng.client.gui.me.common.RepoSlot;
-import appeng.client.gui.widgets.IScrollSource;
-import appeng.client.gui.widgets.ISortSource;
-import appeng.menu.me.common.GridInventoryEntry;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.util.Mth;
-
-import org.lwjgl.glfw.GLFW;
+import net.minecraft.world.item.Items;
 
 /**
- * 工厂工作台界面。
+ * 工厂工作台。
  *
- * <p>面板尺寸不写死，按当前 GUI 逻辑尺寸自适应：占满可用区域，四周只留 {@link #MARGIN} 的边距。
- * 这样 GUI scale 调大（逻辑尺寸变小）时不会溢出，调小（逻辑尺寸变大）时也不会缩成一小块。</p>
+ * <p><b>P0 阶段</b>：只画骨架，不连数据、不做交互（除了关闭）。目的是进游戏量三件事：
+ * 面板占屏比例、两侧给配方查看器留的宽度够不够、MC 真实字体下中文和数字会不会挤。</p>
  *
- * <p>右侧是 176px 宽的 AE2 终端风格存储栏：搜索框、9 列物品网格、底部玩家背包。
- * 奇点/网络状态显示在顶部标题栏。
- * 存储网格直接用 AE2 的 {@link Repo} + {@link RepoSlot}（客户端只读虚拟槽位），
- * 所以 tooltip、JEI R/U、数量/耐久装饰都由原版/ AE2 逻辑免费提供；背包是真实 {@link Slot}。</p>
+ * <p>静态外观全部来自贴图（{@link NineSlice}），这里不画边框和斜边；纯色块用
+ * {@link NineSlice#fill} 把 1×1 贴图拉伸。</p>
  *
- * <p>所有颜色来自 {@link GuiTheme}，切换主题时这里不用改代码。</p>
+ * <p>几何全在 {@link FactoryLayout}，本类只负责「按坐标画」。以后调尺寸只改布局类。</p>
  */
-public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> implements IScrollSource, ISortSource {
-    /** 面板四周留白（GUI 逻辑像素）。 */
-    private static final int MARGIN = 4;
-    /** 最小面板宽度，防止极端小窗口下面板消失。 */
-    private static final int MIN_WIDTH = 320;
-    /** 最小面板高度。 */
-    private static final int MIN_HEIGHT = 240;
+public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
+    /** 标题与下拉之间的间距。 */
+    private static final int TITLE_GAP = 10;
+    /** 状态点边长。 */
+    private static final int DOT = 6;
+    /** 状态色轨宽度。 */
+    private static final int TRACK_W = 2;
+    /** 关闭按钮边长。 */
+    private static final int CLOSE_SIZE = 14;
+    /** 图标之间的水平间距。 */
+    private static final int ICON_STEP = FactoryLayout.CELL + 2;
 
-    /** 标题左侧标记的 x 偏移。 */
-    private static final int TITLE_X = 20;
-    /** 标题的 y 偏移。 */
-    private static final int TITLE_Y = 8;
-    /** 标题栏高度，下方画分隔线。 */
-    private static final int HEADER_HEIGHT = 28;
+    private final GuiTheme theme = GuiTheme.current();
+    private final List<Row> rows = DemoRows.rows();
+    private FactoryLayout layout;
 
-    /** 右侧存储栏宽度。 */
-    private static final int STORAGE_WIDTH = 176;
-    /** 存储栏与面板右/下边缘的距离。 */
-    private static final int STORAGE_MARGIN = 8;
-    /** 存储栏左内边距（网格 + 滚动条整体居中后的左侧留白）。 */
-    private static final int STORAGE_INSET = 4;
-    /** 搜索框距存储栏顶部的距离。 */
-    private static final int SEARCH_TOP = 8;
-    /** 搜索框高度。 */
-    private static final int SEARCH_HEIGHT = 14;
-    /** 网格距存储栏顶部的距离（奇点状态已移到标题栏，搜索框下面直接是网格）。 */
-    private static final int GRID_TOP = 28;
-    /** 背包距存储栏底部的距离。 */
-    private static final int INVENTORY_BOTTOM_PADDING = 9;
-    /** 主背包与快捷栏之间、网格与背包之间的间距。 */
-    private static final int INVENTORY_GAP = 4;
-    /** 滚动条宽度。 */
-    private static final int SCROLLBAR_WIDTH = 3;
-
-    /** 当前主题；默认跟随 {@link GuiTheme#current()}（M1 是 DARK）。 */
-    private GuiTheme theme = GuiTheme.current();
-
-    /** 搜索框；每次 {@code init()} 重建（尺寸变化）。 */
-    @Nullable
-    private SearchEditBox searchBox;
-
-    /** AE2 的客户端仓库：负责排序、搜索、滚动偏移和条目视图。 */
-    private final Repo repo;
-
-    /** key → 稳定 serial：服务端快照每次全量下发，用稳定 serial 让 Repo 能正确合并/去重。 */
-    private final Map<AEKey, Long> serials = new HashMap<>();
-    private long nextSerial = 1L;
-
-    /** 最近一次服务端库存快照。 */
-    private StorageSnapshotS2C snapshot = ClientPacketHandler.snapshot();
-
-    /** 当前滚动行（{@link IScrollSource}）。 */
-    private int scrollRow;
-    private boolean draggingScrollbar;
-    /** 拖动滑块时的抓取偏移（鼠标 y - 滑块顶部），避免按下时滑块跳到鼠标中心。 */
-    private double scrollGrabOffset;
-
-    /** 上一次过滤用的搜索词。 */
-    private String lastQuery = "";
-
-    /** 当前鼠标位置（renderSlot 里判断悬停用）。 */
-    private int mouseX;
-    private int mouseY;
-
+    /**
+     * @param menu            菜单
+     * @param playerInventory 玩家背包
+     * @param title           标题
+     */
     public FactoryScreen(FactoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        // 先给一个默认值；真正的尺寸在 init() 里按屏幕算。
-        this.imageWidth = 480;
-        this.imageHeight = 300;
-
-        this.repo = new Repo(this, this);
-        this.repo.setRowSize(ItemGrid.COLUMNS);
-        this.repo.setEnabled(true);
-        this.repo.setUpdateViewListener(this::clampScroll);
+        this.imageWidth = FactoryLayout.MIN_PANEL_W;
+        this.imageHeight = FactoryLayout.MIN_PANEL_H;
     }
 
     @Override
     protected void init() {
-        // 自适应：占满屏幕逻辑尺寸，只留边距。
-        this.imageWidth = Math.max(MIN_WIDTH, this.width - MARGIN * 2);
-        this.imageHeight = Math.max(MIN_HEIGHT, this.height - MARGIN * 2);
-        // 父类会用新的 imageWidth/imageHeight 重算 leftPos/topPos。
+        this.layout = FactoryLayout.of(this.width, this.height);
+        this.imageWidth = this.layout.panelW;
+        this.imageHeight = this.layout.panelH;
+        // 父类按 imageWidth/imageHeight 居中，正好等于 layout 里算的 panelX/panelY
         super.init();
-
-        // 重建搜索框（resize 时旧控件已被 clearWidgets 移除），保留关键字
-        String query = this.searchBox != null ? this.searchBox.getValue() : this.lastQuery;
-        this.searchBox = this.addRenderableWidget(new SearchEditBox(
-                this.font,
-                searchBoxTextX(), searchBoxTextY(), searchBoxTextWidth(), 10,
-                this.theme,
-                Component.translatable("screen.idlefactory.search_hint")));
-        this.searchBox.setValue(query);
-        this.lastQuery = query;
-
-        this.repo.setSearchString(query);
-        layoutSlots();
-        layoutRepoSlots();
-        pushSnapshot();
-        clampScroll();
+        positionSlots();
     }
 
     /**
-     * 重排玩家背包槽位。
+     * 把 36 个玩家槽位摆到右区底部。
      *
-     * <p>1.21.1 的 {@link Slot#x}/{@link Slot#y} 是 final，只能按新坐标重建 Slot；这里只替换
-     * 客户端菜单里的槽位对象，容器与容器索引保持一致，服务端槽位完全不受影响。
-     * 槽位坐标是相对面板左上角的（{@code AbstractContainerScreen} 渲染槽位时会平移）。</p>
+     * <p>{@code Slot.x/y} 在 1.21.1 是 {@code final}，改不了坐标，只能按新坐标重建槽位对象。
+     * 这里只替换客户端菜单里的槽位，容器与容器索引不变，服务端完全不受影响（它不需要坐标）。</p>
+     *
+     * <p>槽位坐标相对面板左上角（父类渲染时会平移），所以全部减掉 leftPos/topPos。</p>
      */
-    private void layoutSlots() {
-        int relGridX = gridX() - this.leftPos;
-        int relHotbarY = hotbarY() - this.topPos;
-        int relMainY = mainInvY() - this.topPos;
+    private void positionSlots() {
+        FactoryLayout l = this.layout;
+        int relInvX = l.invX - this.leftPos;
+        int relInvY = l.invY - this.topPos;
+        int relHotbarY = l.hotbarY - this.topPos;
 
-        int count = Math.min(FactoryMenu.PLAYER_SLOTS, this.menu.slots.size());
+        List<Slot> slots = this.menu.slots;
+        int count = Math.min(FactoryMenu.PLAYER_SLOTS, slots.size());
         for (int i = 0; i < count; i++) {
-            Slot old = this.menu.slots.get(i);
+            Slot old = slots.get(i);
             int x;
             int y;
             if (i < 9) {
-                x = relGridX + i * ItemGrid.CELL_SIZE + 1;
+                x = relInvX + i * FactoryLayout.CELL + 1;
                 y = relHotbarY + 1;
             } else {
                 int index = i - 9;
-                x = relGridX + index % 9 * ItemGrid.CELL_SIZE + 1;
-                y = relMainY + index / 9 * ItemGrid.CELL_SIZE + 1;
+                x = relInvX + index % FactoryLayout.GRID_COLS * FactoryLayout.CELL + 1;
+                y = relInvY + index / FactoryLayout.GRID_COLS * FactoryLayout.CELL + 1;
             }
-
             Slot slot = new Slot(old.container, old.getContainerSlot(), x, y);
             slot.index = i;
-            this.menu.slots.set(i, slot);
+            slots.set(i, slot);
         }
     }
 
-    /**
-     * 客户端专用：按当前行数重建存储网格的 {@link RepoSlot}。服务端没有这些槽位，
-     * 点击它们会被 {@link #slotClicked} 拦下，不会发给服务端。
-     */
-    private void layoutRepoSlots() {
-        List<Slot> slots = this.menu.slots;
-        slots.removeIf(slot -> slot instanceof RepoSlot);
+    // ------------------------------------------------------------------
+    // 绘制
+    // ------------------------------------------------------------------
 
-        int relGridX = gridX() - this.leftPos;
-        int relGridTop = gridTop() - this.topPos;
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.render(graphics, mouseX, mouseY, partialTick);
+        drawHeader(graphics);
+        drawTable(graphics);
+        drawRightPanel(graphics);
+    }
 
-        int repoIndex = 0;
-        for (int row = 0; row < gridRows(); row++) {
-            for (int col = 0; col < ItemGrid.COLUMNS; col++) {
-                RepoSlot repoSlot = new RepoSlot(this.repo, repoIndex++,
-                        relGridX + col * ItemGrid.CELL_SIZE + 1,
-                        relGridTop + row * ItemGrid.CELL_SIZE + 1);
-                repoSlot.index = slots.size();
-                slots.add(repoSlot);
+    @Override
+    protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
+        FactoryLayout l = this.layout;
+
+        NineSlice.panel(graphics, this.leftPos, this.topPos, this.imageWidth, this.imageHeight);
+
+        // 顶栏下沿
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+                l.headerX, l.headerY + FactoryLayout.HEADER_H, l.headerW, 1);
+
+        // 左右两区分隔线
+        NineSlice.fill(graphics, GuiTextures.DIVIDER,
+                l.rightX - FactoryLayout.GAP / 2, l.bodyY, 1, l.bodyH);
+
+        // 表头底色
+        NineSlice.fill(graphics, GuiTextures.HEADER_BG,
+                l.leftX + 1, l.tableHeaderY, l.leftW - 2, FactoryLayout.TABLE_HEADER_H);
+
+        // 隔行底色与行分隔线
+        int shown = Math.min(l.rowsVisible, this.rows.size());
+        for (int i = 0; i < shown; i++) {
+            if (i % 2 == 1) {
+                NineSlice.fill(graphics, GuiTextures.ROW_ALT,
+                        l.leftX + 1, l.rowY(i), l.leftW - 2, FactoryLayout.ROW_H - 1);
+            }
+            NineSlice.fill(graphics, GuiTextures.DIVIDER,
+                    l.tableX, l.rowY(i) + FactoryLayout.ROW_H - 1, l.tableW, 1);
+        }
+
+        // 统计行上沿
+        NineSlice.fill(graphics, GuiTextures.DIVIDER, l.tableX, l.footerY, l.tableW, 1);
+
+        drawRightChrome(graphics);
+    }
+
+    /** 右区的静态部分：tab、搜索框、物品网格、合成区。 */
+    private void drawRightChrome(GuiGraphics graphics) {
+        FactoryLayout l = this.layout;
+
+        int tabWidth = l.rightW / FactoryLayout.TAB_COUNT;
+        for (int i = 0; i < FactoryLayout.TAB_COUNT; i++) {
+            int x = l.rightX + i * tabWidth;
+            int w = i == FactoryLayout.TAB_COUNT - 1 ? l.rightW - i * tabWidth : tabWidth;
+            NineSlice.button(graphics, x, l.tabY, w, FactoryLayout.TAB_H);
+        }
+        // 选中 tab 的上沿强调
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+                l.rightX, l.tabY, tabWidth, 2);
+
+        NineSlice.field(graphics, l.rightX + 4, l.searchY, l.rightW - 8, FactoryLayout.SEARCH_H);
+
+        drawGrid(graphics, l.gridX, l.gridY, FactoryLayout.GRID_COLS, l.gridRows,
+                FactoryLayout.CELL);
+        drawGrid(graphics, l.craftX, l.craftY, FactoryLayout.CRAFT, FactoryLayout.CRAFT,
+                FactoryLayout.CRAFT_CELL);
+
+        // 合成箭头：3×3 与结果格之间的一条细杆 + 箭头块
+        int arrowY = l.resultY + FactoryLayout.CRAFT_RESULT / 2;
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+                l.craftX + FactoryLayout.CRAFT * FactoryLayout.CRAFT_CELL + 4, arrowY,
+                FactoryLayout.CRAFT_ARROW - 8, 1);
+
+        NineSlice.slot(graphics, l.resultX, l.resultY,
+                FactoryLayout.CRAFT_RESULT, FactoryLayout.CRAFT_RESULT);
+    }
+
+    private void drawGrid(GuiGraphics graphics, int x, int y, int columns, int rows, int cell) {
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < columns; col++) {
+                NineSlice.slot(graphics, x + col * cell, y + row * cell, cell, cell);
             }
         }
     }
 
-    /** 把当前快照转成 {@link GridInventoryEntry} 并推给 Repo。 */
-    private void pushSnapshot() {
-        List<GridInventoryEntry> entries = new ArrayList<>(this.snapshot.entries().size());
-        for (StorageSnapshotS2C.Entry entry : this.snapshot.entries()) {
-            long serial = this.serials.computeIfAbsent(entry.key(), key -> this.nextSerial++);
-            entries.add(new GridInventoryEntry(serial, entry.key(), entry.amount(), 0, false));
+    /** 顶栏。 */
+    private void drawHeader(GuiGraphics graphics) {
+        FactoryLayout l = this.layout;
+        int x = l.headerX + 6;
+        int textY = l.headerY + (FactoryLayout.HEADER_H - 9) / 2;
+
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, textY + 2, DOT, DOT);
+        x += DOT + 6;
+
+        String title = "放置工厂";
+        graphics.drawString(this.font, title, x, textY, this.theme.accent(), false);
+        x += this.font.width(title) + TITLE_GAP;
+
+        String line = "铁线";
+        int buttonW = this.font.width(line) + 24;
+        NineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
+        graphics.drawString(this.font, line, x + 8, textY, this.theme.textPrimary(), false);
+        x += buttonW + 8;
+
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, textY + 2, DOT, DOT);
+        graphics.drawString(this.font, "运行", x + DOT + 4, textY, this.theme.statusRun(), false);
+
+        String stats = "12 台 · 3 线 · 仓库在线";
+        int closeX = l.headerX + l.headerW - 6 - CLOSE_SIZE;
+        int statsX = closeX - 8 - this.font.width(stats);
+        graphics.drawString(this.font, stats, statsX, textY, this.theme.textDim(), false);
+
+        NineSlice.button(graphics, closeX, l.headerY + 4, CLOSE_SIZE, CLOSE_SIZE);
+        graphics.drawString(this.font, "x",
+                closeX + (CLOSE_SIZE - this.font.width("x")) / 2, textY,
+                this.theme.textPrimary(), false);
+    }
+
+    /** 左区表格。 */
+    private void drawTable(GuiGraphics graphics) {
+        FactoryLayout l = this.layout;
+        int headerY = l.tableHeaderY + (FactoryLayout.TABLE_HEADER_H - 9) / 2;
+        String[] headers = { "机器", "状态", "输入", "输出", "速率" };
+        for (int i = 0; i < headers.length; i++) {
+            graphics.drawString(this.font, headers[i], l.columnX(i) + 4, headerY,
+                    this.theme.textDim(), false);
         }
-        this.repo.handleUpdate(true, entries);
-        clampScroll();
-    }
 
-    @Override
-    public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.mouseX = mouseX;
-        this.mouseY = mouseY;
-
-        // 搜索词变化时更新 Repo（输入法/粘贴/退格/右键清空都走这里）
-        if (this.searchBox != null && !this.searchBox.getValue().equals(this.lastQuery)) {
-            this.lastQuery = this.searchBox.getValue();
-            this.repo.setSearchString(this.lastQuery);
-            this.repo.updateView();
-            this.scrollRow = 0;
-            clampScroll();
+        int shown = Math.min(l.rowsVisible, this.rows.size());
+        for (int i = 0; i < shown; i++) {
+            drawRow(graphics, this.rows.get(i), i);
         }
 
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
-
-        if (this.repo.size() == 0) {
-            int centerX = gridX() + ItemGrid.COLUMNS * ItemGrid.CELL_SIZE / 2;
-            int centerY = gridTop() + gridRows() * ItemGrid.CELL_SIZE / 2 - 4;
-            guiGraphics.drawCenteredString(this.font, emptyText(), centerX, centerY, this.theme.textDim());
-        }
-
-        // 背包 Slot 与 RepoSlot 的 tooltip 都由父类统一处理
-        this.renderTooltip(guiGraphics, mouseX, mouseY);
+        long ok = this.rows.stream().filter(r -> r.state() == State.OK).count();
+        long warn = this.rows.stream().filter(r -> r.state() == State.WARN).count();
+        long idle = this.rows.stream().filter(r -> r.state() == State.IDLE).count();
+        long error = this.rows.stream().filter(r -> r.state() == State.ERROR).count();
+        String footer = "共 " + this.rows.size() + " 台 · 就绪 " + ok + " · 缺料 " + warn
+                + " · 未配 " + idle + " · 失联 " + error;
+        graphics.drawString(this.font, footer, l.tableX, l.footerY + 3, this.theme.textDim(), false);
     }
 
-    @Override
-    protected void renderBg(GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        int x = this.leftPos;
-        int y = this.topPos;
-        int w = this.imageWidth;
-        int h = this.imageHeight;
+    private void drawRow(GuiGraphics graphics, Row row, int index) {
+        FactoryLayout l = this.layout;
+        int y = l.rowY(index);
+        int textY = y + (FactoryLayout.ROW_H - 9) / 2;
 
-        // 面板底色 + 1px 细边框
-        guiGraphics.fill(x, y, x + w, y + h, this.theme.panelBg());
-        guiGraphics.fill(x, y, x + w, y + 1, this.theme.panelBorder());
-        guiGraphics.fill(x, y + h - 1, x + w, y + h, this.theme.panelBorder());
-        guiGraphics.fill(x, y, x + 1, y + h, this.theme.panelBorder());
-        guiGraphics.fill(x + w - 1, y, x + w, y + h, this.theme.panelBorder());
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+                l.leftX + 1, y, TRACK_W, FactoryLayout.ROW_H - 2);
 
-        // 标题栏分隔线
-        guiGraphics.fill(x + 1, y + HEADER_HEIGHT, x + w - 1, y + HEADER_HEIGHT + 1, this.theme.panelBorder());
+        int iconX = l.columnX(0) + 4;
+        graphics.renderItem(new ItemStack(Items.BLAST_FURNACE), iconX, y + 5);
+        graphics.drawString(this.font, row.name(), iconX + FactoryLayout.CELL + 2, textY,
+                this.theme.textPrimary(), false);
 
-        // 标题左侧的强调色竖条
-        guiGraphics.fill(x + TITLE_X, y + TITLE_Y, x + TITLE_X + 2, y + TITLE_Y + 9, this.theme.accent());
+        int dotX = l.columnX(1) + 4;
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, dotX, textY + 2, DOT, DOT);
+        graphics.drawString(this.font, row.detail(), dotX + DOT + 4, textY, colorOf(row.state()), false);
 
-        renderStoragePanel(guiGraphics);
-        renderScrollbar(guiGraphics);
+        drawIcons(graphics, row.inputs(), l.columnX(2) + 2, y + 5, l.columnW(2) - 6);
+        drawIcons(graphics, row.outputs(), l.columnX(3) + 2, y + 5, l.columnW(3) - 6);
+
+        graphics.drawString(this.font, row.rate(), l.columnX(4) + 4, textY,
+                "—".equals(row.rate()) ? this.theme.textDim() : this.theme.textPrimary(), false);
     }
 
-    @Override
-    protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // 不调用父类：父类会画菜单标题和玩家物品栏标题，这版都用自定义布局。
-        // 这里的坐标相对面板左上角。
-        guiGraphics.drawString(this.font, "Idle Factory", TITLE_X + 8, TITLE_Y + 1, this.theme.accent(), false);
-        // 奇点/网络状态放在标题栏右侧，把存储栏顶部整行让给搜索框和网格
-        guiGraphics.drawString(this.font, statusText(), TITLE_X + 90, TITLE_Y + 1, statusColor(), false);
-    }
-
-    /**
-     * 完全接管槽位绘制：主题色内凹格子背景，然后画物品。
-     *
-     * <p>背包槽位交给父类（保留耐久条等原版装饰）；{@link RepoSlot} 的 {@code getItem()} 只是
-     * 数量为 1 的展示栈，不能交给父类（父类会按 count 再画一次数量），这里自己用
-     * {@code renderItemDecorations} 画库存数量，位置和背包数量完全一致。</p>
-     */
-    @Override
-    protected void renderSlot(GuiGraphics guiGraphics, Slot slot) {
-        boolean hovered = this.isHovering(slot.x, slot.y, 16, 16, this.mouseX, this.mouseY);
-        ItemGrid.drawSlotBackground(guiGraphics, this.theme, slot.x - 1, slot.y - 1, hovered);
-
-        if (slot instanceof RepoSlot repoSlot) {
-            ItemStack stack = repoSlot.getItem();
-            if (!stack.isEmpty()) {
-                guiGraphics.renderItem(stack, slot.x, slot.y);
-                long amount = repoSlot.getStoredAmount();
-                guiGraphics.renderItemDecorations(this.font, stack, slot.x, slot.y,
-                        amount > 0 ? formatAmount(amount) : null);
-            }
-        } else {
-            super.renderSlot(guiGraphics, slot);
-        }
-    }
-
-    @Override
-    protected void renderSlotHighlight(GuiGraphics guiGraphics, Slot slot, int mouseX, int mouseY, float partialTick) {
-        // 悬停高亮已由 renderSlot 用主题色接管，不要再叠一层原版白框
-    }
-
-    /**
-     * {@link RepoSlot} 是客户端只读虚拟槽位，点击不能发给服务端（服务端没有这个索引）。
-     */
-    @Override
-    protected void slotClicked(Slot slot, int slotId, int mouseButton, ClickType type) {
-        if (slot instanceof RepoSlot) {
+    private void drawIcons(GuiGraphics graphics, List<ItemStack> stacks, int x, int y, int maxWidth) {
+        if (stacks.isEmpty()) {
+            graphics.drawString(this.font, "—", x, y + 4, this.theme.textDim(), false);
             return;
         }
-        super.slotClicked(slot, slotId, mouseButton, type);
+        int fit = Math.max(1, maxWidth / ICON_STEP);
+        int shown = Math.min(stacks.size(), fit);
+        for (int i = 0; i < shown; i++) {
+            graphics.renderItem(stacks.get(i), x + i * ICON_STEP, y);
+        }
+        if (stacks.size() > shown) {
+            graphics.drawString(this.font, "+" + (stacks.size() - shown),
+                    x + shown * ICON_STEP, y + 4, this.theme.textDim(), false);
+        }
     }
 
-    /** 收到服务端库存快照时刷新界面。 */
-    public void applySnapshot(StorageSnapshotS2C payload) {
-        this.snapshot = payload;
-        this.scrollRow = 0;
-        pushSnapshot();
+    /** 右区文字。 */
+    private void drawRightPanel(GuiGraphics graphics) {
+        FactoryLayout l = this.layout;
+        String[] tabs = { "仓库", "机器" };
+        int tabWidth = l.rightW / FactoryLayout.TAB_COUNT;
+        for (int i = 0; i < tabs.length; i++) {
+            int x = l.rightX + i * tabWidth;
+            graphics.drawString(this.font, tabs[i],
+                    x + (tabWidth - this.font.width(tabs[i])) / 2,
+                    l.tabY + (FactoryLayout.TAB_H - 9) / 2,
+                    i == 0 ? this.theme.textPrimary() : this.theme.textDim(), false);
+        }
+
+        graphics.drawString(this.font, "搜索…", l.rightX + 8,
+                l.searchY + (FactoryLayout.SEARCH_H - 9) / 2 + 1, this.theme.textDim(), false);
+
+        graphics.drawString(this.font, "合成", l.craftX, l.craftLabelY, this.theme.textDim(), false);
+        graphics.drawString(this.font, "背包", l.invX, l.invLabelY, this.theme.textDim(), false);
+    }
+
+    private int colorOf(State state) {
+        return switch (state) {
+            case OK -> this.theme.statusRun();
+            case WARN -> this.theme.statusWarn();
+            case IDLE -> this.theme.statusIdle();
+            case ERROR -> this.theme.error();
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // 槽位
+    // ------------------------------------------------------------------
+
+    @Override
+    protected void renderSlot(GuiGraphics graphics, Slot slot) {
+        NineSlice.slot(graphics, slot.x - 1, slot.y - 1, FactoryLayout.CELL, FactoryLayout.CELL);
+        super.renderSlot(graphics, slot);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // 搜索框有焦点时：ESC 先退出焦点（不关界面），再按一次才交给父类关闭
-        if (this.searchBox != null && this.searchBox.isFocused()) {
-            if (keyCode == 256 || keyCode == 257) {
-                this.searchBox.setFocused(false);
-                return true;
-            }
-            // 其余按键全部吞掉，避免输入 e 触发原版「关闭容器」
-            this.searchBox.keyPressed(keyCode, scanCode, modifiers);
-            return true;
-        }
-
-        // 焦点不在搜索框：PageUp / PageDown 按当前可见行数翻页
-        if (keyCode == GLFW.GLFW_KEY_PAGE_UP) {
-            scrollByPage(-1);
-            return true;
-        }
-        if (keyCode == GLFW.GLFW_KEY_PAGE_DOWN) {
-            scrollByPage(1);
-            return true;
-        }
-
-        return super.keyPressed(keyCode, scanCode, modifiers);
+    protected void renderSlotHighlight(GuiGraphics graphics, Slot slot, int mouseX, int mouseY,
+            float partialTick) {
+        // 悬停高亮由贴图接管，不要叠一层原版白框
     }
+
+    @Override
+    protected void renderLabels(GuiGraphics graphics, int mouseX, int mouseY) {
+        // 不画原版标题与「物品栏」字样
+    }
+
+    // ------------------------------------------------------------------
+    // 输入
+    // ------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.searchBox != null && !this.searchBox.isMouseOver(mouseX, mouseY)) {
-            this.searchBox.setFocused(false);
-        }
-        if (button == 0 && handleScrollbarClick(mouseX, mouseY)) {
+        FactoryLayout l = this.layout;
+        int closeX = l.headerX + l.headerW - 6 - CLOSE_SIZE;
+        if (mouseX >= closeX && mouseX < closeX + CLOSE_SIZE
+                && mouseY >= l.headerY + 4 && mouseY < l.headerY + 4 + CLOSE_SIZE) {
+            this.onClose();
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (isOverStorageGridArea(mouseX, mouseY) || isOverScrollbar(mouseX, mouseY)) {
-            int maxScroll = maxScrollRow();
-            if (maxScroll > 0) {
-                int delta = scrollY > 0 ? -1 : 1;
-                this.scrollRow = Mth.clamp(this.scrollRow + delta, 0, maxScroll);
-                this.repo.updateView();
-            }
-            return true;
-        }
-        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
-    }
-
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (this.draggingScrollbar) {
-            scrollToMouse(mouseY);
-            return true;
-        }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-    }
-
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.draggingScrollbar) {
-            this.draggingScrollbar = false;
-            return true;
-        }
-        return super.mouseReleased(mouseX, mouseY, button);
-    }
-
-    // ------------------------------------------------------------------
-    // IScrollSource / ISortSource
-    // ------------------------------------------------------------------
-
-    @Override
-    public int getCurrentScroll() {
-        return this.scrollRow;
-    }
-
-    @Override
-    public SortOrder getSortBy() {
-        return SortOrder.NAME;
-    }
-
-    @Override
-    public SortDir getSortDir() {
-        return SortDir.ASCENDING;
-    }
-
-    @Override
-    public ViewItems getSortDisplay() {
-        return ViewItems.ALL;
-    }
-
-    @Override
-    public Set<AEKeyType> getSortKeyTypes() {
-        // 只展示物品（服务端快照本身也只发物品）
-        return Set.of(AEKeyType.items());
-    }
-
-    // ------------------------------------------------------------------
-    // 存储栏布局
-    // ------------------------------------------------------------------
-
-    private int storageX() {
-        return this.leftPos + this.imageWidth - STORAGE_WIDTH - STORAGE_MARGIN;
-    }
-
-    private int storageY() {
-        return this.topPos + HEADER_HEIGHT + 8;
-    }
-
-    private int storageHeight() {
-        return this.imageHeight - HEADER_HEIGHT - 8 - STORAGE_MARGIN;
-    }
-
-    private int gridX() {
-        return storageX() + STORAGE_INSET;
-    }
-
-    private int gridTop() {
-        return storageY() + GRID_TOP;
-    }
-
-    private int hotbarY() {
-        return storageY() + storageHeight() - INVENTORY_BOTTOM_PADDING - ItemGrid.CELL_SIZE;
-    }
-
-    private int mainInvY() {
-        return hotbarY() - INVENTORY_GAP - 3 * ItemGrid.CELL_SIZE;
-    }
-
-    private int gridRows() {
-        return Math.max(1, (mainInvY() - INVENTORY_GAP - gridTop()) / ItemGrid.CELL_SIZE);
-    }
-
-    private int gridWidth() {
-        return ItemGrid.COLUMNS * ItemGrid.CELL_SIZE;
-    }
-
-    private int searchBoxTextX() {
-        return gridX() + 3;
-    }
-
-    private int searchBoxTextY() {
-        return storageY() + SEARCH_TOP + 3;
-    }
-
-    private int searchBoxTextWidth() {
-        return gridWidth() - 6;
-    }
-
-    // ------------------------------------------------------------------
-    // 存储栏绘制
-    // ------------------------------------------------------------------
-
-    private void renderStoragePanel(GuiGraphics guiGraphics) {
-        int x = storageX();
-        int y = storageY();
-        int w = STORAGE_WIDTH;
-        int h = storageHeight();
-
-        // 存储栏用面板底色，让深一档的格子（slotBg）显出层次
-        guiGraphics.fill(x, y, x + w, y + h, this.theme.panelBg());
-        guiGraphics.fill(x, y, x + w, y + 1, this.theme.panelBorder());
-        guiGraphics.fill(x, y + h - 1, x + w, y + h, this.theme.panelBorder());
-        guiGraphics.fill(x, y, x + 1, y + h, this.theme.panelBorder());
-        guiGraphics.fill(x + w - 1, y, x + w, y + h, this.theme.panelBorder());
-
-        // 搜索框背景（与网格同宽）
-        int searchX = gridX();
-        int searchY = y + SEARCH_TOP;
-        int searchW = gridWidth();
-        int searchH = SEARCH_HEIGHT;
-        guiGraphics.fill(searchX, searchY, searchX + searchW, searchY + searchH, this.theme.slotBg());
-
-        boolean focused = this.searchBox != null && this.searchBox.isFocused();
-        int searchBorder = focused ? this.theme.accent() : this.theme.panelBorder();
-        guiGraphics.fill(searchX, searchY, searchX + searchW, searchY + 1, searchBorder);
-        guiGraphics.fill(searchX, searchY + searchH - 1, searchX + searchW, searchY + searchH, searchBorder);
-        guiGraphics.fill(searchX, searchY, searchX + 1, searchY + searchH, searchBorder);
-        guiGraphics.fill(searchX + searchW - 1, searchY, searchX + searchW, searchY + searchH, searchBorder);
-
-        // 背包上方分隔线
-        int dividerY = mainInvY() - INVENTORY_GAP;
-        if (dividerY > gridTop()) {
-            guiGraphics.fill(x + 1, dividerY, x + w - 1, dividerY + 1, this.theme.panelBorder());
-        }
-    }
-
-    private void renderScrollbar(GuiGraphics guiGraphics) {
-        int trackX = scrollbarX();
-        int trackY = gridTop();
-        int trackHeight = trackHeight();
-        guiGraphics.fill(trackX, trackY, trackX + SCROLLBAR_WIDTH, trackY + trackHeight, this.theme.slotBorderDark());
-
-        int maxScroll = maxScrollRow();
-        if (maxScroll <= 0) {
-            return;
-        }
-
-        int thumbHeight = thumbHeight();
-        int thumbTop = thumbY();
-        boolean active = this.draggingScrollbar || isOverScrollbar(this.mouseX, this.mouseY);
-        guiGraphics.fill(trackX, thumbTop, trackX + SCROLLBAR_WIDTH, thumbTop + thumbHeight,
-                active ? this.theme.accent() : this.theme.textDim());
-    }
-
-    // ------------------------------------------------------------------
-    // 滚动条
-    // ------------------------------------------------------------------
-
-    private int scrollbarX() {
-        return gridX() + gridWidth() + 3;
-    }
-
-    private boolean isOverScrollbar(double mouseX, double mouseY) {
-        int x = scrollbarX();
-        int y = gridTop();
-        return mouseX >= x - 2 && mouseX < x + SCROLLBAR_WIDTH + 2
-                && mouseY >= y && mouseY < y + trackHeight();
-    }
-
-    private boolean isOverStorageGridArea(double mouseX, double mouseY) {
-        return mouseX >= gridX() && mouseX < gridX() + gridWidth()
-                && mouseY >= gridTop() && mouseY < gridTop() + trackHeight();
-    }
-
-    /**
-     * 滚动条点击：按在滑块上开始拖拽；按在轨道空白处则向点击方向翻一页（翻页量 = 可见行数）。
-     */
-    private boolean handleScrollbarClick(double mouseX, double mouseY) {
-        if (!isOverScrollbar(mouseX, mouseY)) {
-            return false;
-        }
-
-        int maxScroll = maxScrollRow();
-        if (maxScroll <= 0) {
-            return true;
-        }
-
-        int thumbTop = thumbY();
-        int thumbHeight = thumbHeight();
-        if (mouseY >= thumbTop && mouseY < thumbTop + thumbHeight) {
-            this.draggingScrollbar = true;
-            this.scrollGrabOffset = mouseY - thumbTop;
-            return true;
-        }
-
-        int page = Math.max(1, gridRows());
-        int direction = mouseY < thumbTop ? -1 : 1;
-        this.scrollRow = Mth.clamp(this.scrollRow + direction * page, 0, maxScroll);
-        this.repo.updateView();
-        return true;
-    }
-
-    private void scrollByPage(int direction) {
-        int maxScroll = maxScrollRow();
-        if (maxScroll <= 0) {
-            return;
-        }
-        int page = Math.max(1, gridRows());
-        this.scrollRow = Mth.clamp(this.scrollRow + direction * page, 0, maxScroll);
-        this.repo.updateView();
-    }
-
-    private void scrollToMouse(double mouseY) {
-        int maxScroll = maxScrollRow();
-        if (maxScroll <= 0) {
-            this.scrollRow = 0;
-            return;
-        }
-        int thumbHeight = thumbHeight();
-        int travel = trackHeight() - thumbHeight;
-        if (travel <= 0) {
-            this.scrollRow = 0;
-            return;
-        }
-        // 保持按下时鼠标相对滑块的位置，滑块不会跳到鼠标中心
-        double desiredThumbY = mouseY - this.scrollGrabOffset;
-        double ratio = (desiredThumbY - gridTop()) / travel;
-        this.scrollRow = Mth.clamp((int) Math.round(ratio * maxScroll), 0, maxScroll);
-        this.repo.updateView();
-    }
-
-    private int trackHeight() {
-        return gridRows() * ItemGrid.CELL_SIZE;
-    }
-
-    private int thumbHeight() {
-        int maxScroll = maxScrollRow();
-        if (maxScroll <= 0) {
-            return trackHeight();
-        }
-        int usedRows = maxScroll + gridRows();
-        return Math.max(12, trackHeight() * gridRows() / usedRows);
-    }
-
-    private int thumbY() {
-        int maxScroll = maxScrollRow();
-        int travel = trackHeight() - thumbHeight();
-        if (maxScroll <= 0 || travel <= 0) {
-            return gridTop();
-        }
-        return gridTop() + travel * this.scrollRow / maxScroll;
-    }
-
-    private int maxScrollRow() {
-        int totalRows = (this.repo.size() + ItemGrid.COLUMNS - 1) / ItemGrid.COLUMNS;
-        if (this.repo.hasPinnedRow()) {
-            totalRows++;
-        }
-        return Math.max(0, totalRows - gridRows());
-    }
-
-    private void clampScroll() {
-        this.scrollRow = Mth.clamp(this.scrollRow, 0, maxScrollRow());
-    }
-
-    // ------------------------------------------------------------------
-    // 状态 / 工具
-    // ------------------------------------------------------------------
-
-    private Component statusText() {
-        if (!this.snapshot.equipped()) {
-            return Component.translatable("screen.idlefactory.status.not_equipped");
-        }
-        if (!this.snapshot.bound()) {
-            return Component.translatable("screen.idlefactory.status.no_network");
-        }
-        return Component.translatable("screen.idlefactory.status.equipped");
-    }
-
-    private int statusColor() {
-        if (!this.snapshot.equipped()) {
-            return this.theme.textDim();
-        }
-        return this.snapshot.bound() ? this.theme.accent() : this.theme.error();
-    }
-
-    private Component emptyText() {
-        if (!this.snapshot.equipped()) {
-            return Component.translatable("screen.idlefactory.empty.not_equipped");
-        }
-        if (!this.snapshot.bound()) {
-            return Component.translatable("screen.idlefactory.empty.no_network");
-        }
-        if (this.snapshot.entries().isEmpty()) {
-            return Component.translatable("screen.idlefactory.empty.no_stock");
-        }
-        return Component.translatable("screen.idlefactory.empty.no_match");
-    }
-
-    /** 数量简写：<1000 原样；1000–9999 千分位；再大用 k / M / B。 */
-    private static String formatAmount(long amount) {
-        if (amount < 1_000L) {
-            return Long.toString(amount);
-        }
-        if (amount < 10_000L) {
-            return String.format(Locale.ROOT, "%,d", amount);
-        }
-        if (amount < 1_000_000L) {
-            return compact(amount / 1_000.0) + "k";
-        }
-        if (amount < 1_000_000_000L) {
-            return compact(amount / 1_000_000.0) + "M";
-        }
-        return compact(amount / 1_000_000_000.0) + "B";
-    }
-
-    private static String compact(double value) {
-        String text = String.format(Locale.ROOT, "%.1f", value);
-        return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
+    /** 当前布局（调试与后续阶段用）。 */
+    public FactoryLayout layout() {
+        return this.layout;
     }
 }

@@ -5,9 +5,6 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 import io.github.crafteve.idlefactory.network.ModNetwork;
-import io.github.crafteve.idlefactory.player.ModAttachments;
-import io.github.crafteve.idlefactory.registry.ModCreativeTabs;
-import io.github.crafteve.idlefactory.registry.ModItems;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import net.neoforged.bus.api.IEventBus;
@@ -22,13 +19,10 @@ public class IdleFactory {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public IdleFactory(IEventBus modEventBus, ModContainer modContainer) {
-        // 所有注册表都挂在 mod 事件总线上
-        ModItems.ITEMS.register(modEventBus);
+        // 注册表挂在 mod 事件总线上。P0 没有物品 / 方块，只有菜单
         ModMenus.MENUS.register(modEventBus);
-        ModCreativeTabs.TABS.register(modEventBus);
-        ModAttachments.ATTACHMENT_TYPES.register(modEventBus);
 
-        // 网络包注册（M0 占位包 + M1 业务包）
+        // 网络包注册（P0 只有通道自检包）
         ModNetwork.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
