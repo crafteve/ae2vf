@@ -1,13 +1,13 @@
 # 放置工厂 GUI 设计（讨论记录）
 
-> **⚠ 本文档大部分内容已作废（2026-10-26）。** 画布、物品节点、按面分槽的 IO 面板都不再采用——
-> 新架构里机器之间没有连线（全部经过仓库），IO 规则是扁平的「资源 + 可选面」。
-> 现行设计见 [docs/ui/P0.md](ui/P0.md) 与 [docs/ui/mockup-v2.png](ui/mockup-v2.png)。
-> 本文保留仅作决策留痕：其中「编辑器不是容器界面」「物品三种角色」「主题走 GuiTheme」
-> 三条仍然成立，其余作废。
+> **🗄 已归档（2026-10-26）** —— 画布、物品节点、按面分槽的 IO 面板全部废弃。新架构里机器之间
+> 没有连线（所有流动都经过仓库），IO 规则是扁平的「资源 + 可选面」。
+> **现行设计**：[../ui/P0.md](../ui/P0.md)、[../ui/mockup-v2.png](../ui/mockup-v2.png)。
+>
+> 归档理由与「哪几条仍然成立」见 [README.md](README.md)。
 >
 > 状态：历史（2026-10-24 起）
-> 关联：[ARCHITECTURE.md](ARCHITECTURE.md)、[DECISIONS.md](DECISIONS.md)
+> 关联：[ARCHITECTURE.md](ARCHITECTURE.md)、[DECISIONS.md](../DECISIONS.md)
 
 ## 0. 定性：这是编辑器，不是容器界面
 

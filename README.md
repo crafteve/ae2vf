@@ -204,8 +204,12 @@ IO 默认每 tick 一轮，能量 / 流体也是「塞满」；1 tick 一轮对�
 
 ## 文档
 
-- [架构说明](docs/ARCHITECTURE.md)（旧版设计，部分内容已被 `factory` 包取代）
-- [决策记录](docs/DECISIONS.md)
+全部文档见 [docs/README.md](docs/README.md)（含「怎么判断一份文档是否过时」）。常用的：
+
+- [决策记录](docs/DECISIONS.md) —— ADR，唯一活的设计约束来源
+- [界面 P0](docs/ui/P0.md) —— 尺寸、贴图管线、怎么试、P1 清单
+- [界面定稿设计稿](docs/ui/mockup-v2.png)
+- [归档区](docs/archive/README.md) —— 画布时代的一切，只作决策留痕，**不要照着实现**
 
 ## 分支说明
 

@@ -1,5 +1,16 @@
-# Idle Factory 架构说明
+# Idle Factory 架构说明（v0.2 · 已归档）
 
+> **🗄 已归档（2026-10-26）** —— 这里的包结构（`core/graph`、`core/machine`、`machine/`、
+> `warehouse/`、Node / Edge / PortSpec）已经不存在了。当前代码是 `factory/` 包：
+> Factory / 机器库 / 被动产线 / 观测层 / IO 执行。
+>
+> **现行结构**：仓库根 [README.md](../../README.md) 的「架构」一节。
+> **设计原则与取舍**：[DECISIONS.md](../DECISIONS.md)（ADR 仍在维护）。
+>
+> 本文仍有参考价值的部分：定位（虚拟 pattern provider）、设计原则 P1–P4、
+> 资源类型边界（只认 FE、化学品单列）。已作废的部分：所有分包树、M0–M6 分期、
+> 与 UI 有关的描述。
+>
 > 状态：设计草案 v0.2（2026-10-24 讨论确定）
 >
 > 本文档取代此前 AI 生成的 v0.1。v0.1 中的 Node / Edge / Line、带宽配额、产线图、自动推断连线、P0–P6 分期均已作废。

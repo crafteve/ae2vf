@@ -1,7 +1,14 @@
-# 开发计划与代码分包
+# 开发计划与代码分包（已归档）
 
+> **🗄 已归档（2026-10-26）** —— M0–M6 分期是围绕 `core/graph`（节点 / 边 / 端口 / 带宽）
+> 排的，那个模型已经被 `factory/` 包取代：机器之间不连线，产线是「机器 + 规则」的集合。
+> 同时「终端物品」「装备奇点」两条入口也已在 P0 删除。
+>
+> **现行**：仓库根 [README.md](../../README.md) 的「当前状态」与「未实现」两节；
+> 界面进度见 [../ui/P0.md](../ui/P0.md)。
+>
 > 状态：v0.1（2026-10-24）
-> 关联：[ARCHITECTURE.md](ARCHITECTURE.md)、[DECISIONS.md](DECISIONS.md)、[GUI.md](GUI.md)
+> 关联：[ARCHITECTURE.md](ARCHITECTURE.md)、[DECISIONS.md](../DECISIONS.md)、[GUI.md](GUI.md)
 
 ## 0. 当前环境
 

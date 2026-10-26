@@ -1,6 +1,13 @@
-# M0 / M1 详细计划
+# M0 / M1 详细计划（已归档）
 
-> 状态：执行中
+> **🗄 已归档（2026-10-26）** —— M1 的「装备量子纠缠奇点 → 终端读 ME 网络库存」整条链
+> 在 P0 被删掉：界面改由 `/idf gui` 打开，仓库读 `factory.storage()`（AE2 与容器组走同一条路），
+> 终端物品与玩家附件一起退场。
+>
+> **现行**：界面相关见 [../ui/P0.md](../ui/P0.md)；网络与仓库见
+> [../DECISIONS.md](../DECISIONS.md) 的 ADR-014/015/019。
+>
+> 状态：已完结（M0/M1 已完成，随后被重构取代）
 > 关联：[ROADMAP.md](ROADMAP.md)、[GUI.md](GUI.md)、[ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## M0 骨架
