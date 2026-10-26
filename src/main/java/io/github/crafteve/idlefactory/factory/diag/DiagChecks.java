@@ -8,13 +8,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -70,25 +74,41 @@ public final class DiagChecks {
         List<GroupCheck> result = new ArrayList<>();
         Storage storage = factory.storage();
         boolean online = factory.storageLink().online();
+        FactoryRuntime runtime = FactoryRuntime.get();
+        ObservationService observations = runtime == null ? null : runtime.observations();
         for (IoGroup group : line.groups()) {
             Optional<MachineRef> target = factory.machines().byId(group.machineId());
             if (target.isEmpty()) {
                 result.add(simple(group.machineId(), DiagEvent.Level.ERROR, "机器已不在机器库"));
                 continue;
             }
-            result.add(checkGroup(server, storage, online, target.get(), group));
+            result.add(checkGroup(server, storage, online, target.get(), group, observations,
+                    factory.machines().isDetached(target.get().id())));
         }
         return result;
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,
-            MachineRef machine, IoGroup group) {
+            MachineRef machine, IoGroup group, @Nullable ObservationService observations,
+            boolean detached) {
         ServerLevel level = server.getLevel(machine.dimension());
         if (level == null) {
             return simple(machine.id(), DiagEvent.Level.ERROR, "维度不存在");
         }
-        if (!level.isLoaded(machine.pos())) {
+        if (observations != null) {
+            // why 是现场体检：先刷新这一台，再看结论
+            Observation observation = observations.refresh(machine);
+            if (observation.health() == Health.UNLOADED) {
+                return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
+            }
+            if (observation.health() != Health.PRESENT) {
+                return simple(machine.id(), DiagEvent.Level.ERROR, observation.health().describe());
+            }
+        } else if (!level.isLoaded(machine.pos())) {
             return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
+        }
+        if (detached) {
+            return simple(machine.id(), DiagEvent.Level.WARN, "已被移出机器库（回收站）");
         }
 
         List<String> problems = new ArrayList<>();

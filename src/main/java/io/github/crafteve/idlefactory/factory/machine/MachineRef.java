@@ -5,6 +5,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.observation.Located;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
@@ -22,7 +24,7 @@ import net.minecraft.world.level.Level;
  * @param dimension 机器所在维度
  * @param pos       机器方块坐标
  */
-public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
+public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) implements Located {
 
     private static final String TAG_ID = "Id";
     private static final String TAG_DIMENSION = "Dimension";

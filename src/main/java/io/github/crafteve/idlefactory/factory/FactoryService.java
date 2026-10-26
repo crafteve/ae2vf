@@ -9,6 +9,11 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.BlockProbe;
+import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
@@ -17,8 +22,6 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerStorage;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
-import io.github.crafteve.idlefactory.factory.machine.MachineChecks;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import appeng.api.ids.AEComponents;
@@ -45,6 +48,8 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 public final class FactoryService {
     /** {@code storage info} 最多列出多少种物品。 */
     private static final int INFO_LIMIT = 30;
+    /** {@code factory info} 最多列多少台机器。 */
+    private static final int INFO_MACHINE_LIMIT = 20;
     /** 准星操作的射线距离（格）。 */
     private static final double REACH = 10.0D;
 
@@ -111,6 +116,9 @@ public final class FactoryService {
     /**
      * 打印工厂摘要和机器库。
      *
+     * <p>读路径<b>不探世界</b>：每台机器的状态取自上一次的观测结论（{@link ObservationService}）。
+     * 刚 connect / 刚恢复的机器会被立刻刷新过，所以第一眼看到的就是准的。</p>
+     *
      * @param player 发起请求的玩家
      * @return 命令结果
      */
@@ -123,22 +131,41 @@ public final class FactoryService {
         factory.refreshStorage();
         info(player, FactorySnapshotBuilder.describe(factory));
 
-        List<MachineRef> machines = factory.machines().all();
+        ObservationService observations = observations();
+        List<FactorySnapshotBuilder.MachineView> machines =
+                FactorySnapshotBuilder.machines(factory, observations);
         if (machines.isEmpty()) {
             info(player, "机器库为空：准星对准机器执行 /idf factory connect");
             return 1;
         }
-        info(player, "机器库 " + machines.size() + " 台：");
-        for (MachineRef target : machines) {
-            String where = target.dimension().location() + " " + target.pos().toShortString();
-            String status = describeTarget(player, target);
-            Component row = Component.empty()
-                    .append(FactoryMessages.text("  ", FactoryMessages.INFO))
-                    .append(FactoryMessages.hover(target.shortId(), where + "\n" + status))
-                    .append(FactoryMessages.text(" " + where + "  " + status, FactoryMessages.INFO));
-            FactoryMessages.send(player, row);
+        info(player, FactorySnapshotBuilder.health(factory, machines).describe());
+
+        int shown = 0;
+        for (FactorySnapshotBuilder.MachineView view : machines) {
+            if (shown >= INFO_MACHINE_LIMIT) {
+                info(player, "… 还有 " + (machines.size() - shown) + " 台");
+                break;
+            }
+            sendMachineRow(player, view);
+            shown++;
         }
         return 1;
+    }
+
+    private static void sendMachineRow(ServerPlayer player, FactorySnapshotBuilder.MachineView view) {
+        MachineRef ref = view.ref();
+        String where = ref.dimension().location() + " " + ref.pos().toShortString();
+        String status = FactorySnapshotBuilder.describe(view);
+        StringBuilder hover = new StringBuilder(where).append('\n').append(status);
+        if (!view.lineNames().isEmpty()) {
+            hover.append("\n产线：").append(String.join(" / ", view.lineNames()))
+                    .append(" · 规则 ").append(view.ruleCount()).append(" 条");
+        }
+        Component row = Component.empty()
+                .append(FactoryMessages.text("  ", FactoryMessages.INFO))
+                .append(FactoryMessages.hover(ref.shortId(), hover.toString()))
+                .append(FactoryMessages.text(" " + where + "  " + status, FactoryMessages.INFO));
+        FactoryMessages.send(player, row);
     }
 
     // ------------------------------------------------------------------
@@ -170,21 +197,25 @@ public final class FactoryService {
             err(player, "这个方块没有方块实体");
             return 0;
         }
-        if (!MachineChecks.isSupported(level, pos)) {
-            err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
+        MinecraftServer server = player.getServer();
+        if (server == null) {
+            err(player, "服务端未就绪");
             return 0;
         }
         MachineRef target = MachineRef.of(level.dimension(), pos);
+        BlockProbe.Presence presence = BlockProbe.presence(server, ObservationKey.of(target));
+        if (presence.health() != Health.PRESENT || presence.kinds().isEmpty()) {
+            err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
+            return 0;
+        }
         if (!factory.machines().add(target)) {
             err(player, "这台机器已经接入过了：" + target.shortId());
             return 0;
         }
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.markDirty();
-        }
+        refreshObservation(target);
+        markDirty();
         ok(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
-                + " " + pos.toShortString() + " [" + MachineChecks.describeCapabilities(level, pos) + "]");
+                + " " + pos.toShortString() + " [" + presence.describe() + "]");
         return 1;
     }
 
@@ -649,25 +680,26 @@ public final class FactoryService {
     }
 
     /**
-     * 给 {@code info} 用的一行目标状态。
+     * 取观测服务；服务端未就绪时为 {@code null}。
      *
-     * @param player 玩家（用来取服务端）
-     * @param target 目标
-     * @return 状态文本
+     * @return 观测服务
      */
-    private static String describeTarget(ServerPlayer player, MachineRef target) {
-        MinecraftServer server = player.getServer();
-        ServerLevel level = server == null ? null : server.getLevel(target.dimension());
-        if (level == null) {
-            return "维度不存在";
+    @Nullable
+    private static ObservationService observations() {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        return runtime == null ? null : runtime.observations();
+    }
+
+    /**
+     * 立刻刷新一台机器的观测（接入、取回之后调，别让 {@code info} 看到 UNKNOWN）。
+     *
+     * @param target 机器
+     */
+    private static void refreshObservation(MachineRef target) {
+        ObservationService observations = observations();
+        if (observations != null) {
+            observations.refresh(target);
         }
-        if (!level.isLoaded(target.pos())) {
-            return "未加载";
-        }
-        if (!MachineChecks.isSupported(level, target.pos())) {
-            return "方块已消失";
-        }
-        return MachineChecks.describeCapabilities(level, target.pos());
     }
 
     /**

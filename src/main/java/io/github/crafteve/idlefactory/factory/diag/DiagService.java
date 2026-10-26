@@ -20,8 +20,12 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.network.chat.Component;
@@ -44,6 +48,8 @@ public final class DiagService {
     private static final int STATUS_LINES = 8;
     /** tail 上限。 */
     private static final int TAIL_MAX = 20;
+    /** {@code observe} 最多列几条异常机器。 */
+    private static final int OBSERVE_LIMIT = 12;
 
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
@@ -74,9 +80,10 @@ public final class DiagService {
         List<PassiveLine> lines = factory.lines().all();
 
         FactoryMessages.send(player, FactoryMessages.info("── 工厂 " + DiagRender.shortId(factory.id())
-                + " · 仓库" + (factory.storageLink().online() ? "在线" : "离线")
-                + " · 机器 " + factory.machines().size()
-                + " · 产线 " + lines.size()));
+                + " · 仓库" + (factory.storageLink().online() ? "在线" : "离线")));
+        FactoryMessages.send(player, FactoryMessages.info(
+                FactorySnapshotBuilder.health(factory, runtime.observations()).describe()
+                        + " · 产线 " + lines.size()));
 
         int shown = Math.min(lines.size(), STATUS_LINES);
         for (int i = 0; i < shown; i++) {
@@ -92,6 +99,81 @@ public final class DiagService {
             FactoryMessages.send(player, DiagRender.event(recent.get(0), now));
         }
         return 1;
+    }
+
+    /**
+     * 观测面板：看观测服务的规模、预算与异常条目。
+     *
+     * <p>这是排查「为什么 info 里那台机器是未加载」的唯一入口——未加载刻意不进事件流。</p>
+     *
+     * @param player 玩家
+     * @return 命令结果
+     */
+    public static int observe(ServerPlayer player) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        FactoryRuntime runtime = FactoryRuntime.get();
+        ObservationService observations = runtime.observations();
+        if (observations == null) {
+            FactoryMessages.send(player, FactoryMessages.err("观测服务未就绪"));
+            return 0;
+        }
+        ObservationService.Stats stats = observations.stats();
+        FactoryMessages.send(player, FactoryMessages.info(
+                "观测 " + stats.total() + " 条 · 就绪 " + stats.present()
+                        + " · 未加载 " + stats.unloaded() + " · 失联 " + stats.missing()
+                        + " · 未探测 " + stats.unknown()
+                        + " · 本 tick 探测 " + stats.probesLastTick()));
+
+        long now = observations.currentTick();
+        int shown = 0;
+        for (MachineRef ref : factory.machines().all()) {
+            Observation observation = observations.observe(ref);
+            boolean detached = factory.machines().isDetached(ref.id());
+            if (observation.health() == Health.PRESENT && !detached) {
+                continue;
+            }
+            if (shown >= OBSERVE_LIMIT) {
+                FactoryMessages.send(player, FactoryMessages.info("… 还有更多，用 /idf factory bin 查看"));
+                break;
+            }
+            FactoryMessages.send(player, observationRow(ref, observation, detached, now));
+            shown++;
+        }
+        if (shown == 0) {
+            FactoryMessages.send(player, FactoryMessages.info("所有机器都在线"));
+        }
+        return 1;
+    }
+
+    private static Component observationRow(MachineRef ref, Observation observation,
+            boolean detached, long now) {
+        String where = ref.dimension().location() + " " + ref.pos().toShortString();
+        DiagEvent.Level level = switch (observation.health()) {
+            case PRESENT -> detached ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
+            case UNLOADED -> DiagEvent.Level.WARN;
+            case UNKNOWN -> DiagEvent.Level.IDLE;
+            default -> DiagEvent.Level.ERROR;
+        };
+        StringBuilder tail = new StringBuilder(observation.health().describe());
+        if (detached) {
+            tail.append(" · 已断开");
+        }
+        long missingSince = observation.missingSince();
+        if (missingSince >= 0L) {
+            tail.append(" · 失联 ").append(seconds(now - missingSince)).append('s');
+        }
+        long age = observation.ageTicks(now);
+        if (age >= 0L) {
+            tail.append(" · 观测 ").append(seconds(age)).append("s 前");
+        }
+        return Component.empty()
+                .append(DiagRender.levelTag(level))
+                .append(FactoryMessages.text(" ", FactoryMessages.INFO))
+                .append(FactoryMessages.hover(ref.shortId(), where))
+                .append(FactoryMessages.text(" " + where + " · " + tail, FactoryMessages.INFO));
     }
 
     private static Component statusRow(Factory factory, PassiveLine line, long now,

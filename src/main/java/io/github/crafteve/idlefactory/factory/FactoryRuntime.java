@@ -1,23 +1,26 @@
 package io.github.crafteve.idlefactory.factory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.diag.DiagEvent;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.LineRunner;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
-import io.github.crafteve.idlefactory.factory.machine.MachineChecks;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -28,11 +31,18 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 /**
  * 工厂总调度室：绑定在服务器 tick 上的常驻服务。
  *
- * <p>它是工厂生命周期的唯一入口：服务器启动时读档案、服务器停止时写档案、每 tick 推进所有
- * 工厂。它不认识终端、玩家会话或 GUI——终端关掉、玩家下线，它照跑。</p>
+ * <p>它是工厂生命周期的唯一入口：服务器启动时读档案、服务器停止时写档案、每 tick 推进所有工厂。
+ * 它不认识终端、玩家会话或 GUI——终端关掉、玩家下线，它照跑。</p>
  *
- * <p>第一版只做「加载 / 保存 / 每 100 tick 打一条心跳日志」，验证工厂确实活在 tick 上。
- * 搬运逻辑等 {@code factory/io} 重写后再接进来。</p>
+ * <p>每 tick 的顺序是固定的：</p>
+ * <ol>
+ *   <li><b>观测</b>：把「被引用的位置集合」交给 {@link ObservationService}，再消费它吐出的状态迁移；</li>
+ *   <li><b>仓库</b>：每 20 tick 重新解析一次地址，把上线/离线记进事件流；</li>
+ *   <li><b>IO</b>：按 IO 间隔跑一轮搬运；</li>
+ *   <li><b>心跳</b>：每 100 tick 打一条 trace 日志。</li>
+ * </ol>
+ *
+ * <p>观测必须先于 IO：IO 的门禁读的是观测结论，读路径不许自己探世界。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryRuntime {
@@ -40,8 +50,6 @@ public final class FactoryRuntime {
     private static final int HEARTBEAT_INTERVAL = 100;
     /** 仓库状态刷新间隔（tick）：每秒重新解析一次，别让 online 变成启动时的快照。 */
     private static final int REFRESH_INTERVAL = 20;
-    /** 机器库对账间隔（tick）：每 5 秒清一次悬空引用。 */
-    private static final int RECONCILE_INTERVAL = 100;
     /** IO 执行间隔（tick）的下限。 */
     public static final int MIN_IO_INTERVAL = 1;
     /** IO 执行间隔（tick）的上限。 */
@@ -52,7 +60,11 @@ public final class FactoryRuntime {
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
     private final LineRunner lineRunner = new LineRunner();
+    /** 每 tick 复用的「被引用位置集合」，避免反复分配。 */
+    private final Set<ObservationKey> observedKeys = new HashSet<>();
     private FactoryStore store;
+    @Nullable
+    private ObservationService observations;
     private int tickCounter;
     /** IO 执行间隔（tick），默认每 tick 一轮；可由 /idf diag io 调整。 */
     private int ioInterval = 1;
@@ -85,10 +97,13 @@ public final class FactoryRuntime {
         runtime.lineRunner.clear();
         DiagService.clearWatches();
         StorageLink.setResolver(null);
+        runtime.observations = null;
+        runtime.observedKeys.clear();
         instance = null;
     }
 
     /** @return 当前运行时；服务端未启动时为 {@code null} */
+    @Nullable
     public static FactoryRuntime get() {
         return instance;
     }
@@ -101,6 +116,12 @@ public final class FactoryRuntime {
     /** IO 执行器。 */
     public LineRunner lineRunner() {
         return this.lineRunner;
+    }
+
+    /** 观测服务；服务端未就绪时为 {@code null}。 */
+    @Nullable
+    public ObservationService observations() {
+        return this.observations;
     }
 
     /** 服务端实例。 */
@@ -156,6 +177,7 @@ public final class FactoryRuntime {
         StorageLink.setResolver(new DispatchingStorageResolver(
                 new Ae2StorageResolver(this.server),
                 new ContainerStorageResolver(this.server)));
+        this.observations = new ObservationService(this.server);
         this.manager.loadFrom(this.store.records());
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage();
@@ -164,10 +186,15 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 每 tick 推进一次。第一版只刷新仓库状态、打心跳日志。
+     * 每 tick 推进一次。
+     *
+     * <p>观测 → 仓库 → IO → 心跳。观测一定在最前：IO 的门禁读的是观测结论。</p>
      */
     public void tick() {
         this.tickCounter++;
+
+        this.observe();
+
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
             long now = this.server.overworld().getGameTime();
             for (Factory factory : this.manager.all()) {
@@ -183,16 +210,13 @@ public final class FactoryRuntime {
             }
             DiagService.tick(this.server);
         }
-        if (this.tickCounter % RECONCILE_INTERVAL == 0) {
-            for (Factory factory : this.manager.all()) {
-                reconcileMachines(factory);
-            }
-        }
+
         if (this.tickCounter % this.ioInterval == 0) {
             long start = System.nanoTime();
-            this.lineRunner.tick(this.server, this.manager);
+            this.lineRunner.tick(this.server, this.manager, this.observations);
             DiagService.recordIoCost(System.nanoTime() - start);
         }
+
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
@@ -200,44 +224,67 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 对账：把「方块已经不在了」的机器从机器库移除。
+     * 观测一轮：重建被引用的位置集合，交给观测服务，再消费它吐出的状态迁移。
      *
-     * <p>只对已加载区块判断——没加载不代表机器没了，删了会把玩家没到过的产线清空。
-     * 玩家破坏、爆炸、活塞、{@code /setblock} 造成的消失都能被这条兜底。</p>
-     *
-     * @param factory 工厂
+     * <p>集合每 tick 重建，因为配置随时可能变（接入、断开、删线）。规模是「机器总数」，
+     * 百台级下这点分配可以忽略；真要省再上脏标记。</p>
      */
-    private void reconcileMachines(Factory factory) {
-        long now = this.server.overworld().getGameTime();
-        List<UUID> stale = new ArrayList<>();
-        for (MachineRef target : factory.machines().all()) {
-            ServerLevel level = this.server.getLevel(target.dimension());
-            if (level == null) {
-                stale.add(target.id());
-                factory.stats().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
-                        DiagEvent.Category.MACH, null, target.id(), null, "维度不存在，自动移出机器库"));
-                continue;
-            }
-            if (!level.isLoaded(target.pos())) {
-                continue;
-            }
-            if (!MachineChecks.isSupported(level, target.pos())) {
-                stale.add(target.id());
-                factory.stats().record(DiagEvent.of(now, DiagEvent.Level.ERROR,
-                        DiagEvent.Category.MACH, null, target.id(), null, "方块已消失，自动移出机器库"));
-            }
-        }
-        if (stale.isEmpty()) {
+    private void observe() {
+        if (this.observations == null) {
             return;
         }
-        for (UUID id : stale) {
-            factory.machines().remove(id);
+        this.observedKeys.clear();
+        for (Factory factory : this.manager.all()) {
+            for (MachineRef ref : factory.machines().all()) {
+                this.observedKeys.add(ObservationKey.of(ref));
+            }
         }
+        this.observations.tick(this.observedKeys);
+        for (ObservationService.Transition transition : this.observations.drainTransitions()) {
+            this.handleTransition(transition);
+        }
+    }
+
+    /**
+     * 消费一次状态迁移：记事件，必要时唤醒产线。
+     *
+     * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
+     * 未加载只在 {@code diag observe} 里看得到。</p>
+     *
+     * @param transition 迁移
+     */
+    private void handleTransition(ObservationService.Transition transition) {
+        long now = this.server.overworld().getGameTime();
+        for (Factory factory : this.manager.all()) {
+            MachineRef ref = factory.machines()
+                    .byPosition(transition.key().dimension(), transition.key().pos());
+            if (ref == null) {
+                continue;
+            }
+            switch (transition.to()) {
+                case MISSING, NO_DIMENSION -> factory.stats().record(DiagEvent.of(now,
+                        DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
+                        transition.to().describe() + "，已进回收站"));
+                case PRESENT -> {
+                    if (transition.from() != Health.UNKNOWN) {
+                        factory.stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
+                                DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
+                        this.wakeLines(factory, ref.id());
+                    }
+                }
+                default -> {
+                    // UNLOADED / UNKNOWN 不记
+                }
+            }
+        }
+    }
+
+    private void wakeLines(Factory factory, UUID machineId) {
         for (PassiveLine line : factory.lines().all()) {
-            line.removeGroupsFor(stale);
+            if (line.groupByMachine(machineId).isPresent()) {
+                this.lineRunner.wake(line.id());
+            }
         }
-        markDirty();
-        IdleFactory.LOGGER.info("Idle Factory: removed {} stale machine(s)", stale.size());
     }
 
     /**

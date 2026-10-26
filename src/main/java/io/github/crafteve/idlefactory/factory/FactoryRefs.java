@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -112,5 +113,40 @@ public final class FactoryRefs {
             }
         }
         return assigned;
+    }
+
+    /**
+     * 一台机器挂在哪些产线上（按产线登记顺序）。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return 产线名列表；没挂任何产线时为空
+     */
+    public static List<String> lineNamesOf(Factory factory, UUID machineId) {
+        List<String> names = new ArrayList<>();
+        for (PassiveLine line : factory.lines().all()) {
+            if (line.groupByMachine(machineId).isPresent()) {
+                names.add(line.name());
+            }
+        }
+        return names;
+    }
+
+    /**
+     * 一台机器配了几条规则（输入 + 输出）。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return 规则条数；没挂任何产线时为 {@code 0}
+     */
+    public static int ruleCountOf(Factory factory, UUID machineId) {
+        int count = 0;
+        for (PassiveLine line : factory.lines().all()) {
+            Optional<IoGroup> group = line.groupByMachine(machineId);
+            if (group.isPresent()) {
+                count += group.get().inputs().size() + group.get().outputs().size();
+            }
+        }
+        return count;
     }
 }
