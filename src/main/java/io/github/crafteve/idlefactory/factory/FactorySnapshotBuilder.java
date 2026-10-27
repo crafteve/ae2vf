@@ -39,6 +39,7 @@ public final class FactorySnapshotBuilder {
     public enum TotalState {
         RUNNING,
         IDLE,
+        WAITING_MATERIAL,
         INPUT_OK,
         INPUT_BLOCKED,
         OFFLINE,
@@ -206,6 +207,13 @@ public final class FactorySnapshotBuilder {
             }
             if (this.workState == WorkState.WORKING) {
                 return TotalState.RUNNING;
+            }
+            // 缺料是「等仓库」，不是「机器不收」；输出满了不算缺料，避免误报。
+            if (!this.inputs.isEmpty()
+                    && this.inputReason == IoResult.Reason.NO_ITEM
+                    && this.outputReason != IoResult.Reason.NO_SPACE
+                    && this.outputReason != IoResult.Reason.REJECTED) {
+                return TotalState.WAITING_MATERIAL;
             }
             if (this.workState == WorkState.IDLE) {
                 return TotalState.IDLE;

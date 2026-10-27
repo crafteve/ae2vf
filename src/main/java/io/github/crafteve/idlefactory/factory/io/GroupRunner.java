@@ -155,17 +155,24 @@ public final class GroupRunner {
                 inputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
-            List<ResourceAdapter> adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
+            Adapters adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
                     variantBudget);
-            if (adapters.isEmpty()) {
+            if (adapters.starved()) {
+                // 组预算被前面的规则用完：本轮跳过，不写入原因；也不代表机器拒收。
+                anyInputAccepted = true;
+                continue;
+            }
+            if (adapters.list().isEmpty()) {
                 inputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
                 inputReason = worse(inputReason, IoResult.Reason.NO_ITEM);
+                // 没有候选 = 仓库当前没有这个物品；机器侧并没有拒收，不能算「输入堵塞」。
+                anyInputAccepted = true;
                 continue;
             }
             long moved = 0L;
             IoResult.Reason reason = null;
             boolean accepted = false;
-            for (ResourceAdapter adapter : adapters) {
+            for (ResourceAdapter adapter : adapters.list()) {
                 IoResult result = IoTransfer.feed(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
@@ -212,16 +219,20 @@ public final class GroupRunner {
                 outputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
-            List<ResourceAdapter> adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
+            Adapters adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
                     variantBudget);
-            if (adapters.isEmpty()) {
+            if (adapters.starved()) {
+                // 预算耗尽：本轮不判断方向，交给下一 tick 的轮转；同样不能算机器堵塞。
+                continue;
+            }
+            if (adapters.list().isEmpty()) {
                 outputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
                 outputReason = worse(outputReason, IoResult.Reason.NO_ITEM);
                 continue;
             }
             long moved = 0L;
             IoResult.Reason reason = null;
-            for (ResourceAdapter adapter : adapters) {
+            for (ResourceAdapter adapter : adapters.list()) {
                 IoResult result = IoTransfer.pull(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
@@ -256,21 +267,28 @@ public final class GroupRunner {
     }
 
     /**
+     * 一组搬运通道；{@code starved} 表示组预算耗尽，而不是真的没有候选。
+     */
+    private record Adapters(List<ResourceAdapter> list, boolean starved) {
+    }
+
+    /**
      * 按规则展开出一条或多条搬运通道。
      *
      * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
      * 取仓库变体索引、输出侧扫机器库存。</p>
      */
-    private static List<ResourceAdapter> ruleAdapters(Storage storage, RuleResolver.Resolved resolved,
+    private static Adapters ruleAdapters(Storage storage, RuleResolver.Resolved resolved,
             ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
             int[] budget) {
         if (!(resolved.adapter() instanceof ItemAdapter base)) {
             // 流体/能量没有变体概念，只有一条通道。
-            return List.of(resolved.adapter());
+            return new Adapters(List.of(resolved.adapter()), false);
         }
-        List<ResourceAdapter> result = new ArrayList<>();
-        result.addAll(ItemCandidates.of(storage, base, spec, input, variants, now, budget));
-        return result;
+        ItemCandidates.Candidates candidates = ItemCandidates.of(storage, base, spec, input,
+                variants, now, budget);
+        List<ResourceAdapter> result = new ArrayList<>(candidates.adapters());
+        return new Adapters(result, candidates.budgetStarved());
     }
 
     private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,

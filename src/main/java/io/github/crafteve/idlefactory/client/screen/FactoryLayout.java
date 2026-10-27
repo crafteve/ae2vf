@@ -349,33 +349,6 @@ public final class FactoryLayout {
     }
 
     /**
-     * 一段（输入或输出）需要的高度。
-     *
-     * <p>0 条规则时仍占一行，用来显示「未配置」空状态；高度按整行单元格计算，
-     * 保证展开区和表格行一样是整数像素。</p>
-     *
-     * @param rules 该侧规则条数
-     * @return 段高度
-     */
-    public int ioSectionHeight(int rules) {
-        int perRow = ioCellsPerRow();
-        int rows = Math.max(1, (rules + perRow - 1) / perRow);
-        return IO_SECTION_H + IO_GAP + rows * IO_CELL_H + (rows - 1) * IO_GAP;
-    }
-
-    /**
-     * 展开详情面板的完整高度（未夹紧）。
-     *
-     * @param inputs  输入规则数
-     * @param outputs 输出规则数
-     * @return 所需高度
-     */
-    public int ioDetailHeight(int inputs, int outputs) {
-        return IO_PANEL_PAD * 2 + ioSectionHeight(inputs)
-                + IO_SECTION_GAP + ioSectionHeight(outputs);
-    }
-
-    /**
      * 按优先级挑一组能放下的列，并把宽度按比例分配。
      *
      * <p>四列放不下时退化成「机器 + 状态」，IO 走 tooltip。这样任何宽度下都不会有列

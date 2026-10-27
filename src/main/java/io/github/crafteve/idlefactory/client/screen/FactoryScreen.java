@@ -998,7 +998,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         drawExpandButton(graphics, y, isOpen(machine));
         if (detailHeight > 0) {
             IoDetailRender.Detail detail = IoDetailRender.layout(l, machine,
-                    y + FactoryLayout.ROW_H, detailHeight);
+                    y + FactoryLayout.ROW_H, detailHeight, this.font);
             IoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
                     this.renderMouseX, this.renderMouseY);
         }
@@ -1018,7 +1018,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (!this.expandedMachines.contains(machine.ref())) {
             return 0;
         }
-        int required = IoDetailRender.requiredHeight(this.layout, machine);
+        int required = IoDetailRender.requiredHeight(this.layout, machine, this.font);
         int available = Math.max(0, this.layout.footerY - rowY - FactoryLayout.ROW_H);
         return Math.min(required, available);
     }
@@ -1153,7 +1153,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return;
             }
         }
-        int required = IoDetailRender.requiredHeight(this.layout, table.get(index));
+        int required = IoDetailRender.requiredHeight(this.layout, table.get(index), this.font);
         int available = Math.max(0, this.layout.footerY - y - FactoryLayout.ROW_H);
         if (required > available) {
             this.firstRow = index;
@@ -1247,6 +1247,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
             case IDLE -> new Status("空闲", this.theme.statusIdle(),
                     GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
+            case WAITING_MATERIAL -> new Status("仓库缺料", this.theme.statusWarn(),
+                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
             case INPUT_OK -> new Status("可输入", this.theme.statusRun(),
                     GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
             case INPUT_BLOCKED -> new Status("输入堵塞",
@@ -1297,11 +1299,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private void drawResourceIcon(GuiGraphics graphics, ResourceKey key, int x, int y) {
-        ItemStack icon = iconStack(key);
-        graphics.renderItem(icon, x, y);
-        // 与 AE2 终端一致：叠一层原版装饰，补耐久条与冷却；数量仍由 drawCount 自己画，
-        // 所以传空串抑制原版数字。
-        graphics.renderItemDecorations(this.font, icon, x, y, "");
+        ResourceIconRenderer.draw(graphics, this.font, key, x, y);
     }
 
     /** 资源对应的界面图标；JEI 查询也复用这一份。*/
@@ -1570,7 +1568,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return null;
         }
         IoDetailRender.Detail detail = IoDetailRender.layout(this.layout, hit.machine(),
-                hit.y() + FactoryLayout.ROW_H, hit.detailHeight());
+                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font);
         return IoDetailRender.hit(detail, mouseX, mouseY);
     }
 
@@ -1620,7 +1618,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 cell.input() ? "输入面：" : "输出面：",
                 faceName(spec), FactoryLabels.faceEn(spec), this.theme));
         if (spec.fuzzy()) {
-            lines.add(FactoryLabels.colored("匹配：忽略组件（按物品 id）", tt.label()));
+            lines.add(FactoryLabels.coloredBold("忽略组件", 0xFFFF55));
         }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("速率：", tt.label()))

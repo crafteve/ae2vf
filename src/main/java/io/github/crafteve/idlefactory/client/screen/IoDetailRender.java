@@ -11,7 +11,6 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
 
 /**
  * 左表机器行的展开详情：输入/输出规则面板。
@@ -78,15 +77,38 @@ final class IoDetailRender {
         }
     }
 
+    /** 单元格高度。 */
+    private static final int CELL_H = FactoryLayout.IO_CELL_H;
+    /** 单元格之间的间距。 */
+    private static final int GAP = FactoryLayout.IO_GAP;
+    /** 名字之外固定占用的宽度：图标、左右内边距、速率与名字之间的间隔。 */
+    private static final int CELL_CHROME = 76;
+
+    /**
+     * 一个规则单元格相对段内容起点的位置。
+     *
+     * @param x         左边缘（相对内容区）
+     * @param rowY      所在行的 y（相对内容区）
+     * @param width     宽度；整行卡等于内容区宽度
+     * @param ruleIndex 在该侧规则列表里的下标
+     */
+    private record Placement(int x, int rowY, int width, int ruleIndex) {
+    }
+
     /**
      * 展开面板的完整所需高度（未夹紧）。
      *
      * @param layout  布局
      * @param machine 机器视图
+     * @param font    字体，用来判断名字是否需要整行
      * @return 高度
      */
-    static int requiredHeight(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine) {
-        return layout.ioDetailHeight(machine.inputs().size(), machine.outputs().size());
+    static int requiredHeight(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
+            Font font) {
+        return FactoryLayout.IO_PANEL_PAD * 2
+                + sectionHeight(place(layout, machine.inputs(), font))
+                + FactoryLayout.IO_SECTION_GAP
+                + sectionHeight(place(layout, machine.outputs(), font));
     }
 
     /**
@@ -96,33 +118,84 @@ final class IoDetailRender {
      * @param machine        机器视图
      * @param topY           面板上边缘（基础行底部）
      * @param animatedHeight 动画后的高度
+     * @param font           字体，用来判断名字是否需要整行
      * @return 排版结果
      */
     static Detail layout(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
-            int topY, int animatedHeight) {
+            int topY, int animatedHeight, Font font) {
         int height = Math.max(0, animatedHeight);
         int x = layout.leftX + 2;
         int width = layout.ioPanelWidth();
         int contentX = x + FactoryLayout.IO_PANEL_PAD;
-        int innerW = layout.ioInnerWidth();
-        int perRow = layout.ioCellsPerRow();
-        int cellW = layout.ioCellWidth();
         int bottomLimit = topY + height - FactoryLayout.IO_PANEL_PAD;
 
         List<Section> sections = new ArrayList<>(2);
         List<Cell> cells = new ArrayList<>();
         int cursorY = topY + FactoryLayout.IO_PANEL_PAD;
 
+        List<Placement> inputPlacements = place(layout, machine.inputs(), font);
         int inputRules = machine.inputs().size();
         int inputUnshown = addSection(sections, cells, true, inputRules, cursorY,
-                contentX, cellW, perRow, bottomLimit);
-        cursorY += layout.ioSectionHeight(inputRules) + FactoryLayout.IO_SECTION_GAP;
+                contentX, inputPlacements, bottomLimit);
+        cursorY += sectionHeight(inputPlacements) + FactoryLayout.IO_SECTION_GAP;
 
+        List<Placement> outputPlacements = place(layout, machine.outputs(), font);
         int outputRules = machine.outputs().size();
         int outputUnshown = addSection(sections, cells, false, outputRules, cursorY,
-                contentX, cellW, perRow, bottomLimit);
+                contentX, outputPlacements, bottomLimit);
 
         return new Detail(x, topY, width, height, sections, cells, inputUnshown, outputUnshown);
+    }
+
+    /**
+     * 排一段规则：短名字两列，长名字整行，后面的卡片自动换行。
+     *
+     * <p>只做相对坐标；绝对坐标由 {@link #layout} 加上段头起点。整行卡关行，半行卡按
+     * {@link FactoryLayout#ioCellsPerRow()} 的列数排。</p>
+     */
+    private static List<Placement> place(FactoryLayout layout, List<ResourceSpec> rules, Font font) {
+        int innerW = layout.ioInnerWidth();
+        int cellW = Math.min(layout.ioCellWidth(), innerW);
+        if (rules.isEmpty() || innerW <= 0) {
+            return List.of();
+        }
+        List<Placement> result = new ArrayList<>(rules.size());
+        int rowY = 0;
+        int used = 0;
+        for (int i = 0; i < rules.size(); i++) {
+            ResourceSpec spec = rules.get(i);
+            int width = needsFullRow(font, spec, cellW) ? innerW : cellW;
+            if (used > 0 && (width >= innerW || used + GAP + width > innerW)) {
+                rowY += CELL_H + GAP;
+                used = 0;
+            }
+            int cellX = used == 0 ? 0 : used + GAP;
+            result.add(new Placement(cellX, rowY, width, i));
+            used = used == 0 ? width : used + GAP + width;
+            if (width >= innerW || used >= innerW) {
+                rowY += CELL_H + GAP;
+                used = 0;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 这一条规则是否需要占满一行。
+     *
+     * <p>按名字像素宽度估算：名字 + 图标/速率/边距超过标准半宽就整行。这样长药水名不会被
+     * 截成一半，短名字仍然保持两列。</p>
+     */
+    private static boolean needsFullRow(Font font, ResourceSpec spec, int cellW) {
+        return font.width(FactoryLabels.name(spec.key())) + CELL_CHROME > cellW;
+    }
+
+    /** 一段（输入或输出）需要的高度；0 条规则时仍留一行给「未配置」。 */
+    private static int sectionHeight(List<Placement> placements) {
+        int rowsHeight = placements.isEmpty()
+                ? CELL_H
+                : placements.get(placements.size() - 1).rowY() + CELL_H;
+        return FactoryLayout.IO_SECTION_H + GAP + rowsHeight;
     }
 
     /**
@@ -131,22 +204,20 @@ final class IoDetailRender {
      * @return 因高度不足没放下的条数
      */
     private static int addSection(List<Section> sections, List<Cell> cells,
-            boolean input, int rules, int headerY, int contentX, int cellW,
-            int perRow, int bottomLimit) {
+            boolean input, int rules, int headerY, int contentX,
+            List<Placement> placements, int bottomLimit) {
         sections.add(new Section(input, headerY, rules));
         if (rules <= 0) {
             return 0;
         }
-        int startY = headerY + FactoryLayout.IO_SECTION_H + FactoryLayout.IO_GAP;
-        for (int i = 0; i < rules; i++) {
-            int row = i / perRow;
-            int col = i % perRow;
-            int cellY = startY + row * (FactoryLayout.IO_CELL_H + FactoryLayout.IO_GAP);
-            if (cellY + FactoryLayout.IO_CELL_H > bottomLimit) {
-                return rules - i;
+        int startY = headerY + FactoryLayout.IO_SECTION_H + GAP;
+        for (Placement placement : placements) {
+            int cellY = startY + placement.rowY();
+            if (cellY + CELL_H > bottomLimit) {
+                return rules - placement.ruleIndex();
             }
-            cells.add(new Cell(contentX + col * (cellW + FactoryLayout.IO_GAP), cellY,
-                    cellW, FactoryLayout.IO_CELL_H, input, i));
+            cells.add(new Cell(contentX + placement.x(), cellY,
+                    placement.width(), CELL_H, input, placement.ruleIndex()));
         }
         return 0;
     }
@@ -266,10 +337,7 @@ final class IoDetailRender {
         int slotX = cell.x() + 3;
         int slotY = cell.y() + 4;
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
-        ItemStack icon = FactoryLabels.icon(spec.key());
-        graphics.renderItem(icon, slotX + 1, slotY + 1);
-        // 规则可能是带耐久的工具/打火石，装饰层补耐久条；数量不在格子里显示。
-        graphics.renderItemDecorations(font, icon, slotX + 1, slotY + 1, "");
+        ResourceIconRenderer.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
         String rateValue = FactoryLabels.count(rate);
         String rateUnit = FactoryLabels.rateUnit(spec.key().kind());

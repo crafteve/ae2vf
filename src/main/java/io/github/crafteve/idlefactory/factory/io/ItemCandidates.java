@@ -27,6 +27,18 @@ public final class ItemCandidates {
     /** 单个 IO 组每 tick 最多试几个变体（输入+输出共享）。 */
     public static final int MAX_VARIANTS_PER_GROUP_TICK = 16;
 
+    /**
+     * 展开结果。
+     *
+     * @param adapters      候选适配器
+     * @param budgetStarved 是否因为组预算耗尽而没展开；这种空结果不能当成「缺料」
+     */
+    public record Candidates(List<ItemAdapter> adapters, boolean budgetStarved) {
+        public Candidates {
+            adapters = List.copyOf(adapters);
+        }
+    }
+
     private ItemCandidates() {
         // 纯静态工具类
     }
@@ -41,21 +53,21 @@ public final class ItemCandidates {
      * @param variants 变体索引；{@code null} 时模糊输入没有候选
      * @param now      当前 tick
      * @param budget   组级剩余预算，单元素数组，调用后扣减
-     * @return 候选适配器；空表示当前没有可搬的变体
+     * @return 候选；空且 {@code budgetStarved=false} 表示仓库/机器当前确实没有可搬的变体
      */
-    public static List<ItemAdapter> of(Storage storage, ItemAdapter base, ResourceSpec spec,
+    public static Candidates of(Storage storage, ItemAdapter base, ResourceSpec spec,
             boolean input, @Nullable ItemVariantIndex variants, long now, int[] budget) {
         if (spec.mode() == MatchMode.EXACT) {
-            return List.of(base);
+            return new Candidates(List.of(base), false);
         }
         int limit = Math.min(MAX_VARIANTS_PER_RULE_TICK, budget[0]);
         if (limit <= 0) {
-            return List.of();
+            return new Candidates(List.of(), true);
         }
         List<ItemAdapter> result = new ArrayList<>();
         if (input) {
             if (variants == null) {
-                return List.of();
+                return new Candidates(List.of(), false);
             }
             for (ResourceKey key : variants.candidates(storage, spec.key().id(), now, limit)) {
                 ItemStack sample = key.toStack();
@@ -66,13 +78,13 @@ public final class ItemCandidates {
         } else {
             Item item = BuiltInRegistries.ITEM.get(spec.key().id());
             if (item == Items.AIR) {
-                return List.of();
+                return new Candidates(List.of(), false);
             }
             for (ItemStack sample : ItemAdapter.samples(base.handler(), item, limit)) {
                 result.add(new ItemAdapter(base.handler(), sample));
             }
         }
         budget[0] -= result.size();
-        return result;
+        return new Candidates(result, false);
     }
 }
