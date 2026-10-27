@@ -47,6 +47,29 @@ public final class NineSlice {
         slice(graphics, GuiTextures.FIELD, GuiTextures.FIELD_SIZE, 1, x, y, width, height);
     }
 
+    /** 画凸起表头。 */
+    public static void header(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.TABLE_HEADER, GuiTextures.TABLE_FRAME_SIZE, 1,
+                x, y, width, height);
+    }
+
+    /** 画行卡片。 */
+    public static void card(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.ROW_CARD, GuiTextures.TABLE_FRAME_SIZE, 1,
+                x, y, width, height);
+    }
+
+    /** 画机器库卡片。 */
+    public static void machineCard(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.MACHINE_CARD, GuiTextures.MACHINE_CARD_SIZE, 1,
+                x, y, width, height);
+    }
+
+    /** 画一张固定尺寸的小图标（不做九宫格拉伸）。 */
+    public static void icon(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
+        graphics.blit(texture, x, y, size, size, 0.0F, 0.0F, size, size, size, size);
+    }
+
     /**
      * 用 1×1 贴图填一个矩形（分隔线、表头底色这类纯色块）。
      *

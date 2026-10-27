@@ -32,6 +32,8 @@ public final class ObservationService {
     private static final int PROBE_BUDGET_PER_TICK = 8;
     /** 每 tick 最多处理几个「被失效事件标脏」的条目。 */
     private static final int DIRTY_BUDGET_PER_TICK = 32;
+    /** 每 tick 最多探测几个工作状态。 */
+    private static final int WORK_BUDGET_PER_TICK = 16;
 
     private final MinecraftServer server;
     /** 键 → 观测。插入顺序稳定，便于诊断输出。 */
@@ -97,7 +99,21 @@ public final class ObservationService {
             this.probesLastTick++;
         }
 
-        // 3) mark-sweep：不再被引用的位置，连能力缓存一起丢
+        // 3) 工作状态：独立预算，只探加载中的机器
+        int workBudget = WORK_BUDGET_PER_TICK;
+        for (Map.Entry<ObservationKey, Observation> entry : this.observations.entrySet()) {
+            if (workBudget <= 0) {
+                break;
+            }
+            Observation observation = entry.getValue();
+            if (!observation.workDue(this.tick)) {
+                continue;
+            }
+            probeWork(entry.getKey(), observation);
+            workBudget--;
+        }
+
+        // 4) mark-sweep：不再被引用的位置，连能力缓存一起丢
         this.observations.keySet().removeIf(key -> {
             if (referenced.contains(key)) {
                 return false;
@@ -153,6 +169,7 @@ public final class ObservationService {
         ObservationKey key = ObservationKey.of(located);
         Observation observation = this.observations.computeIfAbsent(key, ignored -> new Observation());
         probe(key, observation);
+        probeWork(key, observation);
         return observation;
     }
 
@@ -250,6 +267,14 @@ public final class ObservationService {
         if (before != observation.health()) {
             this.transitions.add(new Transition(key, before, observation.health(), this.tick));
         }
+    }
+
+    private void probeWork(ObservationKey key, Observation observation) {
+        ServerLevel level = this.server.getLevel(key.dimension());
+        WorkState state = level == null
+                ? WorkState.UNKNOWN
+                : BlockProbe.workState(level, key.pos());
+        observation.applyWorkState(state, this.tick);
     }
 
     /**

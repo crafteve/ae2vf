@@ -18,8 +18,11 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.AbstractFurnaceBlock;
+import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.neoforged.neoforge.capabilities.Capabilities;
 
 /**
@@ -114,6 +117,44 @@ public final class BlockProbe {
         boolean legacy = blockEntity instanceof Container;
         Health health = kinds.isEmpty() && !legacy ? Health.MISSING : Health.PRESENT;
         return new Presence(health, blockId, beTypeId, kinds, legacy);
+    }
+
+    /**
+     * 探测机器是否在工作。
+     *
+     * <p>本轮只读方块状态；没有可靠状态就返回 {@link WorkState#UNKNOWN}，
+     * 绝不用 IO 结果反推。</p>
+     *
+     * @param level 服务端世界
+     * @param pos   方块坐标
+     * @return 工作状态
+     */
+    public static WorkState workState(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return WorkState.UNKNOWN;
+        }
+        BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof AbstractFurnaceBlock) {
+            return state.getValue(AbstractFurnaceBlock.LIT) ? WorkState.WORKING : WorkState.IDLE;
+        }
+        if (state.getBlock() instanceof CampfireBlock) {
+            return state.getValue(CampfireBlock.LIT) ? WorkState.WORKING : WorkState.IDLE;
+        }
+
+        for (Property<?> property : state.getProperties()) {
+            if (property.getValueClass() != Boolean.class) {
+                continue;
+            }
+            String name = property.getName();
+            if (!name.equals("active") && !name.equals("working")
+                    && !name.equals("running") && !name.equals("lit")) {
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            Property<Boolean> booleanProperty = (Property<Boolean>) property;
+            return state.getValue(booleanProperty) ? WorkState.WORKING : WorkState.IDLE;
+        }
+        return WorkState.UNKNOWN;
     }
 
     /**

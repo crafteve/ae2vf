@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.menu;
 
+import io.github.crafteve.idlefactory.factory.storage.FactoryStorageActions;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -40,12 +42,23 @@ public class FactoryMenu extends AbstractContainerMenu {
     }
 
     /**
-     * Shift 点击：只在背包内部搬（快捷栏 ↔ 主背包）。
+     * Shift 点击：先尝试把背包槽放进在线仓库，仓库拒绝时再走快捷栏 ↔ 主背包。
      *
-     * <p>仓库里的物品不是真实槽位，所以这里没有跨区搬运；存取走我们自己的包。</p>
+     * <p>仓库里的物品不是真实槽位，所以仓库侧点击走 {@code FactoryStorageActionC2S}；
+     * 这里只负责「背包 → 仓库」。</p>
      */
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        /*
+         * 客户端不做 Shift 预测。
+         *
+         * 仓库在服务端，客户端 quickMoveStack 无法知道“会不会进仓库”；如果本地先按原版
+         * 快捷栏 ↔ 主背包搬一次，服务端再把它送进仓库，快捷键栏就会闪一下。这里让客户端
+         * 保持原样，等服务端结果同步即可。
+         */
+        if (!(player instanceof ServerPlayer)) {
+            return ItemStack.EMPTY;
+        }
         Slot slot = this.slots.get(index);
         if (!slot.hasItem()) {
             return ItemStack.EMPTY;
@@ -53,6 +66,11 @@ public class FactoryMenu extends AbstractContainerMenu {
 
         ItemStack stack = slot.getItem();
         ItemStack original = stack.copy();
+
+        if (player instanceof ServerPlayer serverPlayer
+                && FactoryStorageActions.quickMoveFromPlayer(serverPlayer, slot)) {
+            return original;
+        }
 
         boolean moved = index < 9
                 ? this.moveItemStackTo(stack, 9, PLAYER_SLOTS, false)

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.io.IoResult;
+import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 
 /**
@@ -106,13 +107,16 @@ public final class DiagStats {
         /**
          * 记一次成功搬运。
          *
-         * @param machineId 机器
-         * @param fed       按资源拆分的补料量
-         * @param pulled    按资源拆分的抽取量
-         * @param tick      时间
+         * @param machineId  机器
+         * @param fed        按资源拆分的补料量
+         * @param pulled     按资源拆分的抽取量
+         * @param fedByRule  按规则拆分的补料量
+         * @param pulledByRule 按规则拆分的抽取量
+         * @param tick       时间
          */
         public void addMoved(UUID machineId, Map<ResourceKey, Long> fed,
-                Map<ResourceKey, Long> pulled, long tick) {
+                Map<ResourceKey, Long> pulled, Map<RuleKey, Long> fedByRule,
+                Map<RuleKey, Long> pulledByRule, long tick) {
             for (Map.Entry<ResourceKey, Long> entry : fed.entrySet()) {
                 this.inWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
             }
@@ -123,18 +127,37 @@ public final class DiagStats {
             GroupStats group = group(machineId);
             group.lastMoveTick = tick;
             group.blockedSince = -1L;
+            group.inputReason = IoResult.Reason.OK;
+            group.outputReason = IoResult.Reason.OK;
+            group.inputFull = false;
+            if (!fed.isEmpty()) {
+                group.lastInputMoveTick = tick;
+            }
+            for (Map.Entry<RuleKey, Long> entry : fedByRule.entrySet()) {
+                group.inRuleWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
+            }
+            for (Map.Entry<RuleKey, Long> entry : pulledByRule.entrySet()) {
+                group.outRuleWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
+            }
         }
 
         /**
          * 记一次「这一轮没搬动」。
          *
-         * @param machineId 机器
-         * @param reason    这一轮的最后一个原因
-         * @param tick      时间
+         * @param machineId   机器
+         * @param inputReason 输入侧原因
+         * @param outputReason 输出侧原因
+         * @param inputFull   所有输入规则都无法接收
+         * @param tick        时间
          */
-        public void markBlocked(UUID machineId, IoResult.Reason reason, long tick) {
+        public void markBlocked(UUID machineId, IoResult.Reason inputReason,
+                IoResult.Reason outputReason, boolean inputFull, long tick) {
             GroupStats group = group(machineId);
-            group.lastReason = reason;
+            group.inputReason = inputReason;
+            group.outputReason = outputReason;
+            group.inputFull = inputFull;
+            group.lastReason = outputReason != IoResult.Reason.OK
+                    ? outputReason : inputReason;
             if (group.blockedSince < 0L) {
                 group.blockedSince = tick;
             }
@@ -177,6 +200,16 @@ public final class DiagStats {
             return this.groups.computeIfAbsent(machineId, id -> new GroupStats());
         }
 
+        /**
+         * 取一台机器的统计；没有时返回 {@code null}，不创建空项。
+         *
+         * @param machineId 机器 id
+         * @return 统计或 {@code null}
+         */
+        public GroupStats groupOrNull(UUID machineId) {
+            return this.groups.get(machineId);
+        }
+
         /** 所有机器的统计（只读）。 */
         public Map<UUID, GroupStats> groups() {
             return Map.copyOf(this.groups);
@@ -189,18 +222,92 @@ public final class DiagStats {
             this.rateOut.clear();
             this.rateOut.putAll(this.outWindow);
             this.outWindow.clear();
+            for (GroupStats group : this.groups.values()) {
+                group.sample();
+            }
         }
     }
 
     /** 一台机器的搬运统计。 */
     public static final class GroupStats {
+        private final Map<RuleKey, Long> inRuleWindow = new HashMap<>();
+        private final Map<RuleKey, Long> outRuleWindow = new HashMap<>();
+        private final Map<RuleKey, Long> inRuleRate = new HashMap<>();
+        private final Map<RuleKey, Long> outRuleRate = new HashMap<>();
         private long lastMoveTick;
+        private long lastInputMoveTick;
         private long blockedSince = -1L;
+        private boolean inputFull;
         private IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
+        private IoResult.Reason inputReason = IoResult.Reason.OK;
+        private IoResult.Reason outputReason = IoResult.Reason.OK;
 
         /** 最后一次成功搬运的时间；从没搬过为 0。 */
         public long lastMoveTick() {
             return this.lastMoveTick;
+        }
+
+        /** 最后一次成功输入的时间；从没输入过为 0。 */
+        public long lastInputMoveTick() {
+            return this.lastInputMoveTick;
+        }
+
+        /** 所有输入规则当前是否都无法接收。 */
+        public boolean inputFull() {
+            return this.inputFull;
+        }
+
+        /** 输入侧最近一次原因。 */
+        public IoResult.Reason inputReason() {
+            return this.inputReason;
+        }
+
+        /** 输出侧最近一次原因。 */
+        public IoResult.Reason outputReason() {
+            return this.outputReason;
+        }
+
+        /**
+         * 一条规则上一秒的速率。
+         *
+         * @param key 规则
+         * @return 数量/秒；没有统计为 0
+         */
+        public long rate(RuleKey key) {
+            Long in = this.inRuleRate.get(key);
+            Long out = this.outRuleRate.get(key);
+            return (in == null ? 0L : in) + (out == null ? 0L : out);
+        }
+
+        /**
+         * 一条输入规则上一秒的速率。
+         *
+         * @param key 规则
+         * @return 数量/秒
+         */
+        public long rateIn(RuleKey key) {
+            Long value = this.inRuleRate.get(key);
+            return value == null ? 0L : value;
+        }
+
+        /**
+         * 一条输出规则上一秒的速率。
+         *
+         * @param key 规则
+         * @return 数量/秒
+         */
+        public long rateOut(RuleKey key) {
+            Long value = this.outRuleRate.get(key);
+            return value == null ? 0L : value;
+        }
+
+        private void sample() {
+            this.inRuleRate.clear();
+            this.inRuleRate.putAll(this.inRuleWindow);
+            this.inRuleWindow.clear();
+            this.outRuleRate.clear();
+            this.outRuleRate.putAll(this.outRuleWindow);
+            this.outRuleWindow.clear();
         }
 
         /** 连续没搬动的起点；{@code -1} 表示当前没卡。 */

@@ -34,8 +34,13 @@ public final class Observation {
     /** 失联复探的起始间隔与上限。 */
     private static final int MISSING_MIN_INTERVAL = 100;
     private static final int MISSING_MAX_INTERVAL = 1200;
+    /** 工作状态复探间隔。 */
+    private static final int WORK_INTERVAL = 10;
 
     private Health health = Health.UNKNOWN;
+    private WorkState workState = WorkState.UNKNOWN;
+    private long workObservedAtTick = -1L;
+    private long nextWorkProbeTick;
     @Nullable
     private ResourceLocation blockId;
     @Nullable
@@ -59,6 +64,43 @@ public final class Observation {
     /** 当前结论。 */
     public Health health() {
         return this.health;
+    }
+
+    /** 观测到的工作状态；没有可靠探针时为 {@link WorkState#UNKNOWN}。 */
+    public WorkState workState() {
+        return this.workState;
+    }
+
+    /** 最后一次工作状态探测的 tick；没探过为 {@code -1}。 */
+    public long workObservedAtTick() {
+        return this.workObservedAtTick;
+    }
+
+    /**
+     * 距离上次工作状态探测的 tick。
+     *
+     * @param now 当前 tick
+     * @return 没探过为 {@code -1}
+     */
+    public long workAgeTicks(long now) {
+        return this.workObservedAtTick < 0L ? -1L : Math.max(0L, now - this.workObservedAtTick);
+    }
+
+    /** 下一次该探测工作状态的 tick。 */
+    long nextWorkProbeTick() {
+        return this.nextWorkProbeTick;
+    }
+
+    /** 当前是否该探测工作状态。 */
+    boolean workDue(long tick) {
+        return this.health == Health.PRESENT && this.nextWorkProbeTick <= tick;
+    }
+
+    /** 写入一次工作状态探测结果（包内可见）。 */
+    void applyWorkState(WorkState state, long tick) {
+        this.workState = state;
+        this.workObservedAtTick = tick;
+        this.nextWorkProbeTick = tick + WORK_INTERVAL;
     }
 
     /** 观测到的方块 id（注册名）；未探测或未加载时为 {@code null}。 */
@@ -166,9 +208,19 @@ public final class Observation {
             this.missingSince = -1L;
             this.goneProbes = 0;
             this.probeInterval = PRESENT_INTERVAL;
+            if (before != Health.PRESENT) {
+                this.workState = WorkState.UNKNOWN;
+                this.workObservedAtTick = -1L;
+                this.nextWorkProbeTick = tick;
+            } else if (this.nextWorkProbeTick <= 0L) {
+                this.nextWorkProbeTick = tick;
+            }
         } else {
             this.goneProbes = 0;
             this.probeInterval = UNLOADED_INTERVAL;
+            this.workState = WorkState.UNKNOWN;
+            this.workObservedAtTick = -1L;
+            this.nextWorkProbeTick = 0L;
         }
 
         if (before != result.health() || identityChanged) {

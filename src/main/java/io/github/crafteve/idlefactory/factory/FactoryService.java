@@ -160,7 +160,8 @@ public final class FactoryService {
 
         ObservationService observations = observations();
         List<FactorySnapshotBuilder.MachineView> machines =
-                FactorySnapshotBuilder.machines(factory, observations);
+                FactorySnapshotBuilder.machines(factory, observations,
+                        player.serverLevel().getGameTime());
         if (machines.isEmpty()) {
             info(player, "机器库为空：准星对准机器执行 /idf factory connect");
             return 1;

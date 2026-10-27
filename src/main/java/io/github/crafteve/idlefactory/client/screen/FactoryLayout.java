@@ -78,23 +78,19 @@ public final class FactoryLayout {
     public static final int COL_INPUT = 2;
     /** 列下标：输出。 */
     public static final int COL_OUTPUT = 3;
-    /** 列下标：速率。 */
-    public static final int COL_RATE = 4;
 
-    /** 五列全要时的最小宽度（顺序同上）。 */
-    private static final int[] MIN_ALL = { 80, 88, 76, 76, 64 };
-    /** 五列全要时的理想宽度。 */
-    private static final int[] PREF_ALL = { 263, 104, 112, 112, 93 };
-    /** 去掉速率后的最小宽度。 */
-    private static final int[] MIN_NO_RATE = { 80, 88, 76, 76 };
-    /** 只剩下 ICON 侧时的最小宽度。 */
-    private static final int[] MIN_NO_IO = { 80, 88, 64 };
+    /** 四列全要时的最小宽度（顺序同上）。 */
+    private static final int[] MIN_ALL = { 72, 64, 72, 72 };
+    /** 四列全要时的理想宽度。 */
+    private static final int[] PREF_ALL = { 150, 88, 130, 130 };
+    /** 四列全要时的最大宽度；超出部分按优先级分配。 */
+    private static final int[] MAX_ALL = { 160, 100, 225, 225 };
     /** 只剩机器+状态时的最小宽度。 */
-    private static final int[] MIN_BASIC = { 80, 88 };
-    /** 三列模式的理想宽度。 */
-    private static final int[] PREF_NO_IO = { 200, 104, 93 };
-    /** 两列模式的理想宽度。 */
-    private static final int[] PREF_BASIC = { 300, 120 };
+    private static final int[] MIN_BASIC = { 72, 64 };
+    /** 只剩机器+状态时的理想宽度。 */
+    private static final int[] PREF_BASIC = { 160, 100 };
+    /** 只剩机器+状态时的最大宽度。 */
+    private static final int[] MAX_BASIC = { 160, 100 };
 
     /** 面板左上角 x。 */
     public final int panelX;
@@ -168,10 +164,10 @@ public final class FactoryLayout {
     /** 快捷栏上边。 */
     public final int hotbarY;
 
-    /** 五列的 x 坐标（按列下标，不看可见性）。 */
-    private final int[] columnX = new int[5];
-    /** 五列的宽度；{@code 0} 表示这一列被丢掉了。 */
-    private final int[] columnW = new int[5];
+    /** 四列的 x 坐标（按列下标，不看可见性）。 */
+    private final int[] columnX = new int[4];
+    /** 四列的宽度；{@code 0} 表示这一列被丢掉了。 */
+    private final int[] columnW = new int[4];
     /** 当前显示的列，按显示顺序排列，元素是逻辑列下标。构造期由 {@link #layoutColumns} 填入。 */
     private int[] columnIds = new int[0];
     /** 当前显示几列。 */
@@ -302,35 +298,30 @@ public final class FactoryLayout {
     /**
      * 按优先级挑一组能放下的列，并把宽度按比例分配。
      *
-     * <p>丢列的顺序是固定的：先丢速率，再丢输入/输出这一对（它们只有一边没意义），
-     * 最后退化成「机器 + 状态」。这样任何宽度下都不会有列被画到右区上面。</p>
-     *
-     * <p>注意三列模式是「机器 / 状态 / 速率」——所以必须显式记下列的下标，
-     * 不能让绘制方按「前 N 个表头」去猜，否则表头会写成「机器/状态/输入」而内容是速率。</p>
+     * <p>四列放不下时退化成「机器 + 状态」，IO 走 tooltip。这样任何宽度下都不会有列
+     * 被画到右区上面。</p>
      */
     private void layoutColumns(int tableWidth) {
         int[] ids;
         int[] min;
         int[] pref;
+        int[] max;
+        int[] priority;
         if (tableWidth >= sum(MIN_ALL)) {
-            ids = new int[] { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT, COL_RATE };
+            ids = new int[] { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT };
             min = MIN_ALL;
             pref = PREF_ALL;
-        } else if (tableWidth >= sum(MIN_NO_RATE)) {
-            ids = new int[] { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT };
-            min = MIN_NO_RATE;
-            pref = new int[] { PREF_ALL[0], PREF_ALL[1], PREF_ALL[2], PREF_ALL[3] };
-        } else if (tableWidth >= sum(MIN_NO_IO)) {
-            ids = new int[] { COL_NAME, COL_STATE, COL_RATE };
-            min = MIN_NO_IO;
-            pref = PREF_NO_IO;
+            max = MAX_ALL;
+            priority = new int[] { 2, 3, 0, 1 };
         } else {
             ids = new int[] { COL_NAME, COL_STATE };
             min = MIN_BASIC;
             pref = PREF_BASIC;
+            max = MAX_BASIC;
+            priority = new int[] { 0, 1 };
         }
 
-        int[] widths = distribute(tableWidth, min, pref);
+        int[] widths = distribute(tableWidth, min, pref, max, priority);
         Arrays.fill(this.columnW, 0);
         int cursor = this.tableX;
         for (int i = 0; i < ids.length; i++) {
@@ -340,6 +331,67 @@ public final class FactoryLayout {
         }
         this.columnIds = ids;
         this.columnCount = ids.length;
+    }
+
+    /**
+     * 按当前内容重新分配列宽：内容窄就窄，内容宽才宽。
+     *
+     * @param desired 机器/状态/输入/输出的期望宽度
+     */
+    public void relayoutColumns(int[] desired) {
+        if (desired == null || desired.length < 4) {
+            return;
+        }
+        if (this.tableW < sum(MIN_ALL)) {
+            layoutColumns(this.tableW);
+            return;
+        }
+        int[] widths = new int[4];
+        for (int i = 0; i < 4; i++) {
+            widths[i] = clamp(desired[i], MIN_ALL[i], MAX_ALL[i]);
+        }
+        int total = sum(widths);
+        if (total > this.tableW) {
+            int excess = total - this.tableW;
+            excess = shrink(widths, 0, excess, MIN_ALL[0]);
+            excess = shrink(widths, 2, excess, MIN_ALL[2]);
+            excess = shrink(widths, 3, excess, MIN_ALL[3]);
+            excess = shrink(widths, 1, excess, MIN_ALL[1]);
+            if (excess > 0) {
+                layoutColumns(this.tableW);
+                return;
+            }
+        } else {
+            int extra = this.tableW - total;
+            // 内容宽度只给少量余量，避免机器名又长回去
+            extra = grow(widths, 2, extra, MAX_ALL[2]);
+            extra = grow(widths, 3, extra, MAX_ALL[3]);
+            extra = grow(widths, 0, extra, Math.min(MAX_ALL[0], widths[0] + 20));
+            extra = grow(widths, 1, extra, Math.min(MAX_ALL[1], widths[1] + 16));
+        }
+
+        Arrays.fill(this.columnW, 0);
+        int cursor = this.tableX;
+        int[] ids = { COL_NAME, COL_STATE, COL_INPUT, COL_OUTPUT };
+        for (int i = 0; i < ids.length; i++) {
+            this.columnX[ids[i]] = cursor;
+            this.columnW[ids[i]] = widths[i];
+            cursor += widths[i];
+        }
+        this.columnIds = ids;
+        this.columnCount = ids.length;
+    }
+
+    private static int shrink(int[] widths, int index, int excess, int min) {
+        int remove = Math.min(excess, Math.max(0, widths[index] - min));
+        widths[index] -= remove;
+        return excess - remove;
+    }
+
+    private static int grow(int[] widths, int index, int extra, int limit) {
+        int add = Math.min(extra, Math.max(0, limit - widths[index]));
+        widths[index] += add;
+        return extra - add;
     }
 
     /**
@@ -355,7 +407,8 @@ public final class FactoryLayout {
     /**
      * 按「最小 + 剩余按理想比例分配」算一组整数宽度，总和严格等于 {@code total}。
      */
-    private static int[] distribute(int total, int[] min, int[] pref) {
+    private static int[] distribute(int total, int[] min, int[] pref, int[] max,
+            int[] priority) {
         int n = min.length;
         int[] result = new int[n];
         int minSum = sum(min);
@@ -370,7 +423,25 @@ public final class FactoryLayout {
             for (int i = 0; i < n; i++) {
                 result[i] = Math.max(pref[i], min[i]);
             }
-            result[0] += total - prefSum;
+            int remaining = total - prefSum;
+            // 超出理想宽度后，优先把空间给速率/IO，而不是让机器名无限变宽
+            for (int column : priority) {
+                if (remaining <= 0) {
+                    break;
+                }
+                if (column < 0 || column >= n) {
+                    continue;
+                }
+                int add = Math.min(remaining, max[column] - result[column]);
+                if (add > 0) {
+                    result[column] += add;
+                    remaining -= add;
+                }
+            }
+            // 所有列都到 max 后仍有残余（屏幕极宽），补给第一列
+            if (remaining > 0) {
+                result[0] += remaining;
+            }
             return result;
         }
 
@@ -386,6 +457,8 @@ public final class FactoryLayout {
         result[0] += total - used;
         return result;
     }
+
+    // priority 里存的是显示列下标（width 数组下标），不是逻辑列 id。
 
     private static int sum(int[] values) {
         int total = 0;

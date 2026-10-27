@@ -77,6 +77,39 @@ public final class FactoryRefs {
     }
 
     /**
+     * 找一台机器所属的产线（一台机器最多属于一条产线）。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return 产线；没编线时为空
+     */
+    public static Optional<PassiveLine> lineOf(Factory factory, UUID machineId) {
+        for (PassiveLine line : factory.lines().all()) {
+            if (line.groupByMachine(machineId).isPresent()) {
+                return Optional.of(line);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 找一台机器对应的 IO 组（一台机器最多属于一条产线）。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return IO 组；没编线时为空
+     */
+    public static Optional<IoGroup> groupOf(Factory factory, UUID machineId) {
+        for (PassiveLine line : factory.lines().all()) {
+            Optional<IoGroup> group = line.groupByMachine(machineId);
+            if (group.isPresent()) {
+                return group;
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * 名字是不是保留字。
      *
      * @param name 产线名

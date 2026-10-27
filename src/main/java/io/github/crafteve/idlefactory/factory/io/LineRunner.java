@@ -103,11 +103,13 @@ public final class LineRunner {
                     groupState.routes, generation);
             DiagStats.LineStats stats = factory.stats().line(line.id());
             if (result.movedAnything()) {
-                stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(), now);
+                stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(),
+                        result.fedByRule(), result.pulledByRule(), now);
                 groupState.idleSince = -1L;
                 groupState.sleeping = false;
             } else {
-                stats.markBlocked(target.id(), result.lastReason(), now);
+                stats.markBlocked(target.id(), result.inputReason(), result.outputReason(),
+                        result.inputFull(), now);
                 sleepIfIdle(groupState, now);
             }
         }

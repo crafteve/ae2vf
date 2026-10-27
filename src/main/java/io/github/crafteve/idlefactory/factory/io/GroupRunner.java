@@ -56,11 +56,18 @@ public final class GroupRunner {
      * @param pulled      从机器抽出的总数
      * @param fedByKey    按资源拆分的补料量
      * @param pulledByKey 按资源拆分的抽取量
+     * @param fedByRule   按规则拆分的补料量
+     * @param pulledByRule 按规则拆分的抽取量
      * @param lastReason  没搬动时的最后一个原因
+     * @param inputFull   所有输入规则都无法接收
+     * @param inputReason 输入侧原因
+     * @param outputReason 输出侧原因
      */
     public record GroupRun(long fed, long pulled,
             Map<ResourceKey, Long> fedByKey, Map<ResourceKey, Long> pulledByKey,
-            IoResult.Reason lastReason) {
+            Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
+            IoResult.Reason lastReason, boolean inputFull,
+            IoResult.Reason inputReason, IoResult.Reason outputReason) {
         /** 一共搬了多少。 */
         public long moved() {
             return this.fed + this.pulled;
@@ -74,6 +81,35 @@ public final class GroupRunner {
 
     /** 解析出来的搬运通道：适配器 + 实际用的面（{@code null} = 无向）。 */
     private record Resolved(ResourceAdapter adapter, @Nullable Direction face) {
+    }
+
+    private static IoResult.Reason worse(@Nullable IoResult.Reason current,
+            IoResult.Reason next) {
+        if (current == null) {
+            return next;
+        }
+        return severity(next) > severity(current) ? next : current;
+    }
+
+    private static int severity(IoResult.Reason reason) {
+        return switch (reason) {
+            case REJECTED -> 4;
+            case NO_HANDLER -> 3;
+            case NO_SPACE -> 2;
+            case NO_ITEM -> 1;
+            case OK -> 0;
+        };
+    }
+
+    private static IoResult.Reason combine(@Nullable IoResult.Reason input,
+            @Nullable IoResult.Reason output) {
+        if (output != null && output != IoResult.Reason.OK) {
+            return output;
+        }
+        if (input != null && input != IoResult.Reason.OK) {
+            return input;
+        }
+        return IoResult.Reason.OK;
     }
 
     private GroupRunner() {
@@ -98,26 +134,39 @@ public final class GroupRunner {
         long pulled = 0L;
         Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
         Map<ResourceKey, Long> pulledByKey = new LinkedHashMap<>();
-        IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
+        Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
+        Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
+        IoResult.Reason inputReason = null;
+        IoResult.Reason outputReason = null;
+        boolean anyInputAccepted = false;
+        boolean anyInputRule = false;
 
         for (ResourceSpec spec : group.inputs()) {
+            anyInputRule = true;
             Resolved resolved = resolve(level, pos, spec, true, caps, routes, generation);
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
+                inputReason = worse(inputReason, IoResult.Reason.NO_HANDLER);
                 continue;
             }
             IoResult result = IoTransfer.feed(storage, resolved.adapter());
             fed += result.moved();
             if (result.moved() > 0L) {
                 fedByKey.merge(spec.key(), result.moved(), Long::sum);
+                fedByRule.merge(new RuleKey(true, spec.key(), spec.face()),
+                        result.moved(), Long::sum);
                 remember(routes, spec, true, resolved, generation);
             } else if (result.reason() == IoResult.Reason.REJECTED) {
                 // 有容量却不收：这个面不对，下次重扫
                 clear(routes, spec, true);
             }
-            if (result.reason() != IoResult.Reason.OK) {
-                lastReason = result.reason();
+            if (result.reason() == IoResult.Reason.OK
+                    || result.reason() == IoResult.Reason.NO_ITEM) {
+                // NO_ITEM 只表示仓库没料，机器侧已经点头接收
+                anyInputAccepted = true;
+            } else {
+                inputReason = worse(inputReason, result.reason());
             }
             if (!result.movedAnything()) {
                 IdleFactory.LOGGER.debug("IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
@@ -131,18 +180,21 @@ public final class GroupRunner {
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
+                outputReason = worse(outputReason, IoResult.Reason.NO_HANDLER);
                 continue;
             }
             IoResult result = IoTransfer.pull(storage, resolved.adapter());
             pulled += result.moved();
             if (result.moved() > 0L) {
                 pulledByKey.merge(spec.key(), result.moved(), Long::sum);
+                pulledByRule.merge(new RuleKey(false, spec.key(), spec.face()),
+                        result.moved(), Long::sum);
                 remember(routes, spec, false, resolved, generation);
             } else if (result.reason() == IoResult.Reason.REJECTED) {
                 clear(routes, spec, false);
             }
             if (result.reason() != IoResult.Reason.OK) {
-                lastReason = result.reason();
+                outputReason = worse(outputReason, result.reason());
             }
             if (!result.movedAnything()) {
                 IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
@@ -150,7 +202,12 @@ public final class GroupRunner {
             }
         }
 
-        return new GroupRun(fed, pulled, fedByKey, pulledByKey, lastReason);
+        boolean inputFull = anyInputRule && !anyInputAccepted;
+        IoResult.Reason lastReason = combine(inputReason, outputReason);
+        return new GroupRun(fed, pulled, fedByKey, pulledByKey,
+                fedByRule, pulledByRule, lastReason, inputFull,
+                inputReason == null ? IoResult.Reason.OK : inputReason,
+                outputReason == null ? IoResult.Reason.OK : outputReason);
     }
 
     /**
