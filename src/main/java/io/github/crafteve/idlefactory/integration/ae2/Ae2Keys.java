@@ -10,9 +10,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -36,10 +33,8 @@ public final class Ae2Keys {
     @Nullable
     public static AEKey toAe(ResourceKey key) {
         return switch (key.kind()) {
-            case ITEM -> {
-                Item item = BuiltInRegistries.ITEM.get(key.id());
-                yield item == Items.AIR ? null : AEItemKey.of(new ItemStack(item));
-            }
+            // 整栈往返：组件是 AEItemKey 身份的一部分，不能只传注册名。
+            case ITEM -> AEItemKey.of(key.toStack());
             case FLUID -> {
                 Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
                 yield fluid == Fluids.EMPTY ? null : AEFluidKey.of(new FluidStack(fluid, 1));
@@ -58,7 +53,7 @@ public final class Ae2Keys {
     @Nullable
     public static ResourceKey toResource(AEKey key) {
         if (key instanceof AEItemKey itemKey) {
-            return ResourceKey.item(BuiltInRegistries.ITEM.getKey(itemKey.getItem()));
+            return ResourceKey.item(itemKey.getReadOnlyStack());
         }
         if (key instanceof AEFluidKey fluidKey) {
             return ResourceKey.fluid(BuiltInRegistries.FLUID.getKey(fluidKey.getFluid()));

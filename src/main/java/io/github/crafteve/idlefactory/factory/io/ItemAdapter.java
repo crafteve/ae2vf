@@ -1,24 +1,39 @@
 package io.github.crafteve.idlefactory.factory.io;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
 /**
  * 机器的物品接口。
+ *
+ * <p>一个实例只认一个精确变体（{@code sample} 的组件也参与比较）。模糊规则由
+ * {@link GroupRunner} 展开成多个实例，每个变体走一遍同样的事务逻辑。</p>
  */
 public final class ItemAdapter implements ResourceAdapter {
+    /** 扫机器槽位时的上限，避免超大库存一次遍历几千格。 */
+    public static final int MAX_SCAN_SLOTS = 256;
+
     private final IItemHandler handler;
     private final ItemStack sample;
 
     /**
      * @param handler 物品处理器
-     * @param sample  物品样本（数量忽略）
+     * @param sample  物品样本（数量忽略，组件参与匹配）
      */
     public ItemAdapter(IItemHandler handler, ItemStack sample) {
         this.handler = handler;
         this.sample = sample;
+    }
+
+    /** 底层处理器，给模糊规则按变体重建适配器用。 */
+    public IItemHandler handler() {
+        return this.handler;
     }
 
     @Override
@@ -31,7 +46,7 @@ public final class ItemAdapter implements ResourceAdapter {
         long total = 0L;
         for (int slot = 0; slot < this.handler.getSlots(); slot++) {
             ItemStack inSlot = this.handler.getStackInSlot(slot);
-            if (!inSlot.isEmpty() && !ItemStack.isSameItem(inSlot, this.sample)) {
+            if (!inSlot.isEmpty() && !ItemStack.isSameItemSameComponents(inSlot, this.sample)) {
                 continue;
             }
             int limit = Math.min(this.handler.getSlotLimit(slot), this.sample.getMaxStackSize());
@@ -45,7 +60,7 @@ public final class ItemAdapter implements ResourceAdapter {
         long remaining = amount;
         for (int slot = 0; slot < this.handler.getSlots() && remaining > 0L; slot++) {
             ItemStack inSlot = this.handler.getStackInSlot(slot);
-            if (!inSlot.isEmpty() && !ItemStack.isSameItem(inSlot, this.sample)) {
+            if (!inSlot.isEmpty() && !ItemStack.isSameItemSameComponents(inSlot, this.sample)) {
                 continue;
             }
             int limit = Math.min(this.handler.getSlotLimit(slot), this.sample.getMaxStackSize());
@@ -66,7 +81,7 @@ public final class ItemAdapter implements ResourceAdapter {
         long taken = 0L;
         for (int slot = 0; slot < this.handler.getSlots() && remaining > 0L; slot++) {
             ItemStack inSlot = this.handler.getStackInSlot(slot);
-            if (inSlot.isEmpty() || !ItemStack.isSameItem(inSlot, this.sample)) {
+            if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, this.sample)) {
                 continue;
             }
             int want = (int) Math.min(remaining, inSlot.getCount());
@@ -75,5 +90,41 @@ public final class ItemAdapter implements ResourceAdapter {
             remaining -= got.getCount();
         }
         return taken;
+    }
+
+    /**
+     * 列出机器里与给定物品同注册名的不同变体。
+     *
+     * <p>按槽位顺序取，去重，最多 {@code limit} 个；样本数量统一成 1，组件原样保留。
+     * 这是模糊输出规则的候选来源。</p>
+     *
+     * @param handler 物品处理器
+     * @param item    物品
+     * @param limit   最多返回几个变体
+     * @return 变体样本列表
+     */
+    public static List<ItemStack> samples(IItemHandler handler, Item item, int limit) {
+        List<ItemStack> result = new ArrayList<>();
+        if (limit <= 0) {
+            return result;
+        }
+        int slots = Math.min(handler.getSlots(), MAX_SCAN_SLOTS);
+        for (int slot = 0; slot < slots && result.size() < limit; slot++) {
+            ItemStack inSlot = handler.getStackInSlot(slot);
+            if (inSlot.isEmpty() || inSlot.getItem() != item) {
+                continue;
+            }
+            boolean duplicated = false;
+            for (ItemStack seen : result) {
+                if (ItemStack.isSameItemSameComponents(seen, inSlot)) {
+                    duplicated = true;
+                    break;
+                }
+            }
+            if (!duplicated) {
+                result.add(inSlot.copyWithCount(1));
+            }
+        }
+        return result;
     }
 }

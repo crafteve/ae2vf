@@ -6,11 +6,11 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
 
 /**
  * 面路由表：记住「这条规则上次从哪个面搬通了」。
@@ -18,8 +18,8 @@ import net.minecraft.resources.ResourceLocation;
  * <p>这是<b>派生事实</b>，不是配置：程序自己建、自己失效，玩家不配置它。规则本身写的面
  * （{@link ResourceSpec#face()}）才是配置，优先级更高——配了面就永远用那个面，不查路由表。</p>
  *
- * <p>键是 {@code (种类, 输入/输出, 资源注册名)}。带资源注册名是因为同一台机器可能对不同物品
- * 有不同的槽位过滤（一个面收铁锭、另一个面收煤），只按键种类记会把它们混在一起。</p>
+ * <p>键是 {@code (输入/输出, 资源 key, 匹配模式)}。资源 key 带组件，模糊与精确也分开记，
+ * 免得同名不同变体共用一条路由。</p>
  *
  * <h2>失效</h2>
  * <ul>
@@ -41,7 +41,7 @@ public final class RouteTable {
     public record Route(@Nullable Direction face) {
     }
 
-    private record Key(ResourceKind kind, boolean input, ResourceLocation resourceId) {
+    private record Key(boolean input, ResourceKey key, MatchMode mode) {
     }
 
     private record Entry(Route route, long generation) {
@@ -103,6 +103,6 @@ public final class RouteTable {
     }
 
     private static Key key(ResourceSpec spec, boolean input) {
-        return new Key(spec.key().kind(), input, spec.key().id());
+        return new Key(input, spec.key(), spec.mode());
     }
 }

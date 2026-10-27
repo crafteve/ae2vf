@@ -276,22 +276,22 @@ public final class FactorySnapshotBuilder {
             List<Long> inputRates = new ArrayList<>(inputs.size());
             for (ResourceSpec spec : inputs) {
                 inputRates.add(stats == null ? 0L
-                        : stats.rateIn(new RuleKey(true, spec.key(), spec.face())));
+                        : stats.rateIn(new RuleKey(true, spec.key(), spec.face(), spec.mode())));
             }
             List<Long> outputRates = new ArrayList<>(outputs.size());
             for (ResourceSpec spec : outputs) {
                 outputRates.add(stats == null ? 0L
-                        : stats.rateOut(new RuleKey(false, spec.key(), spec.face())));
+                        : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
             }
             List<IoResult.Reason> inputReasons = new ArrayList<>(inputs.size());
             for (ResourceSpec spec : inputs) {
                 inputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
-                        : stats.ruleReason(true, new RuleKey(true, spec.key(), spec.face())));
+                        : stats.ruleReason(true, new RuleKey(true, spec.key(), spec.face(), spec.mode())));
             }
             List<IoResult.Reason> outputReasons = new ArrayList<>(outputs.size());
             for (ResourceSpec spec : outputs) {
                 outputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
-                        : stats.ruleReason(false, new RuleKey(false, spec.key(), spec.face())));
+                        : stats.ruleReason(false, new RuleKey(false, spec.key(), spec.face(), spec.mode())));
             }
 
             long sinceMove = stats != null && stats.lastMoveTick() > 0L

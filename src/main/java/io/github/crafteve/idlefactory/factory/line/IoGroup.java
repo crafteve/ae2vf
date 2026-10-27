@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -120,45 +121,48 @@ public final class IoGroup {
     /**
      * 序列化成 NBT。
      *
+     * @param registries 注册表访问，物品组件编码需要
      * @return 新标签
      */
-    public CompoundTag save() {
+    public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putUUID(TAG_ID, this.id);
         tag.putUUID(TAG_MACHINE, this.machineId);
-        tag.put(TAG_INPUTS, saveSpecs(this.inputs));
-        tag.put(TAG_OUTPUTS, saveSpecs(this.outputs));
+        tag.put(TAG_INPUTS, saveSpecs(registries, this.inputs));
+        tag.put(TAG_OUTPUTS, saveSpecs(registries, this.outputs));
         return tag;
     }
 
     /**
      * 从 NBT 读回来。
      *
-     * @param tag 存档标签
+     * @param tag        存档标签
+     * @param registries 注册表访问，物品组件解码需要
      * @return IO 组；字段缺失时返回 {@code null}
      */
     @Nullable
-    public static IoGroup load(CompoundTag tag) {
+    public static IoGroup load(CompoundTag tag, HolderLookup.Provider registries) {
         if (!tag.hasUUID(TAG_ID) || !tag.hasUUID(TAG_MACHINE)) {
             return null;
         }
         IoGroup group = new IoGroup(tag.getUUID(TAG_ID), tag.getUUID(TAG_MACHINE));
-        readSpecs(tag.getList(TAG_INPUTS, Tag.TAG_COMPOUND), group.inputs);
-        readSpecs(tag.getList(TAG_OUTPUTS, Tag.TAG_COMPOUND), group.outputs);
+        readSpecs(tag.getList(TAG_INPUTS, Tag.TAG_COMPOUND), registries, group.inputs);
+        readSpecs(tag.getList(TAG_OUTPUTS, Tag.TAG_COMPOUND), registries, group.outputs);
         return group;
     }
 
-    private static ListTag saveSpecs(List<ResourceSpec> specs) {
+    private static ListTag saveSpecs(HolderLookup.Provider registries, List<ResourceSpec> specs) {
         ListTag list = new ListTag();
         for (ResourceSpec spec : specs) {
-            list.add(spec.save());
+            list.add(spec.save(registries));
         }
         return list;
     }
 
-    private static void readSpecs(ListTag list, List<ResourceSpec> target) {
+    private static void readSpecs(ListTag list, HolderLookup.Provider registries,
+            List<ResourceSpec> target) {
         for (int i = 0; i < list.size(); i++) {
-            ResourceSpec spec = ResourceSpec.load(list.getCompound(i));
+            ResourceSpec spec = ResourceSpec.load(list.getCompound(i), registries);
             if (spec != null) {
                 target.add(spec);
             }

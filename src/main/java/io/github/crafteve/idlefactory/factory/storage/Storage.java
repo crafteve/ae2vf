@@ -12,6 +12,9 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
  * 这个资源你能收多少、能给我多少、你支不支持这类资源。</p>
  *
  * <p>所有实现都必须是<b>事务安全</b>的：{@code simulate} 为 {@code true} 时不得产生任何副作用。</p>
+ *
+ * <p>物品的 {@link ResourceKey} 带完整数据组件，数量按精确变体计：同名不同组件的物品是两条
+ * 独立记录，不会在快照里合并。</p>
  */
 public interface Storage {
     /**

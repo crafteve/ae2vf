@@ -6,7 +6,7 @@ import java.util.List;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -19,16 +19,21 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 服务端 → 客户端的仓库摘要。
  *
- * <p>只带资源 key 与数量；名字、图标由客户端注册表解析。取放动作走
- * {@link FactoryStorageActionC2S}，本包仍是完整的服务端快照。</p>
+ * <p>只带资源 key 与数量；名字、图标由客户端解析。物品 key 自带完整组件，因此同名的不同
+ * 变体在界面上是各自独立的格子。</p>
+ *
+ * <p>组件可能很大，服务端会按字节预算把一份快照拆成多个包：{@code part} 从 0 开始，
+ * {@code last} 标记最后一段；客户端按顺序拼完才替换仓库视图。</p>
  *
  * @param containerId 菜单容器 id
  * @param online      仓库是否在线
  * @param truncated   是否因为 1024 条上限被截断
+ * @param part        分片序号，从 0 开始
+ * @param last        是否最后一个分片
  * @param entries     资源条目，按数量降序
  */
 public record FactoryStorageS2C(int containerId, boolean online, boolean truncated,
-        List<Entry> entries) implements CustomPacketPayload {
+        int part, boolean last, List<Entry> entries) implements CustomPacketPayload {
 
     private static final int MAX_ENTRIES = 1024;
 
@@ -47,7 +52,7 @@ public record FactoryStorageS2C(int containerId, boolean online, boolean truncat
 
     /** 没有工厂或仓库离线时的空表。 */
     public static FactoryStorageS2C empty(int containerId) {
-        return new FactoryStorageS2C(containerId, false, false, List.of());
+        return new FactoryStorageS2C(containerId, false, false, 0, true, List.of());
     }
 
     @Override
@@ -69,10 +74,11 @@ public record FactoryStorageS2C(int containerId, boolean online, boolean truncat
         buf.writeVarInt(payload.containerId());
         buf.writeBoolean(payload.online());
         buf.writeBoolean(payload.truncated());
+        buf.writeVarInt(payload.part());
+        buf.writeBoolean(payload.last());
         buf.writeVarInt(payload.entries().size());
         for (Entry entry : payload.entries()) {
-            buf.writeByte(entry.key().kind().ordinal());
-            ResourceLocation.STREAM_CODEC.encode(buf, entry.key().id());
+            ResourceKeyCodec.write(buf, entry.key());
             buf.writeLong(entry.count());
         }
     }
@@ -81,25 +87,25 @@ public record FactoryStorageS2C(int containerId, boolean online, boolean truncat
         int containerId = buf.readVarInt();
         boolean online = buf.readBoolean();
         boolean truncated = buf.readBoolean();
+        int part = buf.readVarInt();
+        if (part < 0) {
+            throw new DecoderException("invalid storage part: " + part);
+        }
+        boolean last = buf.readBoolean();
         int count = buf.readVarInt();
         if (count < 0 || count > MAX_ENTRIES) {
             throw new DecoderException("invalid storage entry count: " + count);
         }
         List<Entry> entries = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            int kindOrdinal = buf.readUnsignedByte();
-            if (kindOrdinal >= ResourceKind.values().length) {
-                throw new DecoderException("invalid resource kind: " + kindOrdinal);
-            }
-            ResourceKind kind = ResourceKind.values()[kindOrdinal];
-            ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
+            ResourceKey key = ResourceKeyCodec.read(buf);
             long amount = buf.readLong();
             if (amount < 0L) {
                 throw new DecoderException("negative storage count: " + amount);
             }
-            entries.add(new Entry(new ResourceKey(kind, id), amount));
+            entries.add(new Entry(key, amount));
         }
-        return new FactoryStorageS2C(containerId, online, truncated, entries);
+        return new FactoryStorageS2C(containerId, online, truncated, part, last, entries);
     }
 
     /**

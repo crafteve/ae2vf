@@ -12,13 +12,10 @@ import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryStorageSnapshots;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;
 
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 
 /**
  * 服务端仓库动作。
@@ -257,8 +254,7 @@ public final class FactoryStorageActions {
         if (key.kind() != ResourceKind.ITEM) {
             return ItemStack.EMPTY;
         }
-        Item item = BuiltInRegistries.ITEM.get(key.id());
-        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+        return key.toStack();
     }
 
     private static void message(ServerPlayer player, String text) {

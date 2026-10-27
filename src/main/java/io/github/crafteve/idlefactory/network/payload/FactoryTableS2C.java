@@ -16,9 +16,11 @@ import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.Health;
 import io.github.crafteve.idlefactory.factory.observation.WorkState;
+import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -227,8 +229,8 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             ResourceSpec rule = rules.get(i);
-            buf.writeByte(rule.key().kind().ordinal());
-            ResourceLocation.STREAM_CODEC.encode(buf, rule.key().id());
+            ResourceKeyCodec.write(buf, rule.key());
+            buf.writeByte(rule.mode().ordinal());
             buf.writeBoolean(rule.face() != null);
             if (rule.face() != null) {
                 buf.writeByte(rule.face().ordinal());
@@ -241,14 +243,14 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         int count = readCount(buf, MAX_RULES_PER_SIDE, "rules");
         List<ResourceSpec> rules = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            ResourceKind kind = readEnum(buf, ResourceKind.values(), "resource kind");
-            ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
+            ResourceKey key = ResourceKeyCodec.read(buf);
+            MatchMode mode = readEnum(buf, MatchMode.values(), "match mode");
             Direction face = null;
             if (buf.readBoolean()) {
                 face = readEnum(buf, Direction.values(), "direction");
             }
             long amount = buf.readLong();
-            rules.add(new ResourceSpec(new ResourceKey(kind, id), face, amount));
+            rules.add(new ResourceSpec(key, face, amount, mode));
         }
         return rules;
     }

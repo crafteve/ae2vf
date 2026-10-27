@@ -37,10 +37,7 @@ final class FactoryLabels {
      */
     static ItemStack icon(ResourceKey key) {
         return switch (key.kind()) {
-            case ITEM -> {
-                Item item = BuiltInRegistries.ITEM.get(key.id());
-                yield item == Items.AIR ? new ItemStack(Items.BARRIER) : new ItemStack(item);
-            }
+            case ITEM -> key.toStack().isEmpty() ? new ItemStack(Items.BARRIER) : key.toStack();
             case FLUID -> {
                 var fluid = BuiltInRegistries.FLUID.get(key.id());
                 Item bucket = fluid.getBucket();
@@ -68,11 +65,21 @@ final class FactoryLabels {
                     : new ItemStack(bucket).getHoverName().getString();
         }
         if (key.kind() == ResourceKind.ITEM) {
-            Item item = BuiltInRegistries.ITEM.get(key.id());
-            return item == Items.AIR ? key.id().toString()
-                    : new ItemStack(item).getHoverName().getString();
+            ItemStack stack = key.toStack();
+            return stack.isEmpty() ? key.id().toString() : stack.getHoverName().getString();
         }
         return key.id().toString();
+    }
+
+    /**
+     * 规则显示名：模糊规则在资源名后加一个 {@code ~}，和 describe() 的记号一致。
+     *
+     * @param spec 规则
+     * @return 显示名
+     */
+    static String name(ResourceSpec spec) {
+        String name = name(spec.key());
+        return spec.fuzzy() ? name + " ~" : name;
     }
 
     /**

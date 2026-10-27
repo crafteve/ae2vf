@@ -1,8 +1,9 @@
 package io.github.crafteve.idlefactory.factory.io;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,40 +16,23 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.energy.IEnergyStorage;
-import net.neoforged.neoforge.fluids.FluidStack;
-import net.neoforged.neoforge.fluids.capability.IFluidHandler;
-import net.neoforged.neoforge.items.IItemHandler;
 
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
  *
- * <p>三层取面策略，从便宜到贵：</p>
- * <ol>
- *   <li><b>玩家配了面</b>：直接用，不查路由、不扫面（配置优先）；</li>
- *   <li><b>路由表里有记录</b>：直接按上次搬通的面取 handler，一次查表；</li>
- *   <li><b>都没有</b>：扫面。流体/能量逐面「模拟搬一点」，物品按无向语义（见下）。</li>
- * </ol>
+ * <p>面与 handler 的解析在 {@link RuleResolver}；物品变体的展开在 {@link ItemCandidates}。
+ * 本类只负责按规则跑事务、汇总本轮结果与逐规则原因。</p>
  *
  * <p>搬成功就记住这个面；{@link IoResult.Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
  * 玩家改规则、方块被换、能力失效都会让路由整体作废（观测层的面表代数 +1）。</p>
  *
- * <p><b>物品保持无向语义</b>：{@code getCapability(..., null)} 才是「整个库存」，符合仓库对容器的
- * 直觉；改成按面会悄悄改变既有玩法。流体和能量才需要尊重机器的面配置。</p>
+ * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.resource.MatchMode#IGNORE_COMPONENTS}
+ * 会把一条规则展开成多个「一个变体一个适配器」，每个变体走一遍 {@link IoTransfer} 的事务逻辑；
+ * 候选变体来自 {@link ItemVariantIndex}（输入）或机器库存（输出）。每 tick 有单规则与单组的
+ * 变体预算，防止变体爆炸时一次打满；规则处理顺序按 tick 轮转，避免后面的规则被饿死。</p>
  */
 public final class GroupRunner {
-    /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
-    private static final int ENERGY_PROBE = 1000;
-
     /**
      * 一次组级搬运的结果。
      *
@@ -88,10 +72,6 @@ public final class GroupRunner {
         public boolean movedAnything() {
             return this.fed + this.pulled > 0L;
         }
-    }
-
-    /** 解析出来的搬运通道：适配器 + 实际用的面（{@code null} = 无向）。 */
-    private record Resolved(ResourceAdapter adapter, @Nullable Direction face) {
     }
 
     private static IoResult.Reason worse(@Nullable IoResult.Reason current,
@@ -137,10 +117,13 @@ public final class GroupRunner {
      * @param caps       能力句柄缓存；{@code null} 时直接查世界
      * @param routes     面路由表；{@code null} 时每次扫面
      * @param generation 观测层的面表代数
+     * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
+     * @param now        当前服务端 tick，给变体索引算 TTL 与规则轮转
      * @return 本轮结果
      */
     public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, IoGroup group,
-            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation) {
+            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation,
+            @Nullable ItemVariantIndex variants, long now) {
         long fed = 0L;
         long pulled = 0L;
         Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
@@ -153,11 +136,18 @@ public final class GroupRunner {
         IoResult.Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
+        // 输入/输出共享的变体预算：模糊规则多时也不会一轮扫几十个变体。
+        int[] variantBudget = {ItemCandidates.MAX_VARIANTS_PER_GROUP_TICK};
 
-        for (ResourceSpec spec : group.inputs()) {
+        // 规则按 tick 轮转起点：模糊规则共享预算时，后面的规则不会被前面的永久挤掉。
+        List<ResourceSpec> inputs = group.inputs();
+        int inputStart = inputs.isEmpty() ? 0 : (int) Math.floorMod(now, (long) inputs.size());
+        for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
+            ResourceSpec spec = inputs.get((inputStart + ruleIndex) % inputs.size());
             anyInputRule = true;
-            RuleKey ruleKey = new RuleKey(true, spec.key(), spec.face());
-            Resolved resolved = resolve(level, pos, spec, true, caps, routes, generation);
+            RuleKey ruleKey = new RuleKey(true, spec.key(), spec.face(), spec.mode());
+            RuleResolver.Resolved resolved = RuleResolver.resolve(level, pos, spec, true, caps, routes,
+                    generation);
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
@@ -165,35 +155,56 @@ public final class GroupRunner {
                 inputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
-            IoResult result = IoTransfer.feed(storage, resolved.adapter());
-            inputReasons.put(ruleKey, result.reason());
-            fed += result.moved();
-            if (result.moved() > 0L) {
-                fedByKey.merge(spec.key(), result.moved(), Long::sum);
-                fedByRule.merge(new RuleKey(true, spec.key(), spec.face()),
-                        result.moved(), Long::sum);
-                remember(routes, spec, true, resolved, generation);
-            } else if (result.reason() == IoResult.Reason.REJECTED) {
-                // 有容量却不收：这个面不对，下次重扫
-                clear(routes, spec, true);
+            List<ResourceAdapter> adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
+                    variantBudget);
+            if (adapters.isEmpty()) {
+                inputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
+                inputReason = worse(inputReason, IoResult.Reason.NO_ITEM);
+                continue;
             }
-            if (result.reason() == IoResult.Reason.OK
-                    || result.reason() == IoResult.Reason.NO_ITEM) {
-                // NO_ITEM 只表示仓库没料，机器侧已经点头接收
-                anyInputAccepted = true;
+            long moved = 0L;
+            IoResult.Reason reason = null;
+            boolean accepted = false;
+            for (ResourceAdapter adapter : adapters) {
+                IoResult result = IoTransfer.feed(storage, adapter);
+                moved += result.moved();
+                reason = worse(reason, result.reason());
+                if (result.reason() == IoResult.Reason.OK || result.reason() == IoResult.Reason.NO_ITEM) {
+                    // NO_ITEM 只表示仓库没料，机器侧已经点头接收
+                    accepted = true;
+                }
+                if (result.moved() > 0L) {
+                    remember(routes, spec, true, resolved, generation);
+                } else if (result.reason() == IoResult.Reason.REJECTED) {
+                    // 有容量却不收：这个面不对，下次重扫
+                    clear(routes, spec, true);
+                } else {
+                    IdleFactory.LOGGER.debug(
+                            "IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
+                            pos.toShortString(), spec.describe(), result.reason(),
+                            adapter.capacity());
+                }
+            }
+            anyInputAccepted |= accepted;
+            IoResult.Reason combined = moved > 0L
+                    ? IoResult.Reason.OK : (reason == null ? IoResult.Reason.NO_ITEM : reason);
+            inputReasons.put(ruleKey, combined);
+            fed += moved;
+            if (moved > 0L) {
+                fedByKey.merge(spec.key(), moved, Long::sum);
+                fedByRule.merge(ruleKey, moved, Long::sum);
             } else {
-                inputReason = worse(inputReason, result.reason());
-            }
-            if (!result.movedAnything()) {
-                IdleFactory.LOGGER.debug("IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
-                        pos.toShortString(), spec.describe(), result.reason(),
-                        resolved.adapter().capacity());
+                inputReason = worse(inputReason, combined);
             }
         }
 
-        for (ResourceSpec spec : group.outputs()) {
-            RuleKey ruleKey = new RuleKey(false, spec.key(), spec.face());
-            Resolved resolved = resolve(level, pos, spec, false, caps, routes, generation);
+        List<ResourceSpec> outputs = group.outputs();
+        int outputStart = outputs.isEmpty() ? 0 : (int) Math.floorMod(now + 1L, (long) outputs.size());
+        for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
+            ResourceSpec spec = outputs.get((outputStart + ruleIndex) % outputs.size());
+            RuleKey ruleKey = new RuleKey(false, spec.key(), spec.face(), spec.mode());
+            RuleResolver.Resolved resolved = RuleResolver.resolve(level, pos, spec, false, caps, routes,
+                    generation);
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
@@ -201,23 +212,37 @@ public final class GroupRunner {
                 outputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
-            IoResult result = IoTransfer.pull(storage, resolved.adapter());
-            outputReasons.put(ruleKey, result.reason());
-            pulled += result.moved();
-            if (result.moved() > 0L) {
-                pulledByKey.merge(spec.key(), result.moved(), Long::sum);
-                pulledByRule.merge(new RuleKey(false, spec.key(), spec.face()),
-                        result.moved(), Long::sum);
-                remember(routes, spec, false, resolved, generation);
-            } else if (result.reason() == IoResult.Reason.REJECTED) {
-                clear(routes, spec, false);
+            List<ResourceAdapter> adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
+                    variantBudget);
+            if (adapters.isEmpty()) {
+                outputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
+                outputReason = worse(outputReason, IoResult.Reason.NO_ITEM);
+                continue;
             }
-            if (result.reason() != IoResult.Reason.OK) {
-                outputReason = worse(outputReason, result.reason());
+            long moved = 0L;
+            IoResult.Reason reason = null;
+            for (ResourceAdapter adapter : adapters) {
+                IoResult result = IoTransfer.pull(storage, adapter);
+                moved += result.moved();
+                reason = worse(reason, result.reason());
+                if (result.moved() > 0L) {
+                    remember(routes, spec, false, resolved, generation);
+                } else if (result.reason() == IoResult.Reason.REJECTED) {
+                    clear(routes, spec, false);
+                } else {
+                    IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
+                            pos.toShortString(), spec.describe(), result.reason());
+                }
             }
-            if (!result.movedAnything()) {
-                IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
-                        pos.toShortString(), spec.describe(), result.reason());
+            IoResult.Reason combined = moved > 0L
+                    ? IoResult.Reason.OK : (reason == null ? IoResult.Reason.NO_ITEM : reason);
+            outputReasons.put(ruleKey, combined);
+            pulled += moved;
+            if (moved > 0L) {
+                pulledByKey.merge(spec.key(), moved, Long::sum);
+                pulledByRule.merge(ruleKey, moved, Long::sum);
+            } else {
+                outputReason = worse(outputReason, combined);
             }
         }
 
@@ -231,122 +256,25 @@ public final class GroupRunner {
     }
 
     /**
-     * 解析一条规则该用哪个面、哪个 handler。
+     * 按规则展开出一条或多条搬运通道。
      *
-     * <p>配置的面优先（不查路由）；其次查路由；最后扫面。</p>
+     * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
+     * 取仓库变体索引、输出侧扫机器库存。</p>
      */
-    @Nullable
-    private static Resolved resolve(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
-            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation) {
-        if (spec.face() == null && routes != null) {
-            Optional<RouteTable.Route> route = routes.route(spec, input, generation);
-            if (route.isPresent()) {
-                Resolved direct = build(level, pos, spec, caps, route.get().face());
-                if (direct != null) {
-                    return direct;
-                }
-                // 记录的面已经没有 handler（能力没了 / 方块换了）：踢掉重扫
-                routes.clear(spec, input);
-            }
+    private static List<ResourceAdapter> ruleAdapters(Storage storage, RuleResolver.Resolved resolved,
+            ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
+            int[] budget) {
+        if (!(resolved.adapter() instanceof ItemAdapter base)) {
+            // 流体/能量没有变体概念，只有一条通道。
+            return List.of(resolved.adapter());
         }
-        return sweep(level, pos, spec, input, caps);
-    }
-
-    /**
-     * 按指定面构建适配器（不扫面、不模拟）。
-     *
-     * @param face 面；{@code null} 表示无向
-     */
-    @Nullable
-    private static Resolved build(ServerLevel level, BlockPos pos, ResourceSpec spec,
-            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
-        return switch (spec.key().kind()) {
-            case ITEM -> {
-                ItemStack sample = itemSample(spec.key());
-                IItemHandler handler = item(level, pos, caps, face);
-                yield handler == null || sample.isEmpty()
-                        ? null
-                        : new Resolved(new ItemAdapter(handler, sample), face);
-            }
-            case FLUID -> {
-                Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
-                IFluidHandler handler = fluid(level, pos, caps, face);
-                yield handler == null || fluid == Fluids.EMPTY
-                        ? null
-                        : new Resolved(new FluidAdapter(handler, fluid), face);
-            }
-            case ENERGY -> {
-                IEnergyStorage handler = energy(level, pos, caps, face);
-                yield handler == null ? null : new Resolved(new EnergyAdapter(handler), face);
-            }
-            case CHEMICAL -> null;
-        };
-    }
-
-    /**
-     * 扫面：配置优先，其次逐面模拟，最后无向兜底。
-     */
-    @Nullable
-    private static Resolved sweep(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
-            @Nullable LevelCapabilityCache caps) {
-        Direction configured = spec.face();
-        if (configured != null) {
-            return build(level, pos, spec, caps, configured);
-        }
-        return switch (spec.key().kind()) {
-            case ITEM -> build(level, pos, spec, caps, null);
-            case FLUID -> sweepFluid(level, pos, spec, input, caps);
-            case ENERGY -> sweepEnergy(level, pos, spec, input, caps);
-            case CHEMICAL -> null;
-        };
-    }
-
-    @Nullable
-    private static Resolved sweepFluid(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
-            @Nullable LevelCapabilityCache caps) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
-        if (fluid == Fluids.EMPTY) {
-            return null;
-        }
-        FluidStack probe = new FluidStack(fluid, 1);
-        for (Direction side : Direction.values()) {
-            IFluidHandler handler = fluid(level, pos, caps, side);
-            if (handler == null) {
-                continue;
-            }
-            int amount = input
-                    ? handler.fill(probe, IFluidHandler.FluidAction.SIMULATE)
-                    : handler.drain(probe, IFluidHandler.FluidAction.SIMULATE).getAmount();
-            if (amount > 0) {
-                return new Resolved(new FluidAdapter(handler, fluid), side);
-            }
-        }
-        IFluidHandler fallback = fluid(level, pos, caps, null);
-        return fallback == null ? null : new Resolved(new FluidAdapter(fallback, fluid), null);
-    }
-
-    @Nullable
-    private static Resolved sweepEnergy(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
-            @Nullable LevelCapabilityCache caps) {
-        for (Direction side : Direction.values()) {
-            IEnergyStorage handler = energy(level, pos, caps, side);
-            if (handler == null) {
-                continue;
-            }
-            // 输入看能不能收，输出看能不能抽——旧代码两边都用 receiveEnergy，是错的
-            int probe = input
-                    ? handler.receiveEnergy(ENERGY_PROBE, true)
-                    : handler.extractEnergy(ENERGY_PROBE, true);
-            if (probe > 0) {
-                return new Resolved(new EnergyAdapter(handler), side);
-            }
-        }
-        IEnergyStorage fallback = energy(level, pos, caps, null);
-        return fallback == null ? null : new Resolved(new EnergyAdapter(fallback), null);
+        List<ResourceAdapter> result = new ArrayList<>();
+        result.addAll(ItemCandidates.of(storage, base, spec, input, variants, now, budget));
+        return result;
     }
 
     private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,
-            Resolved resolved, long generation) {
+            RuleResolver.Resolved resolved, long generation) {
         if (routes == null || spec.face() != null || spec.key().kind() == ResourceKind.ITEM) {
             return;
         }
@@ -357,37 +285,5 @@ public final class GroupRunner {
         if (routes != null && spec.face() == null) {
             routes.clear(spec, input);
         }
-    }
-
-    @Nullable
-    private static IItemHandler item(ServerLevel level, BlockPos pos,
-            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
-        return caps == null
-                ? level.getCapability(Capabilities.ItemHandler.BLOCK, pos, face)
-                : caps.item(pos, face);
-    }
-
-    @Nullable
-    private static IFluidHandler fluid(ServerLevel level, BlockPos pos,
-            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
-        return caps == null
-                ? level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face)
-                : caps.fluid(pos, face);
-    }
-
-    @Nullable
-    private static IEnergyStorage energy(ServerLevel level, BlockPos pos,
-            @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
-        return caps == null
-                ? level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face)
-                : caps.energy(pos, face);
-    }
-
-    private static ItemStack itemSample(ResourceKey key) {
-        Item item = BuiltInRegistries.ITEM.get(key.id());
-        if (item == Items.AIR) {
-            return ItemStack.EMPTY;
-        }
-        return new ItemStack(item);
     }
 }

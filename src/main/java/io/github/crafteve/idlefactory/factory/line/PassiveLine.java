@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -114,16 +115,17 @@ public final class PassiveLine {
     /**
      * 序列化成 NBT。
      *
+     * @param registries 注册表访问，物品组件编码需要
      * @return 新标签
      */
-    public CompoundTag save() {
+    public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putUUID(TAG_ID, this.id);
         tag.putString(TAG_NAME, this.name);
         tag.putBoolean(TAG_RUNNING, this.running);
         ListTag groupList = new ListTag();
         for (IoGroup group : this.groups) {
-            groupList.add(group.save());
+            groupList.add(group.save(registries));
         }
         tag.put(TAG_GROUPS, groupList);
         return tag;
@@ -132,11 +134,12 @@ public final class PassiveLine {
     /**
      * 从 NBT 读回来。
      *
-     * @param tag 存档标签
+     * @param tag        存档标签
+     * @param registries 注册表访问，物品组件解码需要
      * @return 产线；字段缺失时返回 {@code null}
      */
     @Nullable
-    public static PassiveLine load(CompoundTag tag) {
+    public static PassiveLine load(CompoundTag tag, HolderLookup.Provider registries) {
         if (!tag.hasUUID(TAG_ID)) {
             return null;
         }
@@ -144,7 +147,7 @@ public final class PassiveLine {
         line.running = tag.getBoolean(TAG_RUNNING);
         ListTag groupList = tag.getList(TAG_GROUPS, Tag.TAG_COMPOUND);
         for (int i = 0; i < groupList.size(); i++) {
-            IoGroup group = IoGroup.load(groupList.getCompound(i));
+            IoGroup group = IoGroup.load(groupList.getCompound(i), registries);
             if (group != null) {
                 line.groups.add(group);
             }

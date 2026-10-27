@@ -200,7 +200,7 @@ public final class ContainerStorage implements Storage {
         for (IItemHandler handler : handlers) {
             for (int slot = 0; slot < handler.getSlots() && remaining > 0L; slot++) {
                 ItemStack inSlot = handler.getStackInSlot(slot);
-                if (inSlot.isEmpty() || !ItemStack.isSameItem(inSlot, stack)) {
+                if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, stack)) {
                     continue;
                 }
                 int limit = Math.min(handler.getSlotLimit(slot), inSlot.getMaxStackSize());
@@ -221,7 +221,7 @@ public final class ContainerStorage implements Storage {
         for (IItemHandler handler : handlers) {
             for (int slot = 0; slot < handler.getSlots() && remaining > 0L; slot++) {
                 ItemStack inSlot = handler.getStackInSlot(slot);
-                if (!inSlot.isEmpty() && ItemStack.isSameItem(inSlot, stack)) {
+                if (!inSlot.isEmpty() && ItemStack.isSameItemSameComponents(inSlot, stack)) {
                     continue;
                 }
                 int limit = Math.min(handler.getSlotLimit(slot), stack.getMaxStackSize());
@@ -268,7 +268,7 @@ public final class ContainerStorage implements Storage {
             }
             for (int slot = 0; slot < handler.getSlots(); slot++) {
                 ItemStack inSlot = handler.getStackInSlot(slot);
-                if (inSlot.isEmpty() || !ItemStack.isSameItem(inSlot, stack)) {
+                if (inSlot.isEmpty() || !ItemStack.isSameItemSameComponents(inSlot, stack)) {
                     continue;
                 }
                 int limit = Math.min(handler.getSlotLimit(slot), inSlot.getMaxStackSize());
@@ -700,11 +700,7 @@ public final class ContainerStorage implements Storage {
     }
 
     private static ItemStack itemSample(ResourceKey key) {
-        var item = BuiltInRegistries.ITEM.get(key.id());
-        if (item == net.minecraft.world.item.Items.AIR) {
-            return ItemStack.EMPTY;
-        }
-        return new ItemStack(item);
+        return key.toStack();
     }
 
     private static IFluidHandler.FluidAction action(boolean simulate) {

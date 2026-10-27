@@ -4,9 +4,9 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.storage.FactoryStorageActions;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
+import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -68,8 +68,7 @@ public record FactoryStorageActionC2S(int containerId, @Nullable ResourceKey key
         buf.writeVarInt(payload.containerId());
         buf.writeBoolean(payload.key() != null);
         if (payload.key() != null) {
-            buf.writeByte(payload.key().kind().ordinal());
-            ResourceLocation.STREAM_CODEC.encode(buf, payload.key().id());
+            ResourceKeyCodec.write(buf, payload.key());
         }
         buf.writeByte(payload.gesture().ordinal());
     }
@@ -78,12 +77,7 @@ public record FactoryStorageActionC2S(int containerId, @Nullable ResourceKey key
         int containerId = buf.readVarInt();
         ResourceKey key = null;
         if (buf.readBoolean()) {
-            int kindOrdinal = buf.readUnsignedByte();
-            if (kindOrdinal >= ResourceKind.values().length) {
-                throw new DecoderException("invalid storage action kind: " + kindOrdinal);
-            }
-            ResourceLocation id = ResourceLocation.STREAM_CODEC.decode(buf);
-            key = new ResourceKey(ResourceKind.values()[kindOrdinal], id);
+            key = ResourceKeyCodec.read(buf);
         }
         int gestureOrdinal = buf.readUnsignedByte();
         if (gestureOrdinal >= Gesture.values().length) {

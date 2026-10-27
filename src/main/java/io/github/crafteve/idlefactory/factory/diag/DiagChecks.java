@@ -23,12 +23,9 @@ import io.github.crafteve.idlefactory.factory.storage.Storage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -192,10 +189,11 @@ public final class DiagChecks {
             problems.add("仓库不支持物品");
             return DiagEvent.Level.WARN;
         }
-        if (online && storage.extract(spec.key(), 1L, true) <= 0L) {
+        if (online && !hasItem(storage, spec)) {
             problems.add("仓库没有 " + shortName(spec.key()));
             return DiagEvent.Level.WARN;
         }
+        // 模糊规则的容量按「无组件样本」估算：多数机器的槽位过滤与组件无关，够用且不扫全仓。
         if (itemCapacity(handler, preview) <= 0) {
             problems.add(itemContains(handler, preview)
                     ? "输入槽已满，收不下 " + shortName(spec.key())
@@ -217,7 +215,7 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有物品能力");
             return new CheckResult(DiagEvent.Level.ERROR, false);
         }
-        if (!itemContains(handler, preview)) {
+        if (!containsItem(handler, spec)) {
             return new CheckResult(DiagEvent.Level.OK, true);
         }
         if (online && storage.insert(spec.key(), 1L, true) <= 0L) {
@@ -375,19 +373,50 @@ public final class DiagChecks {
     }
 
     private static ItemStack itemSample(ResourceKey key) {
-        ResourceLocation id = key.id();
-        Item item = BuiltInRegistries.ITEM.get(id);
-        if (item == Items.AIR) {
-            return ItemStack.EMPTY;
+        return key.toStack();
+    }
+
+    /**
+     * 仓库里是否有这条规则能匹配的东西。
+     *
+     * <p>精确规则直接模拟抽 1 个；模糊规则要扫快照看同 id 的任意变体，避免把「只有带组件
+     * 变体」误报成缺料。</p>
+     */
+    private static boolean hasItem(Storage storage, ResourceSpec spec) {
+        if (!spec.fuzzy()) {
+            return storage.extract(spec.key(), 1L, true) > 0L;
         }
-        return new ItemStack(item);
+        for (ResourceKey key : storage.snapshot().keySet()) {
+            if (key.kind() == ResourceKind.ITEM && key.id().equals(spec.key().id())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 机器里是否有这条规则能匹配的东西。
+     *
+     * <p>模糊规则按注册名比较；精确规则比较完整组件。</p>
+     */
+    private static boolean containsItem(IItemHandler handler, ResourceSpec spec) {
+        if (!spec.fuzzy()) {
+            return itemContains(handler, itemSample(spec.key()));
+        }
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            ItemStack inSlot = handler.getStackInSlot(slot);
+            if (!inSlot.isEmpty() && ResourceKey.item(inSlot).id().equals(spec.key().id())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int itemCapacity(IItemHandler handler, ItemStack preview) {
         int total = 0;
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack inSlot = handler.getStackInSlot(slot);
-            if (!inSlot.isEmpty() && !ItemStack.isSameItem(inSlot, preview)) {
+            if (!inSlot.isEmpty() && !ItemStack.isSameItemSameComponents(inSlot, preview)) {
                 continue;
             }
             int limit = Math.min(handler.getSlotLimit(slot), preview.getMaxStackSize());
@@ -399,7 +428,7 @@ public final class DiagChecks {
     private static boolean itemContains(IItemHandler handler, ItemStack preview) {
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack inSlot = handler.getStackInSlot(slot);
-            if (!inSlot.isEmpty() && ItemStack.isSameItem(inSlot, preview)) {
+            if (!inSlot.isEmpty() && ItemStack.isSameItemSameComponents(inSlot, preview)) {
                 return true;
             }
         }

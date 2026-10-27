@@ -278,7 +278,7 @@ final class IoDetailRender {
         int nameWidth = rateX - textX - 4;
         if (nameWidth > 0) {
             graphics.drawString(font,
-                    font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
+                    font.plainSubstrByWidth(FactoryLabels.name(spec), nameWidth),
                     textX, cell.y() + 4, theme.textPrimary(), false);
         }
         graphics.drawString(font, rateValue, rateX, cell.y() + 4, rateColor, false);

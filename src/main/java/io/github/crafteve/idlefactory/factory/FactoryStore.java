@@ -108,7 +108,7 @@ public final class FactoryStore extends SavedData {
             if (!record.lines().isEmpty()) {
                 ListTag lines = new ListTag();
                 for (PassiveLine line : record.lines()) {
-                    lines.add(line.save());
+                    lines.add(line.save(registries));
                 }
                 entry.put(TAG_LINES, lines);
             }
@@ -146,7 +146,7 @@ public final class FactoryStore extends SavedData {
             List<PassiveLine> lines = new ArrayList<>();
             ListTag lineList = entry.getList(TAG_LINES, Tag.TAG_COMPOUND);
             for (int j = 0; j < lineList.size(); j++) {
-                PassiveLine line = PassiveLine.load(lineList.getCompound(j));
+                PassiveLine line = PassiveLine.load(lineList.getCompound(j), registries);
                 if (line != null) {
                     lines.add(line);
                 }

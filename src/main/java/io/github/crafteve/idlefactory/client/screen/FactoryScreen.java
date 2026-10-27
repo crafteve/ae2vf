@@ -112,6 +112,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private boolean lineMenuOpen;
     /** 客户端仓库视图；全量快照在这里做稳定排序和过滤。 */
     private final FactoryStorageRepo storageRepo = new FactoryStorageRepo();
+    /** 正在拼装的分片快照；last 到齐后才替换 {@link #storageRepo}。 */
+    private final List<FactoryStorageS2C.Entry> pendingStorageEntries = new ArrayList<>();
+    /** 下一个期望的分片序号，用来丢掉重复/错序的包。 */
+    private int pendingStoragePart;
     /** 是否已经收到过一次仓库快照。 */
     private boolean storageReceived;
     /** 服务端仓库快照是否因上限被截断。 */
@@ -246,14 +250,28 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /**
      * 收到服务端仓库快照。
      *
-     * <p>快照是完整的资源列表；{@link FactoryStorageRepo} 会保持已有条目的相对顺序，
-     * 只追加新条目，避免 Shift 连续取物时格子因为数量降序重排而跳动。搜索过滤在这里
-     * 重新套用，滚动位置只做边界夹紧。</p>
+     * <p>快照可能分多个包到达：{@code part == 0} 表示重新开始，{@code last} 到齐才整体替换
+     * {@link #storageRepo}，避免界面闪到半份数据。替换后仍保持已有条目的相对顺序，只追加新条目，
+     * 防止 Shift 连续取物时格子因数量降序重排而跳动。</p>
      *
-     * @param payload 仓库快照
+     * @param payload 仓库快照分片
      */
     public void acceptStorage(FactoryStorageS2C payload) {
-        this.storageRepo.replace(payload.entries());
+        if (payload.part() == 0) {
+            this.pendingStorageEntries.clear();
+            this.pendingStoragePart = 0;
+            this.storageReceived = false;
+        } else if (payload.part() != this.pendingStoragePart) {
+            // 错序或重复的分片直接丢弃，等下一份完整快照。
+            return;
+        }
+        this.pendingStorageEntries.addAll(payload.entries());
+        this.pendingStoragePart = payload.part() + 1;
+        if (!payload.last()) {
+            return;
+        }
+        this.storageRepo.replace(this.pendingStorageEntries);
+        this.pendingStorageEntries.clear();
         this.storageOnline = payload.online();
         this.storageTruncated = payload.truncated();
         this.storageReceived = true;
@@ -444,11 +462,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         List<String> tags = new ArrayList<>();
         switch (key.kind()) {
             case ITEM -> {
-                Item item = BuiltInRegistries.ITEM.get(key.id());
-                if (item != Items.AIR) {
-                    new ItemStack(item).getTags()
-                            .forEach(tag -> tags.add(tag.location().toString()));
-                }
+                resourceStack(key).getTags()
+                        .forEach(tag -> tags.add(tag.location().toString()));
             }
             case FLUID -> {
                 var fluid = BuiltInRegistries.FLUID.get(key.id());
@@ -464,10 +479,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     private static ItemStack resourceStack(ResourceKey key) {
         return switch (key.kind()) {
-            case ITEM -> {
-                Item item = BuiltInRegistries.ITEM.get(key.id());
-                yield item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
-            }
+            case ITEM -> key.toStack();
             case FLUID -> {
                 var fluid = BuiltInRegistries.FLUID.get(key.id());
                 Item bucket = fluid.getBucket();
@@ -1599,10 +1611,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1),
                         tt.index()))
                 .append(FactoryLabels.colored(" · ", tt.label()))
-                .append(FactoryLabels.colored(resourceName(spec.key()), tt.title())));
+                .append(FactoryLabels.colored(FactoryLabels.name(spec), tt.title())));
         lines.add(FactoryLabels.faceLine(
                 cell.input() ? "输入面：" : "输出面：",
                 faceName(spec), FactoryLabels.faceEn(spec), this.theme));
+        if (spec.fuzzy()) {
+            lines.add(FactoryLabels.colored("匹配：忽略组件（按物品 id）", tt.label()));
+        }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), reason, this.theme)));
@@ -1638,7 +1653,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             IoResult.Reason reason = i < reasons.size()
                     ? reasons.get(i) : IoResult.Reason.NO_ITEM;
             lines.add(Component.empty()
-                    .append(FactoryLabels.colored(resourceName(spec.key()), tt.title()))
+                    .append(FactoryLabels.colored(FactoryLabels.name(spec), tt.title()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.coloredBold(faceName(spec), tt.face()))
                     .append(FactoryLabels.colored(" · ", tt.label()))

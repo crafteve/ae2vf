@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.factory.io;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -29,6 +31,8 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class LineRunner {
     private final RunnerState state = new RunnerState();
+    /** 模糊物品规则的变体索引；按工厂隔离，TTL 到期重建。 */
+    private final Map<UUID, ItemVariantIndex> variants = new HashMap<>();
 
     /**
      * 跑一轮所有运行中的产线。
@@ -99,8 +103,10 @@ public final class LineRunner {
 
             LevelCapabilityCache caps = observations == null ? null : observations.capabilities(level);
             long generation = observations == null ? 0L : observations.facesGeneration(target);
+            ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
+                    id -> new ItemVariantIndex());
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
-                    groupState.routes, generation);
+                    groupState.routes, generation, factoryVariants, now);
             DiagStats.LineStats stats = factory.stats().line(line.id());
             // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
             stats.group(target.id()).setRuleReasons(result.inputReasons(), result.outputReasons());
@@ -243,5 +249,6 @@ public final class LineRunner {
     /** 清空全部状态（服务器停止时）。 */
     public void clear() {
         this.state.clear();
+        this.variants.clear();
     }
 }
