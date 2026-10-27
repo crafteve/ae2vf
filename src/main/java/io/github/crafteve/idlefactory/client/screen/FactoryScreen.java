@@ -1500,14 +1500,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             int index = (this.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
             if (index >= 0 && index < this.filteredStorageEntries.size()) {
                 FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
+                GuiTheme.Tooltip tt = this.theme.tooltip();
                 graphics.renderComponentTooltip(this.font, List.of(
-                        FactoryLabels.colored(resourceName(entry.key()), this.theme.textPrimary()),
-                        FactoryLabels.colored(entry.key().id().toString(), this.theme.textDim()),
+                        FactoryLabels.colored(resourceName(entry.key()), tt.title()),
+                        FactoryLabels.colored(entry.key().id().toString(), tt.label()),
                         Component.empty()
                                 .append(FactoryLabels.colored(
-                                        Long.toString(entry.count()), this.theme.textValue()))
+                                        Long.toString(entry.count()), tt.value()))
                                 .append(FactoryLabels.colored(" "
-                                        + unit(entry.key().kind()), this.theme.textDim()))),
+                                        + unit(entry.key().kind()), tt.label()))),
                         mouseX, mouseY);
                 return;
             }
@@ -1563,9 +1564,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     /** 搜索语法提示：符号强调色，说明暗色。 */
     private Component searchHint(String key, String description) {
+        GuiTheme.Tooltip tt = this.theme.tooltip();
         return Component.empty()
-                .append(FactoryLabels.colored(key, this.theme.textValue()))
-                .append(FactoryLabels.colored(" " + description, this.theme.textDim()));
+                .append(FactoryLabels.colored(key, tt.value()))
+                .append(FactoryLabels.colored(" " + description, tt.label()));
     }
 
     /** 鼠标是否落在某行的展开按钮上。 */
@@ -1593,16 +1595,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawExpandTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
+        GuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(FactoryLabels.colored(
-                isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情", this.theme.textPrimary()));
+                isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情", tt.title()));
         lines.add(Component.empty()
-                .append(FactoryLabels.colored("输入 ", this.theme.textDim()))
+                .append(FactoryLabels.colored("输入 ", tt.label()))
                 .append(FactoryLabels.colored(
-                        Integer.toString(machine.inputs().size()), this.theme.textValue()))
-                .append(FactoryLabels.colored(" · 输出 ", this.theme.textDim()))
+                        Integer.toString(machine.inputs().size()), tt.value()))
+                .append(FactoryLabels.colored(" · 输出 ", tt.label()))
                 .append(FactoryLabels.colored(
-                        Integer.toString(machine.outputs().size()), this.theme.textValue()))
-                .append(FactoryLabels.colored(" 条", this.theme.textDim())));
+                        Integer.toString(machine.outputs().size()), tt.value()))
+                .append(FactoryLabels.colored(" 条", tt.label())));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
@@ -1622,18 +1625,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 ? reasons.get(cell.ruleIndex()) : IoResult.Reason.NO_ITEM;
 
         List<Component> lines = new ArrayList<>();
+        GuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(Component.empty()
-                .append(FactoryLabels.colored(cell.input() ? "输入" : "输出",
-                        this.theme.textPrimary()))
-                .append(FactoryLabels.colored(" #" + (cell.ruleIndex() + 1) + " · ",
-                        this.theme.textDim()))
-                .append(FactoryLabels.colored(resourceName(spec.key()),
-                        this.theme.textPrimary())));
-        lines.add(FactoryLabels.labelValue(
+                .append(FactoryLabels.colored(cell.input() ? "输入" : "输出", tt.title()))
+                .append(FactoryLabels.colored(" #", tt.label()))
+                .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1), tt.value()))
+                .append(FactoryLabels.colored(" · ", tt.label()))
+                .append(FactoryLabels.colored(resourceName(spec.key()), tt.title())));
+        lines.add(FactoryLabels.faceLine(
                 cell.input() ? "输入面：" : "输出面：",
-                faceName(spec) + "（" + FactoryLabels.faceEn(spec) + "）", this.theme));
+                faceName(spec), FactoryLabels.faceEn(spec), this.theme));
         lines.add(Component.empty()
-                .append(FactoryLabels.colored("速率：", this.theme.textDim()))
+                .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), this.theme)));
         lines.add(FactoryLabels.state(reason, cell.input(), this.theme));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
@@ -1657,25 +1660,25 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return;
         }
         List<Component> lines = new java.util.ArrayList<>();
-        lines.add(FactoryLabels.colored(title, this.theme.textPrimary()));
+        GuiTheme.Tooltip tt = this.theme.tooltip();
+        lines.add(FactoryLabels.colored(title, tt.title()));
         int shown = Math.min(rules.size(), 10);
         for (int i = 0; i < shown; i++) {
             ResourceSpec spec = rules.get(i);
             long rate = i < rates.size() ? rates.get(i) : 0L;
             lines.add(Component.empty()
-                    .append(FactoryLabels.colored(resourceName(spec.key()),
-                            this.theme.textPrimary()))
-                    .append(FactoryLabels.colored(" · ", this.theme.textDim()))
-                    .append(FactoryLabels.colored(faceName(spec), this.theme.textValue()))
-                    .append(FactoryLabels.colored(" · ", this.theme.textDim()))
+                    .append(FactoryLabels.colored(resourceName(spec.key()), tt.title()))
+                    .append(FactoryLabels.colored(" · ", tt.label()))
+                    .append(FactoryLabels.colored(faceName(spec), tt.face()))
+                    .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.rate(rate, spec.key().kind(), this.theme)));
         }
         if (rules.size() > shown) {
             lines.add(Component.empty()
-                    .append(FactoryLabels.colored("还有 ", this.theme.textDim()))
+                    .append(FactoryLabels.colored("还有 ", tt.label()))
                     .append(FactoryLabels.colored(
-                            Integer.toString(rules.size() - shown), this.theme.textValue()))
-                    .append(FactoryLabels.colored(" 条", this.theme.textDim())));
+                            Integer.toString(rules.size() - shown), tt.value()))
+                    .append(FactoryLabels.colored(" 条", tt.label())));
         }
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
@@ -1684,19 +1687,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawMachineTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new java.util.ArrayList<>();
-        lines.add(FactoryLabels.colored(blockName(machine.blockId()), this.theme.textPrimary()));
+        GuiTheme.Tooltip tt = this.theme.tooltip();
+        lines.add(FactoryLabels.colored(blockName(machine.blockId()), tt.title()));
         lines.add(FactoryLabels.colored(statusText(machine), statusColor(machine)));
         lines.add(FactoryLabels.colored(machine.ref().dimension().location()
-                + " " + machine.ref().pos().toShortString(), this.theme.textDim()));
+                + " " + machine.ref().pos().toShortString(), tt.label()));
         lines.add(machine.lineNames().isEmpty()
-                ? FactoryLabels.colored("未编线", this.theme.textDim())
+                ? FactoryLabels.colored("未编线", tt.idle())
                 : FactoryLabels.labelValue("产线 ",
                         String.join("/", machine.lineNames()), this.theme));
         lines.add(Component.empty()
-                .append(FactoryLabels.colored("规则 ", this.theme.textDim()))
+                .append(FactoryLabels.colored("规则 ", tt.label()))
                 .append(FactoryLabels.colored(
-                        Integer.toString(machine.ruleCount()), this.theme.textValue()))
-                .append(FactoryLabels.colored(" 条", this.theme.textDim())));
+                        Integer.toString(machine.ruleCount()), tt.value()))
+                .append(FactoryLabels.colored(" 条", tt.label())));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 

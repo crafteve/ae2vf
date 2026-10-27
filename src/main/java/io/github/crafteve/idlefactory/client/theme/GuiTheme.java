@@ -8,8 +8,8 @@ package io.github.crafteve.idlefactory.client.theme;
  * <p><b>静态外观已经搬到贴图里</b>（{@code tools/gui/gen_textures.py} 生成，色值和这里一一对应）。
  * 这里留下的是**文字色与状态色**——它们要随主题变、又不能进贴图，所以留在代码里。</p>
  *
- * <p>{@code textValue} 是纯文字色（数字、速率、面），没有对应贴图，不需要改生成脚本；
- * 其余色值仍然保持「Java 常量 ↔ 生成脚本调色板」两边一致。</p>
+ * <p>{@code textValue} 与 {@code Tooltip} 是纯文字色（数字、速率、面、深色 tooltip），
+ * 没有对应贴图，不需要改生成脚本；其余色值仍然保持「Java 常量 ↔ 生成脚本调色板」两边一致。</p>
  *
  * <p>改色必须两边一起改：这里的常量 + 生成脚本里的调色板。否则贴图和文字会脱节，而且这种脱节
  * 在截图里看不出来。</p>
@@ -39,6 +39,8 @@ public record GuiTheme(
         int textDim,
         /** 数值/速率/数量/面等需要强调的值；只用于文字，没有对应贴图。 */
         int textValue,
+        /** 深色 tooltip 的霓虹配色。 */
+        Tooltip tooltip,
         /** 悬停底色。 */
         int hoverBg,
         /** 错误。 */
@@ -49,6 +51,25 @@ public record GuiTheme(
         int statusWarn,
         /** 状态：空闲 / 未加载 / 未配置。 */
         int statusIdle) {
+
+    /**
+     * 深色 tooltip 的霓虹配色。
+     *
+     * <p>原版 tooltip 背景是深紫色，浅色面板的 {@code textPrimary} 放进去几乎看不见，
+     * 所以单独给一套高对比色。只用于 tooltip 文字，没有贴图对应。</p>
+     *
+     * @param title 标题
+     * @param label 标签/单位
+     * @param value 数值/速率
+     * @param face  面
+     * @param ok    正常
+     * @param warn  警告
+     * @param error 错误
+     * @param idle  空闲
+     */
+    public record Tooltip(int title, int label, int value, int face,
+            int ok, int warn, int error, int idle) {
+    }
 
     /**
      * AE2 浅色（默认）。
@@ -66,10 +87,12 @@ public record GuiTheme(
             0xFFADB0C4, // slotBg
             0xFF878FA5, // slotBorderDark
             0xFFF2F2F2, // slotBorderLight
-            0xFF413F54, // accent
-            0xFF413F54, // textPrimary
-            0xFF878FA5, // textDim
-            0xFF2F6F86, // textValue（青蓝色，专门区分数字与面）
+            0xFF33445C, // accent
+            0xFF33445C, // textPrimary
+            0xFF7C8BA3, // textDim
+            0xFF0E8FA8, // textValue（亮青，浅色面板上更像科技终端）
+            new Tooltip(0xFFFFFFFF, 0xFFA9B8CC, 0xFF4DE3FF, 0xFFFF6BD6,
+                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF93A5BC),
             0xFFDEDFE3, // hoverBg
             0xFFCE2401, // error
             0xFF3F7F8C, // statusRun
@@ -91,6 +114,8 @@ public record GuiTheme(
             0xFFE6E6E6,
             0xFF6B6B72,
             0xFF4DD0E1,
+            new Tooltip(0xFFFFFFFF, 0xFFA9B8CC, 0xFF4DE3FF, 0xFFFF6BD6,
+                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF93A5BC),
             0xFF2A2A30,
             0xFFE57373,
             0xFF4DD0E1,

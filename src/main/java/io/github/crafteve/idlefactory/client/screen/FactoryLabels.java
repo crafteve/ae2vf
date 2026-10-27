@@ -202,6 +202,22 @@ final class FactoryLabels {
     }
 
     /**
+     * 深色 tooltip 上的诊断颜色，用霓虹色而不是面板状态色。
+     *
+     * @param reason 原因
+     * @param theme  主题
+     * @return ARGB 颜色
+     */
+    static int tooltipReasonColor(IoResult.Reason reason, GuiTheme theme) {
+        return switch (reason) {
+            case OK -> theme.tooltip().ok();
+            case NO_ITEM -> theme.tooltip().idle();
+            case NO_SPACE -> theme.tooltip().warn();
+            case NO_HANDLER, REJECTED -> theme.tooltip().error();
+        };
+    }
+
+    /**
      * 给一段文字上色。
      *
      * <p>MC 的文字颜色只认 RGB，这里把主题里的 ARGB 去掉 alpha；tooltip 的
@@ -226,8 +242,23 @@ final class FactoryLabels {
      */
     static Component labelValue(String label, String value, GuiTheme theme) {
         return Component.empty()
-                .append(colored(label, theme.textDim()))
-                .append(colored(value, theme.textValue()));
+                .append(colored(label, theme.tooltip().label()))
+                .append(colored(value, theme.tooltip().value()));
+    }
+
+    /**
+     * 「面：xxx」的 tooltip 片段，面用霓虹品红区别于数值青。
+     *
+     * @param label 标签
+     * @param face  中文面名
+     * @param faceEn 英文面名
+     * @param theme 主题
+     * @return 文本组件
+     */
+    static Component faceLine(String label, String face, String faceEn, GuiTheme theme) {
+        return Component.empty()
+                .append(colored(label, theme.tooltip().label()))
+                .append(colored(face + "（" + faceEn + "）", theme.tooltip().face()));
     }
 
     /**
@@ -240,8 +271,8 @@ final class FactoryLabels {
      */
     static Component rate(long rate, ResourceKind kind, GuiTheme theme) {
         return Component.empty()
-                .append(colored(count(rate), theme.textValue()))
-                .append(colored(rateUnit(kind), theme.textDim()));
+                .append(colored(count(rate), theme.tooltip().value()))
+                .append(colored(rateUnit(kind), theme.tooltip().label()));
     }
 
     /**
@@ -254,7 +285,7 @@ final class FactoryLabels {
      */
     static Component state(IoResult.Reason reason, boolean input, GuiTheme theme) {
         return Component.empty()
-                .append(colored("状态：", theme.textDim()))
-                .append(colored(reason(reason, input), reasonColor(reason, theme)));
+                .append(colored("状态：", theme.tooltip().label()))
+                .append(colored(reason(reason, input), tooltipReasonColor(reason, theme)));
     }
 }
