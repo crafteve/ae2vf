@@ -112,6 +112,8 @@ public final class FactorySnapshotBuilder {
      * @param sinceInputMoveTicks 距上次成功输入的 tick；-1 表示从没输入
      * @param inputReason    输入侧原因
      * @param outputReason   输出侧原因
+     * @param inputReasons   与 inputs 顺序一致的逐规则原因
+     * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
     public record MachineView(MachineRef ref, boolean detached, Health health,
             @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
@@ -120,13 +122,30 @@ public final class FactorySnapshotBuilder {
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
             WorkState workState, boolean inputFull, long sinceInputMoveTicks,
-            IoResult.Reason inputReason, IoResult.Reason outputReason) {
+            IoResult.Reason inputReason, IoResult.Reason outputReason,
+            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons) {
 
         public MachineView {
             inputs = List.copyOf(inputs);
             outputs = List.copyOf(outputs);
             inputRates = List.copyOf(inputRates);
             outputRates = List.copyOf(outputRates);
+            inputReasons = alignReasons(inputReasons, inputs.size());
+            outputReasons = alignReasons(outputReasons, outputs.size());
+        }
+
+        /**
+         * 把原因列表补齐到规则条数。
+         *
+         * <p>旧快照或服务端尚未产生本轮结果时列表可能偏短；补 {@link IoResult.Reason#NO_ITEM}
+         * 而不是 {@code OK}，界面才不会把没跑过的规则画成「正常」。</p>
+         */
+        private static List<IoResult.Reason> alignReasons(List<IoResult.Reason> reasons, int size) {
+            List<IoResult.Reason> aligned = new ArrayList<>(size);
+            for (int i = 0; i < size; i++) {
+                aligned.add(i < reasons.size() ? reasons.get(i) : IoResult.Reason.NO_ITEM);
+            }
+            return List.copyOf(aligned);
         }
 
         /** 是否在回收站里（断开 或 确实不在了）。 */
@@ -264,6 +283,16 @@ public final class FactorySnapshotBuilder {
                 outputRates.add(stats == null ? 0L
                         : stats.rateOut(new RuleKey(false, spec.key(), spec.face())));
             }
+            List<IoResult.Reason> inputReasons = new ArrayList<>(inputs.size());
+            for (ResourceSpec spec : inputs) {
+                inputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                        : stats.ruleReason(true, new RuleKey(true, spec.key(), spec.face())));
+            }
+            List<IoResult.Reason> outputReasons = new ArrayList<>(outputs.size());
+            for (ResourceSpec spec : outputs) {
+                outputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                        : stats.ruleReason(false, new RuleKey(false, spec.key(), spec.face())));
+            }
 
             long sinceMove = stats != null && stats.lastMoveTick() > 0L
                     ? Math.max(0L, now - stats.lastMoveTick()) : -1L;
@@ -286,7 +315,8 @@ public final class FactorySnapshotBuilder {
                     inputs.size() + outputs.size(),
                     inputs, outputs, inputRates, outputRates,
                     sinceMove, blocked, observation.workState(), inputFull,
-                    sinceInput, inputReason, outputReason));
+                    sinceInput, inputReason, outputReason,
+                    inputReasons, outputReasons));
         }
         return views;
     }

@@ -62,12 +62,23 @@ public final class GroupRunner {
      * @param inputFull   所有输入规则都无法接收
      * @param inputReason 输入侧原因
      * @param outputReason 输出侧原因
+     * @param inputReasons 逐输入规则的本轮原因，供界面显示每条规则的诊断
+     * @param outputReasons 逐输出规则的本轮原因
      */
     public record GroupRun(long fed, long pulled,
             Map<ResourceKey, Long> fedByKey, Map<ResourceKey, Long> pulledByKey,
             Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
             IoResult.Reason lastReason, boolean inputFull,
-            IoResult.Reason inputReason, IoResult.Reason outputReason) {
+            IoResult.Reason inputReason, IoResult.Reason outputReason,
+            Map<RuleKey, IoResult.Reason> inputReasons,
+            Map<RuleKey, IoResult.Reason> outputReasons) {
+
+        public GroupRun {
+            // 逐规则原因会被快照读取，先冻结成只读，避免调用方后续改动影响已发出的视图。
+            inputReasons = Map.copyOf(inputReasons);
+            outputReasons = Map.copyOf(outputReasons);
+        }
+
         /** 一共搬了多少。 */
         public long moved() {
             return this.fed + this.pulled;
@@ -136,6 +147,8 @@ public final class GroupRunner {
         Map<ResourceKey, Long> pulledByKey = new LinkedHashMap<>();
         Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
         Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
+        Map<RuleKey, IoResult.Reason> inputReasons = new LinkedHashMap<>();
+        Map<RuleKey, IoResult.Reason> outputReasons = new LinkedHashMap<>();
         IoResult.Reason inputReason = null;
         IoResult.Reason outputReason = null;
         boolean anyInputAccepted = false;
@@ -143,14 +156,17 @@ public final class GroupRunner {
 
         for (ResourceSpec spec : group.inputs()) {
             anyInputRule = true;
+            RuleKey ruleKey = new RuleKey(true, spec.key(), spec.face());
             Resolved resolved = resolve(level, pos, spec, true, caps, routes, generation);
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 inputReason = worse(inputReason, IoResult.Reason.NO_HANDLER);
+                inputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
             IoResult result = IoTransfer.feed(storage, resolved.adapter());
+            inputReasons.put(ruleKey, result.reason());
             fed += result.moved();
             if (result.moved() > 0L) {
                 fedByKey.merge(spec.key(), result.moved(), Long::sum);
@@ -176,14 +192,17 @@ public final class GroupRunner {
         }
 
         for (ResourceSpec spec : group.outputs()) {
+            RuleKey ruleKey = new RuleKey(false, spec.key(), spec.face());
             Resolved resolved = resolve(level, pos, spec, false, caps, routes, generation);
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 outputReason = worse(outputReason, IoResult.Reason.NO_HANDLER);
+                outputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
                 continue;
             }
             IoResult result = IoTransfer.pull(storage, resolved.adapter());
+            outputReasons.put(ruleKey, result.reason());
             pulled += result.moved();
             if (result.moved() > 0L) {
                 pulledByKey.merge(spec.key(), result.moved(), Long::sum);
@@ -207,7 +226,8 @@ public final class GroupRunner {
         return new GroupRun(fed, pulled, fedByKey, pulledByKey,
                 fedByRule, pulledByRule, lastReason, inputFull,
                 inputReason == null ? IoResult.Reason.OK : inputReason,
-                outputReason == null ? IoResult.Reason.OK : outputReason);
+                outputReason == null ? IoResult.Reason.OK : outputReason,
+                inputReasons, outputReasons);
     }
 
     /**

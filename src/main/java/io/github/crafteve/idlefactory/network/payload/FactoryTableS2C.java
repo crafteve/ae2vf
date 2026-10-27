@@ -132,8 +132,10 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         buf.writeVarInt(machine.ruleCount());
         writeRules(buf, machine.inputs());
         writeRates(buf, machine.inputRates());
+        writeReasons(buf, machine.inputReasons());
         writeRules(buf, machine.outputs());
         writeRates(buf, machine.outputRates());
+        writeReasons(buf, machine.outputReasons());
         buf.writeVarLong(machine.sinceMoveTicks());
         buf.writeVarLong(machine.blockedTicks());
         buf.writeByte(machine.workState().ordinal());
@@ -159,8 +161,10 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
         List<Long> inputRates = readRates(buf, inputs.size());
+        List<IoResult.Reason> inputReasons = readReasons(buf, inputs.size());
         List<ResourceSpec> outputs = readRules(buf);
         List<Long> outputRates = readRates(buf, outputs.size());
+        List<IoResult.Reason> outputReasons = readReasons(buf, outputs.size());
         long sinceMoveTicks = buf.readVarLong();
         long blockedTicks = buf.readVarLong();
         WorkState workState = readEnum(buf, WorkState.values(), "work state");
@@ -174,7 +178,28 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         return new FactorySnapshotBuilder.MachineView(ref, detached, health, blockId,
                 presence, lineNames, ruleCount, inputs, outputs, inputRates, outputRates,
                 sinceMoveTicks, blockedTicks, workState, inputFull, sinceInputMoveTicks,
-                inputReason, outputReason);
+                inputReason, outputReason, inputReasons, outputReasons);
+    }
+
+    private static void writeReasons(RegistryFriendlyByteBuf buf,
+            List<IoResult.Reason> reasons) {
+        int count = Math.min(reasons.size(), MAX_RULES_PER_SIDE);
+        buf.writeVarInt(count);
+        for (int i = 0; i < count; i++) {
+            buf.writeByte(reasons.get(i).ordinal());
+        }
+    }
+
+    private static List<IoResult.Reason> readReasons(RegistryFriendlyByteBuf buf, int expected) {
+        int count = readCount(buf, MAX_RULES_PER_SIDE, "rule reasons");
+        List<IoResult.Reason> reasons = new ArrayList<>(expected);
+        for (int i = 0; i < count; i++) {
+            reasons.add(readEnum(buf, IoResult.Reason.values(), "rule reason"));
+        }
+        while (reasons.size() < expected) {
+            reasons.add(IoResult.Reason.NO_ITEM);
+        }
+        return reasons;
     }
 
     private static void writeRates(RegistryFriendlyByteBuf buf, List<Long> rates) {

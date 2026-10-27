@@ -102,6 +102,8 @@ public final class LineRunner {
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
                     groupState.routes, generation);
             DiagStats.LineStats stats = factory.stats().line(line.id());
+            // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
+            stats.group(target.id()).setRuleReasons(result.inputReasons(), result.outputReasons());
             if (result.movedAnything()) {
                 stats.addMoved(target.id(), result.fedByKey(), result.pulledByKey(),
                         result.fedByRule(), result.pulledByRule(), now);

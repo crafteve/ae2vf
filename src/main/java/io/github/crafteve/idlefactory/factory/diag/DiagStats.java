@@ -234,6 +234,8 @@ public final class DiagStats {
         private final Map<RuleKey, Long> outRuleWindow = new HashMap<>();
         private final Map<RuleKey, Long> inRuleRate = new HashMap<>();
         private final Map<RuleKey, Long> outRuleRate = new HashMap<>();
+        private final Map<RuleKey, IoResult.Reason> inRuleReasons = new HashMap<>();
+        private final Map<RuleKey, IoResult.Reason> outRuleReasons = new HashMap<>();
         private long lastMoveTick;
         private long lastInputMoveTick;
         private long blockedSince = -1L;
@@ -299,6 +301,36 @@ public final class DiagStats {
         public long rateOut(RuleKey key) {
             Long value = this.outRuleRate.get(key);
             return value == null ? 0L : value;
+        }
+
+        /**
+         * 覆盖写入逐规则原因。
+         *
+         * <p>每轮 IO 都调用一次，先清空再写入，避免已删除的规则留下旧诊断。缺省
+         * 原因用 {@link IoResult.Reason#NO_ITEM}：界面把它解释成「还没有可搬的东西」，
+         * 比「正常」更贴近从未运行过的规则。</p>
+         *
+         * @param input  逐输入规则原因
+         * @param output 逐输出规则原因
+         */
+        public void setRuleReasons(Map<RuleKey, IoResult.Reason> input,
+                Map<RuleKey, IoResult.Reason> output) {
+            this.inRuleReasons.clear();
+            this.inRuleReasons.putAll(input);
+            this.outRuleReasons.clear();
+            this.outRuleReasons.putAll(output);
+        }
+
+        /**
+         * 取一条规则最近一次的原因。
+         *
+         * @param input 是否输入侧
+         * @param key   规则
+         * @return 原因；没有统计时为 {@link IoResult.Reason#NO_ITEM}
+         */
+        public IoResult.Reason ruleReason(boolean input, RuleKey key) {
+            IoResult.Reason reason = (input ? this.inRuleReasons : this.outRuleReasons).get(key);
+            return reason == null ? IoResult.Reason.NO_ITEM : reason;
         }
 
         private void sample() {
