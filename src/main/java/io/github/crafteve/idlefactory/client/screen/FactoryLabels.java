@@ -72,17 +72,6 @@ final class FactoryLabels {
     }
 
     /**
-     * 规则显示名：模糊规则在资源名后加一个 {@code ~}，和 describe() 的记号一致。
-     *
-     * @param spec 规则
-     * @return 显示名
-     */
-    static String name(ResourceSpec spec) {
-        String name = name(spec.key());
-        return spec.fuzzy() ? name + " ~" : name;
-    }
-
-    /**
      * 资源数量单位。
      *
      * @param kind 资源类型

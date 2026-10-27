@@ -268,6 +268,8 @@ final class IoDetailRender {
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
         ItemStack icon = FactoryLabels.icon(spec.key());
         graphics.renderItem(icon, slotX + 1, slotY + 1);
+        // 规则可能是带耐久的工具/打火石，装饰层补耐久条；数量不在格子里显示。
+        graphics.renderItemDecorations(font, icon, slotX + 1, slotY + 1, "");
 
         String rateValue = FactoryLabels.count(rate);
         String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
@@ -278,7 +280,7 @@ final class IoDetailRender {
         int nameWidth = rateX - textX - 4;
         if (nameWidth > 0) {
             graphics.drawString(font,
-                    font.plainSubstrByWidth(FactoryLabels.name(spec), nameWidth),
+                    font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
                     textX, cell.y() + 4, theme.textPrimary(), false);
         }
         graphics.drawString(font, rateValue, rateX, cell.y() + 4, rateColor, false);

@@ -99,9 +99,9 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
         return this.mode == MatchMode.IGNORE_COMPONENTS;
     }
 
-    /** 给界面和日志用的一行：{@code fluid:minecraft:water[north]}。 */
+    /** 给界面和日志用的一行：{@code fluid:minecraft:water[north]}；模糊规则追加 {@code [模糊]}。 */
     public String describe() {
-        String match = this.mode == MatchMode.IGNORE_COMPONENTS ? "~" : "";
+        String match = this.mode == MatchMode.IGNORE_COMPONENTS ? " [模糊]" : "";
         return this.key.describe() + match + "[" + faceName() + "]";
     }
 

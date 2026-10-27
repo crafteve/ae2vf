@@ -1297,7 +1297,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private void drawResourceIcon(GuiGraphics graphics, ResourceKey key, int x, int y) {
-        graphics.renderItem(iconStack(key), x, y);
+        ItemStack icon = iconStack(key);
+        graphics.renderItem(icon, x, y);
+        // 与 AE2 终端一致：叠一层原版装饰，补耐久条与冷却；数量仍由 drawCount 自己画，
+        // 所以传空串抑制原版数字。
+        graphics.renderItemDecorations(this.font, icon, x, y, "");
     }
 
     /** 资源对应的界面图标；JEI 查询也复用这一份。*/
@@ -1611,7 +1615,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1),
                         tt.index()))
                 .append(FactoryLabels.colored(" · ", tt.label()))
-                .append(FactoryLabels.colored(FactoryLabels.name(spec), tt.title())));
+                .append(FactoryLabels.colored(FactoryLabels.name(spec.key()), tt.title())));
         lines.add(FactoryLabels.faceLine(
                 cell.input() ? "输入面：" : "输出面：",
                 faceName(spec), FactoryLabels.faceEn(spec), this.theme));
@@ -1653,7 +1657,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             IoResult.Reason reason = i < reasons.size()
                     ? reasons.get(i) : IoResult.Reason.NO_ITEM;
             lines.add(Component.empty()
-                    .append(FactoryLabels.colored(FactoryLabels.name(spec), tt.title()))
+                    .append(FactoryLabels.colored(FactoryLabels.name(spec.key()), tt.title()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.coloredBold(faceName(spec), tt.face()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
