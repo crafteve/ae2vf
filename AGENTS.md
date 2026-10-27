@@ -1,12 +1,5 @@
 # AGENTS.md
 
-本文件是本仓库的 Agent 执行手册，只写"怎么做对"。
-
-权威顺序：代码 > `docs/DECISIONS.md` > `README.md` > `docs/ui/*` > `docs/archive/**`。
-归档区只作决策留痕，禁止作为实现依据。
-
-本机语言、编码、PowerShell 规则见 `~/.dsh/AGENTS.md`，本文不重复。
-
 ## 一、项目概述
 
 ### 1.1 是什么
@@ -74,10 +67,16 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 7. 单文件超过约 400 行先给拆分方案，不边想边改。
 8. 新建包、新建文件、改数据层交互结构（record 字段 / NBT / 网络字段 / 跨包签名），计划里必须逐项列出：文件、职责、依赖方向、迁移顺序。等你确认后再动手。
 
-### 2.2 factory / line / io
+### 2.2 三层信息：配置 / 观测 / io
+
+- 配置（最高信息，写档）：`line` 的产线与 IO 组规则、`factory` 的机器库与仓库地址。只描述搬什么，不执行。
+- 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面、指令、执行门禁都只读它，读路径不探世界。
+- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `LineRunner → GroupRunner → IoTransfer`；结果只留在本轮与诊断里，不回写配置。
+
+各包职责：
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口；`FactoryBin` 管回收站；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `line`：配置层。`PassiveLine` 是产线开关，`IoGroup` 是一台机器的输入输出规则组，`LineService` 做管理动作。只描述搬什么，不执行。
+- `line`：配置层。`PassiveLine` 是产线开关，`IoGroup` 是一台机器的输入输出规则组，`LineService` 做管理动作。
 - `io`：执行层。`LineRunner` 遍历线与组、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
 
 调用链：`ServerTick → FactoryRuntime → LineRunner → GroupRunner → IoTransfer → Storage / ResourceAdapter`。
@@ -204,6 +203,10 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
 - 当前分支 `refactor/factory-core`。
+
+### 5.5 本文件的修改
+
+`AGENTS.md` 只有在计划中明确列出修改项、并得到用户审批后才能修改。计划外不得改动。
 
 ## 六、速查与坑
 
