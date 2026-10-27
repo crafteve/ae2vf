@@ -56,7 +56,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>左表的每一行对应一个 {@link FactorySnapshotBuilder.MachineView}。行高不是固定的：
  * 机器可以展开成「输入/输出」两行规则详情，所以绘制和命中测试统一走
- * {@link #tableHitAt(double)}，不能再用固定 {@code rowY} 推算。</p>
+ * {@link #tableHitAt(double, long)}，不能再用固定 {@code rowY} 推算。</p>
  *
  * <p>仓库区不伪造原版槽位，而是用 {@link FactoryStorageRepo} 维护服务端快照。
  * 仓库格点击只发送 {@code FactoryStorageActionC2S} 手势，实际数量、背包扣减和
@@ -73,9 +73,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int CLOSE_SIZE = 14;
     /** 机器卡片第一行文字：机器名，使用接近白色的冷色。 */
     private static final int CARD_NAME = 0xFFE8ECF5;
-    /** 机器卡片第二行左侧：产线信息，使用青色区分。 */
-    private static final int CARD_LINE = 0xFF8FB7C7;
-    /** 机器卡片第二行右侧：规则数量，使用灰蓝色。 */
+    /** 机器卡片第二行右侧：规则标签，使用灰蓝色。 */
     private static final int CARD_META = 0xFF98A2B8;
 
     /** 左表每隔多少 tick 主动请求一次机器快照。 */
@@ -138,6 +136,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 本帧鼠标位置，用于槽位背景悬停；{@code renderSlot} 本身不接收鼠标坐标。*/
     private int renderMouseX;
     private int renderMouseY;
+    /** 本帧统一的时间基准，避免同一帧内行高因多次取时间差 1px。 */
+    private long frameNow;
 
     /**
      * 一台机器的展开动画。
@@ -571,7 +571,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        pruneExpansions(System.currentTimeMillis());
+        this.frameNow = System.currentTimeMillis();
+        pruneExpansions(this.frameNow);
         this.renderMouseX = mouseX;
         this.renderMouseY = mouseY;
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -740,12 +741,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         // 顶栏右侧同时要放统计和关闭按钮。窄屏（例如 640 逻辑宽）下，
         // 统计是最不重要的信息，放不下就直接省略，优先保证状态和关闭按钮可读。
-        String stats = this.machines.size() + " 台 · " + this.lineCount + " 线 · 仓库"
-                + (this.storageOnline ? "在线" : "离线");
+        List<TextPart> stats = List.of(
+                new TextPart(Integer.toString(this.machines.size()), this.theme.textValue()),
+                new TextPart(" 台 · ", this.theme.textDim()),
+                new TextPart(Integer.toString(this.lineCount), this.theme.textValue()),
+                new TextPart(" 线 · 仓库", this.theme.textDim()),
+                new TextPart(this.storageOnline ? "在线" : "离线",
+                        this.storageOnline ? this.theme.statusRun() : this.theme.error()));
         int closeX = l.rightX - 6 - CLOSE_SIZE;
-        int statsX = closeX - 8 - this.font.width(stats);
+        int statsX = closeX - 8 - partsWidth(stats);
         if (statsX > statusEnd + 8) {
-            graphics.drawString(this.font, stats, statsX, textY, this.theme.textDim(), false);
+            drawParts(graphics, stats, statsX, textY);
         }
 
         NineSlice.button(graphics, closeX, l.headerY + 4, CLOSE_SIZE, CLOSE_SIZE);
@@ -798,7 +804,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             graphics.drawString(this.font,
                     this.font.plainSubstrByWidth(options.get(i), width - 16),
                     x + 7, rowY + 3,
-                    hovered ? this.theme.textPrimary() : this.theme.textDim(), false);
+                    selected ? this.theme.textValue()
+                            : hovered ? this.theme.textPrimary() : this.theme.textDim(),
+                    false);
         }
     }
 
@@ -850,8 +858,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         // 显示顺序 → 逻辑列下标；窄屏时输入/输出可能被丢，不能直接拿 slot 当列号。
         for (int slot = 0; slot < l.columnCount; slot++) {
             int id = l.columnId(slot);
+            int color = id == FactoryLayout.COL_INPUT || id == FactoryLayout.COL_OUTPUT
+                    ? this.theme.textValue() : this.theme.textPrimary();
             graphics.drawString(this.font, headers[id], l.columnX(id) + 4, headerY,
-                    this.theme.textDim(), false);
+                    color, false);
         }
 
         List<FactorySnapshotBuilder.MachineView> table = tableMachines();
@@ -859,13 +869,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int shown = 0;
         int y = l.rowTop;
         for (int i = this.firstRow; i < total; i++) {
-            FactorySnapshotBuilder.MachineView machine = table.get(i);
-            int rowHeight = rowHeight(machine);
-            if (y + rowHeight > l.footerY) {
+            if (y + FactoryLayout.ROW_H > l.footerY) {
                 break;
             }
-            drawRow(graphics, machine, y);
-            y += rowHeight;
+            FactorySnapshotBuilder.MachineView machine = table.get(i);
+            int detailHeight = detailHeight(machine, y, this.frameNow);
+            drawRow(graphics, machine, y, detailHeight);
+            y += FactoryLayout.ROW_H + detailHeight;
             shown++;
         }
 
@@ -900,12 +910,24 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 }
             }
         }
-        String footer = "共 " + total + " 台 · 就绪 " + ready + " · 未载 " + unloaded
-                + " · 失联 " + missing + " · 回收站 " + binned;
+        List<TextPart> footer = new ArrayList<>();
+        footer.add(new TextPart("共 ", this.theme.textDim()));
+        footer.add(new TextPart(Integer.toString(total), this.theme.textValue()));
+        footer.add(new TextPart(" 台 · 就绪 ", this.theme.textDim()));
+        footer.add(new TextPart(Integer.toString(ready), this.theme.textValue()));
+        footer.add(new TextPart(" · 未载 ", this.theme.textDim()));
+        footer.add(new TextPart(Integer.toString(unloaded), this.theme.textValue()));
+        footer.add(new TextPart(" · 失联 ", this.theme.textDim()));
+        footer.add(new TextPart(Integer.toString(missing), this.theme.textValue()));
+        footer.add(new TextPart(" · 回收站 ", this.theme.textDim()));
+        footer.add(new TextPart(Integer.toString(binned), this.theme.textValue()));
         if (this.maxFirstRow() > 0) {
-            footer += " · " + (this.firstRow + 1) + "-" + (this.firstRow + shown);
+            footer.add(new TextPart(" · ", this.theme.textDim()));
+            footer.add(new TextPart(Integer.toString(this.firstRow + 1), this.theme.textValue()));
+            footer.add(new TextPart("-", this.theme.textDim()));
+            footer.add(new TextPart(Integer.toString(this.firstRow + shown), this.theme.textValue()));
         }
-        graphics.drawString(this.font, footer, l.tableX, l.footerY + 3, this.theme.textDim(), false);
+        drawParts(graphics, footer, l.tableX, l.footerY + 3);
         drawTableFrame(graphics);
     }
 
@@ -925,7 +947,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 一行里，而是由 {@link IoDetailRender} 接到行底部。</p>
      */
     private void drawRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            int y) {
+            int y, int detailHeight) {
         FactoryLayout l = this.layout;
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
         Status status = statusOf(machine);
@@ -955,7 +977,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.drawString(this.font,
                 this.font.plainSubstrByWidth(lineName, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 14,
-                this.theme.textDim(), false);
+                machine.lineNames().isEmpty()
+                        ? this.theme.textDim() : this.theme.textValue(), false);
 
         int stateX = l.columnX(FactoryLayout.COL_STATE) + 4;
         NineSlice.icon(graphics, status.lamp(), stateX, textY + 2,
@@ -978,7 +1001,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                             - FactoryLayout.EXPAND_BUTTON - 2);
         }
         drawExpandButton(graphics, y, isOpen(machine));
-        int detailHeight = expandedHeight(machine);
         if (detailHeight > 0) {
             IoDetailRender.Detail detail = IoDetailRender.layout(l, machine,
                     y + FactoryLayout.ROW_H, detailHeight);
@@ -987,29 +1009,26 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
     }
 
-    /** 一行机器在表格中占用的实际高度：基础行 + 当前动画高度。 */
-    private int rowHeight(FactorySnapshotBuilder.MachineView machine) {
-        return FactoryLayout.ROW_H + expandedHeight(machine);
-    }
-
     /**
-     * 该机器当前的展开高度（已按动画进度和视口上限夹紧）。
+     * 该机器在当前行位置上的展开高度。
      *
-     * <p>绘制循环、命中测试和 JEI 都用这一个函数，不允许各算一套，否则动画期间
-     * 点击会落到相邻行。</p>
+     * <p>按动画进度插值，再按「这一行下面还剩多少空间」夹紧。绘制循环、命中测试和
+     * JEI 都走同一个函数，避免动画期间各算一套、点击落到相邻行。</p>
      *
      * @param machine 机器视图
-     * @return 像素高度；未展开或动画已结束为 0
+     * @param rowY    该行当前顶部
+     * @param now     本帧统一时间
+     * @return 像素高度
      */
-    private int expandedHeight(FactorySnapshotBuilder.MachineView machine) {
+    private int detailHeight(FactorySnapshotBuilder.MachineView machine, int rowY, long now) {
         Expansion expansion = this.expansions.get(machine.ref());
         if (expansion == null) {
             return 0;
         }
-        int target = Math.min(IoDetailRender.requiredHeight(this.layout, machine),
-                this.layout.ioMaxDetailHeight());
-        float progress = Mth.clamp(expansion.progress(System.currentTimeMillis()),
-                0.0F, 1.0F);
+        int required = IoDetailRender.requiredHeight(this.layout, machine);
+        int available = Math.max(0, this.layout.footerY - rowY - FactoryLayout.ROW_H);
+        int target = Math.min(required, available);
+        float progress = Mth.clamp(expansion.progress(now), 0.0F, 1.0F);
         return Math.round(target * progress);
     }
 
@@ -1055,21 +1074,23 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 x + offset, buttonY + offset, GuiTextures.CHEVRON_SIZE);
     }
 
-    /** 左表中一次命中：机器、行顶部 y 和该行当前实际高度。 */
-    private record TableHit(FactorySnapshotBuilder.MachineView machine, int y, int height) {
+    /** 左表中一次命中：机器、行顶部 y、该行当前实际高度和展开区高度。 */
+    private record TableHit(FactorySnapshotBuilder.MachineView machine, int y, int height,
+            int detailHeight) {
     }
 
     /**
      * 按鼠标 y 找到它落在哪个可见机器行里。
      *
      * <p>行高可变，不能再用 {@code (mouseY - rowTop) / ROW_H}。这里从
-     * {@link #firstRow} 开始逐行累加 {@link #rowHeight}，和绘制循环保持完全一致。</p>
+     * {@link #firstRow} 开始逐行累加，和绘制循环使用同一个 {@link #detailHeight}。</p>
      *
      * @param mouseY 屏幕 y
+     * @param now    本次命中的时间基准
      * @return 命中行；空白区或超出表格时为 {@code null}
      */
     @Nullable
-    private TableHit tableHitAt(double mouseY) {
+    private TableHit tableHitAt(double mouseY, long now) {
         FactoryLayout l = this.layout;
         if (mouseY < l.rowTop || mouseY >= l.footerY) {
             return null;
@@ -1077,13 +1098,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         List<FactorySnapshotBuilder.MachineView> table = tableMachines();
         int y = l.rowTop;
         for (int i = this.firstRow; i < table.size(); i++) {
-            FactorySnapshotBuilder.MachineView machine = table.get(i);
-            int height = rowHeight(machine);
-            if (y + height > l.footerY) {
+            if (y + FactoryLayout.ROW_H > l.footerY) {
                 return null;
             }
+            FactorySnapshotBuilder.MachineView machine = table.get(i);
+            int detailHeight = detailHeight(machine, y, now);
+            int height = FactoryLayout.ROW_H + detailHeight;
             if (mouseY >= y && mouseY < y + height) {
-                return new TableHit(machine, y, height);
+                return new TableHit(machine, y, height, detailHeight);
             }
             y += height;
         }
@@ -1101,20 +1123,73 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (mouseX < buttonX || mouseX >= buttonX + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
-        TableHit hit = tableHitAt(mouseY);
+        long now = System.currentTimeMillis();
+        TableHit hit = tableHitAt(mouseY, now);
         if (hit == null
                 || mouseY < hit.y() + 6
                 || mouseY >= hit.y() + 6 + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
         MachineRef ref = hit.machine().ref();
-        long now = System.currentTimeMillis();
         Expansion current = this.expansions.get(ref);
         float from = current == null ? 0.0F : Mth.clamp(current.progress(now), 0.0F, 1.0F);
-        boolean open = current == null || !current.open();
-        this.expansions.put(ref, new Expansion(from, open, now));
+        boolean opening = current == null || !current.open();
+        if (opening) {
+            // 只允许一台处于展开目标；其他已展开的机器从当前进度收起，避免瞬移。
+            for (MachineRef other : new ArrayList<>(this.expansions.keySet())) {
+                if (other.equals(ref)) {
+                    continue;
+                }
+                Expansion expansion = this.expansions.get(other);
+                if (expansion != null && expansion.open()) {
+                    float otherFrom = Mth.clamp(expansion.progress(now), 0.0F, 1.0F);
+                    this.expansions.put(other, new Expansion(otherFrom, false, now));
+                }
+            }
+        }
+        this.expansions.put(ref, new Expansion(from, opening, now));
+        if (opening) {
+            ensureExpansionVisible(ref, now);
+        }
         this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         return true;
+    }
+
+    /**
+     * 展开行需要的高度超过当前剩余空间时，把它滚到表格顶部。
+     *
+     * <p>否则靠底部的行只能露出一部分，动画过程中看起来像被截断。只调 {@code firstRow}，
+     * 不改数据。</p>
+     */
+    private void ensureExpansionVisible(MachineRef ref, long now) {
+        List<FactorySnapshotBuilder.MachineView> table = tableMachines();
+        int index = -1;
+        for (int i = 0; i < table.size(); i++) {
+            if (table.get(i).ref().equals(ref)) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            return;
+        }
+        if (index < this.firstRow) {
+            this.firstRow = index;
+            return;
+        }
+        int y = this.layout.rowTop;
+        for (int i = this.firstRow; i < index; i++) {
+            y += FactoryLayout.ROW_H + detailHeight(table.get(i), y, now);
+            if (y >= this.layout.footerY) {
+                this.firstRow = index;
+                return;
+            }
+        }
+        int required = IoDetailRender.requiredHeight(this.layout, table.get(index));
+        int available = Math.max(0, this.layout.footerY - y - FactoryLayout.ROW_H);
+        if (required > available) {
+            this.firstRow = index;
+        }
     }
 
     /**
@@ -1127,8 +1202,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             List<Long> rates, int x, int y, int maxWidth) {
         if (rules.isEmpty()) {
             NineSlice.slot(graphics, x, y, FactoryLayout.CELL, FactoryLayout.CELL);
-            graphics.drawString(this.font, "—", x + 6, y + 4,
-                    this.theme.textDim(), false);
+            String empty = "未配置";
+            graphics.drawString(this.font,
+                    this.font.plainSubstrByWidth(empty, Math.max(0, maxWidth - FactoryLayout.CELL - 2)),
+                    x + FactoryLayout.CELL + 2, y + 5, this.theme.textDim(), false);
             return;
         }
         int cursor = x;
@@ -1136,28 +1213,56 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int limit = Math.min(rules.size(), 3);
         while (shown < limit) {
             ResourceSpec spec = rules.get(shown);
-            String rateText = countText(shown < rates.size() ? rates.get(shown) : 0L)
-                    + FactoryLabels.rateUnit(spec.key().kind());
-            int entryWidth = FactoryLayout.CELL + 2 + this.font.width(rateText) + 6;
+            String rateValue = countText(shown < rates.size() ? rates.get(shown) : 0L);
+            String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
+            int valueWidth = this.font.width(rateValue);
+            int entryWidth = FactoryLayout.CELL + 2 + valueWidth
+                    + this.font.width(rateUnit) + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;
             }
             NineSlice.slot(graphics, cursor, y, FactoryLayout.CELL,
                     FactoryLayout.CELL);
             drawResourceIcon(graphics, rules.get(shown).key(), cursor + 1, y + 1);
-            graphics.drawString(this.font, rateText, cursor + FactoryLayout.CELL + 2,
+            graphics.drawString(this.font, rateValue, cursor + FactoryLayout.CELL + 2,
+                    y + 5, this.theme.textValue(), false);
+            graphics.drawString(this.font, rateUnit,
+                    cursor + FactoryLayout.CELL + 2 + valueWidth,
                     y + 5, this.theme.textDim(), false);
             cursor += entryWidth;
             shown++;
         }
         if (rules.size() > shown) {
             graphics.drawString(this.font, "+" + (rules.size() - shown),
-                    cursor, y + 4, this.theme.textDim(), false);
+                    cursor, y + 4, this.theme.textValue(), false);
         }
     }
 
     private record Status(String text, int color, ResourceLocation strip,
             ResourceLocation lamp) {
+    }
+
+    /** 一行多色文字里的一个片段；用于统计、底部汇总这类「标签暗、数字亮」的地方。 */
+    private record TextPart(String text, int color) {
+    }
+
+    /** 一组多色片段的总宽度。 */
+    private int partsWidth(List<TextPart> parts) {
+        int width = 0;
+        for (TextPart part : parts) {
+            width += this.font.width(part.text());
+        }
+        return width;
+    }
+
+    /** 从左到右画一组多色片段。 */
+    private int drawParts(GuiGraphics graphics, List<TextPart> parts, int x, int y) {
+        int cursor = x;
+        for (TextPart part : parts) {
+            graphics.drawString(this.font, part.text(), cursor, y, part.color(), false);
+            cursor += this.font.width(part.text());
+        }
+        return cursor;
     }
 
     private Status statusOf(FactorySnapshotBuilder.MachineView machine) {
@@ -1172,9 +1277,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
             case INPUT_OK -> new Status("可输入", this.theme.statusRun(),
                     GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
-            case INPUT_BLOCKED -> new Status("输入堵塞 "
-                    + (machine.sinceInputMoveTicks() < 0L ? "—"
-                            : durationText(machine.sinceInputMoveTicks())),
+            case INPUT_BLOCKED -> new Status("输入堵塞",
                     this.theme.statusWarn(), GuiTextures.STATUS_STRIP_WARN,
                     GuiTextures.STATUS_LAMP_WARN);
             default -> new Status("未知", this.theme.statusIdle(),
@@ -1203,18 +1306,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     private int statusColor(FactorySnapshotBuilder.MachineView machine) {
         return statusOf(machine).color();
-    }
-
-    private static String durationText(long ticks) {
-        long seconds = Math.max(0L, ticks) / 20L;
-        if (seconds < 60L) {
-            return seconds + "s";
-        }
-        long minutes = seconds / 60L;
-        if (minutes < 60L) {
-            return minutes + "m";
-        }
-        return (minutes / 60L) + "h";
     }
 
     private static ItemStack blockStack(ResourceLocation blockId) {
@@ -1286,7 +1377,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             graphics.drawString(this.font, tabs[i],
                     x + (tabWidth - this.font.width(tabs[i])) / 2,
                     l.tabY + (FactoryLayout.HEADER_H - 9) / 2,
-                    i == this.activeTab ? this.theme.textPrimary() : this.theme.textDim(),
+                    i == this.activeTab ? this.theme.textValue() : this.theme.textDim(),
                     false);
         }
 
@@ -1297,8 +1388,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             drawMachineLibrary(graphics);
         }
 
-        graphics.drawString(this.font, "合成", l.craftX, l.craftLabelY, this.theme.textDim(), false);
-        graphics.drawString(this.font, "背包", l.invX, l.invLabelY, this.theme.textDim(), false);
+        graphics.drawString(this.font, "合成", l.craftX, l.craftLabelY,
+                this.theme.textPrimary(), false);
+        graphics.drawString(this.font, "背包", l.invX, l.invLabelY,
+                this.theme.textPrimary(), false);
     }
 
     /**
@@ -1392,11 +1485,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && mouseX >= l.rightX + 4 && mouseX < l.rightX + l.rightW - 4
                 && mouseY >= l.searchY && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
             graphics.renderComponentTooltip(this.font, List.of(
-                    Component.literal("@ 按模组"),
-                    Component.literal("# 按标签"),
-                    Component.literal("$ 按 tooltip"),
-                    Component.literal("* 按注册名"),
-                    Component.literal("| 或；空格 与")), mouseX, mouseY);
+                    searchHint("@", "按模组"),
+                    searchHint("#", "按标签"),
+                    searchHint("$", "按 tooltip"),
+                    searchHint("*", "按注册名"),
+                    searchHint("|", "或；空格 与")), mouseX, mouseY);
             return;
         }
         if (this.activeTab == TAB_STORAGE
@@ -1408,10 +1501,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             if (index >= 0 && index < this.filteredStorageEntries.size()) {
                 FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
                 graphics.renderComponentTooltip(this.font, List.of(
-                        Component.literal(resourceName(entry.key())),
-                        Component.literal(entry.key().id().toString()),
-                        Component.literal(entry.count() + " "
-                                + unit(entry.key().kind()))), mouseX, mouseY);
+                        FactoryLabels.colored(resourceName(entry.key()), this.theme.textPrimary()),
+                        FactoryLabels.colored(entry.key().id().toString(), this.theme.textDim()),
+                        Component.empty()
+                                .append(FactoryLabels.colored(
+                                        Long.toString(entry.count()), this.theme.textValue()))
+                                .append(FactoryLabels.colored(" "
+                                        + unit(entry.key().kind()), this.theme.textDim()))),
+                        mouseX, mouseY);
                 return;
             }
         }
@@ -1430,7 +1527,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            TableHit hit = tableHitAt(mouseY);
+            TableHit hit = tableHitAt(mouseY, this.frameNow);
             if (hit == null) {
                 return;
             }
@@ -1440,7 +1537,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 drawExpandTooltip(graphics, machine, mouseX, mouseY);
                 return;
             }
-            IoDetailRender.Cell cell = detailCellAt(machine, hit.y(), mouseX, mouseY);
+            IoDetailRender.Cell cell = detailCellAt(hit, mouseX, mouseY);
             if (cell != null) {
                 drawCellTooltip(graphics, machine, cell, mouseX, mouseY);
                 return;
@@ -1464,6 +1561,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
     }
 
+    /** 搜索语法提示：符号强调色，说明暗色。 */
+    private Component searchHint(String key, String description) {
+        return Component.empty()
+                .append(FactoryLabels.colored(key, this.theme.textValue()))
+                .append(FactoryLabels.colored(" " + description, this.theme.textDim()));
+    }
+
     /** 鼠标是否落在某行的展开按钮上。 */
     private boolean inExpandButton(TableHit hit, double mouseX, double mouseY) {
         return inside(mouseX, mouseY, expandButtonX(), hit.y() + 6,
@@ -1476,14 +1580,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 单元格；没展开或没命中为 {@code null}
      */
     @Nullable
-    private IoDetailRender.Cell detailCellAt(FactorySnapshotBuilder.MachineView machine,
-            int rowY, double mouseX, double mouseY) {
-        int height = expandedHeight(machine);
-        if (height <= 0) {
+    private IoDetailRender.Cell detailCellAt(TableHit hit, double mouseX, double mouseY) {
+        if (hit.detailHeight() <= 0) {
             return null;
         }
-        IoDetailRender.Detail detail = IoDetailRender.layout(this.layout, machine,
-                rowY + FactoryLayout.ROW_H, height);
+        IoDetailRender.Detail detail = IoDetailRender.layout(this.layout, hit.machine(),
+                hit.y() + FactoryLayout.ROW_H, hit.detailHeight());
         return IoDetailRender.hit(detail, mouseX, mouseY);
     }
 
@@ -1491,13 +1593,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawExpandTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.literal(isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情"));
-        lines.add(Component.literal("输入 " + machine.inputs().size()
-                + " · 输出 " + machine.outputs().size() + " 条"));
+        lines.add(FactoryLabels.colored(
+                isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情", this.theme.textPrimary()));
+        lines.add(Component.empty()
+                .append(FactoryLabels.colored("输入 ", this.theme.textDim()))
+                .append(FactoryLabels.colored(
+                        Integer.toString(machine.inputs().size()), this.theme.textValue()))
+                .append(FactoryLabels.colored(" · 输出 ", this.theme.textDim()))
+                .append(FactoryLabels.colored(
+                        Integer.toString(machine.outputs().size()), this.theme.textValue()))
+                .append(FactoryLabels.colored(" 条", this.theme.textDim())));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
-    /** 展开区单元格的完整信息：面、速率、诊断和每轮上限。 */
+    /** 展开区单元格的完整信息：面、速率和诊断。 */
     private void drawCellTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, IoDetailRender.Cell cell,
             int mouseX, int mouseY) {
@@ -1513,15 +1622,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 ? reasons.get(cell.ruleIndex()) : IoResult.Reason.NO_ITEM;
 
         List<Component> lines = new ArrayList<>();
-        lines.add(Component.literal((cell.input() ? "输入" : "输出")
-                + " #" + (cell.ruleIndex() + 1) + " · " + resourceName(spec.key())));
-        lines.add(Component.literal((cell.input() ? "输入面：" : "输出面：")
-                + faceName(spec) + "（" + FactoryLabels.faceEn(spec) + "）"));
-        lines.add(Component.literal("速率：" + countText(rate)
-                + FactoryLabels.rateUnit(spec.key().kind())));
-        lines.add(Component.literal("状态：" + FactoryLabels.reason(reason, cell.input())));
-        lines.add(Component.literal("每轮上限："
-                + (spec.fillToCapacity() ? "塞满" : spec.amount())));
+        lines.add(Component.empty()
+                .append(FactoryLabels.colored(cell.input() ? "输入" : "输出",
+                        this.theme.textPrimary()))
+                .append(FactoryLabels.colored(" #" + (cell.ruleIndex() + 1) + " · ",
+                        this.theme.textDim()))
+                .append(FactoryLabels.colored(resourceName(spec.key()),
+                        this.theme.textPrimary())));
+        lines.add(FactoryLabels.labelValue(
+                cell.input() ? "输入面：" : "输出面：",
+                faceName(spec) + "（" + FactoryLabels.faceEn(spec) + "）", this.theme));
+        lines.add(Component.empty()
+                .append(FactoryLabels.colored("速率：", this.theme.textDim()))
+                .append(FactoryLabels.rate(rate, spec.key().kind(), this.theme)));
+        lines.add(FactoryLabels.state(reason, cell.input(), this.theme));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
@@ -1543,17 +1657,25 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return;
         }
         List<Component> lines = new java.util.ArrayList<>();
-        lines.add(Component.literal(title));
+        lines.add(FactoryLabels.colored(title, this.theme.textPrimary()));
         int shown = Math.min(rules.size(), 10);
         for (int i = 0; i < shown; i++) {
             ResourceSpec spec = rules.get(i);
             long rate = i < rates.size() ? rates.get(i) : 0L;
-            lines.add(Component.literal(resourceName(spec.key()) + " · "
-                    + faceName(spec) + " · " + countText(rate)
-                    + FactoryLabels.rateUnit(spec.key().kind())));
+            lines.add(Component.empty()
+                    .append(FactoryLabels.colored(resourceName(spec.key()),
+                            this.theme.textPrimary()))
+                    .append(FactoryLabels.colored(" · ", this.theme.textDim()))
+                    .append(FactoryLabels.colored(faceName(spec), this.theme.textValue()))
+                    .append(FactoryLabels.colored(" · ", this.theme.textDim()))
+                    .append(FactoryLabels.rate(rate, spec.key().kind(), this.theme)));
         }
         if (rules.size() > shown) {
-            lines.add(Component.literal("还有 " + (rules.size() - shown) + " 条"));
+            lines.add(Component.empty()
+                    .append(FactoryLabels.colored("还有 ", this.theme.textDim()))
+                    .append(FactoryLabels.colored(
+                            Integer.toString(rules.size() - shown), this.theme.textValue()))
+                    .append(FactoryLabels.colored(" 条", this.theme.textDim())));
         }
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
@@ -1562,13 +1684,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawMachineTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new java.util.ArrayList<>();
-        lines.add(Component.literal(blockName(machine.blockId())));
-        lines.add(Component.literal(statusText(machine)));
-        lines.add(Component.literal(machine.ref().dimension().location()
-                + " " + machine.ref().pos().toShortString()));
-        lines.add(Component.literal(machine.lineNames().isEmpty()
-                ? "未编线" : "产线 " + String.join("/", machine.lineNames())));
-        lines.add(Component.literal("规则 " + machine.ruleCount() + " 条"));
+        lines.add(FactoryLabels.colored(blockName(machine.blockId()), this.theme.textPrimary()));
+        lines.add(FactoryLabels.colored(statusText(machine), statusColor(machine)));
+        lines.add(FactoryLabels.colored(machine.ref().dimension().location()
+                + " " + machine.ref().pos().toShortString(), this.theme.textDim()));
+        lines.add(machine.lineNames().isEmpty()
+                ? FactoryLabels.colored("未编线", this.theme.textDim())
+                : FactoryLabels.labelValue("产线 ",
+                        String.join("/", machine.lineNames()), this.theme));
+        lines.add(Component.empty()
+                .append(FactoryLabels.colored("规则 ", this.theme.textDim()))
+                .append(FactoryLabels.colored(
+                        Integer.toString(machine.ruleCount()), this.theme.textValue()))
+                .append(FactoryLabels.colored(" 条", this.theme.textDim())));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
@@ -1652,12 +1780,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         String lines = machine.lineNames().isEmpty()
                 ? "未编线" : String.join(" / ", machine.lineNames());
-        String rules = "规则 " + machine.ruleCount();
-        int rulesWidth = this.font.width(rules);
+        String rulesLabel = "规则 ";
+        String rulesValue = Integer.toString(machine.ruleCount());
+        int rulesWidth = this.font.width(rulesLabel) + this.font.width(rulesValue);
         int lineWidth = Math.max(12, right - rulesWidth - 6 - textX);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(lines, lineWidth),
-                textX, lineY, CARD_LINE, false);
-        graphics.drawString(this.font, rules, right - rulesWidth, lineY, CARD_META, false);
+                textX, lineY,
+                machine.lineNames().isEmpty()
+                        ? this.theme.textDim() : this.theme.textValue(), false);
+        int rulesX = right - rulesWidth;
+        graphics.drawString(this.font, rulesLabel, rulesX, lineY, CARD_META, false);
+        graphics.drawString(this.font, rulesValue,
+                rulesX + this.font.width(rulesLabel), lineY,
+                this.theme.textValue(), false);
     }
 
     // ------------------------------------------------------------------
@@ -2035,7 +2170,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            TableHit hit = tableHitAt(mouseY);
+            TableHit hit = tableHitAt(mouseY, System.currentTimeMillis());
             if (hit != null) {
                 FactorySnapshotBuilder.MachineView machine = hit.machine();
                 int y = hit.y();
@@ -2046,7 +2181,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 }
 
                 // 展开区单元格：位置必须和绘制共用同一份排版。
-                IoDetailRender.Cell cell = detailCellAt(machine, y, mouseX, mouseY);
+                IoDetailRender.Cell cell = detailCellAt(hit, mouseX, mouseY);
                 if (cell != null) {
                     List<ResourceSpec> rules = cell.input()
                             ? machine.inputs() : machine.outputs();

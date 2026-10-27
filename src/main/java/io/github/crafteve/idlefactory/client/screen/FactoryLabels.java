@@ -10,6 +10,9 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -196,5 +199,62 @@ final class FactoryLabels {
             case NO_SPACE -> theme.statusWarn();
             case NO_HANDLER, REJECTED -> theme.error();
         };
+    }
+
+    /**
+     * 给一段文字上色。
+     *
+     * <p>MC 的文字颜色只认 RGB，这里把主题里的 ARGB 去掉 alpha；tooltip 的
+     * {@code Component} 会保留每个片段的样式。</p>
+     *
+     * @param text 文字
+     * @param argb 主题色
+     * @return 带颜色的文本组件
+     */
+    static Component colored(String text, int argb) {
+        return Component.literal(text)
+                .withStyle(Style.EMPTY.withColor(TextColor.fromRgb(argb & 0xFFFFFF)));
+    }
+
+    /**
+     * 「标签 + 值」的一行 tooltip：标签暗色、值强调色。
+     *
+     * @param label 标签
+     * @param value 值
+     * @param theme 主题
+     * @return 文本组件
+     */
+    static Component labelValue(String label, String value, GuiTheme theme) {
+        return Component.empty()
+                .append(colored(label, theme.textDim()))
+                .append(colored(value, theme.textValue()));
+    }
+
+    /**
+     * 「数量 + 单位」的速率片段。
+     *
+     * @param rate 速率值
+     * @param kind 资源类型
+     * @param theme 主题
+     * @return 文本组件
+     */
+    static Component rate(long rate, ResourceKind kind, GuiTheme theme) {
+        return Component.empty()
+                .append(colored(count(rate), theme.textValue()))
+                .append(colored(rateUnit(kind), theme.textDim()));
+    }
+
+    /**
+     * 「状态：xxx」的 tooltip 片段，状态本身继续跟随状态色。
+     *
+     * @param reason 原因
+     * @param input  是否输入侧
+     * @param theme  主题
+     * @return 文本组件
+     */
+    static Component state(IoResult.Reason reason, boolean input, GuiTheme theme) {
+        return Component.empty()
+                .append(colored("状态：", theme.textDim()))
+                .append(colored(reason(reason, input), reasonColor(reason, theme)));
     }
 }

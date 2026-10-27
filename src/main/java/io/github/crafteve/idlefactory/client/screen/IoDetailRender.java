@@ -100,7 +100,7 @@ final class IoDetailRender {
      */
     static Detail layout(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
             int topY, int animatedHeight) {
-        int height = Math.max(0, Math.min(animatedHeight, layout.ioMaxDetailHeight()));
+        int height = Math.max(0, animatedHeight);
         int x = layout.leftX + 2;
         int width = layout.ioPanelWidth();
         int contentX = x + FactoryLayout.IO_PANEL_PAD;
@@ -182,7 +182,7 @@ final class IoDetailRender {
      */
     static void draw(GuiGraphics graphics, Font font, GuiTheme theme, FactoryLayout layout,
             FactorySnapshotBuilder.MachineView machine, Detail detail, int mouseX, int mouseY) {
-        if (detail.height() <= 0) {
+        if (detail.height() < FactoryLayout.IO_PANEL_PAD + 2) {
             return;
         }
         NineSlice.ioPanel(graphics, detail.x(), detail.y(), detail.width(), detail.height());
@@ -215,9 +215,14 @@ final class IoDetailRender {
         NineSlice.ioHeader(graphics, contentX, section.headerY(),
                 innerW, FactoryLayout.IO_SECTION_H);
 
-        String label = (section.input() ? "输入" : "输出") + " · " + section.rules() + " 条";
+        String label = (section.input() ? "输入" : "输出") + " · ";
+        String count = Integer.toString(section.rules());
         graphics.drawString(font, label, contentX + 4, section.headerY() + 2,
                 HEADER_TEXT, false);
+        graphics.drawString(font, count, contentX + 4 + font.width(label),
+                section.headerY() + 2, HEADER_RATE, false);
+        graphics.drawString(font, " 条", contentX + 4 + font.width(label) + font.width(count),
+                section.headerY() + 2, HEADER_TEXT, false);
 
         long rate = section.input() ? machine.rateIn() : machine.rateOut();
         String rateText = FactoryLabels.count(rate) + "/s";
@@ -262,15 +267,19 @@ final class IoDetailRender {
         ItemStack icon = FactoryLabels.icon(spec.key());
         graphics.renderItem(icon, slotX + 1, slotY + 1);
 
-        String rateText = FactoryLabels.count(rate) + FactoryLabels.rateUnit(spec.key().kind());
-        graphics.drawString(font, rateText,
-                cell.x() + cell.width() - 4 - font.width(rateText),
-                cell.y() + 4, theme.textPrimary(), false);
+        String rateValue = FactoryLabels.count(rate);
+        String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
+        int rateWidth = font.width(rateValue) + font.width(rateUnit);
+        int rateX = cell.x() + cell.width() - 4 - rateWidth;
+        graphics.drawString(font, rateValue, rateX, cell.y() + 4,
+                theme.textValue(), false);
+        graphics.drawString(font, rateUnit, rateX + font.width(rateValue), cell.y() + 4,
+                theme.textDim(), false);
 
         int textX = slotX + FactoryLayout.CELL + 4;
         int lineY = cell.y() + 14;
         String face = FactoryLabels.face(spec);
-        graphics.drawString(font, face, textX, lineY, theme.textDim(), false);
+        graphics.drawString(font, face, textX, lineY, theme.textValue(), false);
         int reasonX = textX + font.width(face) + 4;
         int reasonWidth = cell.x() + cell.width() - 4 - reasonX;
         String reasonText = FactoryLabels.reason(reason, cell.input());

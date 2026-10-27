@@ -378,18 +378,6 @@ public final class FactoryLayout {
     }
 
     /**
-     * 展开详情面板允许的最大高度。
-     *
-     * <p>必须至少给基础行留出 {@link #ROW_H}，否则展开行会高过表格可视区，连基础行
-     * 都画不出来。超高时由绘制方按整行裁剪。</p>
-     *
-     * @return 最大高度；屏幕太矮时可能为 0
-     */
-    public int ioMaxDetailHeight() {
-        return Math.max(0, this.footerY - this.rowTop - ROW_H);
-    }
-
-    /**
      * 按优先级挑一组能放下的列，并把宽度按比例分配。
      *
      * <p>四列放不下时退化成「机器 + 状态」，IO 走 tooltip。这样任何宽度下都不会有列

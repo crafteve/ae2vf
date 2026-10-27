@@ -8,6 +8,9 @@ package io.github.crafteve.idlefactory.client.theme;
  * <p><b>静态外观已经搬到贴图里</b>（{@code tools/gui/gen_textures.py} 生成，色值和这里一一对应）。
  * 这里留下的是**文字色与状态色**——它们要随主题变、又不能进贴图，所以留在代码里。</p>
  *
+ * <p>{@code textValue} 是纯文字色（数字、速率、面），没有对应贴图，不需要改生成脚本；
+ * 其余色值仍然保持「Java 常量 ↔ 生成脚本调色板」两边一致。</p>
+ *
  * <p>改色必须两边一起改：这里的常量 + 生成脚本里的调色板。否则贴图和文字会脱节，而且这种脱节
  * 在截图里看不出来。</p>
  */
@@ -34,6 +37,8 @@ public record GuiTheme(
         int textPrimary,
         /** 次要文字。 */
         int textDim,
+        /** 数值/速率/数量/面等需要强调的值；只用于文字，没有对应贴图。 */
+        int textValue,
         /** 悬停底色。 */
         int hoverBg,
         /** 错误。 */
@@ -64,6 +69,7 @@ public record GuiTheme(
             0xFF413F54, // accent
             0xFF413F54, // textPrimary
             0xFF878FA5, // textDim
+            0xFF2F6F86, // textValue（青蓝色，专门区分数字与面）
             0xFFDEDFE3, // hoverBg
             0xFFCE2401, // error
             0xFF3F7F8C, // statusRun
@@ -84,6 +90,7 @@ public record GuiTheme(
             0xFF4DD0E1,
             0xFFE6E6E6,
             0xFF6B6B72,
+            0xFF4DD0E1,
             0xFF2A2A30,
             0xFFE57373,
             0xFF4DD0E1,
