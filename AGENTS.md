@@ -25,7 +25,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | MC / NeoForge | 1.21.1 / 21.1.264 |
 | Java / Gradle / ModDevGradle | 21 / 9.2.1 / 2.0.148 |
 | Parchment | 2024.11.17 |
-| modid / 版本 / 分支 | `idlefactory` / 0.1.0 / `refactor/factory-core` |
+| modid / 版本 / 分支 | `idlefactory` / 0.1.0 / `1.21.1neoforge`（主线） |
 | AE2 | 19.2.10，`implementation`，硬依赖 |
 | JEI | 19.21.1.304，`compileOnly + runtimeOnly`，可选 |
 | Mekanism | 10.7.19.85，仅 `localRuntime`，本地测试用 |
@@ -202,7 +202,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - Conventional Commits + scope：`feat`、`fix`、`refactor`、`docs`、`chore`、`perf`、`test`、`style`；scope 用模块名，如 `io`、`ui`、`command`、`storage`、`tools`。
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
-- 当前分支 `refactor/factory-core`。
+- 当前分支 `1.21.1neoforge`（主线）；旧 M3 画布线归档在 `archive/m3-canvas`，只读，不再从它拉分支。
 
 ### 5.5 本文件的修改
 

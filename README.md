@@ -1,6 +1,6 @@
 # Idle Factory（放置工厂）
 
-> modid: `idlefactory` · 当前分支 `refactor/factory-core`
+> modid: `idlefactory` · 当前分支 `1.21.1neoforge`
 
 把 Minecraft 科技整合包里「把机器接进自动化网络」这一步，从「摆接口、铺线缆、调 IO 面」变成「在终端里点一下」。
 
@@ -213,4 +213,4 @@ IO 默认每 tick 一轮，能量 / 流体也是「塞满」；1 tick 一轮对�
 
 ## 分支说明
 
-`refactor/factory-core` 从 M1 终点 `e8ba44b` 拉出，旧 M2/M3 的 WIP 保存在 `stash@{0}`，切回 `1.21.1neoforge` 后可 `git stash pop` 恢复。
+`1.21.1neoforge` 从 M1 终点 `e8ba44b` 拉出并继续开发，是当前主线。旧 M2/M3 画布线已归档到 `archive/m3-canvas` 分支和 `archive/m3-20261025` tag；其 WIP 仍留在 `stash@{0}`，只作留档，**不要 pop 到新主线**。
