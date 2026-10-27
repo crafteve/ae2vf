@@ -218,18 +218,18 @@ final class IoDetailRender {
 
         String label = (section.input() ? "输入" : "输出") + " · ";
         String count = Integer.toString(section.rules());
-        graphics.drawString(font, label, contentX + 4, section.headerY() + 1,
+        graphics.drawString(font, label, contentX + 4, section.headerY() + 2,
                 HEADER_TEXT, false);
         graphics.drawString(font, count, contentX + 4 + font.width(label),
-                section.headerY() + 1, HEADER_VALUE, false);
+                section.headerY() + 2, HEADER_VALUE, false);
         graphics.drawString(font, " 条", contentX + 4 + font.width(label) + font.width(count),
-                section.headerY() + 1, HEADER_TEXT, false);
+                section.headerY() + 2, HEADER_TEXT, false);
 
         long rate = section.input() ? machine.rateIn() : machine.rateOut();
         String rateText = FactoryLabels.count(rate) + "/s";
         graphics.drawString(font, rateText,
                 contentX + innerW - 4 - font.width(rateText),
-                section.headerY() + 1,
+                section.headerY() + 2,
                 rate > 0L ? theme.statusRun() : HEADER_TEXT, false);
 
         if (section.rules() == 0) {

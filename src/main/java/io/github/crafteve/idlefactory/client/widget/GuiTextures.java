@@ -109,10 +109,10 @@ public final class GuiTextures {
     public static final int IO_PANEL_BORDER = 3;
     /** IO 单元格/段头/悬停按钮的九宫格边长。 */
     public static final int IO_CELL_SIZE = 6;
-    /** IO 段头贴图边长；2px 边框用来画更深的底/右阴影。 */
-    public static final int IO_HEADER_SIZE = 8;
+    /** IO 段头贴图边长；1px 边框用来画下/右阴影。 */
+    public static final int IO_HEADER_SIZE = 6;
     /** IO 段头九宫格边框。 */
-    public static final int IO_HEADER_BORDER = 2;
+    public static final int IO_HEADER_BORDER = 1;
     /** 箭头贴图边长。 */
     public static final int CHEVRON_SIZE = 7;
     /** 状态灯边长。 */
