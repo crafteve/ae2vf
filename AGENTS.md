@@ -14,7 +14,8 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 工厂不是数据库：仓库在 AE2 网络或方块容器组；仓库离线 = 没料，不是断网。
 - 被动产线：玩家配置输入输出，当前形态。主动产线：AE2 pattern / CPU 下单，未实现。
 - 四个基础概念：机器库、产线、IO 组、回收站。
-- 资源统一为 `(kind, id)`：物品、流体、FE；化学品只有枚举位，配了不执行。
+- 资源统一为 `(kind, id, components)`：物品带数据组件快照，流体 / FE 只按注册名；化学品只有枚举位，配了不执行。
+- IO 规则分精确 / 模糊：模糊忽略物品组件，旧规则默认按模糊读入。
 - 观测层是第二事实层：方块在不在、哪个面有什么能力、是否在干活。界面与指令只读观测。
 - 无物品、无方块，只有 MenuType。入口是 `/idf` 指令与 `/idf gui`。
 
@@ -29,6 +30,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | AE2 | 19.2.10，`implementation`，硬依赖 |
 | JEI | 19.21.1.304，`compileOnly + runtimeOnly`，可选 |
 | Mekanism | 10.7.19.85，仅 `localRuntime`，本地测试用 |
+| Applied Flux | 1.21-2.1.5-neoforge，`compileOnly + localRuntime`，可选；提供 AE2 的 FE key |
 
 ## 二、项目结构
 
@@ -63,7 +65,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 3. 依赖单向。现存例外只有 4 个：`storage → menu`、`storage → network`、`factory → integration.ae2`、`network.payload → client.network`。禁止新增跨层环。
 4. 发包只从 `network`。`FactoryStorageActions` 发包是历史例外，新代码不许学。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
-6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。
+6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。唯一例外是 `ResourceKey`：它持一份 count=1 的 `ItemStack` 快照（构造时复制、对外只返回副本），用来承载物品数据组件。
 7. 单文件超过约 400 行先给拆分方案，不边想边改。
 8. 新建包、新建文件、改数据层交互结构（record 字段 / NBT / 网络字段 / 跨包签名），计划里必须逐项列出：文件、职责、依赖方向、迁移顺序。等你确认后再动手。
 
@@ -77,7 +79,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口；`FactoryBin` 管回收站；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
 - `line`：配置层。`PassiveLine` 是产线开关，`IoGroup` 是一台机器的输入输出规则组，`LineService` 做管理动作。
-- `io`：执行层。`LineRunner` 遍历线与组、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
+- `io`：执行层。`LineRunner` 遍历线与组、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`RuleResolver` 负责取面与 handler；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
 
 调用链：`ServerTick → FactoryRuntime → LineRunner → GroupRunner → IoTransfer → Storage / ResourceAdapter`。
 
@@ -91,6 +93,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 上限、间隔、容量一律具名常量，并在解码侧校验。
 - 枚举分支用穷尽 `switch`，不留 `default` 掩盖新增值。
 - 禁止布尔盲参数：不写 `foo(true, false)`，用枚举或具名类型。
+- 物品身份 = 注册名 + 数据组件；`ResourceKey` 的相等 / 哈希与 AE2 `AEItemKey` 对齐（`isSameItemSameComponents` / `hashItemAndComponents`）。
+- `ResourceSpec` 的 `MatchMode` 决定规则是否比较组件；旧档缺 `Mode` 的物品规则按 `IGNORE_COMPONENTS` 读入。
+- 物品规则落盘时，带组件的写 `Stack`（`ItemStack.CODEC` + `HolderLookup.Provider`），无组件仍旧只写 `Kind/Id`；网络 key 统一走 `ResourceKeyCodec` 整栈编解码。
 
 ### 2.4 其余包
 
@@ -110,6 +115,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 读路径不探世界：展示、指令、界面只读观测缓存。
 - 索引 O(1)：`byId`、`byPosition`；不每 tick 新建集合、不重复分配。
 - 所有遍历有上限护栏；失联通知按工厂聚合、10 秒节流；心跳走 trace。
+- 模糊物品变体：索引 TTL 20 tick、单 id 64 个、单规则 8 个 / 单组 16 个变体每 tick；仓库快照按 512 KiB 分片。
 - 卡顿先降频，再考虑加预算。
 
 ### 3.2 界面
@@ -123,6 +129,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 图标主导，少文字：物品、机器、状态优先用图标 + 颜色 + 动画表达。
 - 状态表达：灯色 + 文字色 + 1px 状态条；列宽自适应，压缩机器名与状态，信息列优先。
 - 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步 `GuiTheme`。
+- 流体 / FE 图标按 AE2 风格：流体 still 贴图染色，FE 用 Applied Flux 图标（未装时绿色水贴图兜底）；物品用原版装饰层补耐久条。
+- 仓库格数量：物品 / FE 最多 4 字符、流体最多 5 字符，缩放 0.666；完整精度只放 tooltip 与速率。
+- 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
 - 几何只在 `FactoryLayout`。溢出先让位，不许压到相邻区域。
 - 尺寸问题先看 `logs/latest.log` 的 `Idle Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Didlefactory.gutter` 现场调。
 
@@ -160,6 +169,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - 空值用 `org.jetbrains.annotations.Nullable`。
 - 游戏循环内异常必须降级，不外抛；快照失败返回空快照。
 - 不新增 AE2 之外的硬依赖；可选模组一律 `compileOnly + localRuntime`。
+- Applied Flux 只能通过 `AppFluxKeys.Bridge` 懒加载；加 `-PwithoutAppFlux` 可验证未安装路径。
 
 ### 4.5 网络
 
@@ -212,7 +222,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `IoTransfer.java` · `GroupRunner.java` · `ObservationService.java` · `FactoryLayout.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -226,11 +236,13 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 8. 容器优先级：高的先填、低的先抽；同优先级组内两阶段，组间不合并。
 9. 仓库离线 = 空仓库，表现为没料，不是报错。
 10. 无自动化测试；新逻辑优先写成可独立验证的纯函数，再进游戏核验。
+11. 模糊规则没有候选 ≠ 输入堵塞：仓库缺料是 `WAITING_MATERIAL`，只有 `inputFull`（机器满 / 拒收）才是 `INPUT_BLOCKED`。
+12. 流体图标不透明：仓库格的悬停描边必须画在图标之后，否则只剩 1px 暗边。
+13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 
 ### 6.3 文档偏差
 
-- README 仍写界面 P0，架构树含已删除的 `DemoRows`。
 - `docs/ui/P0.md` 写默认留白 48，代码是 96。
 - `factory/io/package-info.java` 仍称"本包暂时为空"。
 
-改到相关处顺手修，不为这三条单独开重构。
+改到相关处顺手修，不为这两条单独开重构。

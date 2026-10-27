@@ -483,6 +483,48 @@
 
 ---
 
+## ADR-028 物品身份包含数据组件，IO 规则分精确 / 模糊
+
+**状态**：已决定
+
+**决定**：物品资源身份 = 注册名 + 完整数据组件。`ResourceKey` 内部持一份 count=1 的 `ItemStack` 快照，相等 / 哈希直接复用 `ItemStack.isSameItemSameComponents` / `hashItemAndComponents`，与 AE2 的 `AEItemKey` 对齐。`ResourceSpec` 增加 `MatchMode`：`EXACT` 比较组件，`IGNORE_COMPONENTS` 只比较注册名；旧存档缺 `Mode` 的物品规则按模糊读入，新规则只在命令里写了组件时才精确。
+
+**理由**：
+
+- 1.21 的附魔、药水、命名、损伤都在数据组件里；只按注册名会把不同变体合并，取出时丢组件
+- AE2 的仓库本身就是按精确变体存储，模糊只发生在输出总线 / 接口 / 样板这一侧
+- 旧规则原本就是「按 id 搬」，迁移成模糊才能保持行为
+
+**后果**：
+
+- 仓库快照、GUI、网络、存档、AE2 适配全部保留组件；同名变体在界面各占一格
+- 模糊输入需要枚举仓库变体，新增 `ItemVariantIndex`（TTL 20 tick、单 id 64、单规则 8 / 单组 16 每 tick）；模糊输出直接读机器实际栈
+- 仓库快照按 512 KiB 分片，避免大组件撑爆单包；协议版本随包结构递增
+- 暂不做 AE2 的百分比模糊（99/75/50/25）；`IGNORE_COMPONENTS` 等价于 `IGNORE_ALL`
+- `ResourceKey` 是「数据 record 不持活对象」的唯一例外：只持不可变副本
+
+---
+
+## ADR-029 AE2 的 FE 通过 Applied Flux 的 FE key 桥接
+
+**状态**：已决定
+
+**决定**：AE2 仓库的 FE 走 Applied Flux 的 `FluxKey.of(EnergyType.FE)`，只桥接 `EnergyType.FE`（GTEU 忽略）。Applied Flux 是可选依赖：`compileOnly + localRuntime`，所有类型收进 `AppFluxKeys.Bridge` 懒加载，未安装时 `available()` 短路并降级。
+
+**理由**：
+
+- AE2 原生只有物品 / 流体，FE 必须依赖附属的 key 类型
+- 直接把附属类散在业务代码里会让「没装附属」变成类加载崩溃
+- `-PwithoutAppFlux` 可以在开发环境验证未安装路径
+
+**后果**：
+
+- `Ae2Storage.supports(ENERGY)` 以 `feKey() != null` 为准；没装附属时 FE 只走方块容器
+- FE 图标优先用 `EnergyType.FE.getIcon()`，未装时退回绿色水贴图
+- Applied Flux 版本升级时先看 `FluxKey` / `EnergyType` 的 API 是否变化
+
+---
+
 ## 待定
 
 | 编号 | 问题 |

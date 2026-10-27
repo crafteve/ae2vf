@@ -48,8 +48,9 @@
 
 **阶段收尾：多类型（物品 / 流体 / FE）**
 
-- 已跑通：容器仓库（箱子、储罐、能量立方）与 AE2 仓库（物品、流体）
-- 已知限制：AE2 的 FE 仍等 Applied Flux；化学品只有枚举位；旧存档不兼容
+- 已跑通：容器仓库（箱子、储罐、能量立方）与 AE2 仓库（物品、流体、FE）
+- 资源身份包含物品数据组件；IO 规则分精确 / 模糊，旧规则默认模糊；仓库格数量按 k/M/G… 缩写、流体用 B
+- 已知限制：化学品只有枚举位；模糊规则暂不支持 AE2 的百分比档（99/75/50/25）
 - 下一步：界面 P1（详见 [docs/ui/P0.md](docs/ui/P0.md)）
 
 ## 指令
@@ -127,9 +128,9 @@ Tab 补全按上下文过滤：`add` 只补还没进任何产线的机器，`rem
 
 | 类型 | 单位 | 来源 |
 |---|---|---|
-| 物品 | 个 | `IItemHandler` / AE2 `AEItemKey` |
-| 流体 | mB | `IFluidHandler` / AE2 `AEFluidKey` |
-| 能量 | FE | `IEnergyStorage`；AE2 侧需要 Applied Flux（目前占位） |
+| 物品 | 个 | `IItemHandler` / AE2 `AEItemKey`（含数据组件） |
+| 流体 | B（内部 mB） | `IFluidHandler` / AE2 `AEFluidKey` |
+| 能量 | FE | `IEnergyStorage`；AE2 侧经 Applied Flux 的 `FluxKey` |
 
 默认搬运量是「塞满」：机器能收多少就搬多少。化学品只留枚举位，配了规则不执行。
 
@@ -158,17 +159,17 @@ factory/                        工厂主体（服务端权威）
 │   └── PassiveLine / IoGroup / LineLibrary / LineService
 ├── io/                         IO 执行
 │   └── IoTransfer / GroupRunner / LineRunner / RunnerState / IoResult
+│   └── RuleResolver / ItemCandidates / ItemVariantIndex
 │   └── ResourceAdapter / ItemAdapter / FluidAdapter / EnergyAdapter
 └── diag/                       诊断
     └── DiagEvent / DiagStats / DiagChecks / DiagRender / DiagService
 
 integration/ae2/                AE2 适配（物品 / 流体）
-integration/appflux/            Applied Flux 的 FE key（占位）
+integration/appflux/            Applied Flux 的 FE key（可选依赖）
 menu/                           FactoryMenu（只持有 36 个玩家槽位）
 client/
 ├── screen/FactoryScreen        工作台绘制（P0：骨架 + 假数据）
 ├── screen/FactoryLayout        全部几何，一处算完
-├── screen/DemoRows             P0 假数据（P1 删）
 ├── widget/NineSlice            九宫格 blit
 ├── widget/GuiTextures          贴图 id 与边框宽度
 └── theme/GuiTheme              文字色与状态色（静态外观在贴图里）
@@ -194,7 +195,7 @@ client/
 ./gradlew runClient  # 起开发客户端
 ```
 
-Mekanism 只用于本地运行期测试流体机器（`localRuntime`），不是编译依赖；首次 `runClient` 会从 Modrinth 下载。
+Mekanism 只用于本地运行期测试流体机器（`localRuntime`），不是编译依赖；首次 `runClient` 会从 Modrinth 下载。Applied Flux 用于测试 AE2 的 FE 仓库，同样是可选运行期依赖；加 `-PwithoutAppFlux` 可验证未安装附属时的降级路径。
 
 ## 已知的平衡改变
 
