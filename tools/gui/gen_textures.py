@@ -247,21 +247,21 @@ def solid(color) -> Image.Image:
 
 
 def io_panel(width: int = 10, height: int = 10, border: int = 3) -> Image.Image:
-    """IO 展开详情底板：浅色终端面板，深色外框 + 亮色内圈 + 顶部青色科技线。"""
-    img = Image.new("RGBA", (width, height), PANEL_BG)
-    rect(img, 0, 0, width, 1, PANEL_BORDER)
-    rect(img, 0, height - 1, width, 1, PANEL_BORDER)
-    rect(img, 0, 0, 1, height, PANEL_BORDER)
-    rect(img, width - 1, 0, 1, height, PANEL_BORDER)
-    rect(img, 1, 1, width - 2, 1, PANEL_BORDER_LIGHT)
-    rect(img, 1, 1, 1, height - 2, PANEL_BORDER_LIGHT)
-    rect(img, 1, height - 2, width - 2, 1, PANEL_BEVEL_LIGHT)
-    rect(img, width - 2, 1, 1, height - 2, PANEL_BEVEL_LIGHT)
-    # 上/左内凹阴影，下/右高光，和面板本身同一套立体逻辑。
-    rect(img, 2, 2, width - 4, 1, PANEL_BEVEL_DARK)
-    rect(img, 2, 2, 1, height - 4, PANEL_BEVEL_DARK)
-    # 顶部一条青色科技线，强调「这是 IO 详情」而不是普通面板。
-    rect(img, 2, 2, width - 4, 1, STATUS_RUN)
+    """IO 展开详情底板：深钢灰板材，亮顶、暗底、冷色外框，顶部一条青色科技线。"""
+    img = Image.new("RGBA", (width, height), MACHINE_CARD_BG)
+    rect(img, 0, 0, width, 1, MACHINE_CARD_BORDER)
+    rect(img, 0, height - 1, width, 1, MACHINE_CARD_BORDER)
+    rect(img, 0, 0, 1, height, MACHINE_CARD_BORDER)
+    rect(img, width - 1, 0, 1, height, MACHINE_CARD_BORDER)
+    rect(img, 1, 1, width - 2, 1, MACHINE_CARD_TOP)
+    rect(img, 1, 1, 1, height - 2, MACHINE_CARD_TOP)
+    rect(img, 1, height - 2, width - 2, 1, MACHINE_CARD_BOTTOM)
+    rect(img, width - 2, 1, 1, height - 2, MACHINE_CARD_BOTTOM)
+    # 内凹：顶部再压暗、底部再提亮，让板材低于行卡片一层。
+    rect(img, 2, 2, width - 4, 1, MACHINE_CARD_BOTTOM)
+    rect(img, 2, 2, 1, height - 4, MACHINE_CARD_BOTTOM)
+    # 顶部一条青色科技线。
+    rect(img, 2, 2, width - 5, 1, STATUS_RUN)
     return img
 
 
@@ -288,9 +288,9 @@ def io_cell_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Ima
 
 
 def io_header(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
-    """IO 段头：浅钢灰底，顶部亮线、底部青色科技线。"""
-    img = Image.new("RGBA", (width, height), TABLE_HEADER_BG)
-    rect(img, 0, 0, width, 1, PANEL_BORDER_LIGHT)
+    """IO 段头：深色凹槽条，顶部冷色高光、底部青色科技线。"""
+    img = Image.new("RGBA", (width, height), MACHINE_CARD_BOTTOM)
+    rect(img, 0, 0, width, 1, MACHINE_CARD_TOP)
     rect(img, 0, height - 1, width, 1, STATUS_RUN)
     return img
 

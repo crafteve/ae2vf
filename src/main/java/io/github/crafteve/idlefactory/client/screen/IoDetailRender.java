@@ -24,6 +24,11 @@ import net.minecraft.world.item.ItemStack;
  * 面板高度由动画进度决定，但只有整行单元格会画出来，避免半行贴图。</p>
  */
 final class IoDetailRender {
+    /** 深色段头上的冷白。 */
+    private static final int HEADER_TEXT = 0xFFE8ECF5;
+    /** 深色段头上的亮青数值。 */
+    private static final int HEADER_VALUE = 0xFF4DE3FF;
+
     private IoDetailRender() {
         // 纯静态工具类
     }
@@ -213,17 +218,17 @@ final class IoDetailRender {
         String label = (section.input() ? "输入" : "输出") + " · ";
         String count = Integer.toString(section.rules());
         graphics.drawString(font, label, contentX + 4, section.headerY() + 2,
-                theme.textPrimary(), false);
+                HEADER_TEXT, false);
         graphics.drawString(font, count, contentX + 4 + font.width(label),
-                section.headerY() + 2, theme.textValue(), false);
+                section.headerY() + 2, HEADER_VALUE, false);
         graphics.drawString(font, " 条", contentX + 4 + font.width(label) + font.width(count),
-                section.headerY() + 2, theme.textPrimary(), false);
+                section.headerY() + 2, HEADER_TEXT, false);
 
         long rate = section.input() ? machine.rateIn() : machine.rateOut();
         String rateText = FactoryLabels.count(rate) + "/s";
         graphics.drawString(font, rateText,
                 contentX + innerW - 4 - font.width(rateText),
-                section.headerY() + 2, theme.textValue(), false);
+                section.headerY() + 2, HEADER_VALUE, false);
 
         if (section.rules() == 0) {
             int textY = section.headerY() + FactoryLayout.IO_SECTION_H

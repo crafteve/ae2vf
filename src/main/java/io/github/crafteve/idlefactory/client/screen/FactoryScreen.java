@@ -13,6 +13,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.storage.FactoryStorageRepo;
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
+import io.github.crafteve.idlefactory.client.widget.NeonTooltip;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
@@ -1484,7 +1485,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.searchBox != null && !this.searchBox.isFocused()
                 && mouseX >= l.rightX + 4 && mouseX < l.rightX + l.rightW - 4
                 && mouseY >= l.searchY && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
-            graphics.renderComponentTooltip(this.font, List.of(
+            drawNeonTooltip(graphics, List.of(
                     searchHint("@", "按模组"),
                     searchHint("#", "按标签"),
                     searchHint("$", "按 tooltip"),
@@ -1501,7 +1502,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             if (index >= 0 && index < this.filteredStorageEntries.size()) {
                 FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
                 GuiTheme.Tooltip tt = this.theme.tooltip();
-                graphics.renderComponentTooltip(this.font, List.of(
+                drawNeonTooltip(graphics, List.of(
                         FactoryLabels.colored(resourceName(entry.key()), tt.title()),
                         FactoryLabels.colored(entry.key().id().toString(), tt.label()),
                         Component.empty()
@@ -1562,6 +1563,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
     }
 
+    /** 用工厂自己的浅色 RGB tooltip 代替原版深色 tooltip。 */
+    private void drawNeonTooltip(GuiGraphics graphics, List<Component> lines,
+            int mouseX, int mouseY) {
+        NeonTooltip.draw(graphics, this.font, lines, mouseX, mouseY, this.width, this.height);
+    }
+
     /** 搜索语法提示：符号强调色，说明暗色。 */
     private Component searchHint(String key, String description) {
         GuiTheme.Tooltip tt = this.theme.tooltip();
@@ -1606,7 +1613,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 .append(FactoryLabels.colored(
                         Integer.toString(machine.outputs().size()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));
-        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        drawNeonTooltip(graphics, lines, mouseX, mouseY);
     }
 
     /** 展开区单元格的完整信息：面、速率和诊断。 */
@@ -1629,7 +1636,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         lines.add(Component.empty()
                 .append(FactoryLabels.colored(cell.input() ? "输入" : "输出", tt.title()))
                 .append(FactoryLabels.colored(" #", tt.label()))
-                .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1), tt.value()))
+                .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1),
+                        tt.index()))
                 .append(FactoryLabels.colored(" · ", tt.label()))
                 .append(FactoryLabels.colored(resourceName(spec.key()), tt.title())));
         lines.add(FactoryLabels.faceLine(
@@ -1639,7 +1647,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), this.theme)));
         lines.add(FactoryLabels.state(reason, cell.input(), this.theme));
-        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        drawNeonTooltip(graphics, lines, mouseX, mouseY);
     }
 
     /** 鼠标是否落在某个逻辑列的横向范围内。 */
@@ -1680,7 +1688,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                             Integer.toString(rules.size() - shown), tt.value()))
                     .append(FactoryLabels.colored(" 条", tt.label())));
         }
-        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        drawNeonTooltip(graphics, lines, mouseX, mouseY);
     }
 
     /** 机器库卡片的 tooltip：名称、总状态、坐标、产线和规则数。 */
@@ -1701,7 +1709,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 .append(FactoryLabels.colored(
                         Integer.toString(machine.ruleCount()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));
-        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+        drawNeonTooltip(graphics, lines, mouseX, mouseY);
     }
 
     /**

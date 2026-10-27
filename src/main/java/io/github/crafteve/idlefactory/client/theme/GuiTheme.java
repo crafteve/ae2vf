@@ -39,7 +39,7 @@ public record GuiTheme(
         int textDim,
         /** 数值/速率/数量/面等需要强调的值；只用于文字，没有对应贴图。 */
         int textValue,
-        /** 深色 tooltip 的霓虹配色。 */
+        /** 浅色 tooltip 的霓虹配色。 */
         Tooltip tooltip,
         /** 悬停底色。 */
         int hoverBg,
@@ -53,21 +53,22 @@ public record GuiTheme(
         int statusIdle) {
 
     /**
-     * 深色 tooltip 的霓虹配色。
+     * 浅色 tooltip 的霓虹配色。
      *
-     * <p>原版 tooltip 背景是深紫色，浅色面板的 {@code textPrimary} 放进去几乎看不见，
-     * 所以单独给一套高对比色。只用于 tooltip 文字，没有贴图对应。</p>
+     * <p>tooltip 由 {@code NeonTooltip} 自绘成浅色底板，所以文字用深色高饱和值；
+     * 只用于 tooltip 文字，没有贴图对应。</p>
      *
      * @param title 标题
      * @param label 标签/单位
      * @param value 数值/速率
      * @param face  面
+     * @param index 序号
      * @param ok    正常
      * @param warn  警告
      * @param error 错误
      * @param idle  空闲
      */
-    public record Tooltip(int title, int label, int value, int face,
+    public record Tooltip(int title, int label, int value, int face, int index,
             int ok, int warn, int error, int idle) {
     }
 
@@ -91,8 +92,8 @@ public record GuiTheme(
             0xFF33445C, // textPrimary
             0xFF7C8BA3, // textDim
             0xFF0E8FA8, // textValue（亮青，浅色面板上更像科技终端）
-            new Tooltip(0xFFFFFFFF, 0xFFA9B8CC, 0xFF4DE3FF, 0xFFFF6BD6,
-                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF93A5BC),
+            new Tooltip(0xFF22303F, 0xFF5E7089, 0xFF007A99, 0xFFB0008A, 0xFF9A6A00,
+                    0xFF1E8E3E, 0xFFB26A00, 0xFFC21B3E, 0xFF6B7A90),
             0xFFDEDFE3, // hoverBg
             0xFFCE2401, // error
             0xFF3F7F8C, // statusRun
@@ -114,8 +115,8 @@ public record GuiTheme(
             0xFFE6E6E6,
             0xFF6B6B72,
             0xFF4DD0E1,
-            new Tooltip(0xFFFFFFFF, 0xFFA9B8CC, 0xFF4DE3FF, 0xFFFF6BD6,
-                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF93A5BC),
+            new Tooltip(0xFF22303F, 0xFF5E7089, 0xFF007A99, 0xFFB0008A, 0xFF9A6A00,
+                    0xFF1E8E3E, 0xFFB26A00, 0xFFC21B3E, 0xFF6B7A90),
             0xFF2A2A30,
             0xFFE57373,
             0xFF4DD0E1,
