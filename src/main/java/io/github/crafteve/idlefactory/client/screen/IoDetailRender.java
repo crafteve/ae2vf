@@ -339,10 +339,9 @@ final class IoDetailRender {
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
         ResourceIconRenderer.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
-        String rateValue = FactoryLabels.count(rate);
-        String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
+        String rateText = FactoryLabels.rateText(rate, spec.key().kind());
         int rateColor = FactoryLabels.rateColorUi(rate, reason, theme);
-        int rateWidth = font.width(rateValue) + font.width(rateUnit);
+        int rateWidth = font.width(rateText);
         int rateX = cell.x() + cell.width() - 4 - rateWidth;
         int textX = slotX + FactoryLayout.CELL + 4;
         int nameWidth = rateX - textX - 4;
@@ -351,9 +350,7 @@ final class IoDetailRender {
                     font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
                     textX, cell.y() + 4, theme.textPrimary(), false);
         }
-        graphics.drawString(font, rateValue, rateX, cell.y() + 4, rateColor, false);
-        graphics.drawString(font, rateUnit, rateX + font.width(rateValue), cell.y() + 4,
-                rateColor, false);
+        graphics.drawString(font, rateText, rateX, cell.y() + 4, rateColor, false);
 
         int lineY = cell.y() + 14;
         String face = FactoryLabels.face(spec);

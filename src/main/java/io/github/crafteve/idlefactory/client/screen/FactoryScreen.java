@@ -380,8 +380,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private int ruleWidth(List<ResourceSpec> rules, List<Long> rates) {
         int width = 4;
         for (int i = 0; i < Math.min(3, rules.size()); i++) {
-            String rate = countText(i < rates.size() ? rates.get(i) : 0L)
-                    + FactoryLabels.rateUnit(rules.get(i).key().kind());
+            String rate = FactoryLabels.rateText(i < rates.size() ? rates.get(i) : 0L,
+                    rules.get(i).key().kind());
             width += FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
         }
         return Math.max(72, width);
@@ -1185,21 +1185,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             IoResult.Reason reason = shown < reasons.size()
                     ? reasons.get(shown) : IoResult.Reason.NO_ITEM;
             int rateColor = FactoryLabels.rateColorUi(rate, reason, this.theme);
-            String rateValue = countText(rate);
-            String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
-            int valueWidth = this.font.width(rateValue);
-            int entryWidth = FactoryLayout.CELL + 2 + valueWidth
-                    + this.font.width(rateUnit) + 6;
+            String rateText = FactoryLabels.rateText(rate, spec.key().kind());
+            int valueWidth = this.font.width(rateText);
+            int entryWidth = FactoryLayout.CELL + 2 + valueWidth + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;
             }
             NineSlice.slot(graphics, cursor, y, FactoryLayout.CELL,
                     FactoryLayout.CELL);
             drawResourceIcon(graphics, rules.get(shown).key(), cursor + 1, y + 1);
-            graphics.drawString(this.font, rateValue, cursor + FactoryLayout.CELL + 2,
-                    y + 5, rateColor, false);
-            graphics.drawString(this.font, rateUnit,
-                    cursor + FactoryLayout.CELL + 2 + valueWidth,
+            graphics.drawString(this.font, rateText, cursor + FactoryLayout.CELL + 2,
                     y + 5, rateColor, false);
             cursor += entryWidth;
             shown++;
@@ -1307,10 +1302,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return FactoryLabels.icon(key);
     }
 
-    private void drawCount(GuiGraphics graphics, long count, int right, int bottom) {
-        String text = countText(count);
+    private void drawCount(GuiGraphics graphics, long count, ResourceKind kind,
+            int right, int bottom) {
+        String text = FactoryLabels.gridCount(count, kind);
         float scale = 0.75F;
-        float width = this.font.width(text) * scale;
+        float textWidth = this.font.width(text);
+        // 缩写后仍然偏长时再缩一点，尽量不要压到左边格子；最小 0.5 保证可读。
+        if (textWidth * scale > FactoryLayout.CELL - 2) {
+            scale = Math.max(0.5F, (FactoryLayout.CELL - 2) / textWidth);
+        }
+        float width = textWidth * scale;
         float height = this.font.lineHeight * scale;
         graphics.pose().pushPose();
         graphics.pose().translate(right - width - 1.0F, bottom - height, 300.0F);
@@ -1319,16 +1320,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.pose().popPose();
     }
 
-    private static String countText(long count) {
-        return FactoryLabels.count(count);
-    }
-
     private static String resourceName(ResourceKey key) {
         return FactoryLabels.name(key);
-    }
-
-    private static String unit(ResourceKind kind) {
-        return FactoryLabels.unit(kind);
     }
 
     private static String faceName(ResourceSpec spec) {
@@ -1440,7 +1433,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawStorageEntry(GuiGraphics graphics, FactoryStorageS2C.Entry entry,
             int x, int y) {
         drawResourceIcon(graphics, entry.key(), x + 1, y + 1);
-        drawCount(graphics, entry.count(), x + FactoryLayout.CELL - 1,
+        drawCount(graphics, entry.count(), entry.key().kind(), x + FactoryLayout.CELL - 1,
                 y + FactoryLayout.CELL - 1);
     }
 
@@ -2241,8 +2234,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int shown = 0;
         int limit = Math.min(rules.size(), 3);
         while (shown < limit) {
-            String rate = countText(shown < rates.size() ? rates.get(shown) : 0L)
-                    + FactoryLabels.rateUnit(rules.get(shown).key().kind());
+            String rate = FactoryLabels.rateText(shown < rates.size() ? rates.get(shown) : 0L,
+                    rules.get(shown).key().kind());
             int entryWidth = FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;

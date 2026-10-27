@@ -72,35 +72,6 @@ final class FactoryLabels {
     }
 
     /**
-     * 资源数量单位。
-     *
-     * @param kind 资源类型
-     * @return 单位后缀
-     */
-    static String unit(ResourceKind kind) {
-        return switch (kind) {
-            case ITEM -> "个";
-            case FLUID -> "mB";
-            case ENERGY -> "FE";
-            case CHEMICAL -> "";
-        };
-    }
-
-    /**
-     * 速率后缀，例如 {@code /s}、{@code mB/s}、{@code FE/s}。
-     *
-     * @param kind 资源类型
-     * @return 速率后缀
-     */
-    static String rateUnit(ResourceKind kind) {
-        return switch (kind) {
-            case FLUID -> "mB/s";
-            case ENERGY -> "FE/s";
-            default -> "/s";
-        };
-    }
-
-    /**
      * 配置面的中文单字。
      *
      * @param spec 规则
@@ -131,19 +102,94 @@ final class FactoryLabels {
     }
 
     /**
-     * 大数量缩写。
+     * 资源数量在窄格子里的显示：物品/FE 走通用缩写，流体换算成 B。
+     *
+     * @param value 内部单位（物品个 / 流体 mB / FE）
+     * @param kind  资源类型
+     * @return 例如 {@code 12}、{@code 1.2k}、{@code 1.5B}、{@code 28.1G}
+     */
+    static String gridCount(long value, ResourceKind kind) {
+        return kind == ResourceKind.FLUID ? fluid(value) : count(value);
+    }
+
+    /**
+     * 速率显示：物品 {@code 1.2k/s}、流体 {@code 1.5B/s}、FE {@code 28.1G FE/s}。
+     *
+     * @param rate 内部单位每秒（物品个 / 流体 mB / FE）
+     * @param kind 资源类型
+     * @return 带单位的一行
+     */
+    static String rateText(long rate, ResourceKind kind) {
+        return switch (kind) {
+            case FLUID -> fluid(rate) + "/s";
+            case ENERGY -> count(rate) + " FE/s";
+            default -> count(rate) + "/s";
+        };
+    }
+
+    /**
+     * 大数量缩写：k、M、G、T、P、E，保留 1 位小数。
+     *
+     * <p>四舍五入后到 1000 会自动进位（例如 999950 → 1.0M），避免出现 {@code 1000.0k}。</p>
      *
      * @param count 数量
-     * @return 例如 {@code 999}、{@code 1.2k}、{@code 3.4M}
+     * @return 例如 {@code 999}、{@code 1.2k}、{@code 3.4M}、{@code 28.1G}
      */
     static String count(long count) {
+        if (count < 0L) {
+            return Long.toString(count);
+        }
         if (count < 1000L) {
             return Long.toString(count);
         }
-        if (count < 1_000_000L) {
-            return String.format(Locale.ROOT, "%.1fk", count / 1000.0D);
+        return scaled(count, "");
+    }
+
+    /**
+     * 流体容量：内部单位是 mB，显示单位是 B。
+     *
+     * <p>小于 1B 时按需求逐级提高精度：先 1 位小数；若四舍五入成 {@code 0.0} 就用 2 位；
+     * 仍是 {@code 0.00} 就用 3 位（即 1mB = 0.001B）。1B 以上按 k/M/G… 缩写。</p>
+     *
+     * @param milliBuckets 容量（mB）
+     * @return 例如 {@code 0.5B}、{@code 0.04B}、{@code 0.001B}、{@code 1.5kB}
+     */
+    static String fluid(long milliBuckets) {
+        if (milliBuckets <= 0L) {
+            return "0B";
         }
-        return String.format(Locale.ROOT, "%.1fM", count / 1_000_000.0D);
+        double buckets = milliBuckets / 1000.0D;
+        if (buckets < 1.0D) {
+            String text = String.format(Locale.ROOT, "%.1f", buckets);
+            if (Double.parseDouble(text) == 0.0D) {
+                text = String.format(Locale.ROOT, "%.2f", buckets);
+            }
+            if (Double.parseDouble(text) == 0.0D) {
+                text = String.format(Locale.ROOT, "%.3f", buckets);
+            }
+            return text + "B";
+        }
+        return scaled(buckets, "B");
+    }
+
+    private static final String[] PREFIXES = {"k", "M", "G", "T", "P", "E"};
+
+    /**
+     * 把数值按 1000 进制缩写；{@code unit} 是 B 这类不能省的单位，通用数量传空串。
+     */
+    private static String scaled(double value, String unit) {
+        int prefix = -1;
+        while (value >= 1000.0D && prefix < PREFIXES.length - 1) {
+            value /= 1000.0D;
+            prefix++;
+        }
+        String text = String.format(Locale.ROOT, "%.1f", value);
+        if (Double.parseDouble(text) >= 1000.0D && prefix < PREFIXES.length - 1) {
+            value /= 1000.0D;
+            prefix++;
+            text = String.format(Locale.ROOT, "%.1f", value);
+        }
+        return text + (prefix < 0 ? "" : PREFIXES[prefix]) + unit;
     }
 
     /**
@@ -318,9 +364,7 @@ final class FactoryLabels {
     static Component rate(long rate, ResourceKind kind, IoResult.Reason reason,
             GuiTheme theme) {
         int color = rateColorTooltip(rate, reason, theme);
-        return Component.empty()
-                .append(coloredBold(count(rate), color))
-                .append(colored(rateUnit(kind), color));
+        return coloredBold(rateText(rate, kind), color);
     }
 
     /**
