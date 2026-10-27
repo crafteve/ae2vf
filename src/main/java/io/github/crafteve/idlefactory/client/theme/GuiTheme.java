@@ -45,6 +45,8 @@ public record GuiTheme(
         Tooltip tooltip,
         /** 悬停底色。 */
         int hoverBg,
+        /** 悬停/选中描边；纯色填充，没有对应贴图。 */
+        int hoverOutline,
         /** 错误。 */
         int error,
         /** 状态：运行 / 就绪。 */
@@ -98,6 +100,7 @@ public record GuiTheme(
             new Tooltip(0xFFFFFFFF, 0xFFC9D4E4, 0xFF4DE3FF, 0xFFC792EA, 0xFFFFB86B,
                     0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF9AA8BF),
             0xFFDEDFE3, // hoverBg
+            0xFFA6C4E6, // hoverOutline（与 slot_hover 同色系）
             0xFFD63A3A, // error
             0xFF2E9E4F, // statusRun
             0xFFD18A00, // statusWarn
@@ -122,6 +125,7 @@ public record GuiTheme(
             new Tooltip(0xFFFFFFFF, 0xFFC9D4E4, 0xFF4DE3FF, 0xFFC792EA, 0xFFFFB86B,
                     0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF9AA8BF),
             0xFF2A2A30,
+            0xFF4DD0E1,
             0xFFD63A3A,
             0xFF2E9E4F,
             0xFFD18A00,

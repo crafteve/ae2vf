@@ -1305,7 +1305,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawCount(GuiGraphics graphics, long count, ResourceKind kind,
             int right, int bottom) {
         String text = FactoryLabels.gridCount(count, kind);
-        float scale = 0.75F;
+        float scale = 0.666F;
         float textWidth = this.font.width(text);
         // 缩写后仍然偏长时再缩一点，尽量不要压到左边格子；最小 0.5 保证可读。
         if (textWidth * scale > FactoryLayout.CELL - 2) {
@@ -1351,6 +1351,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.activeTab == TAB_STORAGE) {
             drawStorageHover(graphics, mouseX, mouseY);
             drawStorageEntries(graphics);
+            // 描边放在图标之后：流体贴图是不透明的，画在下面会被完全盖住。
+            drawStorageHoverOutline(graphics, mouseX, mouseY);
         } else {
             drawMachineLibrary(graphics);
         }
@@ -1381,6 +1383,33 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 l.gridX + col * FactoryLayout.CELL,
                 l.gridY + row * FactoryLayout.CELL,
                 GuiTextures.SLOT_HOVER_SIZE);
+    }
+
+    /**
+     * 悬停格的 1px 描边。
+     *
+     * <p>仿 AE2 的 {@code renderSlotHighlight}：只画四周，不盖图标。这样不透明的流体
+     * 贴图也不会把高亮完全遮住。</p>
+     */
+    private void drawStorageHoverOutline(GuiGraphics graphics, int mouseX, int mouseY) {
+        FactoryLayout l = this.layout;
+        if (mouseX < l.gridX
+                || mouseX >= l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
+                || mouseY < l.gridY
+                || mouseY >= l.gridY + l.gridRows * FactoryLayout.CELL) {
+            return;
+        }
+        int col = (mouseX - l.gridX) / FactoryLayout.CELL;
+        int row = (mouseY - l.gridY) / FactoryLayout.CELL;
+        int x = l.gridX + col * FactoryLayout.CELL;
+        int y = l.gridY + row * FactoryLayout.CELL;
+        int right = x + FactoryLayout.CELL;
+        int bottom = y + FactoryLayout.CELL;
+        int color = this.theme.hoverOutline();
+        graphics.fill(x, y, right, y + 1, color);
+        graphics.fill(x, bottom - 1, right, bottom, color);
+        graphics.fill(x, y, x + 1, bottom, color);
+        graphics.fill(right - 1, y, right, bottom, color);
     }
 
     /**

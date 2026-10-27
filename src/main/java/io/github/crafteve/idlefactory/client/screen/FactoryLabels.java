@@ -102,14 +102,73 @@ final class FactoryLabels {
     }
 
     /**
-     * 资源数量在窄格子里的显示：物品/FE 走通用缩写，流体换算成 B。
+     * 资源数量在窄格子里的显示：物品/FE 压到最多 4 个字符，流体换算成 B。
      *
      * @param value 内部单位（物品个 / 流体 mB / FE）
      * @param kind  资源类型
-     * @return 例如 {@code 12}、{@code 1.2k}、{@code 1.5B}、{@code 28.1G}
+     * @return 例如 {@code 12}、{@code 28M}、{@code 281T}、{@code 1.5B}、{@code 281kB}
      */
     static String gridCount(long value, ResourceKind kind) {
-        return kind == ResourceKind.FLUID ? fluid(value) : count(value);
+        return kind == ResourceKind.FLUID ? compactFluid(value) : compactCount(value);
+    }
+
+    private static final String[] COMPACT_UNITS = {"E", "P", "T", "G", "M", "k"};
+    private static final double[] COMPACT_DIVISORS = {1.0E18, 1.0E15, 1.0E12, 1.0E9, 1.0E6, 1.0E3};
+
+    /**
+     * 仓库格专用：最多 4 个字符。
+     *
+     * <p>先试带 1 位小数的写法，超长就丢掉小数；例如 {@code 281.5T → 281T}。
+     * 完整精度留给 tooltip 和速率。</p>
+     */
+    private static String compactCount(long value) {
+        if (value < 0L || value < 1000L) {
+            return Long.toString(value);
+        }
+        for (int i = 0; i < COMPACT_UNITS.length; i++) {
+            double divisor = COMPACT_DIVISORS[i];
+            if (value < divisor) {
+                continue;
+            }
+            double scaled = value / divisor;
+            String decimal = String.format(Locale.ROOT, "%.1f", scaled) + COMPACT_UNITS[i];
+            if (decimal.length() <= 4) {
+                return decimal;
+            }
+            String integer = Long.toString((long) scaled) + COMPACT_UNITS[i];
+            if (integer.length() <= 4) {
+                return integer;
+            }
+        }
+        return Long.toString(value);
+    }
+
+    /**
+     * 流体格专用：保留 B 和 0.001B 精度，最多 5 个字符；1B 以上才按 k/M/G… 缩写。
+     */
+    private static String compactFluid(long milliBuckets) {
+        if (milliBuckets < 1000L) {
+            return fluid(milliBuckets);
+        }
+        double buckets = milliBuckets / 1000.0D;
+        for (int i = 0; i < COMPACT_UNITS.length; i++) {
+            double divisor = COMPACT_DIVISORS[i];
+            if (buckets < divisor) {
+                continue;
+            }
+            double scaled = buckets / divisor;
+            String decimal = String.format(Locale.ROOT, "%.1f", scaled)
+                    + COMPACT_UNITS[i] + "B";
+            if (decimal.length() <= 5) {
+                return decimal;
+            }
+            String integer = Long.toString((long) scaled) + COMPACT_UNITS[i] + "B";
+            if (integer.length() <= 5) {
+                return integer;
+            }
+        }
+        String fallback = fluid(milliBuckets);
+        return fallback.length() <= 5 ? fallback : Long.toString((long) buckets) + "B";
     }
 
     /**
