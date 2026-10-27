@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
@@ -182,7 +183,7 @@ final class IoDetailRender {
      */
     static void draw(GuiGraphics graphics, Font font, GuiTheme theme, FactoryLayout layout,
             FactorySnapshotBuilder.MachineView machine, Detail detail, int mouseX, int mouseY) {
-        if (detail.height() < FactoryLayout.IO_PANEL_PAD + 2) {
+        if (detail.height() <= 0) {
             return;
         }
         NineSlice.ioPanel(graphics, detail.x(), detail.y(), detail.width(), detail.height());
@@ -214,6 +215,9 @@ final class IoDetailRender {
         int innerW = layout.ioInnerWidth();
         NineSlice.ioHeader(graphics, contentX, section.headerY(),
                 innerW, FactoryLayout.IO_SECTION_H);
+        NineSlice.fill(graphics, GuiTextures.IO_ACCENT,
+                contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H - 2,
+                Math.max(0, innerW - 2), 1);
 
         String label = (section.input() ? "输入" : "输出") + " · ";
         String count = Integer.toString(section.rules());
@@ -228,7 +232,8 @@ final class IoDetailRender {
         String rateText = FactoryLabels.count(rate) + "/s";
         graphics.drawString(font, rateText,
                 contentX + innerW - 4 - font.width(rateText),
-                section.headerY() + 2, HEADER_VALUE, false);
+                section.headerY() + 2,
+                rate > 0L ? theme.statusRun() : HEADER_TEXT, false);
 
         if (section.rules() == 0) {
             int textY = section.headerY() + FactoryLayout.IO_SECTION_H
@@ -272,14 +277,14 @@ final class IoDetailRender {
         int rateWidth = font.width(rateValue) + font.width(rateUnit);
         int rateX = cell.x() + cell.width() - 4 - rateWidth;
         graphics.drawString(font, rateValue, rateX, cell.y() + 4,
-                theme.textValue(), false);
+                FactoryLabels.rateColorUi(rate, reason, theme), false);
         graphics.drawString(font, rateUnit, rateX + font.width(rateValue), cell.y() + 4,
                 theme.textDim(), false);
 
         int textX = slotX + FactoryLayout.CELL + 4;
         int lineY = cell.y() + 14;
         String face = FactoryLabels.face(spec);
-        graphics.drawString(font, face, textX, lineY, theme.textValue(), false);
+        graphics.drawString(font, face, textX, lineY, theme.textFace(), false);
         int reasonX = textX + font.width(face) + 4;
         int reasonWidth = cell.x() + cell.width() - 4 - reasonX;
         String reasonText = FactoryLabels.reason(reason, cell.input());

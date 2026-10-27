@@ -39,7 +39,9 @@ public record GuiTheme(
         int textDim,
         /** 数值/速率/数量/面等需要强调的值；只用于文字，没有对应贴图。 */
         int textValue,
-        /** 浅色 tooltip 的霓虹配色。 */
+        /** 浅色面板上的面名颜色（紫色）。 */
+        int textFace,
+        /** 深色 tooltip 的霓虹配色。 */
         Tooltip tooltip,
         /** 悬停底色。 */
         int hoverBg,
@@ -53,9 +55,9 @@ public record GuiTheme(
         int statusIdle) {
 
     /**
-     * 浅色 tooltip 的霓虹配色。
+     * 深色 tooltip 的霓虹配色。
      *
-     * <p>tooltip 由 {@code NeonTooltip} 自绘成浅色底板，所以文字用深色高饱和值；
+     * <p>原版 tooltip 背景是深色；这里只给文字上色和加粗，不替换原版渲染管线。
      * 只用于 tooltip 文字，没有贴图对应。</p>
      *
      * @param title 标题
@@ -92,13 +94,14 @@ public record GuiTheme(
             0xFF33445C, // textPrimary
             0xFF7C8BA3, // textDim
             0xFF0E8FA8, // textValue（亮青，浅色面板上更像科技终端）
-            new Tooltip(0xFF22303F, 0xFF5E7089, 0xFF007A99, 0xFFB0008A, 0xFF9A6A00,
-                    0xFF1E8E3E, 0xFFB26A00, 0xFFC21B3E, 0xFF6B7A90),
+            0xFF7B3FA0, // textFace（浅色面板上的面名紫）
+            new Tooltip(0xFFFFFFFF, 0xFFC9D4E4, 0xFF4DE3FF, 0xFFC792EA, 0xFFFFB86B,
+                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF9AA8BF),
             0xFFDEDFE3, // hoverBg
-            0xFFCE2401, // error
-            0xFF3F7F8C, // statusRun
-            0xFFB07822, // statusWarn
-            0xFF878FA5  // statusIdle
+            0xFFD63A3A, // error
+            0xFF2E9E4F, // statusRun
+            0xFFD18A00, // statusWarn
+            0xFF8A93A6  // statusIdle
     );
 
     /** 深色主题（保留，暂不作为默认；贴图目前只生成了浅色一套）。 */
@@ -115,13 +118,14 @@ public record GuiTheme(
             0xFFE6E6E6,
             0xFF6B6B72,
             0xFF4DD0E1,
-            new Tooltip(0xFF22303F, 0xFF5E7089, 0xFF007A99, 0xFFB0008A, 0xFF9A6A00,
-                    0xFF1E8E3E, 0xFFB26A00, 0xFFC21B3E, 0xFF6B7A90),
+            0xFFC792EA,
+            new Tooltip(0xFFFFFFFF, 0xFFC9D4E4, 0xFF4DE3FF, 0xFFC792EA, 0xFFFFB86B,
+                    0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF9AA8BF),
             0xFF2A2A30,
-            0xFFE57373,
-            0xFF4DD0E1,
-            0xFFE0A93A,
-            0xFF6B6B72
+            0xFFD63A3A,
+            0xFF2E9E4F,
+            0xFFD18A00,
+            0xFF8A93A6
     );
 
     /** 当前主题；默认 {@link #AE2}。 */

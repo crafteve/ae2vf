@@ -63,10 +63,10 @@ SPEED_BG = (0x87, 0x8F, 0xA5)
 SPEED_FILL = (0x3F, 0x7F, 0x8C)
 SPEED_FILL_WARN = (0xB0, 0x78, 0x22)
 SPEED_FILL_ERROR = (0xCE, 0x24, 0x01)
-STATUS_RUN = (0x3F, 0x7F, 0x8C)
-STATUS_WARN = (0xB0, 0x78, 0x22)
-STATUS_ERROR = (0xCE, 0x24, 0x01)
-STATUS_IDLE = (0x87, 0x8F, 0xA5)
+STATUS_RUN = (0x2E, 0x9E, 0x4F)
+STATUS_WARN = (0xD1, 0x8A, 0x00)
+STATUS_ERROR = (0xD6, 0x3A, 0x3A)
+STATUS_IDLE = (0x8A, 0x93, 0xA6)
 
 # 搜索框与图标
 SEARCH_BG = (0xB4, 0xB8, 0xC9)
@@ -288,10 +288,12 @@ def io_cell_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Ima
 
 
 def io_header(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
-    """IO 段头：深色凹槽条，顶部冷色高光、底部青色科技线。"""
+    """IO 段头：深色凹槽条，顶部高光、左右/底部深色封口。"""
     img = Image.new("RGBA", (width, height), MACHINE_CARD_BOTTOM)
     rect(img, 0, 0, width, 1, MACHINE_CARD_TOP)
-    rect(img, 0, height - 1, width, 1, STATUS_RUN)
+    rect(img, 0, 0, 1, height, PANEL_BORDER)
+    rect(img, width - 1, 0, 1, height, PANEL_BORDER)
+    rect(img, 0, height - 1, width, 1, PANEL_BORDER)
     return img
 
 
@@ -361,6 +363,7 @@ SPECS = {
     "io_cell": (io_cell, "规则单元格：6×6 九宫格 border=1"),
     "io_cell_hover": (io_cell_hover, "规则单元格悬停：6×6 九宫格 border=1"),
     "io_header": (io_header, "IO 段头：6×6 九宫格 border=1"),
+    "io_accent": (lambda: solid((0x4D, 0xE3, 0xFF)), "IO 段头科技线：1×1 亮青"),
     "button_hover": (button_hover, "按钮悬停：6×6 九宫格 border=1"),
     "chevron_right": (chevron_right, "收起箭头：7×7"),
     "chevron_down": (chevron_down, "展开箭头：7×7"),

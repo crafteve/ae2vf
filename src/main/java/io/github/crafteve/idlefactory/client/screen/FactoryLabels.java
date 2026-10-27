@@ -233,7 +233,56 @@ final class FactoryLabels {
     }
 
     /**
-     * 「标签 + 值」的一行 tooltip：标签暗色、值强调色。
+     * 给一段文字上色并加粗。
+     *
+     * <p>原版 tooltip 背景偏深，粗体能把亮色文字从背景里拔出来；只改变文本样式，
+     * 不改原版 tooltip 的绘制管线。</p>
+     *
+     * @param text 文字
+     * @param argb 主题色
+     * @return 带颜色和粗体的文本组件
+     */
+    static Component coloredBold(String text, int argb) {
+        return Component.literal(text)
+                .withStyle(Style.EMPTY
+                        .withColor(TextColor.fromRgb(argb & 0xFFFFFF))
+                        .withBold(true));
+    }
+
+    /**
+     * 速率在 tooltip 里的颜色：错误红、堵塞橙、有流量绿、其余灰。
+     *
+     * @param rate   速率
+     * @param reason 最近一次原因
+     * @param theme  主题
+     * @return ARGB 颜色
+     */
+    static int rateColorTooltip(long rate, IoResult.Reason reason, GuiTheme theme) {
+        return switch (reason) {
+            case NO_HANDLER, REJECTED -> theme.tooltip().error();
+            case NO_SPACE -> theme.tooltip().warn();
+            case OK, NO_ITEM -> rate > 0L ? theme.tooltip().ok() : theme.tooltip().idle();
+        };
+    }
+
+    /**
+     * 速率在普通界面里的颜色，和 tooltip 语义一致但用面板状态色。
+     *
+     * @param rate   速率
+     * @param reason 最近一次原因
+     * @param theme  主题
+     * @return ARGB 颜色
+     */
+    static int rateColorUi(long rate, IoResult.Reason reason, GuiTheme theme) {
+        return switch (reason) {
+            case NO_HANDLER, REJECTED -> theme.error();
+            case NO_SPACE -> theme.statusWarn();
+            case OK, NO_ITEM -> rate > 0L ? theme.statusRun() : theme.statusIdle();
+        };
+    }
+
+    /**
+     * 「标签 + 值」的一行 tooltip：标签浅灰粗体、值亮色粗体。
      *
      * @param label 标签
      * @param value 值
@@ -242,12 +291,12 @@ final class FactoryLabels {
      */
     static Component labelValue(String label, String value, GuiTheme theme) {
         return Component.empty()
-                .append(colored(label, theme.tooltip().label()))
-                .append(colored(value, theme.tooltip().value()));
+                .append(coloredBold(label, theme.tooltip().label()))
+                .append(coloredBold(value, theme.tooltip().value()));
     }
 
     /**
-     * 「面：xxx」的 tooltip 片段，面用霓虹品红区别于数值青。
+     * 「面：xxx」的 tooltip 片段，面用紫色区别于数值青。
      *
      * @param label 标签
      * @param face  中文面名
@@ -257,26 +306,28 @@ final class FactoryLabels {
      */
     static Component faceLine(String label, String face, String faceEn, GuiTheme theme) {
         return Component.empty()
-                .append(colored(label, theme.tooltip().label()))
-                .append(colored(face + "（" + faceEn + "）", theme.tooltip().face()));
+                .append(coloredBold(label, theme.tooltip().label()))
+                .append(coloredBold(face + "（" + faceEn + "）", theme.tooltip().face()));
     }
 
     /**
-     * 「数量 + 单位」的速率片段。
+     * 「数量 + 单位」的速率片段，数值颜色跟随流量与原因。
      *
-     * @param rate 速率值
-     * @param kind 资源类型
-     * @param theme 主题
+     * @param rate   速率值
+     * @param kind   资源类型
+     * @param reason 最近一次原因
+     * @param theme  主题
      * @return 文本组件
      */
-    static Component rate(long rate, ResourceKind kind, GuiTheme theme) {
+    static Component rate(long rate, ResourceKind kind, IoResult.Reason reason,
+            GuiTheme theme) {
         return Component.empty()
-                .append(colored(count(rate), theme.tooltip().value()))
+                .append(coloredBold(count(rate), rateColorTooltip(rate, reason, theme)))
                 .append(colored(rateUnit(kind), theme.tooltip().label()));
     }
 
     /**
-     * 「状态：xxx」的 tooltip 片段，状态本身继续跟随状态色。
+     * 「状态：xxx」的 tooltip 片段，状态本身跟随原因色并加粗。
      *
      * @param reason 原因
      * @param input  是否输入侧
@@ -285,7 +336,7 @@ final class FactoryLabels {
      */
     static Component state(IoResult.Reason reason, boolean input, GuiTheme theme) {
         return Component.empty()
-                .append(colored("状态：", theme.tooltip().label()))
-                .append(colored(reason(reason, input), tooltipReasonColor(reason, theme)));
+                .append(coloredBold("状态：", theme.tooltip().label()))
+                .append(coloredBold(reason(reason, input), tooltipReasonColor(reason, theme)));
     }
 }

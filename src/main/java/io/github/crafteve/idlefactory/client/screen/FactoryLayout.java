@@ -61,8 +61,6 @@ public final class FactoryLayout {
 
     /** 行尾展开按钮边长；也是输出列右侧要给按钮让出的宽度。 */
     public static final int EXPAND_BUTTON = 14;
-    /** 展开动画时长（毫秒）；太短看不出过渡，太长会拖慢点击反馈。 */
-    public static final int EXPAND_DURATION_MS = 140;
     /** IO 详情面板内边距；包含九宫格边框占的 3px。 */
     public static final int IO_PANEL_PAD = 4;
     /** IO 段头高度。 */
