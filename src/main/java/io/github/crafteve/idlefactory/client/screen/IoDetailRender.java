@@ -213,12 +213,9 @@ final class IoDetailRender {
         }
         int contentX = detail.x() + FactoryLayout.IO_PANEL_PAD;
         int innerW = layout.ioInnerWidth();
-        NineSlice.ioHeader(graphics, contentX, section.headerY(),
+        // 段头和右侧机器卡同一套深色立体：上亮、下暗、左右有边框。
+        NineSlice.machineCard(graphics, contentX, section.headerY(),
                 innerW, FactoryLayout.IO_SECTION_H);
-        // 段头下方 1px 阴影，让闭合的段头压在内容上。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
-                contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H,
-                Math.max(0, innerW - 2), 1);
         NineSlice.fill(graphics, GuiTextures.IO_ACCENT,
                 contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H - 2,
                 Math.max(0, innerW - 2), 1);
@@ -281,11 +278,17 @@ final class IoDetailRender {
         int rateColor = FactoryLabels.rateColorUi(rate, reason, theme);
         int rateWidth = font.width(rateValue) + font.width(rateUnit);
         int rateX = cell.x() + cell.width() - 4 - rateWidth;
+        int textX = slotX + FactoryLayout.CELL + 4;
+        int nameWidth = rateX - textX - 4;
+        if (nameWidth > 0) {
+            graphics.drawString(font,
+                    font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
+                    textX, cell.y() + 4, theme.textPrimary(), false);
+        }
         graphics.drawString(font, rateValue, rateX, cell.y() + 4, rateColor, false);
         graphics.drawString(font, rateUnit, rateX + font.width(rateValue), cell.y() + 4,
                 rateColor, false);
 
-        int textX = slotX + FactoryLayout.CELL + 4;
         int lineY = cell.y() + 14;
         String face = FactoryLabels.face(spec);
         graphics.drawString(font, face, textX, lineY, theme.textFace(), false);

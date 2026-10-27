@@ -60,8 +60,6 @@ public final class GuiTextures {
     public static final ResourceLocation IO_CELL = id("io_cell");
     /** IO 规则单元格悬停：九宫格，边框 1。 */
     public static final ResourceLocation IO_CELL_HOVER = id("io_cell_hover");
-    /** IO 段头：九宫格，边框 1。 */
-    public static final ResourceLocation IO_HEADER = id("io_header");
     /** IO 段头科技线：1×1，亮青。 */
     public static final ResourceLocation IO_ACCENT = id("io_accent");
     /** 按钮悬停：九宫格，边框 1。 */

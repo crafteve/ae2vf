@@ -287,16 +287,6 @@ def io_cell_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Ima
     return img
 
 
-def io_header(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
-    """IO 段头：深色凹槽条，顶部高光、左右/底部浅色封口。"""
-    img = Image.new("RGBA", (width, height), MACHINE_CARD_BOTTOM)
-    rect(img, 0, 0, width, 1, MACHINE_CARD_TOP)
-    rect(img, 0, 1, 1, height - 1, MACHINE_CARD_BORDER)
-    rect(img, width - 1, 1, 1, height - 1, MACHINE_CARD_BORDER)
-    rect(img, 0, height - 1, width, 1, MACHINE_CARD_BORDER)
-    return img
-
-
 def button_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
     """凸起按钮悬停：浅蓝底，保留上/左亮、下/右暗。"""
     img = Image.new("RGBA", (width, height), SLOT_HOVER_BG)
@@ -362,7 +352,6 @@ SPECS = {
     "io_panel": (io_panel, "IO 详情底板：10×10 九宫格 border=3"),
     "io_cell": (io_cell, "规则单元格：6×6 九宫格 border=1"),
     "io_cell_hover": (io_cell_hover, "规则单元格悬停：6×6 九宫格 border=1"),
-    "io_header": (io_header, "IO 段头：6×6 九宫格 border=1"),
     "io_accent": (lambda: solid((0x4D, 0xE3, 0xFF)), "IO 段头科技线：1×1 亮青"),
     "button_hover": (button_hover, "按钮悬停：6×6 九宫格 border=1"),
     "chevron_right": (chevron_right, "收起箭头：7×7"),

@@ -391,7 +391,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int lineButtonW() {
-        return this.font.width(lineButtonText()) + 24;
+        return Math.max(24, this.font.width(lineButtonText()) + 14);
     }
 
     private int maxStorageFirstRow() {
@@ -672,13 +672,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int textY = l.headerY + (FactoryLayout.HEADER_H - 9) / 2;
 
         String title = "放置工厂";
-        graphics.drawString(this.font, title, x, textY, this.theme.accent(), false);
+        graphics.drawString(this.font, FactoryLabels.coloredBold(title, 0xFF000000),
+                x, textY, 0xFFFFFFFF, false);
         x += this.font.width(title) + TITLE_GAP;
 
         String line = lineButtonText();
         int buttonW = lineButtonW();
         NineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
-        graphics.drawString(this.font, line, x + 8, textY, this.theme.textPrimary(), false);
+        graphics.drawString(this.font, line,
+                x + (buttonW - this.font.width(line)) / 2, textY,
+                this.theme.textPrimary(), false);
         x += buttonW + 8;
 
         String status;
@@ -711,13 +714,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         // 顶栏右侧同时要放统计和关闭按钮。窄屏（例如 640 逻辑宽）下，
         // 统计是最不重要的信息，放不下就直接省略，优先保证状态和关闭按钮可读。
+        int storageColor = this.storageOnline ? this.theme.statusRun() : this.theme.error();
         List<TextPart> stats = List.of(
                 new TextPart(Integer.toString(this.machines.size()), this.theme.textValue()),
-                new TextPart(" 台 · ", this.theme.textDim()),
+                new TextPart(" 台", this.theme.textPrimary()),
+                new TextPart(" · ", this.theme.textPrimary()),
                 new TextPart(Integer.toString(this.lineCount), this.theme.textValue()),
-                new TextPart(" 线 · 仓库", this.theme.textDim()),
-                new TextPart(this.storageOnline ? "在线" : "离线",
-                        this.storageOnline ? this.theme.statusRun() : this.theme.error()));
+                new TextPart(" 线", this.theme.textPrimary()),
+                new TextPart(" · ", this.theme.textPrimary()),
+                new TextPart("仓库", storageColor),
+                new TextPart(this.storageOnline ? "在线" : "离线", storageColor));
         int closeX = l.rightX - 6 - CLOSE_SIZE;
         int statsX = closeX - 8 - partsWidth(stats);
         if (statsX > statusEnd + 8) {
@@ -883,18 +889,23 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         List<TextPart> footer = new ArrayList<>();
         footer.add(new TextPart("共 ", this.theme.textPrimary()));
         footer.add(new TextPart(Integer.toString(total), this.theme.textPrimary()));
-        footer.add(new TextPart(" 台 · 就绪 ", this.theme.statusRun()));
+        footer.add(new TextPart(" 台", this.theme.textPrimary()));
+        footer.add(new TextPart(" · ", this.theme.textPrimary()));
+        footer.add(new TextPart("就绪 ", this.theme.statusRun()));
         footer.add(new TextPart(Integer.toString(ready), this.theme.statusRun()));
-        footer.add(new TextPart(" · 未载 ", this.theme.error()));
+        footer.add(new TextPart(" · ", this.theme.textPrimary()));
+        footer.add(new TextPart("未载 ", this.theme.error()));
         footer.add(new TextPart(Integer.toString(unloaded), this.theme.error()));
-        footer.add(new TextPart(" · 失联 ", this.theme.error()));
+        footer.add(new TextPart(" · ", this.theme.textPrimary()));
+        footer.add(new TextPart("失联 ", this.theme.error()));
         footer.add(new TextPart(Integer.toString(missing), this.theme.error()));
-        footer.add(new TextPart(" · 回收站 ", this.theme.statusIdle()));
+        footer.add(new TextPart(" · ", this.theme.textPrimary()));
+        footer.add(new TextPart("回收站 ", this.theme.statusIdle()));
         footer.add(new TextPart(Integer.toString(binned), this.theme.statusIdle()));
         if (this.maxFirstRow() > 0) {
-            footer.add(new TextPart(" · ", this.theme.textDim()));
+            footer.add(new TextPart(" · ", this.theme.textPrimary()));
             footer.add(new TextPart(Integer.toString(this.firstRow + 1), this.theme.textValue()));
-            footer.add(new TextPart("-", this.theme.textDim()));
+            footer.add(new TextPart("-", this.theme.textPrimary()));
             footer.add(new TextPart(Integer.toString(this.firstRow + shown), this.theme.textValue()));
         }
         drawParts(graphics, footer, l.tableX, l.footerY + 3);
