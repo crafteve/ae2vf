@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
@@ -213,27 +212,24 @@ final class IoDetailRender {
         }
         int contentX = detail.x() + FactoryLayout.IO_PANEL_PAD;
         int innerW = layout.ioInnerWidth();
-        // 段头和右侧机器卡同一套深色立体：上亮、下暗、左右有边框。
-        NineSlice.machineCard(graphics, contentX, section.headerY(),
+        // 深色卡片：上/左亮边、下/右 2px 深阴影，和浅色物品卡同一套立体。
+        NineSlice.ioHeader(graphics, contentX, section.headerY(),
                 innerW, FactoryLayout.IO_SECTION_H);
-        NineSlice.fill(graphics, GuiTextures.IO_ACCENT,
-                contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H - 2,
-                Math.max(0, innerW - 2), 1);
 
         String label = (section.input() ? "输入" : "输出") + " · ";
         String count = Integer.toString(section.rules());
-        graphics.drawString(font, label, contentX + 4, section.headerY() + 2,
+        graphics.drawString(font, label, contentX + 4, section.headerY() + 1,
                 HEADER_TEXT, false);
         graphics.drawString(font, count, contentX + 4 + font.width(label),
-                section.headerY() + 2, HEADER_VALUE, false);
+                section.headerY() + 1, HEADER_VALUE, false);
         graphics.drawString(font, " 条", contentX + 4 + font.width(label) + font.width(count),
-                section.headerY() + 2, HEADER_TEXT, false);
+                section.headerY() + 1, HEADER_TEXT, false);
 
         long rate = section.input() ? machine.rateIn() : machine.rateOut();
         String rateText = FactoryLabels.count(rate) + "/s";
         graphics.drawString(font, rateText,
                 contentX + innerW - 4 - font.width(rateText),
-                section.headerY() + 2,
+                section.headerY() + 1,
                 rate > 0L ? theme.statusRun() : HEADER_TEXT, false);
 
         if (section.rules() == 0) {

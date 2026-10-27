@@ -60,8 +60,8 @@ public final class GuiTextures {
     public static final ResourceLocation IO_CELL = id("io_cell");
     /** IO 规则单元格悬停：九宫格，边框 1。 */
     public static final ResourceLocation IO_CELL_HOVER = id("io_cell_hover");
-    /** IO 段头科技线：1×1，亮青。 */
-    public static final ResourceLocation IO_ACCENT = id("io_accent");
+    /** IO 段头：九宫格，边框 2。 */
+    public static final ResourceLocation IO_HEADER = id("io_header");
     /** 按钮悬停：九宫格，边框 1。 */
     public static final ResourceLocation BUTTON_HOVER = id("button_hover");
     /** 收起箭头：7×7。 */
@@ -109,6 +109,10 @@ public final class GuiTextures {
     public static final int IO_PANEL_BORDER = 3;
     /** IO 单元格/段头/悬停按钮的九宫格边长。 */
     public static final int IO_CELL_SIZE = 6;
+    /** IO 段头贴图边长；2px 边框用来画更深的底/右阴影。 */
+    public static final int IO_HEADER_SIZE = 8;
+    /** IO 段头九宫格边框。 */
+    public static final int IO_HEADER_BORDER = 2;
     /** 箭头贴图边长。 */
     public static final int CHEVRON_SIZE = 7;
     /** 状态灯边长。 */

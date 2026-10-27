@@ -82,6 +82,12 @@ public final class NineSlice {
                 x, y, width, height);
     }
 
+    /** 画 IO 段头：深色卡片，下/右 2px 深阴影。 */
+    public static void ioHeader(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.IO_HEADER, GuiTextures.IO_HEADER_SIZE,
+                GuiTextures.IO_HEADER_BORDER, x, y, width, height);
+    }
+
     /** 画按钮悬停底。 */
     public static void buttonHover(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, GuiTextures.BUTTON_HOVER, GuiTextures.IO_CELL_SIZE, 1,
