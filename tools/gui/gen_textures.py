@@ -246,6 +246,82 @@ def solid(color) -> Image.Image:
     return Image.new("RGBA", (1, 1), color)
 
 
+def io_panel(width: int = 10, height: int = 10, border: int = 3) -> Image.Image:
+    """IO 展开详情底板：深钢灰板材，亮顶、暗底、1px 冷色外框，再压一层内凹。"""
+    img = Image.new("RGBA", (width, height), MACHINE_CARD_BG)
+    rect(img, 0, 0, width, 1, MACHINE_CARD_BORDER)
+    rect(img, 0, height - 1, width, 1, MACHINE_CARD_BORDER)
+    rect(img, 0, 0, 1, height, MACHINE_CARD_BORDER)
+    rect(img, width - 1, 0, 1, height, MACHINE_CARD_BORDER)
+    rect(img, 1, 1, width - 2, 1, MACHINE_CARD_TOP)
+    rect(img, 1, 1, 1, height - 2, MACHINE_CARD_TOP)
+    rect(img, 1, height - 2, width - 2, 1, MACHINE_CARD_BOTTOM)
+    rect(img, width - 2, 1, 1, height - 2, MACHINE_CARD_BOTTOM)
+    # 内凹：顶部再压暗、底部再提亮，让板材低于行卡片一层。
+    rect(img, 2, 2, width - 4, 1, MACHINE_CARD_BOTTOM)
+    rect(img, 2, 2, 1, height - 4, MACHINE_CARD_BOTTOM)
+    return img
+
+
+def io_cell(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
+    """规则单元格：浅钢灰凸起芯片，亮顶/亮左、暗底/暗右。"""
+    img = Image.new("RGBA", (width, height), ROW_CARD_BG)
+    rect(img, 0, 0, width, 1, ROW_CARD_TOP)
+    rect(img, 0, 0, 1, height, ROW_CARD_TOP)
+    rect(img, 0, height - 1, width, 1, ROW_CARD_BOTTOM)
+    rect(img, width - 1, 0, 1, height, ROW_CARD_BOTTOM)
+    img.load()[0, height - 1] = ROW_CARD_BOTTOM
+    return img
+
+
+def io_cell_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
+    """规则单元格悬停：浅蓝底，沿用凸起芯片的亮/暗边。"""
+    img = Image.new("RGBA", (width, height), SLOT_HOVER_BG)
+    rect(img, 0, 0, width, 1, ROW_CARD_TOP)
+    rect(img, 0, 0, 1, height, ROW_CARD_TOP)
+    rect(img, 0, height - 1, width, 1, ROW_CARD_BOTTOM)
+    rect(img, width - 1, 0, 1, height, ROW_CARD_BOTTOM)
+    img.load()[0, height - 1] = ROW_CARD_BOTTOM
+    return img
+
+
+def io_header(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
+    """IO 段头：深色凹槽条，顶部一条冷色高光、底部一条深色压边。"""
+    img = Image.new("RGBA", (width, height), MACHINE_CARD_BOTTOM)
+    rect(img, 0, 0, width, 1, MACHINE_CARD_TOP)
+    rect(img, 0, height - 1, width, 1, PANEL_BORDER)
+    return img
+
+
+def button_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
+    """凸起按钮悬停：浅蓝底，保留上/左亮、下/右暗。"""
+    img = Image.new("RGBA", (width, height), SLOT_HOVER_BG)
+    rect(img, 0, 0, width, 1, BUTTON_LIGHT)
+    rect(img, 0, 0, 1, height, BUTTON_LIGHT)
+    rect(img, 0, height - 1, width, 1, BUTTON_DARK)
+    rect(img, width - 1, 0, 1, height, BUTTON_DARK)
+    img.load()[0, height - 1] = BUTTON_DARK
+    return img
+
+
+def chevron_right(size: int = 7) -> Image.Image:
+    """收起箭头：7×7 透明底，指向右。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for y, xs in ((1, (2,)), (2, (2, 3)), (3, (2, 3, 4)), (4, (2, 3)), (5, (2,))):
+        for x in xs:
+            img.putpixel((x, y), PANEL_BORDER)
+    return img
+
+
+def chevron_down(size: int = 7) -> Image.Image:
+    """展开箭头：7×7 透明底，指向下。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for x, ys in ((1, (2,)), (2, (2, 3)), (3, (2, 3, 4)), (4, (2, 3)), (5, (2,))):
+        for y in ys:
+            img.putpixel((x, y), PANEL_BORDER)
+    return img
+
+
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
@@ -279,6 +355,13 @@ SPECS = {
     "divider_dark": (lambda: solid(PANEL_BORDER), "粗分隔线：1×1 拉伸"),
     "header_bg": (lambda: solid(PANEL_BEVEL_LIGHT), "表头底色：1×1 拉伸"),
     "row_alt": (lambda: solid(PANEL_BEVEL_LIGHT), "隔行底色：1×1 拉伸"),
+    "io_panel": (io_panel, "IO 详情底板：10×10 九宫格 border=3"),
+    "io_cell": (io_cell, "规则单元格：6×6 九宫格 border=1"),
+    "io_cell_hover": (io_cell_hover, "规则单元格悬停：6×6 九宫格 border=1"),
+    "io_header": (io_header, "IO 段头：6×6 九宫格 border=1"),
+    "button_hover": (button_hover, "按钮悬停：6×6 九宫格 border=1"),
+    "chevron_right": (chevron_right, "收起箭头：7×7"),
+    "chevron_down": (chevron_down, "展开箭头：7×7"),
 }
 
 

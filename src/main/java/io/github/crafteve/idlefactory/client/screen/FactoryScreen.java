@@ -17,6 +17,7 @@ import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactoryState;
+import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
@@ -36,6 +37,7 @@ import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
@@ -69,10 +71,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int TITLE_GAP = 10;
     /** 顶栏关闭按钮的边长。 */
     private static final int CLOSE_SIZE = 14;
-    /** 机器行展开后额外占用的高度：输入一行、输出一行。 */
-    private static final int EXPANDED_H = 46;
-    /** 行尾小三角按钮的边长。 */
-    private static final int EXPAND_BUTTON = 12;
     /** 机器卡片第一行文字：机器名，使用接近白色的冷色。 */
     private static final int CARD_NAME = 0xFFE8ECF5;
     /** 机器卡片第二行左侧：产线信息，使用青色区分。 */
@@ -127,8 +125,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private int machineFirstRow;
     /** 仓库请求节拍器。 */
     private int storageRequestTicker;
-    /** 已展开的机器；用机器坐标作为稳定身份，刷新快照后仍能保持展开。 */
-    private final Set<MachineRef> expandedMachines = new HashSet<>();
+    /** 已展开的机器；值里保存动画进度，快照刷新后仍能保持展开。 */
+    private final Map<MachineRef, Expansion> expansions = new HashMap<>();
 
     private FactorySearchQuery searchQuery = FactorySearchQuery.EMPTY;
     private List<FactoryStorageS2C.Entry> filteredStorageEntries = List.of();
@@ -140,6 +138,31 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 本帧鼠标位置，用于槽位背景悬停；{@code renderSlot} 本身不接收鼠标坐标。*/
     private int renderMouseX;
     private int renderMouseY;
+
+    /**
+     * 一台机器的展开动画。
+     *
+     * <p>{@code from} 是点击瞬间的进度，{@code open} 是目标方向。用毫秒而不是 tick，
+     * 20 tick/s 的高度插值会明显发飘。动画结束后由 {@link #pruneExpansions(long)} 清理。</p>
+     *
+     * @param from    起始进度（0 收起，1 完全展开）
+     * @param open    目标是否展开
+     * @param startMs 动画开始时间（毫秒）
+     */
+    private record Expansion(float from, boolean open, long startMs) {
+        /**
+         * 当前进度。
+         *
+         * @param now 当前毫秒
+         * @return 0..1
+         */
+        float progress(long now) {
+            float t = Mth.clamp((now - this.startMs)
+                    / (float) FactoryLayout.EXPAND_DURATION_MS, 0.0F, 1.0F);
+            float eased = 1.0F - (1.0F - t) * (1.0F - t);
+            return this.from + (this.open ? 1.0F - this.from : -this.from) * eased;
+        }
+    }
 
     /**
      * @param menu            菜单
@@ -234,7 +257,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
             currentRefs.add(machine.ref());
         }
-        this.expandedMachines.retainAll(currentRefs);
+        this.expansions.keySet().retainAll(currentRefs);
         if (this.lineFilter != null && !lineOptions().contains(this.lineFilter)) {
             this.lineFilter = null;
         }
@@ -367,7 +390,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private int ruleWidth(List<ResourceSpec> rules, List<Long> rates) {
         int width = 4;
         for (int i = 0; i < Math.min(3, rules.size()); i++) {
-            String rate = countText(i < rates.size() ? rates.get(i) : 0L) + "/s";
+            String rate = countText(i < rates.size() ? rates.get(i) : 0L)
+                    + FactoryLabels.rateUnit(rules.get(i).key().kind());
             width += FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
         }
         return Math.max(72, width);
@@ -547,6 +571,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        pruneExpansions(System.currentTimeMillis());
         this.renderMouseX = mouseX;
         this.renderMouseY = mouseY;
         super.render(graphics, mouseX, mouseY, partialTick);
@@ -839,7 +864,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             if (y + rowHeight > l.footerY) {
                 break;
             }
-            drawRow(graphics, machine, y, isExpanded(machine));
+            drawRow(graphics, machine, y);
             y += rowHeight;
             shown++;
         }
@@ -896,11 +921,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 画一台机器的基础行。
      *
      * <p>基础行固定高 {@link FactoryLayout#ROW_H}，包含状态条、机器图标、名称、
-     * 产线、状态和输入/输出摘要；行尾小三角决定是否继续画展开区。展开内容不在这
-     * 一行里，而是在 {@link #drawExpandedRules} 中接到行底部。</p>
+     * 产线、状态和输入/输出摘要；行尾按钮决定是否继续画展开区。展开内容不在这
+     * 一行里，而是由 {@link IoDetailRender} 接到行底部。</p>
      */
     private void drawRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            int y, boolean expanded) {
+            int y) {
         FactoryLayout l = this.layout;
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
         Status status = statusOf(machine);
@@ -949,92 +974,85 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
             drawRuleIcons(graphics, machine.outputs(), machine.outputRates(),
                     l.columnX(FactoryLayout.COL_OUTPUT) + 2, y + 4,
-                    l.columnW(FactoryLayout.COL_OUTPUT) - 4 - EXPAND_BUTTON - 2);
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
+                            - FactoryLayout.EXPAND_BUTTON - 2);
         }
-        drawExpandButton(graphics, y, expanded);
-        if (expanded) {
-            drawExpandedRules(graphics, machine, y);
+        drawExpandButton(graphics, y, isOpen(machine));
+        int detailHeight = expandedHeight(machine);
+        if (detailHeight > 0) {
+            IoDetailRender.Detail detail = IoDetailRender.layout(l, machine,
+                    y + FactoryLayout.ROW_H, detailHeight);
+            IoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
+                    this.renderMouseX, this.renderMouseY);
         }
     }
 
-    /** 一行机器在表格中占用的实际高度：基础行 + 可选的规则详情。 */
+    /** 一行机器在表格中占用的实际高度：基础行 + 当前动画高度。 */
     private int rowHeight(FactorySnapshotBuilder.MachineView machine) {
-        return FactoryLayout.ROW_H + (isExpanded(machine) ? EXPANDED_H : 0);
+        return FactoryLayout.ROW_H + expandedHeight(machine);
     }
 
-    /** 该机器当前是否展开；用机器坐标判定，刷新快照后仍然稳定。 */
-    private boolean isExpanded(FactorySnapshotBuilder.MachineView machine) {
-        return this.expandedMachines.contains(machine.ref());
+    /**
+     * 该机器当前的展开高度（已按动画进度和视口上限夹紧）。
+     *
+     * <p>绘制循环、命中测试和 JEI 都用这一个函数，不允许各算一套，否则动画期间
+     * 点击会落到相邻行。</p>
+     *
+     * @param machine 机器视图
+     * @return 像素高度；未展开或动画已结束为 0
+     */
+    private int expandedHeight(FactorySnapshotBuilder.MachineView machine) {
+        Expansion expansion = this.expansions.get(machine.ref());
+        if (expansion == null) {
+            return 0;
+        }
+        int target = Math.min(IoDetailRender.requiredHeight(this.layout, machine),
+                this.layout.ioMaxDetailHeight());
+        float progress = Mth.clamp(expansion.progress(System.currentTimeMillis()),
+                0.0F, 1.0F);
+        return Math.round(target * progress);
+    }
+
+    /** 该机器是否处于展开状态（看目标，不看动画进度）。 */
+    private boolean isOpen(FactorySnapshotBuilder.MachineView machine) {
+        Expansion expansion = this.expansions.get(machine.ref());
+        return expansion != null && expansion.open();
+    }
+
+    /** 清理已经收起到 0 的动画条目，避免展开过的机器一直留在表里。 */
+    private void pruneExpansions(long now) {
+        this.expansions.entrySet().removeIf(entry ->
+                !entry.getValue().open() && entry.getValue().progress(now) <= 0.0F);
+    }
+
+    /** 行尾展开按钮的 x。 */
+    private int expandButtonX() {
+        FactoryLayout l = this.layout;
+        return l.leftX + l.leftW - FactoryLayout.EXPAND_BUTTON - 4;
     }
 
     /**
      * 行尾展开按钮。
      *
-     * <p>只画一个 12×12 小按钮和三角；三角形用 1px 色块逐行拼出来：
-     * 收起时向右，展开时向下。点击命中在 {@link #clickMachineExpand} 里处理。</p>
+     * <p>14×14 九宫格按钮 + 7×7 箭头贴图；悬停换浅蓝底。收起时箭头向右，展开时向下。
+     * 点击命中在 {@link #clickMachineExpand} 里处理。</p>
      */
-    private void drawExpandButton(GuiGraphics graphics, int y, boolean expanded) {
-        FactoryLayout l = this.layout;
-        int x = l.leftX + l.leftW - EXPAND_BUTTON - 4;
+    private void drawExpandButton(GuiGraphics graphics, int y, boolean open) {
+        int x = expandButtonX();
         int buttonY = y + 6;
-        NineSlice.button(graphics, x, buttonY, EXPAND_BUTTON, EXPAND_BUTTON);
-        int cx = x + EXPAND_BUTTON / 2;
-        int cy = buttonY + EXPAND_BUTTON / 2;
-        if (expanded) {
-            for (int i = 0; i < 3; i++) {
-                NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
-                        cx - 2 + i, cy - 2 + i, 5 - i * 2, 1);
-            }
+        boolean hovered = inside(this.renderMouseX, this.renderMouseY, x, buttonY,
+                FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
+        if (hovered) {
+            NineSlice.buttonHover(graphics, x, buttonY,
+                    FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
         } else {
-            for (int i = 0; i < 3; i++) {
-                NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
-                        cx - 2 + i, cy - 2 + i, 1, 5 - i * 2);
-            }
+            NineSlice.button(graphics, x, buttonY,
+                    FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
         }
-    }
-
-    /**
-     * 画展开后的两行规则详情。
-     *
-     * <p>基础行只显示最多 3 个摘要图标；展开区把输入和输出各放一行，每行固定
-     * 3 个凹槽，超出部分用 {@code +N} 表示。详情面板从基础行底部开始，高度正好
-     * 等于 {@link #EXPANDED_H}，因此下一行的 {@link #rowHeight} 要把这段算进去。</p>
-     */
-    private void drawExpandedRules(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, int y) {
-        FactoryLayout l = this.layout;
-        int x = l.leftX + 2;
-        int top = y + FactoryLayout.ROW_H - 1;
-        int width = l.leftW - 4;
-        NineSlice.fill(graphics, GuiTextures.ROW_ALT, x, top, width, EXPANDED_H);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER, x, top, width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER, x, top + EXPANDED_H - 1, width, 1);
-
-        int labelX = l.tableX + 4;
-        int slotX = labelX + 34;
-        int rowOne = top + 5;
-        int rowTwo = top + 25;
-        drawExpandedRuleRow(graphics, "输入", machine.inputs(), labelX, slotX, rowOne);
-        drawExpandedRuleRow(graphics, "输出", machine.outputs(), labelX, slotX, rowTwo);
-    }
-
-    /** 画展开区的一行：左侧标签 + 3 个规则凹槽，超过 3 条时补 {@code +N}。 */
-    private void drawExpandedRuleRow(GuiGraphics graphics, String label,
-            List<ResourceSpec> rules, int labelX, int slotX, int y) {
-        graphics.drawString(this.font, label, labelX, y + 4,
-                this.theme.textDim(), false);
-        int shown = Math.min(3, rules.size());
-        for (int i = 0; i < 3; i++) {
-            int x = slotX + i * 20;
-            NineSlice.slot(graphics, x, y, FactoryLayout.CELL, FactoryLayout.CELL);
-            if (i < shown) {
-                drawResourceIcon(graphics, rules.get(i).key(), x + 1, y + 1);
-            }
-        }
-        if (rules.size() > 3) {
-            graphics.drawString(this.font, "+" + (rules.size() - 3),
-                    slotX + 3 * 20 + 2, y + 4, this.theme.textDim(), false);
-        }
+        int offset = (FactoryLayout.EXPAND_BUTTON - GuiTextures.CHEVRON_SIZE) / 2;
+        NineSlice.icon(graphics,
+                open ? GuiTextures.CHEVRON_DOWN : GuiTextures.CHEVRON_RIGHT,
+                x + offset, buttonY + offset, GuiTextures.CHEVRON_SIZE);
     }
 
     /** 左表中一次命中：机器、行顶部 y 和该行当前实际高度。 */
@@ -1072,23 +1090,29 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return null;
     }
 
-    /** 点击行尾小三角时切换展开状态；只认按钮区域，不把整行点击都当成展开。 */
+    /**
+     * 点击行尾按钮时切换展开状态。
+     *
+     * <p>只认按钮区域，不把整行点击都当成展开。动画中途再次点击会从当前进度反向，
+     * 不会跳回 0 或 1。</p>
+     */
     private boolean clickMachineExpand(double mouseX, double mouseY) {
-        FactoryLayout l = this.layout;
-        int buttonX = l.leftX + l.leftW - EXPAND_BUTTON - 4;
-        if (mouseX < buttonX || mouseX >= buttonX + EXPAND_BUTTON) {
+        int buttonX = expandButtonX();
+        if (mouseX < buttonX || mouseX >= buttonX + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
         TableHit hit = tableHitAt(mouseY);
         if (hit == null
                 || mouseY < hit.y() + 6
-                || mouseY >= hit.y() + 6 + EXPAND_BUTTON) {
+                || mouseY >= hit.y() + 6 + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
         MachineRef ref = hit.machine().ref();
-        if (!this.expandedMachines.remove(ref)) {
-            this.expandedMachines.add(ref);
-        }
+        long now = System.currentTimeMillis();
+        Expansion current = this.expansions.get(ref);
+        float from = current == null ? 0.0F : Mth.clamp(current.progress(now), 0.0F, 1.0F);
+        boolean open = current == null || !current.open();
+        this.expansions.put(ref, new Expansion(from, open, now));
         this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         return true;
     }
@@ -1111,7 +1135,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int shown = 0;
         int limit = Math.min(rules.size(), 3);
         while (shown < limit) {
-            String rateText = countText(shown < rates.size() ? rates.get(shown) : 0L) + "/s";
+            ResourceSpec spec = rules.get(shown);
+            String rateText = countText(shown < rates.size() ? rates.get(shown) : 0L)
+                    + FactoryLabels.rateUnit(spec.key().kind());
             int entryWidth = FactoryLayout.CELL + 2 + this.font.width(rateText) + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;
@@ -1213,19 +1239,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     /** 资源对应的界面图标；JEI 查询也复用这一份。*/
     private static ItemStack iconStack(ResourceKey key) {
-        return switch (key.kind()) {
-            case ITEM -> {
-                Item item = BuiltInRegistries.ITEM.get(key.id());
-                yield item == Items.AIR ? new ItemStack(Items.BARRIER) : new ItemStack(item);
-            }
-            case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
-                Item bucket = fluid.getBucket();
-                yield new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
-            }
-            case ENERGY -> new ItemStack(Items.REDSTONE);
-            default -> new ItemStack(Items.BARRIER);
-        };
+        return FactoryLabels.icon(key);
     }
 
     private void drawCount(GuiGraphics graphics, long count, int right, int bottom) {
@@ -1241,44 +1255,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private static String countText(long count) {
-        if (count < 1000L) {
-            return Long.toString(count);
-        }
-        if (count < 1_000_000L) {
-            return String.format(java.util.Locale.ROOT, "%.1fk", count / 1000.0D);
-        }
-        return String.format(java.util.Locale.ROOT, "%.1fM", count / 1_000_000.0D);
+        return FactoryLabels.count(count);
     }
 
     private static String resourceName(ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
-            return "FE";
-        }
-        if (key.kind() == ResourceKind.FLUID) {
-            var fluid = BuiltInRegistries.FLUID.get(key.id());
-            Item bucket = fluid.getBucket();
-            return bucket == Items.AIR ? key.id().toString()
-                    : new ItemStack(bucket).getHoverName().getString();
-        }
-        if (key.kind() == ResourceKind.ITEM) {
-            Item item = BuiltInRegistries.ITEM.get(key.id());
-            return item == Items.AIR ? key.id().toString()
-                    : new ItemStack(item).getHoverName().getString();
-        }
-        return key.id().toString();
+        return FactoryLabels.name(key);
     }
 
     private static String unit(ResourceKind kind) {
-        return switch (kind) {
-            case ITEM -> "个";
-            case FLUID -> "mB";
-            case ENERGY -> "FE";
-            case CHEMICAL -> "";
-        };
+        return FactoryLabels.unit(kind);
     }
 
     private static String faceName(ResourceSpec spec) {
-        return spec.face() == null ? "any" : spec.face().getName();
+        return FactoryLabels.face(spec);
     }
 
     /**
@@ -1446,6 +1435,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return;
             }
             FactorySnapshotBuilder.MachineView machine = hit.machine();
+            // 展开按钮压在输出列右端，必须先判按钮，否则会弹出输出列规则提示。
+            if (inExpandButton(hit, mouseX, mouseY)) {
+                drawExpandTooltip(graphics, machine, mouseX, mouseY);
+                return;
+            }
+            IoDetailRender.Cell cell = detailCellAt(machine, hit.y(), mouseX, mouseY);
+            if (cell != null) {
+                drawCellTooltip(graphics, machine, cell, mouseX, mouseY);
+                return;
+            }
+            // 列规则提示只对基础行有效；展开区不再回落成列提示。
+            if (mouseY >= hit.y() + FactoryLayout.ROW_H) {
+                return;
+            }
             if (l.hasColumn(FactoryLayout.COL_INPUT)
                     && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
                 drawRuleTooltip(graphics, "输入", machine.inputs(),
@@ -1459,6 +1462,67 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return;
             }
         }
+    }
+
+    /** 鼠标是否落在某行的展开按钮上。 */
+    private boolean inExpandButton(TableHit hit, double mouseX, double mouseY) {
+        return inside(mouseX, mouseY, expandButtonX(), hit.y() + 6,
+                FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
+    }
+
+    /**
+     * 鼠标命中的展开区单元格。
+     *
+     * @return 单元格；没展开或没命中为 {@code null}
+     */
+    @Nullable
+    private IoDetailRender.Cell detailCellAt(FactorySnapshotBuilder.MachineView machine,
+            int rowY, double mouseX, double mouseY) {
+        int height = expandedHeight(machine);
+        if (height <= 0) {
+            return null;
+        }
+        IoDetailRender.Detail detail = IoDetailRender.layout(this.layout, machine,
+                rowY + FactoryLayout.ROW_H, height);
+        return IoDetailRender.hit(detail, mouseX, mouseY);
+    }
+
+    /** 展开按钮的提示；和输出列规则提示区分开。 */
+    private void drawExpandTooltip(GuiGraphics graphics,
+            FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.literal(isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情"));
+        lines.add(Component.literal("输入 " + machine.inputs().size()
+                + " · 输出 " + machine.outputs().size() + " 条"));
+        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+    }
+
+    /** 展开区单元格的完整信息：面、速率、诊断和每轮上限。 */
+    private void drawCellTooltip(GuiGraphics graphics,
+            FactorySnapshotBuilder.MachineView machine, IoDetailRender.Cell cell,
+            int mouseX, int mouseY) {
+        List<ResourceSpec> rules = cell.input() ? machine.inputs() : machine.outputs();
+        if (cell.ruleIndex() >= rules.size()) {
+            return;
+        }
+        ResourceSpec spec = rules.get(cell.ruleIndex());
+        long rate = machine.ruleRate(cell.input(), cell.ruleIndex());
+        List<IoResult.Reason> reasons = cell.input()
+                ? machine.inputReasons() : machine.outputReasons();
+        IoResult.Reason reason = cell.ruleIndex() < reasons.size()
+                ? reasons.get(cell.ruleIndex()) : IoResult.Reason.NO_ITEM;
+
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.literal((cell.input() ? "输入" : "输出")
+                + " #" + (cell.ruleIndex() + 1) + " · " + resourceName(spec.key())));
+        lines.add(Component.literal((cell.input() ? "输入面：" : "输出面：")
+                + faceName(spec) + "（" + FactoryLabels.faceEn(spec) + "）"));
+        lines.add(Component.literal("速率：" + countText(rate)
+                + FactoryLabels.rateUnit(spec.key().kind())));
+        lines.add(Component.literal("状态：" + FactoryLabels.reason(reason, cell.input())));
+        lines.add(Component.literal("每轮上限："
+                + (spec.fillToCapacity() ? "塞满" : spec.amount())));
+        graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
     /** 鼠标是否落在某个逻辑列的横向范围内。 */
@@ -1485,7 +1549,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             ResourceSpec spec = rules.get(i);
             long rate = i < rates.size() ? rates.get(i) : 0L;
             lines.add(Component.literal(resourceName(spec.key()) + " · "
-                    + faceName(spec) + " · " + countText(rate) + "/s"));
+                    + faceName(spec) + " · " + countText(rate)
+                    + FactoryLabels.rateUnit(spec.key().kind())));
         }
         if (rules.size() > shown) {
             lines.add(Component.literal("还有 " + (rules.size() - shown) + " 条"));
@@ -1975,6 +2040,32 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 FactorySnapshotBuilder.MachineView machine = hit.machine();
                 int y = hit.y();
 
+                // 展开按钮先返回空，避免被输出列识别成资源。
+                if (inExpandButton(hit, mouseX, mouseY)) {
+                    return null;
+                }
+
+                // 展开区单元格：位置必须和绘制共用同一份排版。
+                IoDetailRender.Cell cell = detailCellAt(machine, y, mouseX, mouseY);
+                if (cell != null) {
+                    List<ResourceSpec> rules = cell.input()
+                            ? machine.inputs() : machine.outputs();
+                    if (cell.ruleIndex() < rules.size()) {
+                        ItemStack stack = iconStack(rules.get(cell.ruleIndex()).key());
+                        if (!stack.isEmpty()) {
+                            return new JeiTarget(stack, new Rect2i(
+                                    cell.x() + 4, cell.y() + 5,
+                                    FactoryLayout.CELL, FactoryLayout.CELL));
+                        }
+                    }
+                    return null;
+                }
+
+                // 列命中只对基础行有效，展开区不再回落到输入/输出列。
+                if (mouseY >= y + FactoryLayout.ROW_H) {
+                    return null;
+                }
+
                 int iconX = l.columnX(FactoryLayout.COL_NAME) + 4;
                 if (inside(mouseX, mouseY, iconX, y + 4,
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
@@ -1995,7 +2086,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
                     JeiTarget target = ruleTarget(machine.outputs(), machine.outputRates(),
                             l.columnX(FactoryLayout.COL_OUTPUT) + 2, y + 4,
-                            l.columnW(FactoryLayout.COL_OUTPUT) - 4 - EXPAND_BUTTON - 2,
+                            l.columnW(FactoryLayout.COL_OUTPUT) - 4
+                                    - FactoryLayout.EXPAND_BUTTON - 2,
                             mouseX, mouseY);
                     if (target != null) {
                         return target;
@@ -2022,7 +2114,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int shown = 0;
         int limit = Math.min(rules.size(), 3);
         while (shown < limit) {
-            String rate = countText(shown < rates.size() ? rates.get(shown) : 0L) + "/s";
+            String rate = countText(shown < rates.size() ? rates.get(shown) : 0L)
+                    + FactoryLabels.rateUnit(rules.get(shown).key().kind());
             int entryWidth = FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;

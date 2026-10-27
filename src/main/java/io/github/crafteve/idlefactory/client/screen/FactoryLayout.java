@@ -59,6 +59,27 @@ public final class FactoryLayout {
     /** 小标题（合成 / 背包）与内容的间距。 */
     public static final int LABEL_GAP = 12;
 
+    /** 行尾展开按钮边长；也是输出列右侧要给按钮让出的宽度。 */
+    public static final int EXPAND_BUTTON = 14;
+    /** 展开动画时长（毫秒）；太短看不出过渡，太长会拖慢点击反馈。 */
+    public static final int EXPAND_DURATION_MS = 140;
+    /** IO 详情面板内边距；包含九宫格边框占的 3px。 */
+    public static final int IO_PANEL_PAD = 4;
+    /** IO 段头高度。 */
+    public static final int IO_SECTION_H = 12;
+    /** 单个规则单元格高度。 */
+    public static final int IO_CELL_H = 26;
+    /** 单个规则单元格最大宽度。 */
+    public static final int IO_CELL_W = 132;
+    /** 单个规则单元格最小宽度；再窄就放不下「速率 + 面 + 诊断」。 */
+    public static final int IO_CELL_MIN_W = 96;
+    /** 展开区每行最多几个单元格。 */
+    public static final int IO_MAX_COLS = 6;
+    /** 单元格之间的间距。 */
+    public static final int IO_GAP = 4;
+    /** 输入段与输出段之间的间距。 */
+    public static final int IO_SECTION_GAP = 6;
+
     /** 默认两侧留白（像素）。刚好够配方查看器的一列原料，又不会在 853 宽下把面板挤没。 */
     public static final int DEFAULT_GUTTER = 96;
     /** 面板最大宽（屏幕再大也不无限拉长）。 */
@@ -293,6 +314,79 @@ public final class FactoryLayout {
      */
     public int rowY(int row) {
         return this.rowTop + row * ROW_H;
+    }
+
+    /** 展开详情面板的宽度；和行卡片一样贴着左区两侧。 */
+    public int ioPanelWidth() {
+        return this.leftW - 4;
+    }
+
+    /** 展开详情面板可用于摆放单元格的宽度。 */
+    public int ioInnerWidth() {
+        return Math.max(0, ioPanelWidth() - IO_PANEL_PAD * 2);
+    }
+
+    /**
+     * 单元格宽度。
+     *
+     * <p>先按最小宽度决定每行几列，再把该行剩余宽度均分给单元格；这样宽屏不会只剩
+     * 左半边有内容，窄屏也不会把「速率 + 面 + 诊断」挤丢。</p>
+     *
+     * @return 单元格宽度
+     */
+    public int ioCellWidth() {
+        int cols = ioCellsPerRow();
+        int width = (ioInnerWidth() - (cols - 1) * IO_GAP) / cols;
+        return clamp(width, IO_CELL_MIN_W, IO_CELL_W);
+    }
+
+    /**
+     * 展开区每行能放几个单元格。
+     *
+     * @return 1..{@link #IO_MAX_COLS}
+     */
+    public int ioCellsPerRow() {
+        int cols = (ioInnerWidth() + IO_GAP) / (IO_CELL_MIN_W + IO_GAP);
+        return clamp(cols, 1, IO_MAX_COLS);
+    }
+
+    /**
+     * 一段（输入或输出）需要的高度。
+     *
+     * <p>0 条规则时仍占一行，用来显示「未配置」空状态；高度按整行单元格计算，
+     * 保证展开区和表格行一样是整数像素。</p>
+     *
+     * @param rules 该侧规则条数
+     * @return 段高度
+     */
+    public int ioSectionHeight(int rules) {
+        int perRow = ioCellsPerRow();
+        int rows = Math.max(1, (rules + perRow - 1) / perRow);
+        return IO_SECTION_H + IO_GAP + rows * IO_CELL_H + (rows - 1) * IO_GAP;
+    }
+
+    /**
+     * 展开详情面板的完整高度（未夹紧）。
+     *
+     * @param inputs  输入规则数
+     * @param outputs 输出规则数
+     * @return 所需高度
+     */
+    public int ioDetailHeight(int inputs, int outputs) {
+        return IO_PANEL_PAD * 2 + ioSectionHeight(inputs)
+                + IO_SECTION_GAP + ioSectionHeight(outputs);
+    }
+
+    /**
+     * 展开详情面板允许的最大高度。
+     *
+     * <p>必须至少给基础行留出 {@link #ROW_H}，否则展开行会高过表格可视区，连基础行
+     * 都画不出来。超高时由绘制方按整行裁剪。</p>
+     *
+     * @return 最大高度；屏幕太矮时可能为 0
+     */
+    public int ioMaxDetailHeight() {
+        return Math.max(0, this.footerY - this.rowTop - ROW_H);
     }
 
     /**

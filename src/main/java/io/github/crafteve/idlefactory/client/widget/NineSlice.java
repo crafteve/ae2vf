@@ -65,6 +65,35 @@ public final class NineSlice {
                 x, y, width, height);
     }
 
+    /** 画 IO 展开详情底板。 */
+    public static void ioPanel(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.IO_PANEL, GuiTextures.IO_PANEL_SIZE,
+                GuiTextures.IO_PANEL_BORDER, x, y, width, height);
+    }
+
+    /** 画 IO 规则单元格。 */
+    public static void ioCell(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.IO_CELL, GuiTextures.IO_CELL_SIZE, 1, x, y, width, height);
+    }
+
+    /** 画 IO 规则单元格悬停底。 */
+    public static void ioCellHover(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.IO_CELL_HOVER, GuiTextures.IO_CELL_SIZE, 1,
+                x, y, width, height);
+    }
+
+    /** 画 IO 段头。 */
+    public static void ioHeader(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.IO_HEADER, GuiTextures.IO_CELL_SIZE, 1,
+                x, y, width, height);
+    }
+
+    /** 画按钮悬停底。 */
+    public static void buttonHover(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, GuiTextures.BUTTON_HOVER, GuiTextures.IO_CELL_SIZE, 1,
+                x, y, width, height);
+    }
+
     /** 画一张固定尺寸的小图标（不做九宫格拉伸）。 */
     public static void icon(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
         graphics.blit(texture, x, y, size, size, 0.0F, 0.0F, size, size, size, size);
