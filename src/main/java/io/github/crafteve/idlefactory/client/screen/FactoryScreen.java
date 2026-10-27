@@ -881,15 +881,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
         List<TextPart> footer = new ArrayList<>();
-        footer.add(new TextPart("共 ", this.theme.textDim()));
+        footer.add(new TextPart("共 ", this.theme.textPrimary()));
         footer.add(new TextPart(Integer.toString(total), this.theme.textPrimary()));
-        footer.add(new TextPart(" 台 · 就绪 ", this.theme.textDim()));
+        footer.add(new TextPart(" 台 · 就绪 ", this.theme.statusRun()));
         footer.add(new TextPart(Integer.toString(ready), this.theme.statusRun()));
-        footer.add(new TextPart(" · 未载 ", this.theme.textDim()));
+        footer.add(new TextPart(" · 未载 ", this.theme.error()));
         footer.add(new TextPart(Integer.toString(unloaded), this.theme.error()));
-        footer.add(new TextPart(" · 失联 ", this.theme.textDim()));
+        footer.add(new TextPart(" · 失联 ", this.theme.error()));
         footer.add(new TextPart(Integer.toString(missing), this.theme.error()));
-        footer.add(new TextPart(" · 回收站 ", this.theme.textDim()));
+        footer.add(new TextPart(" · 回收站 ", this.theme.statusIdle()));
         footer.add(new TextPart(Integer.toString(binned), this.theme.statusIdle()));
         if (this.maxFirstRow() > 0) {
             footer.add(new TextPart(" · ", this.theme.textDim()));
@@ -1161,6 +1161,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             long rate = shown < rates.size() ? rates.get(shown) : 0L;
             IoResult.Reason reason = shown < reasons.size()
                     ? reasons.get(shown) : IoResult.Reason.NO_ITEM;
+            int rateColor = FactoryLabels.rateColorUi(rate, reason, this.theme);
             String rateValue = countText(rate);
             String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
             int valueWidth = this.font.width(rateValue);
@@ -1173,10 +1174,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     FactoryLayout.CELL);
             drawResourceIcon(graphics, rules.get(shown).key(), cursor + 1, y + 1);
             graphics.drawString(this.font, rateValue, cursor + FactoryLayout.CELL + 2,
-                    y + 5, FactoryLabels.rateColorUi(rate, reason, this.theme), false);
+                    y + 5, rateColor, false);
             graphics.drawString(this.font, rateUnit,
                     cursor + FactoryLayout.CELL + 2 + valueWidth,
-                    y + 5, this.theme.textDim(), false);
+                    y + 5, rateColor, false);
             cursor += entryWidth;
             shown++;
         }
@@ -1325,7 +1326,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             graphics.drawString(this.font, tabs[i],
                     x + (tabWidth - this.font.width(tabs[i])) / 2,
                     l.tabY + (FactoryLayout.HEADER_H - 9) / 2,
-                    i == this.activeTab ? this.theme.textValue() : this.theme.textDim(),
+                    this.theme.textPrimary(),
                     false);
         }
 
@@ -1440,6 +1441,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     searchHint("|", "或；空格 与")), mouseX, mouseY);
             return;
         }
+
+        // 背包/快捷栏直接用原版物品 tooltip，完整继承模组追加的文本和组件。
+        for (Slot slot : this.menu.slots) {
+            if (slot.hasItem() && isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
+                graphics.renderTooltip(this.font, slot.getItem(), mouseX, mouseY);
+                return;
+            }
+        }
+
         if (this.activeTab == TAB_STORAGE
                 && mouseX >= l.gridX && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
@@ -1448,16 +1458,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             int index = (this.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
             if (index >= 0 && index < this.filteredStorageEntries.size()) {
                 FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
-                GuiTheme.Tooltip tt = this.theme.tooltip();
-                graphics.renderComponentTooltip(this.font, List.of(
-                        FactoryLabels.coloredBold(resourceName(entry.key()), tt.title()),
-                        FactoryLabels.colored(entry.key().id().toString(), tt.label()),
-                        Component.empty()
-                                .append(FactoryLabels.coloredBold(
-                                        Long.toString(entry.count()), tt.value()))
-                                .append(FactoryLabels.colored(" "
-                                        + unit(entry.key().kind()), tt.label()))),
-                        mouseX, mouseY);
+                // 仓库格同样不做自定义摘要：物品走原版 tooltip，流体/能量只保留名称。
+                if (entry.key().kind() == ResourceKind.ITEM) {
+                    graphics.renderTooltip(this.font, iconStack(entry.key()), mouseX, mouseY);
+                } else {
+                    graphics.renderComponentTooltip(this.font, List.of(
+                            FactoryLabels.colored(resourceName(entry.key()),
+                                    this.theme.tooltip().title())), mouseX, mouseY);
+                }
                 return;
             }
         }
@@ -1544,7 +1552,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
         GuiTheme.Tooltip tt = this.theme.tooltip();
-        lines.add(FactoryLabels.coloredBold(
+        lines.add(FactoryLabels.colored(
                 isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情", tt.title()));
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("输入 ", tt.label()))
@@ -1575,17 +1583,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         List<Component> lines = new ArrayList<>();
         GuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(Component.empty()
-                .append(FactoryLabels.coloredBold(cell.input() ? "输入" : "输出", tt.title()))
+                .append(FactoryLabels.colored(cell.input() ? "输入" : "输出", tt.title()))
                 .append(FactoryLabels.colored(" #", tt.label()))
-                .append(FactoryLabels.coloredBold(Integer.toString(cell.ruleIndex() + 1),
+                .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1),
                         tt.index()))
                 .append(FactoryLabels.colored(" · ", tt.label()))
-                .append(FactoryLabels.coloredBold(resourceName(spec.key()), tt.title())));
+                .append(FactoryLabels.colored(resourceName(spec.key()), tt.title())));
         lines.add(FactoryLabels.faceLine(
                 cell.input() ? "输入面：" : "输出面：",
                 faceName(spec), FactoryLabels.faceEn(spec), this.theme));
         lines.add(Component.empty()
-                .append(FactoryLabels.coloredBold("速率：", tt.label()))
+                .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), reason, this.theme)));
         lines.add(FactoryLabels.state(reason, cell.input(), this.theme));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
@@ -1611,7 +1619,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         List<Component> lines = new java.util.ArrayList<>();
         GuiTheme.Tooltip tt = this.theme.tooltip();
-        lines.add(FactoryLabels.coloredBold(title, tt.title()));
+        lines.add(FactoryLabels.colored(title, tt.title()));
         int shown = Math.min(rules.size(), 10);
         for (int i = 0; i < shown; i++) {
             ResourceSpec spec = rules.get(i);
@@ -1619,7 +1627,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             IoResult.Reason reason = i < reasons.size()
                     ? reasons.get(i) : IoResult.Reason.NO_ITEM;
             lines.add(Component.empty()
-                    .append(FactoryLabels.coloredBold(resourceName(spec.key()), tt.title()))
+                    .append(FactoryLabels.colored(resourceName(spec.key()), tt.title()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.coloredBold(faceName(spec), tt.face()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
@@ -1640,7 +1648,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new java.util.ArrayList<>();
         GuiTheme.Tooltip tt = this.theme.tooltip();
-        lines.add(FactoryLabels.coloredBold(blockName(machine.blockId()), tt.title()));
+        lines.add(FactoryLabels.colored(blockName(machine.blockId()), tt.title()));
         lines.add(FactoryLabels.coloredBold(statusText(machine), statusColor(machine)));
         lines.add(FactoryLabels.colored(machine.ref().dimension().location()
                 + " " + machine.ref().pos().toShortString(), tt.label()));
@@ -1649,7 +1657,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 : FactoryLabels.labelValue("产线 ",
                         String.join("/", machine.lineNames()), this.theme));
         lines.add(Component.empty()
-                .append(FactoryLabels.coloredBold("规则 ", tt.label()))
+                .append(FactoryLabels.colored("规则 ", tt.label()))
                 .append(FactoryLabels.coloredBold(
                         Integer.toString(machine.ruleCount()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));

@@ -288,12 +288,12 @@ def io_cell_hover(width: int = 6, height: int = 6, border: int = 1) -> Image.Ima
 
 
 def io_header(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
-    """IO 段头：深色凹槽条，顶部高光、左右/底部深色封口。"""
+    """IO 段头：深色凹槽条，顶部高光、左右/底部浅色封口。"""
     img = Image.new("RGBA", (width, height), MACHINE_CARD_BOTTOM)
     rect(img, 0, 0, width, 1, MACHINE_CARD_TOP)
-    rect(img, 0, 0, 1, height, PANEL_BORDER)
-    rect(img, width - 1, 0, 1, height, PANEL_BORDER)
-    rect(img, 0, height - 1, width, 1, PANEL_BORDER)
+    rect(img, 0, 1, 1, height - 1, MACHINE_CARD_BORDER)
+    rect(img, width - 1, 1, 1, height - 1, MACHINE_CARD_BORDER)
+    rect(img, 0, height - 1, width, 1, MACHINE_CARD_BORDER)
     return img
 
 

@@ -291,7 +291,7 @@ final class FactoryLabels {
      */
     static Component labelValue(String label, String value, GuiTheme theme) {
         return Component.empty()
-                .append(coloredBold(label, theme.tooltip().label()))
+                .append(colored(label, theme.tooltip().label()))
                 .append(coloredBold(value, theme.tooltip().value()));
     }
 
@@ -306,7 +306,7 @@ final class FactoryLabels {
      */
     static Component faceLine(String label, String face, String faceEn, GuiTheme theme) {
         return Component.empty()
-                .append(coloredBold(label, theme.tooltip().label()))
+                .append(colored(label, theme.tooltip().label()))
                 .append(coloredBold(face + "（" + faceEn + "）", theme.tooltip().face()));
     }
 
@@ -321,9 +321,10 @@ final class FactoryLabels {
      */
     static Component rate(long rate, ResourceKind kind, IoResult.Reason reason,
             GuiTheme theme) {
+        int color = rateColorTooltip(rate, reason, theme);
         return Component.empty()
-                .append(coloredBold(count(rate), rateColorTooltip(rate, reason, theme)))
-                .append(colored(rateUnit(kind), theme.tooltip().label()));
+                .append(coloredBold(count(rate), color))
+                .append(colored(rateUnit(kind), color));
     }
 
     /**
@@ -336,7 +337,7 @@ final class FactoryLabels {
      */
     static Component state(IoResult.Reason reason, boolean input, GuiTheme theme) {
         return Component.empty()
-                .append(coloredBold("状态：", theme.tooltip().label()))
+                .append(colored("状态：", theme.tooltip().label()))
                 .append(coloredBold(reason(reason, input), tooltipReasonColor(reason, theme)));
     }
 }

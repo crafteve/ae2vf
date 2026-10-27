@@ -215,6 +215,10 @@ final class IoDetailRender {
         int innerW = layout.ioInnerWidth();
         NineSlice.ioHeader(graphics, contentX, section.headerY(),
                 innerW, FactoryLayout.IO_SECTION_H);
+        // 段头下方 1px 阴影，让闭合的段头压在内容上。
+        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+                contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H,
+                Math.max(0, innerW - 2), 1);
         NineSlice.fill(graphics, GuiTextures.IO_ACCENT,
                 contentX + 1, section.headerY() + FactoryLayout.IO_SECTION_H - 2,
                 Math.max(0, innerW - 2), 1);
@@ -274,12 +278,12 @@ final class IoDetailRender {
 
         String rateValue = FactoryLabels.count(rate);
         String rateUnit = FactoryLabels.rateUnit(spec.key().kind());
+        int rateColor = FactoryLabels.rateColorUi(rate, reason, theme);
         int rateWidth = font.width(rateValue) + font.width(rateUnit);
         int rateX = cell.x() + cell.width() - 4 - rateWidth;
-        graphics.drawString(font, rateValue, rateX, cell.y() + 4,
-                FactoryLabels.rateColorUi(rate, reason, theme), false);
+        graphics.drawString(font, rateValue, rateX, cell.y() + 4, rateColor, false);
         graphics.drawString(font, rateUnit, rateX + font.width(rateValue), cell.y() + 4,
-                theme.textDim(), false);
+                rateColor, false);
 
         int textX = slotX + FactoryLayout.CELL + 4;
         int lineY = cell.y() + 14;
