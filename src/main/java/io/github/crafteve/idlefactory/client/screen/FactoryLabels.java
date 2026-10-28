@@ -425,6 +425,20 @@ final class FactoryLabels {
     }
 
     /**
+     * 把「最近一轮原因」与「上一秒速率」对齐。
+     *
+     * <p>速率是 1 秒窗口，原因是逐轮写入；刚搬动过 132/s 的规则可能在同一帧仍带着上一轮的
+     * 红色原因。只要这一秒有流量，就按正常显示，避免出现「132/s 但状态是拒收」。</p>
+     *
+     * @param rate   上一秒速率
+     * @param reason 最近一轮原因
+     * @return 有流量时为 {@link IoResult.Reason#OK}，否则原样返回
+     */
+    static IoResult.Reason effectiveReason(long rate, IoResult.Reason reason) {
+        return rate > 0L ? IoResult.Reason.OK : reason;
+    }
+
+    /**
      * 「标签 + 值」的一行 tooltip：标签浅灰粗体、值亮色粗体。
      *
      * @param label 标签

@@ -101,10 +101,11 @@ final class RuleStrip {
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      * @param dragging 是否正在拖资源（用于空槽高亮）
+     * @param inactive 产线是否暂停/睡眠；此时速率用中性色
      */
     static void draw(GuiGraphics graphics, Font font, GuiTheme theme, Layout layout,
             List<ResourceSpec> rules, List<Long> rates, List<IoResult.Reason> reasons,
-            int mouseX, int mouseY, boolean dragging) {
+            int mouseX, int mouseY, boolean dragging, boolean inactive) {
         for (Entry entry : layout.entries()) {
             if (entry.ruleIndex() >= rules.size()) {
                 continue;
@@ -113,7 +114,10 @@ final class RuleStrip {
             long rate = entry.ruleIndex() < rates.size() ? rates.get(entry.ruleIndex()) : 0L;
             IoResult.Reason reason = entry.ruleIndex() < reasons.size()
                     ? reasons.get(entry.ruleIndex()) : IoResult.Reason.NO_ITEM;
-            int rateColor = FactoryLabels.rateColorUi(rate, reason, theme);
+            IoResult.Reason effective = inactive ? IoResult.Reason.NO_ITEM
+                    : FactoryLabels.effectiveReason(rate, reason);
+            int rateColor = inactive ? theme.statusIdle()
+                    : FactoryLabels.rateColorUi(rate, effective, theme);
             String rateText = FactoryLabels.rateText(rate, spec.key().kind());
             NineSlice.slot(graphics, entry.x(), entry.y(),
                     FactoryLayout.CELL, FactoryLayout.CELL);

@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.List;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
@@ -15,14 +17,17 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 展开 IO 面板的绘制层：段头、配置卡、空卡、滚动条。
  *
- * <p>只读 {@link IoDetailLayout.Detail} 的绝对坐标；不自己算布局。卡片控件（面、匹配、删除）
- * 的矩形来自 {@link IoCardControls}，和点击命中共用一份。</p>
+ * <p>只读 {@link IoDetailLayout.Detail} 的绝对坐标；不自己算布局。卡片控件（面、匹配）的
+ * 矩形来自 {@link IoCardControls}，和点击命中共用一份。卡片保持 26px：第一行槽位 + 名称 +
+ * 右对齐速率，第二行面按钮 + 匹配按钮 + 状态文字。</p>
  */
 final class IoDetailRender {
     /** 深色段头上的冷白。 */
     private static final int HEADER_TEXT = 0xFFE8ECF5;
     /** 深色段头上的亮青数值。 */
     private static final int HEADER_VALUE = 0xFF4DE3FF;
+    /** 黄色匹配按钮上的深棕文字。 */
+    private static final int MATCH_TEXT = 0xFF4A3200;
 
     private IoDetailRender() {
         // 纯静态工具类
@@ -40,10 +45,11 @@ final class IoDetailRender {
      * @param mouseX           鼠标 x
      * @param mouseY           鼠标 y
      * @param draggingResource 是否正在拖资源
+     * @param idleLabel        产线暂停/睡眠时的中性文案；运行中传 {@code null}
      */
     static void draw(GuiGraphics graphics, Font font, GuiTheme theme, FactoryLayout layout,
             FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Detail detail,
-            int mouseX, int mouseY, boolean draggingResource) {
+            int mouseX, int mouseY, boolean draggingResource, @Nullable String idleLabel) {
         if (detail.panelH() <= 0 || detail.panelW() <= 0) {
             return;
         }
@@ -54,17 +60,17 @@ final class IoDetailRender {
                 detail.panelX() + detail.panelW() - 1,
                 detail.panelY() + detail.panelH() - 1);
         for (IoDetailLayout.Section section : detail.sections()) {
-            drawSection(graphics, font, theme, layout, detail, section);
+            drawSection(graphics, font, theme, layout, detail, section, idleLabel);
         }
         for (IoDetailLayout.Card card : detail.cards()) {
-            if (card.y() + FactoryLayout.IO_CARD_H < detail.panelY()
+            if (card.y() + FactoryLayout.IO_CELL_H < detail.panelY()
                     || card.y() > detail.panelY() + detail.panelH()) {
                 continue;
             }
             if (card.empty()) {
                 drawEmptyCard(graphics, font, theme, card, mouseX, mouseY, draggingResource);
             } else {
-                drawRuleCard(graphics, font, theme, machine, card, mouseX, mouseY);
+                drawRuleCard(graphics, font, theme, machine, card, mouseX, mouseY, idleLabel);
             }
         }
         graphics.disableScissor();
@@ -72,7 +78,8 @@ final class IoDetailRender {
     }
 
     private static void drawSection(GuiGraphics graphics, Font font, GuiTheme theme,
-            FactoryLayout layout, IoDetailLayout.Detail detail, IoDetailLayout.Section section) {
+            FactoryLayout layout, IoDetailLayout.Detail detail, IoDetailLayout.Section section,
+            @Nullable String idleLabel) {
         int contentX = detail.panelX() + FactoryLayout.IO_PANEL_PAD;
         int innerW = layout.ioInnerWidth();
         NineSlice.ioHeader(graphics, contentX, section.headerY(), innerW,
@@ -87,37 +94,52 @@ final class IoDetailRender {
                 section.headerY() + 2, HEADER_TEXT, false);
 
         String rateText = FactoryLabels.count(section.rate()) + "/s";
+        int rateColor = idleLabel != null ? HEADER_TEXT
+                : section.rate() > 0L ? theme.statusRun() : HEADER_TEXT;
         graphics.drawString(font, rateText,
                 contentX + innerW - 4 - font.width(rateText), section.headerY() + 2,
-                section.rate() > 0L ? theme.statusRun() : HEADER_TEXT, false);
+                rateColor, false);
     }
 
+    /**
+     * 空卡：与规则卡同一槽位、同一高度，只把按钮行换成提示文字。
+     *
+     * @param graphics         画布
+     * @param font             字体
+     * @param theme            主题
+     * @param card             卡片
+     * @param mouseX           鼠标 x
+     * @param mouseY           鼠标 y
+     * @param draggingResource 是否正在拖资源
+     */
     private static void drawEmptyCard(GuiGraphics graphics, Font font, GuiTheme theme,
             IoDetailLayout.Card card, int mouseX, int mouseY, boolean draggingResource) {
         boolean hovered = inside(mouseX, mouseY, card.x(), card.y(),
-                card.width(), FactoryLayout.IO_CARD_H);
+                card.width(), FactoryLayout.IO_CELL_H);
         if (hovered) {
             NineSlice.ioCellHover(graphics, card.x(), card.y(),
-                    card.width(), FactoryLayout.IO_CARD_H);
+                    card.width(), FactoryLayout.IO_CELL_H);
         } else {
             NineSlice.ioCell(graphics, card.x(), card.y(),
-                    card.width(), FactoryLayout.IO_CARD_H);
+                    card.width(), FactoryLayout.IO_CELL_H);
         }
-        int slotX = card.x() + (card.width() - FactoryLayout.CELL) / 2;
-        int slotY = card.y() + 8;
+        int slotX = card.x() + FactoryLayout.IO_CARD_PAD;
+        int slotY = card.y() + FactoryLayout.IO_CARD_SLOT_Y;
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
-        graphics.drawString(font, "+",
-                slotX + (FactoryLayout.CELL - font.width("+")) / 2, slotY + 5,
-                draggingResource && hovered ? theme.statusRun() : theme.textDim(), false);
-        String hint = "拖入资源";
-        graphics.drawString(font, hint,
-                card.x() + (card.width() - font.width(hint)) / 2, card.y() + 31,
-                draggingResource && hovered ? theme.statusRun() : theme.textDim(), false);
+        int color = draggingResource && hovered ? theme.statusRun() : theme.textDim();
+        String plus = "+";
+        graphics.drawString(font, plus,
+                slotX + (FactoryLayout.CELL - font.width(plus)) / 2, slotY + 5, color, false);
+
+        int textX = card.x() + FactoryLayout.IO_CARD_TEXT_X;
+        graphics.drawString(font, "拖入资源", textX, card.y() + 4, color, false);
+        graphics.drawString(font, "从仓库拖入", textX,
+                card.y() + FactoryLayout.IO_CARD_LINE2_Y + 2, color, false);
     }
 
     private static void drawRuleCard(GuiGraphics graphics, Font font, GuiTheme theme,
             FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
-            int mouseX, int mouseY) {
+            int mouseX, int mouseY, @Nullable String idleLabel) {
         List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
         if (card.ruleIndex() >= rules.size()) {
             return;
@@ -128,76 +150,69 @@ final class IoDetailRender {
                 ? machine.inputReasons() : machine.outputReasons();
         IoResult.Reason reason = card.ruleIndex() < reasons.size()
                 ? reasons.get(card.ruleIndex()) : IoResult.Reason.NO_ITEM;
+        // 速率是 1 秒窗口、原因是最近一轮；有流量时不让上一轮的红色盖住正在搬运的事实。
+        IoResult.Reason effective = idleLabel != null ? IoResult.Reason.NO_ITEM
+                : FactoryLabels.effectiveReason(rate, reason);
 
         boolean hovered = inside(mouseX, mouseY, card.x(), card.y(),
-                card.width(), FactoryLayout.IO_CARD_H);
+                card.width(), FactoryLayout.IO_CELL_H);
         if (hovered) {
             NineSlice.ioCellHover(graphics, card.x(), card.y(),
-                    card.width(), FactoryLayout.IO_CARD_H);
+                    card.width(), FactoryLayout.IO_CELL_H);
         } else {
             NineSlice.ioCell(graphics, card.x(), card.y(),
-                    card.width(), FactoryLayout.IO_CARD_H);
+                    card.width(), FactoryLayout.IO_CELL_H);
         }
-        NineSlice.fill(graphics, FactoryLabels.reasonStrip(reason),
-                card.x() + 1, card.y() + 2, 1, FactoryLayout.IO_CARD_H - 4);
+        NineSlice.fill(graphics,
+                idleLabel != null ? GuiTextures.STATUS_STRIP_IDLE
+                        : FactoryLabels.reasonStrip(effective),
+                card.x() + 1, card.y() + 2, 1, FactoryLayout.IO_CELL_H - 4);
 
-        int slotX = card.x() + 3;
-        int slotY = card.y() + 3;
+        int slotX = card.x() + FactoryLayout.IO_CARD_PAD;
+        int slotY = card.y() + FactoryLayout.IO_CARD_SLOT_Y;
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
         ResourceIconRenderer.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
-        int textX = slotX + FactoryLayout.CELL + 3;
-        int deleteX = card.x() + card.width() - FactoryLayout.IO_DELETE_SIZE - 3;
-        int nameWidth = Math.max(0, deleteX - textX - 2);
+        int textX = card.x() + FactoryLayout.IO_CARD_TEXT_X;
+        String rateText = FactoryLabels.rateText(rate, spec.key().kind());
+        int rateX = card.x() + card.width() - 4 - font.width(rateText);
+        int nameWidth = Math.max(0, rateX - textX - 4);
         graphics.drawString(font,
                 font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
                 textX, card.y() + 4, theme.textPrimary(), false);
-        String rateText = FactoryLabels.rateText(rate, spec.key().kind());
-        graphics.drawString(font, rateText, textX, card.y() + 14,
-                FactoryLabels.rateColorUi(rate, reason, theme), false);
+        int rateColor = idleLabel != null ? theme.statusIdle()
+                : FactoryLabels.rateColorUi(rate, effective, theme);
+        graphics.drawString(font, rateText, rateX, card.y() + 4, rateColor, false);
 
-        drawDelete(graphics, font, theme, card, mouseX, mouseY);
-        drawFaceButtons(graphics, font, theme, card, spec, mouseX, mouseY);
-        drawMatch(graphics, font, theme, card, spec, mouseX, mouseY);
+        drawFaceButton(graphics, font, theme, card, spec, mouseX, mouseY);
+        drawMatchButton(graphics, font, theme, card, spec, mouseX, mouseY);
+
+        int statusX = IoCardControls.reasonX(card.x(), spec);
+        int statusWidth = Math.max(0, card.x() + card.width() - 4 - statusX);
+        String statusText = idleLabel != null ? idleLabel
+                : FactoryLabels.reason(effective, card.input());
+        int statusColor = idleLabel != null ? theme.statusIdle()
+                : FactoryLabels.reasonColor(effective, theme);
+        graphics.drawString(font, font.plainSubstrByWidth(statusText, statusWidth),
+                statusX, card.y() + FactoryLayout.IO_CARD_LINE2_Y + 2, statusColor, false);
     }
 
-    private static void drawDelete(GuiGraphics graphics, Font font, GuiTheme theme,
-            IoDetailLayout.Card card, int mouseX, int mouseY) {
-        IoCardControls.Rect rect = IoCardControls.deleteRect(card.x(), card.y(), card.width());
+    private static void drawFaceButton(GuiGraphics graphics, Font font, GuiTheme theme,
+            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
+        IoCardControls.Rect rect = IoCardControls.faceRect(card.x(), card.y());
         boolean hovered = inside(mouseX, mouseY, rect);
         if (hovered) {
             NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
         } else {
             NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
         }
-        graphics.drawString(font, "x",
-                rect.x() + (rect.width() - font.width("x")) / 2, rect.y() + 2,
-                hovered ? theme.error() : theme.textPrimary(), false);
+        String label = IoCardControls.faceLabel(spec);
+        graphics.drawString(font, label,
+                rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
+                theme.textFace(), false);
     }
 
-    private static void drawFaceButtons(GuiGraphics graphics, Font font, GuiTheme theme,
-            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
-        for (int i = 0; i < IoCardControls.FACES.length; i++) {
-            IoCardControls.Rect rect = IoCardControls.faceRect(card.x(), card.y(), i);
-            boolean hovered = inside(mouseX, mouseY, rect);
-            if (hovered) {
-                NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
-            } else {
-                NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
-            }
-            if (IoCardControls.faceSelected(spec, i)) {
-                NineSlice.fill(graphics, GuiTextures.ROW_ALT, rect.x() + 1, rect.y() + 1,
-                        rect.width() - 2, rect.height() - 2);
-            }
-            String label = IoCardControls.FACE_LABELS[i];
-            graphics.drawString(font, label,
-                    rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
-                    IoCardControls.faceSelected(spec, i)
-                            ? theme.textValue() : theme.textPrimary(), false);
-        }
-    }
-
-    private static void drawMatch(GuiGraphics graphics, Font font, GuiTheme theme,
+    private static void drawMatchButton(GuiGraphics graphics, Font font, GuiTheme theme,
             IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
         if (!IoCardControls.matchVisible(spec)) {
             return;
@@ -216,7 +231,7 @@ final class IoDetailRender {
         String label = IoCardControls.matchLabel(spec);
         graphics.drawString(font, label,
                 rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
-                enabled ? 0xFF4A3200 : theme.textDim(), false);
+                enabled ? MATCH_TEXT : theme.textDim(), false);
     }
 
     private static void drawScrollbar(GuiGraphics graphics, IoDetailLayout.Detail detail) {

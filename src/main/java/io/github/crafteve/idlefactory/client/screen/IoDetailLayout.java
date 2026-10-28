@@ -13,7 +13,7 @@ import net.minecraft.client.gui.Font;
 /**
  * 展开 IO 面板的扁平布局：输入段、输入配置卡/空卡、输出段、输出配置卡/空卡。
  *
- * <p>卡片固定高（{@link FactoryLayout#IO_CARD_H}），内容超过可见高度时用像素滚动；绘制方
+ * <p>卡片固定高（{@link FactoryLayout#IO_CELL_H}），内容超过可见高度时用像素滚动；绘制方
  * 按 {@link Detail#scroll()} 平移，命中测试用同一份绝对坐标并拒绝面板外的位置。空卡永远
  * 在每段末尾，作为“拖资源进来新增规则”的放置目标。</p>
  *
@@ -117,7 +117,7 @@ final class IoDetailLayout {
         int panelX = layout.leftX + 2;
         int panelW = layout.ioPanelWidth();
         int innerW = layout.ioInnerWidth();
-        int cardW = layout.ioCellWidth();
+        int cardW = layout.ioCardWidth();
         int contentX = panelX + FactoryLayout.IO_PANEL_PAD;
 
         List<Placement> input = place(layout, machine.inputs(), font);
@@ -156,7 +156,7 @@ final class IoDetailLayout {
     private static List<Placement> place(FactoryLayout layout, List<ResourceSpec> rules,
             Font font) {
         int innerW = layout.ioInnerWidth();
-        int cardW = layout.ioCellWidth();
+        int cardW = layout.ioCardWidth();
         if (innerW <= 0 || cardW <= 0) {
             return List.of();
         }
@@ -167,19 +167,19 @@ final class IoDetailLayout {
             ResourceSpec spec = rules.get(i);
             int width = needsFullRow(font, spec, cardW) ? innerW : cardW;
             if (used > 0 && (width >= innerW || used + GAP + width > innerW)) {
-                rowY += FactoryLayout.IO_CARD_H + GAP;
+                rowY += FactoryLayout.IO_CELL_H + GAP;
                 used = 0;
             }
             int cellX = used == 0 ? 0 : used + GAP;
             result.add(new Placement(cellX, rowY, width, i, false));
             used = used == 0 ? width : used + GAP + width;
             if (width >= innerW || used >= innerW) {
-                rowY += FactoryLayout.IO_CARD_H + GAP;
+                rowY += FactoryLayout.IO_CELL_H + GAP;
                 used = 0;
             }
         }
         if (used > 0 && used + GAP + cardW > innerW) {
-            rowY += FactoryLayout.IO_CARD_H + GAP;
+            rowY += FactoryLayout.IO_CELL_H + GAP;
             used = 0;
         }
         int cellX = used == 0 ? 0 : used + GAP;
@@ -196,7 +196,7 @@ final class IoDetailLayout {
             return FactoryLayout.IO_SECTION_H + GAP;
         }
         Placement last = placements.get(placements.size() - 1);
-        return FactoryLayout.IO_SECTION_H + GAP + last.rowY() + FactoryLayout.IO_CARD_H;
+        return FactoryLayout.IO_SECTION_H + GAP + last.rowY() + FactoryLayout.IO_CELL_H;
     }
 
     /**
@@ -217,7 +217,7 @@ final class IoDetailLayout {
         }
         for (Card card : detail.cards()) {
             if (mouseX >= card.x() && mouseX < card.x() + card.width()
-                    && mouseY >= card.y() && mouseY < card.y() + FactoryLayout.IO_CARD_H) {
+                    && mouseY >= card.y() && mouseY < card.y() + FactoryLayout.IO_CELL_H) {
                 return card;
             }
         }

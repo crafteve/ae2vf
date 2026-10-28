@@ -38,6 +38,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.Rect2i;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -442,6 +443,26 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Nullable
     private FactorySnapshotBuilder.LineView selectedLine() {
         return this.selectedLineId == null ? null : findLine(this.selectedLineId);
+    }
+
+    /**
+     * 当前产线是否处于不执行 IO 的状态。
+     *
+     * <p>暂停与睡眠时卡片不再显示上一轮的红色诊断，改用中性文案；运行中返回
+     * {@code null}，由各卡片按真实原因上色。</p>
+     *
+     * @return 已暂停 / 睡眠中；运行中或未选线为 {@code null}
+     */
+    @Nullable
+    private String lineIdleLabel() {
+        FactorySnapshotBuilder.LineView line = selectedLine();
+        if (line == null) {
+            return null;
+        }
+        if (!line.running()) {
+            return "已暂停";
+        }
+        return line.sleeping() ? "睡眠中" : null;
     }
 
     @Nullable
@@ -963,6 +984,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
         Status status = statusOf(machine);
+        String idleLabel = lineIdleLabel();
 
         NineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
                 FactoryLayout.ROW_H - 1);
@@ -1009,7 +1031,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             RuleStrip.draw(graphics, this.font, this.theme, strip, machine.inputs(),
                     machine.inputRates(), machine.inputReasons(), this.renderMouseX,
                     this.renderMouseY, this.editController != null
-                            && this.editController.isDraggingResource());
+                            && this.editController.isDraggingResource(),
+                    idleLabel != null);
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
@@ -1020,7 +1043,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             RuleStrip.draw(graphics, this.font, this.theme, strip, machine.outputs(),
                     machine.outputRates(), machine.outputReasons(), this.renderMouseX,
                     this.renderMouseY, this.editController != null
-                            && this.editController.isDraggingResource());
+                            && this.editController.isDraggingResource(),
+                    idleLabel != null);
         }
         drawExpandButton(graphics, y, isOpen(machine));
         if (detailHeight > 0) {
@@ -1028,7 +1052,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
             IoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
                     this.renderMouseX, this.renderMouseY,
-                    this.editController != null && this.editController.isDraggingResource());
+                    this.editController != null && this.editController.isDraggingResource(),
+                    idleLabel);
         }
     }
 
@@ -1298,11 +1323,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     boolean handleIoCardMouse(FactorySnapshotBuilder.MachineView machine,
             IoDetailLayout.Card card, double mouseX, double mouseY, int button) {
-        if (button != 0) {
-            return true;
-        }
         IoSide side = card.input() ? IoSide.INPUT : IoSide.OUTPUT;
-        if (card.empty()) {
+        if (card.empty() || this.editController == null) {
             return true;
         }
         List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
@@ -1312,21 +1334,27 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         ResourceSpec spec = rules.get(card.ruleIndex());
         IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
                 false, spec, mouseX, mouseY);
-        if (this.editController == null) {
-            return true;
-        }
         switch (hit.kind()) {
-            case DELETE -> this.editController.removeRule(machine, side, spec);
-            case FACE -> this.editController.updateRule(machine, side, spec,
-                    IoCardControls.FACES[hit.faceIndex()], spec.mode());
+            case FACE -> {
+                // 左键下一个面、右键上一个面；面按钮本身就是当前面的显示。
+                if (button == 0 || button == 1) {
+                    Direction next = IoCardControls.nextFace(spec.face(),
+                            button == 0 ? 1 : -1);
+                    this.editController.updateRule(machine, side, spec, next, spec.mode());
+                }
+            }
             case MATCH -> {
-                if (IoCardControls.matchEnabled(spec)) {
+                if (button == 0 && IoCardControls.matchEnabled(spec)) {
                     MatchMode next = spec.mode() == MatchMode.IGNORE_COMPONENTS
                             ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
                     this.editController.updateRule(machine, side, spec, spec.face(), next);
                 }
             }
-            case BODY -> this.editController.beginRuleDrag(machine, side, spec, mouseX, mouseY);
+            case BODY -> {
+                if (button == 0) {
+                    this.editController.beginRuleDrag(machine, side, spec, mouseX, mouseY);
+                }
+            }
             default -> {
                 // 空卡/未命中：不动作。
             }
@@ -1879,13 +1907,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             if (l.hasColumn(FactoryLayout.COL_INPUT)
                     && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
                 drawRuleTooltip(graphics, "输入", machine.inputs(),
-                        machine.inputRates(), machine.inputReasons(), mouseX, mouseY);
+                        machine.inputRates(), machine.inputReasons(), mouseX, mouseY,
+                        lineIdleLabel());
                 return;
             }
             if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                     && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
                 drawRuleTooltip(graphics, "输出", machine.outputs(),
-                        machine.outputRates(), machine.outputReasons(), mouseX, mouseY);
+                        machine.outputRates(), machine.outputReasons(), mouseX, mouseY,
+                        lineIdleLabel());
                 return;
             }
         }
@@ -1955,19 +1985,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return;
         }
         ResourceSpec spec = rules.get(card.ruleIndex());
+        String idleLabel = lineIdleLabel();
         IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
                 false, spec, mouseX, mouseY);
         switch (hit.kind()) {
-            case DELETE -> {
-                lines.add(FactoryLabels.colored("删除规则", tt.title()));
-                lines.add(FactoryLabels.colored("点 x 删除；也可以拖回仓库", tt.label()));
-                graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
-                return;
-            }
             case FACE -> {
-                lines.add(FactoryLabels.colored("设置面", tt.title()));
-                lines.add(FactoryLabels.colored("点击设为「"
-                        + IoCardControls.FACE_LABELS[hit.faceIndex()] + "」", tt.label()));
+                lines.add(FactoryLabels.colored(
+                        card.input() ? "输入面" : "输出面", tt.title()));
+                lines.add(FactoryLabels.faceLine(
+                        "当前：", faceName(spec), FactoryLabels.faceEn(spec), this.theme));
+                lines.add(FactoryLabels.colored("左键下一个面，右键上一个面", tt.label()));
                 graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
                 return;
             }
@@ -1993,6 +2020,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 ? machine.inputReasons() : machine.outputReasons();
         IoResult.Reason reason = card.ruleIndex() < reasons.size()
                 ? reasons.get(card.ruleIndex()) : IoResult.Reason.NO_ITEM;
+        IoResult.Reason effective = idleLabel != null ? IoResult.Reason.NO_ITEM
+                : FactoryLabels.effectiveReason(rate, reason);
 
         lines.add(Component.empty()
                 .append(FactoryLabels.colored(card.input() ? "输入" : "输出", tt.title()))
@@ -2009,9 +2038,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("速率：", tt.label()))
-                .append(FactoryLabels.rate(rate, spec.key().kind(), reason, this.theme)));
-        lines.add(FactoryLabels.state(reason, card.input(), this.theme));
-        lines.add(FactoryLabels.colored("点 x 删除；拖回仓库也可删除", tt.label()));
+                .append(FactoryLabels.rate(rate, spec.key().kind(), effective, this.theme)));
+        if (idleLabel != null) {
+            lines.add(Component.empty()
+                    .append(FactoryLabels.colored("状态：", tt.label()))
+                    .append(FactoryLabels.coloredBold(idleLabel, tt.idle())));
+        } else {
+            lines.add(FactoryLabels.state(effective, card.input(), this.theme));
+        }
+        lines.add(FactoryLabels.colored("拖回仓库删除", tt.label()));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
@@ -2026,10 +2061,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      *
      * <p>最多列 10 条，每条显示资源名、面、速率；超出部分只显示剩余数量，
      * 防止 tooltip 高度超出屏幕。</p>
+     *
+     * @param idleLabel 产线暂停/睡眠时的中性文案；运行中传 {@code null}
      */
     private void drawRuleTooltip(GuiGraphics graphics, String title,
             List<ResourceSpec> rules, List<Long> rates, List<IoResult.Reason> reasons,
-            int mouseX, int mouseY) {
+            int mouseX, int mouseY, @Nullable String idleLabel) {
         if (rules.isEmpty()) {
             return;
         }
@@ -2042,12 +2079,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             long rate = i < rates.size() ? rates.get(i) : 0L;
             IoResult.Reason reason = i < reasons.size()
                     ? reasons.get(i) : IoResult.Reason.NO_ITEM;
+            IoResult.Reason effective = idleLabel != null ? IoResult.Reason.NO_ITEM
+                    : FactoryLabels.effectiveReason(rate, reason);
             lines.add(Component.empty()
                     .append(FactoryLabels.colored(FactoryLabels.name(spec.key()), tt.title()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.coloredBold(faceName(spec), tt.face()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
-                    .append(FactoryLabels.rate(rate, spec.key().kind(), reason, this.theme)));
+                    .append(FactoryLabels.rate(rate, spec.key().kind(), effective, this.theme)));
         }
         if (rules.size() > shown) {
             lines.add(Component.empty()
@@ -2055,6 +2094,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     .append(FactoryLabels.coloredBold(
                             Integer.toString(rules.size() - shown), tt.value()))
                     .append(FactoryLabels.colored(" 条", tt.label())));
+        }
+        if (idleLabel != null) {
+            lines.add(FactoryLabels.coloredBold(idleLabel, tt.idle()));
         }
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }

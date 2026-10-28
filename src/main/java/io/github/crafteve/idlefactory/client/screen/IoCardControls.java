@@ -10,9 +10,9 @@ import net.minecraft.core.Direction;
 /**
  * IO 配置卡内部控件的几何与命中。
  *
- * <p>卡片布局：顶部信息区（图标、名字、速率、删除 x），下面两行面按钮（任/上/下/北 与
- * 南/东/西），第二行/第一行末尾放黄色匹配按钮。绘制、命中、tooltip 都从这里取矩形，
- * 避免三处各算一份。</p>
+ * <p>卡片沿用 26px 的紧凑样式：第一行是槽位、名称与右对齐速率；第二行依次是面按钮、
+ * 匹配按钮与状态文字。面按钮左键切到下一个面、右键切回上一个面；匹配按钮点击在精确 /
+ * 模糊之间切换。绘制、命中、tooltip 都从这里取矩形，避免三处各算一份。</p>
  */
 final class IoCardControls {
     /** 面顺序：任意 + 六向。 */
@@ -25,9 +25,7 @@ final class IoCardControls {
 
     /** 命中类型。 */
     enum Kind {
-        /** 删除规则。 */
-        DELETE,
-        /** 设置某个面。 */
+        /** 面按钮。 */
         FACE,
         /** 切换模糊/精确。 */
         MATCH,
@@ -42,10 +40,9 @@ final class IoCardControls {
     /**
      * 一次命中。
      *
-     * @param kind      类型
-     * @param faceIndex 面下标；仅 {@link Kind#FACE} 有意义
+     * @param kind 类型
      */
-    record Hit(Kind kind, int faceIndex) {
+    record Hit(Kind kind) {
     }
 
     private IoCardControls() {
@@ -53,47 +50,86 @@ final class IoCardControls {
     }
 
     /**
-     * 面按钮矩形。
+     * 面按钮矩形；固定在卡片第二行左侧。
      *
      * @param cardX 卡片左边缘
      * @param cardY 卡片上边缘
-     * @param index 面下标 0..6
      * @return 矩形
      */
-    static Rect faceRect(int cardX, int cardY, int index) {
-        int row = index / 4;
-        int col = index % 4;
-        int x = cardX + FactoryLayout.IO_CARD_PAD
-                + col * (FactoryLayout.IO_FACE_BTN_W + FactoryLayout.IO_FACE_GAP);
-        int y = cardY + FactoryLayout.IO_CARD_TOP_H + 2 + row * 14;
-        return new Rect(x, y, FactoryLayout.IO_FACE_BTN_W, FactoryLayout.IO_FACE_BTN_H);
+    static Rect faceRect(int cardX, int cardY) {
+        return new Rect(cardX + FactoryLayout.IO_CARD_TEXT_X,
+                cardY + FactoryLayout.IO_CARD_LINE2_Y,
+                FactoryLayout.IO_CARD_FACE_W, FactoryLayout.IO_CARD_BTN_H);
     }
 
     /**
-     * 匹配按钮矩形；放在第一行面按钮之后。
+     * 匹配按钮矩形；紧跟面按钮。
      *
      * @param cardX 卡片左边缘
      * @param cardY 卡片上边缘
      * @return 矩形
      */
     static Rect matchRect(int cardX, int cardY) {
-        int x = cardX + FactoryLayout.IO_CARD_PAD
-                + 4 * (FactoryLayout.IO_FACE_BTN_W + FactoryLayout.IO_FACE_GAP);
-        int y = cardY + FactoryLayout.IO_CARD_TOP_H + 2;
-        return new Rect(x, y, FactoryLayout.IO_FACE_BTN_W, FactoryLayout.IO_FACE_BTN_H);
+        Rect face = faceRect(cardX, cardY);
+        return new Rect(face.x() + face.width() + FactoryLayout.IO_CARD_BTN_GAP,
+                face.y(), FactoryLayout.IO_CARD_MATCH_W, FactoryLayout.IO_CARD_BTN_H);
     }
 
     /**
-     * 删除按钮矩形。
+     * 状态文字的起始 x。
+     *
+     * <p>物品有匹配按钮时从匹配按钮右侧开始；流体 / FE 不显示匹配按钮，直接从面按钮
+     * 右侧开始，避免留下空洞。</p>
      *
      * @param cardX 卡片左边缘
-     * @param cardY 卡片上边缘
-     * @param cardW 卡片宽
-     * @return 矩形
+     * @param spec  规则
+     * @return 状态文字左边缘
      */
-    static Rect deleteRect(int cardX, int cardY, int cardW) {
-        return new Rect(cardX + cardW - FactoryLayout.IO_DELETE_SIZE - 3, cardY + 3,
-                FactoryLayout.IO_DELETE_SIZE, FactoryLayout.IO_DELETE_SIZE);
+    static int reasonX(int cardX, ResourceSpec spec) {
+        int x = cardX + FactoryLayout.IO_CARD_TEXT_X + FactoryLayout.IO_CARD_FACE_W
+                + FactoryLayout.IO_CARD_REASON_GAP;
+        if (matchVisible(spec)) {
+            x += FactoryLayout.IO_CARD_BTN_GAP + FactoryLayout.IO_CARD_MATCH_W;
+        }
+        return x;
+    }
+
+    /**
+     * 当前面在 {@link #FACES} 里的下标。
+     *
+     * @param face 面；{@code null} 表示任意
+     * @return 下标 0..6
+     */
+    static int faceIndex(@Nullable Direction face) {
+        for (int i = 0; i < FACES.length; i++) {
+            if (FACES[i] == face) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 面按钮文案。
+     *
+     * @param spec 规则
+     * @return 任 / 上 / 下 / 北 / 南 / 东 / 西
+     */
+    static String faceLabel(ResourceSpec spec) {
+        return FACE_LABELS[faceIndex(spec.face())];
+    }
+
+    /**
+     * 在七个面之间循环。
+     *
+     * @param current 当前面；{@code null} 表示任意
+     * @param delta   正数下一个、负数上一个
+     * @return 新面
+     */
+    @Nullable
+    static Direction nextFace(@Nullable Direction current, int delta) {
+        int index = Math.floorMod(faceIndex(current) + delta, FACES.length);
+        return FACES[index];
     }
 
     /**
@@ -110,24 +146,19 @@ final class IoCardControls {
      */
     static Hit hit(int cardX, int cardY, int cardW, boolean empty,
             @Nullable ResourceSpec spec, double mx, double my) {
-        if (!inside(mx, my, cardX, cardY, cardW, FactoryLayout.IO_CARD_H)) {
-            return new Hit(Kind.NONE, -1);
+        if (!inside(mx, my, cardX, cardY, cardW, FactoryLayout.IO_CELL_H)) {
+            return new Hit(Kind.NONE);
         }
         if (empty) {
-            return new Hit(Kind.EMPTY, -1);
+            return new Hit(Kind.EMPTY);
         }
-        if (inside(mx, my, deleteRect(cardX, cardY, cardW))) {
-            return new Hit(Kind.DELETE, -1);
-        }
-        for (int i = 0; i < FACES.length; i++) {
-            if (inside(mx, my, faceRect(cardX, cardY, i))) {
-                return new Hit(Kind.FACE, i);
-            }
+        if (inside(mx, my, faceRect(cardX, cardY))) {
+            return new Hit(Kind.FACE);
         }
         if (spec != null && matchVisible(spec) && inside(mx, my, matchRect(cardX, cardY))) {
-            return new Hit(matchEnabled(spec) ? Kind.MATCH : Kind.NONE, -1);
+            return new Hit(Kind.MATCH);
         }
-        return new Hit(Kind.BODY, -1);
+        return new Hit(Kind.BODY);
     }
 
     /**
@@ -158,17 +189,6 @@ final class IoCardControls {
      */
     static String matchLabel(ResourceSpec spec) {
         return spec.fuzzy() ? "模" : "精";
-    }
-
-    /**
-     * 面按钮是否选中。
-     *
-     * @param spec  规则
-     * @param index 面下标
-     * @return 选中时为 {@code true}
-     */
-    static boolean faceSelected(ResourceSpec spec, int index) {
-        return spec.face() == FACES[index];
     }
 
     private static boolean inside(double mouseX, double mouseY, Rect rect) {

@@ -67,28 +67,28 @@ public final class FactoryLayout {
     public static final int IO_SECTION_H = 12;
     /** 单个规则单元格高度。 */
     public static final int IO_CELL_H = 26;
-    /** 配置卡高度：比只读单元格高，容纳两行面按钮和匹配按钮。 */
-    public static final int IO_CARD_H = 54;
-    /** 配置卡顶部信息区高度。 */
-    public static final int IO_CARD_TOP_H = 22;
+    /** 配置卡槽位的上边距（相对卡片）。 */
+    public static final int IO_CARD_SLOT_Y = 4;
+    /** 配置卡第二行控件的上边距（相对卡片）。 */
+    public static final int IO_CARD_LINE2_Y = 13;
+    /** 配置卡名称/第二行控件的左边缘：槽位右缘再加 4px。 */
+    public static final int IO_CARD_TEXT_X = 25;
     /** 配置卡面按钮宽。 */
-    public static final int IO_FACE_BTN_W = 16;
-    /** 配置卡面按钮高。 */
-    public static final int IO_FACE_BTN_H = 12;
-    /** 面按钮之间的间距。 */
-    public static final int IO_FACE_GAP = 1;
+    public static final int IO_CARD_FACE_W = 18;
+    /** 配置卡匹配按钮宽。 */
+    public static final int IO_CARD_MATCH_W = 18;
+    /** 配置卡按钮高。 */
+    public static final int IO_CARD_BTN_H = 12;
+    /** 配置卡按钮之间的间距。 */
+    public static final int IO_CARD_BTN_GAP = 2;
+    /** 状态文字与按钮之间的间距。 */
+    public static final int IO_CARD_REASON_GAP = 4;
     /** 配置卡内边距。 */
     public static final int IO_CARD_PAD = 3;
-    /** 配置卡删除按钮边长。 */
-    public static final int IO_DELETE_SIZE = 12;
+    /** 展开区短名字两列时的最小单卡宽。 */
+    public static final int IO_CARD_MIN_W = 132;
     /** 展开区滚轮一次滚动的像素。 */
     public static final int IO_SCROLL_STEP = 20;
-    /** 单个规则单元格最大宽度。 */
-    public static final int IO_CELL_W = 132;
-    /** 单个规则单元格最小宽度；再窄就放不下「速率 + 面 + 诊断」。 */
-    public static final int IO_CELL_MIN_W = 96;
-    /** 展开区每行最多几个单元格。 */
-    public static final int IO_MAX_COLS = 6;
     /** 单元格之间的间距。 */
     public static final int IO_GAP = 4;
     /** 输入段与输出段之间的间距。 */
@@ -399,27 +399,26 @@ public final class FactoryLayout {
     }
 
     /**
-     * 单元格宽度。
+     * 配置卡每行放几列。
      *
-     * <p>先按最小宽度决定每行几列，再把该行剩余宽度均分给单元格；这样宽屏不会只剩
-     * 左半边有内容，窄屏也不会把「速率 + 面 + 诊断」挤丢。</p>
+     * <p>短名字两列；两列都放不下最小卡宽时退化为单列，绝不把按钮挤没。</p>
      *
-     * @return 单元格宽度
+     * @return 1 或 2
      */
-    public int ioCellWidth() {
-        int cols = ioCellsPerRow();
-        int width = (ioInnerWidth() - (cols - 1) * IO_GAP) / cols;
-        return clamp(width, IO_CELL_MIN_W, IO_CELL_W);
+    public int ioCardColumns() {
+        return ioInnerWidth() >= IO_CARD_MIN_W * 2 + IO_GAP ? 2 : 1;
     }
 
     /**
-     * 展开区每行能放几个单元格。
+     * 配置卡宽度。
      *
-     * @return 1..{@link #IO_MAX_COLS}
+     * <p>两列时均分整行（每张卡拉满半行），单列时铺满整行；不再固定 132px 留白。</p>
+     *
+     * @return 像素宽度
      */
-    public int ioCellsPerRow() {
-        int cols = (ioInnerWidth() + IO_GAP) / (IO_CELL_MIN_W + IO_GAP);
-        return clamp(cols, 1, IO_MAX_COLS);
+    public int ioCardWidth() {
+        int cols = ioCardColumns();
+        return cols <= 1 ? ioInnerWidth() : (ioInnerWidth() - IO_GAP) / 2;
     }
 
     /**
