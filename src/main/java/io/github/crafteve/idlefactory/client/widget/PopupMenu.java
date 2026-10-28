@@ -180,16 +180,25 @@ public final class PopupMenu {
     /**
      * 画菜单；调用方保证它在表格之后、tooltip 之前或之后由自己决定。
      *
+     * <p>菜单是浮层，必须高于物品图标（150）与自定义数量（300）。层级由调用方显式传入：
+     * 已经处在浮层 pose 内的调用方传 {@link GuiLayer#BASE}，独立调用传
+     * {@link GuiLayer#OVERLAY}。这样不会出现「父级已提升、子菜单再提升」叠到 tooltip
+     * 之上的情况。</p>
+     *
      * @param graphics 画布
      * @param font     字体
      * @param theme    主题
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
+     * @param layer    绘制层级
      */
-    public void draw(GuiGraphics graphics, Font font, GuiTheme theme, int mouseX, int mouseY) {
+    public void draw(GuiGraphics graphics, Font font, GuiTheme theme, int mouseX, int mouseY,
+            GuiLayer layer) {
         if (!this.open) {
             return;
         }
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, layer.z());
         int height = height();
         NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
                 this.width, height);
@@ -220,6 +229,7 @@ public final class PopupMenu {
             }
             cursor += rowH;
         }
+        graphics.pose().popPose();
     }
 
     private void drawHeader(GuiGraphics graphics, Font font, GuiTheme theme, Item item,

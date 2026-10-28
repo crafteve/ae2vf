@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.client.widget.PopupMenu;
@@ -233,7 +234,7 @@ public final class LineSelectorMenu {
                     hovered ? theme.textValue() : theme.textPrimary(), false);
         }
 
-        this.submenu.draw(graphics, font, theme, mouseX, mouseY);
+        this.submenu.draw(graphics, font, theme, mouseX, mouseY, GuiLayer.BASE);
     }
 
     /**

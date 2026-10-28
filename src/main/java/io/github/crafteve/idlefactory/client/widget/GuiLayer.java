@@ -20,6 +20,8 @@ public enum GuiLayer {
     GRID_COUNT(300.0F),
     /** 产线下拉、二级菜单、命名/确认浮层。 */
     OVERLAY(360.0F),
+    /** 排序菜单；高于产线下拉/确认浮层，低于拖拽幽灵与 tooltip。 */
+    SORT_MENU(365.0F),
     /** 拖拽时跟随鼠标的物品幽灵。 */
     DRAG(370.0F),
     /** 原版 tooltip；浮层打开时会被抑制。 */

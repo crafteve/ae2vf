@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.PopupMenu;
 
 import net.minecraft.client.gui.Font;
@@ -137,8 +138,18 @@ final class FactorySortMenu {
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
+    /**
+     * 画菜单；调用方保证它在右区内容之后、tooltip 之前或之后由自己决定。
+     *
+     * <p>排序菜单会盖住仓库格，所以显式要求 {@link GuiLayer#SORT_MENU}；菜单打开时
+     * {@link FactoryScreen} 已抑制 tooltip。</p>
+     *
+     * @param graphics 画布
+     * @param mouseX   鼠标 x
+     * @param mouseY   鼠标 y
+     */
     void draw(GuiGraphics graphics, int mouseX, int mouseY) {
-        this.menu.draw(graphics, this.font, this.theme, mouseX, mouseY);
+        this.menu.draw(graphics, this.font, this.theme, mouseX, mouseY, GuiLayer.SORT_MENU);
     }
 
     /**
