@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
@@ -612,10 +613,10 @@ public final class FactoryEditController {
             return;
         }
         drawFeedback(graphics);
-        // 物品图标在 z=150 绘制并立即 flush，九宫格/文字却在 z=0；浮层不抬层就会被表格里的
-        // 机器/资源图标穿透。200 在物品之上、tooltip 的 400 之下，浮层打开时 tooltip 已被抑制。
+        // 物品图标在 150、原版数量装饰在 200、仓库自定义数量在 300；浮层必须高于这些内容层。
+        // 层级统一走 GuiLayer，tooltip 由原版画在 400，浮层打开时 tooltip 已被抑制。
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, 200.0F);
+        graphics.pose().translate(0.0F, 0.0F, GuiLayer.OVERLAY.z());
         this.lineMenu.draw(graphics, this.font, this.theme, mouseX, mouseY);
         this.nameDialog.draw(graphics, mouseX, mouseY, partialTick);
         this.confirmDialog.draw(graphics, mouseX, mouseY);
@@ -632,7 +633,11 @@ public final class FactoryEditController {
             if (icon.isEmpty()) {
                 icon = new ItemStack(Items.BARRIER);
             }
+            // renderItem 自带 150 偏移，这里再补差值，让幽灵净层级落在 DRAG。
+            graphics.pose().pushPose();
+            graphics.pose().translate(0.0F, 0.0F, GuiLayer.DRAG.z() - GuiLayer.ITEM.z());
             graphics.renderItem(icon, (int) this.dragMouseX - 8, (int) this.dragMouseY - 8);
+            graphics.pose().popPose();
         }
     }
 

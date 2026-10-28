@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.storage.FactoryStorageRepo;
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
@@ -1660,7 +1661,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         float width = textWidth * scale;
         float height = this.font.lineHeight * scale;
         graphics.pose().pushPose();
-        graphics.pose().translate(right - width - 1.0F, bottom - height, 300.0F);
+        graphics.pose().translate(right - width - 1.0F, bottom - height,
+                GuiLayer.GRID_COUNT.z());
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.drawString(this.font, text, 0, 0, 0xFFFFFFFF, true);
         graphics.pose().popPose();
