@@ -24,6 +24,7 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 
@@ -539,6 +540,7 @@ public final class FactoryService {
             return 0;
         }
         factory.bindAnchor(anchor);
+        factory.setStorageMode(StorageMode.ME);
         held.shrink(1);
         player.getInventory().setChanged();
         markDirty();
@@ -601,6 +603,7 @@ public final class FactoryService {
         }
 
         factory.bindAnchor(anchor);
+        factory.setStorageMode(StorageMode.CONTAINER);
         markDirty();
         ok(player, "已加入仓库容器 [" + ref.shortId() + "] " + level.dimension().location()
                 + " " + pos.toShortString() + "（共 " + anchor.containers().size() + " 个）");

@@ -6,13 +6,16 @@ import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 
 import appeng.api.features.Locatables;
 import appeng.api.ids.AEComponents;
+import appeng.api.networking.GridHelper;
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;
+import appeng.api.networking.IInWorldGridNodeHost;
 import appeng.api.networking.security.IActionHost;
 import appeng.core.definitions.AEItems;
 import appeng.me.cluster.implementations.QuantumCluster;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 
@@ -83,6 +86,40 @@ public final class Ae2Binder {
         } catch (RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * 按方块坐标找它接入 ME 网络的节点。
+     *
+     * <p>用于存储链接杖 A 模式：目标不限于 ME 控制器，只要方块实现了 AE2 的
+     * {@link IInWorldGridNodeHost} 并暴露了任一面的节点即可。没有节点、区块未加载或方块不是
+     * ME 网络方块时返回 {@code null}。</p>
+     *
+     * @param level 服务端世界
+     * @param pos   方块坐标
+     * @return 节点；不在 ME 网络上时为 {@code null}
+     */
+    @Nullable
+    public static IGridNode nodeAt(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return null;
+        }
+        try {
+            IInWorldGridNodeHost host = GridHelper.getNodeHost(level, pos);
+            if (host == null) {
+                return null;
+            }
+            for (Direction direction : Direction.values()) {
+                IGridNode node = host.getGridNode(direction);
+                if (node != null) {
+                    return node;
+                }
+            }
+        } catch (RuntimeException e) {
+            // 节点已销毁 / 集群正在拆分
+            return null;
+        }
+        return null;
     }
 
     /**

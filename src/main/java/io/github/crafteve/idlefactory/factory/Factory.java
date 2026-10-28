@@ -6,9 +6,11 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.diag.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.LineLibrary;
+import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 
 /**
@@ -27,6 +29,8 @@ public final class Factory {
     private final UUID owner;
     /** 仓库插头：永远对外给出非 null 的仓库。 */
     private final StorageLink storageLink = new StorageLink();
+    /** 当前仓库接入模式；清空地址后仍保留，供存储链接杖切换显示。 */
+    private StorageMode storageMode = StorageMode.ME;
     /** 机器库：这台工厂接管的 IO 目标。 */
     private final MachineLibrary machines = new MachineLibrary();
     /** 被动产线库。 */
@@ -90,13 +94,35 @@ public final class Factory {
         this.state = newState;
     }
 
+    /** 当前仓库接入模式。 */
+    public StorageMode storageMode() {
+        return this.storageMode;
+    }
+
+    /**
+     * 改仓库接入模式；调用方负责保证当前地址为空。
+     *
+     * @param mode 新模式
+     */
+    public void setStorageMode(StorageMode mode) {
+        this.storageMode = mode;
+    }
+
     /**
      * 绑定仓库地址并立即解析一次。
+     *
+     * <p>非空地址会顺手把模式推到对应类型；解绑时保留当前模式，方便存储链接杖清空后继续用
+     * 同一模式。</p>
      *
      * @param anchor 新地址；{@code null} 表示解绑
      */
     public void bindAnchor(@Nullable StorageAnchor anchor) {
         this.storageLink.bind(anchor);
+        if (anchor instanceof ContainerAnchor) {
+            this.storageMode = StorageMode.CONTAINER;
+        } else if (anchor != null) {
+            this.storageMode = StorageMode.ME;
+        }
         updateStateFromStorage();
     }
 

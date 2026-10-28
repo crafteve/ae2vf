@@ -9,7 +9,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.core.HolderLookup;
@@ -35,6 +37,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_ID = "Id";
     private static final String TAG_OWNER = "Owner";
     private static final String TAG_ANCHOR = "Anchor";
+    private static final String TAG_STORAGE_MODE = "StorageMode";
     private static final String TAG_TARGETS = "Targets";
     private static final String TAG_LINES = "Lines";
     private static final String TAG_DETACHED = "Detached";
@@ -98,6 +101,7 @@ public final class FactoryStore extends SavedData {
             if (record.anchor() != null) {
                 entry.put(TAG_ANCHOR, record.anchor().save());
             }
+            entry.putString(TAG_STORAGE_MODE, record.storageMode().name());
             if (!record.targets().isEmpty()) {
                 ListTag targets = new ListTag();
                 for (MachineRef target : record.targets()) {
@@ -135,6 +139,7 @@ public final class FactoryStore extends SavedData {
             StorageAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
                     ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
                     : null;
+            StorageMode storageMode = readMode(entry, anchor);
             List<MachineRef> targets = new ArrayList<>();
             ListTag targetList = entry.getList(TAG_TARGETS, Tag.TAG_COMPOUND);
             for (int j = 0; j < targetList.size(); j++) {
@@ -152,11 +157,30 @@ public final class FactoryStore extends SavedData {
                 }
             }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    targets, lines, decodeUuids(entry.getIntArray(TAG_DETACHED))));
+                    targets, lines, decodeUuids(entry.getIntArray(TAG_DETACHED)), storageMode));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
         return store;
+    }
+
+    /**
+     * 读仓库模式；旧档没有字段时按地址类型推断。
+     *
+     * @param entry  工厂记录
+     * @param anchor 已读出的地址，可为空
+     * @return 仓库模式
+     */
+    private static StorageMode readMode(CompoundTag entry, @Nullable StorageAnchor anchor) {
+        String raw = entry.getString(TAG_STORAGE_MODE);
+        if (!raw.isEmpty()) {
+            try {
+                return StorageMode.valueOf(raw);
+            } catch (IllegalArgumentException ignored) {
+                // 未知值按地址类型推断
+            }
+        }
+        return anchor instanceof ContainerAnchor ? StorageMode.CONTAINER : StorageMode.ME;
     }
 
     /**
@@ -168,9 +192,11 @@ public final class FactoryStore extends SavedData {
      * @param targets  机器库里的目标
      * @param lines    被动产线
      * @param detached 玩家已断开、仍留在库里的机器 id（意图，必须写档）
+     * @param storageMode 仓库接入模式（ME / 容器）
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            List<MachineRef> targets, List<PassiveLine> lines, Set<UUID> detached) {
+            List<MachineRef> targets, List<PassiveLine> lines, Set<UUID> detached,
+            StorageMode storageMode) {
     }
 
     /**

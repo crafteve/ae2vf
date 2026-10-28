@@ -32,6 +32,7 @@ public final class FactoryManager {
         for (FactoryRecord record : records) {
             Factory factory = new Factory(record.id(), record.owner());
             factory.bindAnchor(record.anchor());
+            factory.setStorageMode(record.storageMode());
             factory.machines().addAll(record.targets());
             for (UUID detachedId : record.detached()) {
                 factory.machines().setDetached(detachedId, true);
@@ -50,7 +51,8 @@ public final class FactoryManager {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.owner(),
                         factory.storageLink().anchor(), factory.machines().all(),
-                        factory.lines().all(), factory.machines().detachedIds()))
+                        factory.lines().all(), factory.machines().detachedIds(),
+                        factory.storageMode()))
                 .toList();
     }
 

@@ -5,7 +5,8 @@ import org.jetbrains.annotations.Nullable;
 /**
  * 按地址类型分发到具体解析器。
  *
- * <p>当前只有两条路：AE2 和方块容器。加第三种后端时在这里加一个分支即可。</p>
+ * <p>地址有三种（ME 坐标、旧量子环、容器组），后端仍是两条：ME 和方块容器。加第三种后端时
+ * 在这里加一个分支即可。</p>
  */
 public final class DispatchingStorageResolver implements StorageResolver {
     private final StorageResolver ae2;
@@ -23,7 +24,7 @@ public final class DispatchingStorageResolver implements StorageResolver {
     @Override
     @Nullable
     public Storage resolve(StorageAnchor anchor) {
-        if (anchor instanceof Ae2Anchor) {
+        if (anchor instanceof MeAnchor || anchor instanceof Ae2Anchor) {
             return this.ae2.resolve(anchor);
         }
         if (anchor instanceof ContainerAnchor) {
