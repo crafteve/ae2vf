@@ -133,6 +133,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 仓库格数量：物品 / FE 最多 4 字符、流体最多 5 字符，缩放 0.666；完整精度只放 tooltip 与速率。
 - 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
 - 几何只在 `FactoryLayout`。溢出先让位，不许压到相邻区域。
+- 绘制层级统一走 `client/widget/GuiLayer`，顺序固定：`BASE 0` → `ITEM 150` → `ITEM_DECORATION 200` → `GRID_COUNT 300` → `OVERLAY 360` → `DRAG 370` → `TOOLTIP 400`。浮层必须高于数量层（300），否则会被仓库/背包数量盖住；tooltip 由原版固定在 400，浮层打开时已抑制。新加图层先加枚举项再引用，禁止在调用点写 z 魔法数。
 - 尺寸问题先看 `logs/latest.log` 的 `Idle Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Didlefactory.gutter` 现场调。
 
 ### 3.3 便利性
