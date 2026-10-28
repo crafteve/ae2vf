@@ -827,24 +827,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 statusColor = this.theme.statusRun();
             }
         } else {
-            switch (this.factoryState) {
-                case RUNNING -> {
-                    status = "运行中";
-                    statusColor = this.theme.statusRun();
-                }
-                case PAUSED -> {
-                    status = this.storageOnline ? "已暂停" : "仓库离线";
-                    statusColor = this.storageOnline ? this.theme.statusWarn() : this.theme.error();
-                }
-                case STOPPED -> {
-                    status = "已停止";
-                    statusColor = this.theme.statusIdle();
-                }
-                default -> {
-                    status = "未绑仓库";
-                    statusColor = this.theme.statusIdle();
-                }
-            }
+            // 顶栏状态描述的是当前产线，不是工厂整体。没有选线时没有可报的
+            // 运行状态，不能拿 factoryState 冒充，否则会出现无主的「运行中」。
+            status = "未选产线";
+            statusColor = this.theme.statusIdle();
         }
         graphics.drawString(this.font, status, x + 4, textY, statusColor, false);
         int statusEnd = x + 4 + this.font.width(status);
