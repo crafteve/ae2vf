@@ -788,9 +788,22 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         String status;
         int statusColor;
+        FactorySnapshotBuilder.LineView activeLine = selectedLine();
         if (!this.hasFactory) {
             status = "未创建";
             statusColor = this.theme.statusIdle();
+        } else if (activeLine != null) {
+            // 顶栏状态描述的是当前产线，不是仓库连接；仓库在线由右侧统计单独显示。
+            if (!activeLine.running()) {
+                status = "已暂停";
+                statusColor = this.theme.error();
+            } else if (activeLine.sleeping()) {
+                status = "睡眠 " + FactoryLabels.seconds(activeLine.sleepRemainingTicks()) + "s";
+                statusColor = this.theme.statusIdle();
+            } else {
+                status = "运行中";
+                statusColor = this.theme.statusRun();
+            }
         } else {
             switch (this.factoryState) {
                 case RUNNING -> {

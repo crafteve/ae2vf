@@ -134,6 +134,8 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
             buf.writeUtf(line.name(), MAX_LINE_NAME);
             buf.writeBoolean(line.running());
             buf.writeVarInt(Math.max(0, line.machineCount()));
+            buf.writeBoolean(line.sleeping());
+            buf.writeVarLong(Math.max(0L, line.sleepRemainingTicks()));
         }
     }
 
@@ -148,7 +150,13 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
             if (machineCount < 0) {
                 throw new DecoderException("invalid line machine count: " + machineCount);
             }
-            lines.add(new FactorySnapshotBuilder.LineView(id, name, running, machineCount));
+            boolean sleeping = buf.readBoolean();
+            long sleepRemainingTicks = buf.readVarLong();
+            if (sleepRemainingTicks < 0L) {
+                throw new DecoderException("invalid line sleep ticks: " + sleepRemainingTicks);
+            }
+            lines.add(new FactorySnapshotBuilder.LineView(id, name, running, machineCount,
+                    sleeping, sleepRemainingTicks));
         }
         return lines;
     }

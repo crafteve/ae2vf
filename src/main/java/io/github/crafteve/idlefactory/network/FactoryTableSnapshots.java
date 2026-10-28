@@ -1,11 +1,15 @@
 package io.github.crafteve.idlefactory.network;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -40,12 +44,20 @@ public final class FactoryTableSnapshots {
             return;
         }
         Factory owner = factory.get();
+        long now = player.serverLevel().getGameTime();
         List<FactorySnapshotBuilder.MachineView> machines =
-                FactorySnapshotBuilder.machines(owner, runtime.observations(),
-                        player.serverLevel().getGameTime());
+                FactorySnapshotBuilder.machines(owner, runtime.observations(), now);
         FactorySnapshotBuilder.FactoryHealth health =
                 FactorySnapshotBuilder.health(owner, machines);
-        List<FactorySnapshotBuilder.LineView> lines = FactorySnapshotBuilder.lines(owner);
+        Map<UUID, Long> sleepRemaining = new HashMap<>();
+        for (PassiveLine line : owner.lines().all()) {
+            long until = runtime.lineRunner().sleepUntil(line.id());
+            if (until > now) {
+                sleepRemaining.put(line.id(), until - now);
+            }
+        }
+        List<FactorySnapshotBuilder.LineView> lines =
+                FactorySnapshotBuilder.lines(owner, sleepRemaining);
         PacketDistributor.sendToPlayer(player, new FactoryTableS2C(
                 containerId, true, owner.state(), owner.storageLink().online(),
                 health.lines(), health.runningLines(), lines, machines));

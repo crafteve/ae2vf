@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -95,27 +96,37 @@ public final class FactorySnapshotBuilder {
     /**
      * 一条产线在界面上的样子。
      *
-     * <p>只来自配置层：id、名字、运行开关、机器数。产线菜单和左表筛选用它，不读观测。</p>
+     * <p>只来自配置层与执行器的睡眠状态：id、名字、运行开关、机器数、是否睡眠、剩余唤醒
+     * tick。产线菜单和左表筛选用它，不读观测。</p>
      *
-     * @param id           产线 id
-     * @param name         产线名
-     * @param running      是否运行
-     * @param machineCount 产线里的机器数
+     * @param id                 产线 id
+     * @param name               产线名
+     * @param running            是否运行
+     * @param machineCount       产线里的机器数
+     * @param sleeping           是否处于 IO 睡眠；暂停时恒为 {@code false}
+     * @param sleepRemainingTicks 距下次唤醒的 tick；不在睡眠为 {@code 0}
      */
-    public record LineView(UUID id, String name, boolean running, int machineCount) {
+    public record LineView(UUID id, String name, boolean running, int machineCount,
+            boolean sleeping, long sleepRemainingTicks) {
     }
 
     /**
      * 生成产线列表（按登记顺序）。
      *
-     * @param factory 工厂
+     * <p>睡眠状态属于执行层，不能从配置层推导，所以由调用方查好剩余 tick 再传进来。
+     * 暂停的产线即使执行器还留着睡眠标志，也强制显示为未睡眠。</p>
+     *
+     * @param factory       工厂
+     * @param sleepRemaining 产线 id → 距下次唤醒的 tick
      * @return 产线视图
      */
-    public static List<LineView> lines(Factory factory) {
+    public static List<LineView> lines(Factory factory, Map<UUID, Long> sleepRemaining) {
         List<LineView> views = new ArrayList<>(factory.lines().size());
         for (PassiveLine line : factory.lines().all()) {
+            long remaining = Math.max(0L, sleepRemaining.getOrDefault(line.id(), 0L));
+            boolean sleeping = line.running() && remaining > 0L;
             views.add(new LineView(line.id(), line.name(), line.running(),
-                    line.groups().size()));
+                    line.groups().size(), sleeping, sleeping ? remaining : 0L));
         }
         return views;
     }

@@ -235,6 +235,18 @@ final class FactoryLabels {
     }
 
     /**
+     * tick 向上取整成秒，给产线睡眠提示用。
+     *
+     * <p>睡眠剩余按 tick 下发；显示时向上取整，避免剩余 1 tick 时出现「睡眠 0s」。</p>
+     *
+     * @param ticks tick 数
+     * @return 秒数；非正数时为 {@code 0}
+     */
+    static long seconds(long ticks) {
+        return ticks <= 0L ? 0L : (ticks + 19L) / 20L;
+    }
+
+    /**
      * 流体容量：内部单位是 mB，显示单位是 B。
      *
      * <p>小于 1B 时按需求逐级提高精度：先 1 位小数；若四舍五入成 {@code 0.0} 就用 2 位；

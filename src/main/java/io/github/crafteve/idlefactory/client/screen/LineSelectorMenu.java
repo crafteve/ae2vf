@@ -236,6 +236,20 @@ public final class LineSelectorMenu {
         this.submenu.draw(graphics, font, theme, mouseX, mouseY);
     }
 
+    /**
+     * 一行产线的状态灯：暂停红、睡眠灰、运行绿。
+     *
+     * @param line 产线
+     * @return 状态灯贴图
+     */
+    private static net.minecraft.resources.ResourceLocation statusLamp(
+            FactorySnapshotBuilder.LineView line) {
+        if (!line.running()) {
+            return GuiTextures.STATUS_LAMP_ERROR;
+        }
+        return line.sleeping() ? GuiTextures.STATUS_LAMP_IDLE : GuiTextures.STATUS_LAMP_RUN;
+    }
+
     private void drawLineRow(GuiGraphics graphics, Font font, GuiTheme theme,
             int mouseX, int mouseY, FactorySnapshotBuilder.LineView line, int rowX, int rowY,
             int rowW) {
@@ -248,7 +262,7 @@ public final class LineSelectorMenu {
                     rowW - 2, FactoryLayout.LINE_ROW_H - 4);
         }
         NineSlice.icon(graphics,
-                line.running() ? GuiTextures.STATUS_LAMP_RUN : GuiTextures.STATUS_LAMP_IDLE,
+                statusLamp(line),
                 rowX + 5, rowY + 6, GuiTextures.STATUS_LAMP_SIZE);
 
         boolean scrollable = this.lines.size() > this.visibleRows;
