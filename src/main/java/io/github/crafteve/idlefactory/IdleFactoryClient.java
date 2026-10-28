@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory;
 
+import io.github.crafteve.idlefactory.client.UiConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
@@ -8,6 +9,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
@@ -19,6 +21,9 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 @EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public class IdleFactoryClient {
     public IdleFactoryClient(ModContainer container) {
+        // 排序偏好是纯客户端视图状态，写进 config/idlefactory-client.toml；
+        // 服务端不加载这份配置。
+        container.registerConfig(ModConfig.Type.CLIENT, UiConfig.SPEC);
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
         // Do not forget to add translations for your config options to the en_us.json file.

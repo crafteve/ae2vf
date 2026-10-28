@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.List;
 
+import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.UiConfig;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
@@ -10,7 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 排序按钮的状态与循环。
  *
- * <p>三个按钮固定在搜索行右侧：排序键、方向、范围。左键正向循环、右键反向；只改客户端视图，
+ * <p>三个按钮固定在搜索行右侧：排序键、方向、范围。左键正向循环、右键反向；偏好写入客户端
+ * CLIENT 配置（{@code config/idlefactory-client.toml}），关闭界面、重启客户端都会保留，
  * 不写存档。本类只回答「当前图标 / 是否可用 / 点击后改什么 / tooltip 写什么」，绘制与命中的
  * 几何在 {@link FactoryScreen} 和 {@link FactoryLayout}。</p>
  */
@@ -84,6 +87,7 @@ final class FactorySortButtons {
      */
     FactorySortButtons(Callbacks callbacks) {
         this.callbacks = callbacks;
+        loadFromConfig();
     }
 
     /**
@@ -126,6 +130,7 @@ final class FactorySortButtons {
                 return;
             }
         }
+        persist();
         this.callbacks.sortChanged();
     }
 
@@ -227,5 +232,61 @@ final class FactorySortButtons {
         Scope[] values = Scope.values();
         storageScope = values[Math.floorMod(
                 storageScope.ordinal() + (reverse ? -1 : 1), values.length)];
+    }
+
+    /**
+     * 从客户端配置读取排序偏好。
+     *
+     * <p>每次打开工作台都会新建本类实例，所以配置界面改过之后，下次打开界面就能读到新值。
+     * 配置尚未加载或值损坏时保留默认值，不阻塞界面。</p>
+     */
+    private static void loadFromConfig() {
+        try {
+            storageKey = parseEnum(FactorySort.StorageKey.class,
+                    UiConfig.STORAGE_KEY.get(), FactorySort.StorageKey.DEFAULT);
+            storageDescending = UiConfig.STORAGE_DESCENDING.get();
+            storageScope = parseEnum(Scope.class, UiConfig.STORAGE_SCOPE.get(), Scope.ALL);
+            machineKey = parseEnum(FactorySort.MachineKey.class,
+                    UiConfig.MACHINE_KEY.get(), FactorySort.MachineKey.DEFAULT);
+            machineDescending = UiConfig.MACHINE_DESCENDING.get();
+        } catch (RuntimeException exception) {
+            IdleFactory.LOGGER.warn("读取排序偏好失败，使用默认值", exception);
+        }
+    }
+
+    /**
+     * 把当前排序偏好写回客户端配置。
+     *
+     * <p>点一次按钮就落盘，避免关闭界面或客户端崩溃时丢失；写失败只记日志，
+     * 界面继续使用内存值。</p>
+     */
+    private static void persist() {
+        try {
+            UiConfig.STORAGE_KEY.set(storageKey.name());
+            UiConfig.STORAGE_DESCENDING.set(storageDescending);
+            UiConfig.STORAGE_SCOPE.set(storageScope.name());
+            UiConfig.MACHINE_KEY.set(machineKey.name());
+            UiConfig.MACHINE_DESCENDING.set(machineDescending);
+            UiConfig.SPEC.save();
+        } catch (RuntimeException exception) {
+            IdleFactory.LOGGER.warn("保存排序偏好失败", exception);
+        }
+    }
+
+    /**
+     * 解析配置里的枚举名；空值或未知名字回默认。
+     *
+     * @param type     枚举类型
+     * @param raw      配置字符串
+     * @param fallback 解析失败时的默认值
+     * @param <E>      枚举类型
+     * @return 解析结果
+     */
+    private static <E extends Enum<E>> E parseEnum(Class<E> type, String raw, E fallback) {
+        try {
+            return Enum.valueOf(type, raw);
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            return fallback;
+        }
     }
 }
