@@ -1,11 +1,13 @@
 package io.github.crafteve.idlefactory.client;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S.Action;
+import io.github.crafteve.idlefactory.network.payload.OpenFactoryGuiC2S;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
@@ -29,7 +31,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>手持绑定杖时每 2 秒请求一次链接快照，兼顾指令改链接后客户端能刷新。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
+        value = Dist.CLIENT)
 public final class ClientWandInput {
     /** 请求节流：40 tick = 2 秒。 */
     private static int requestCooldown;
@@ -98,6 +101,29 @@ public final class ClientWandInput {
         event.setCanceled(true);
         PacketDistributor.sendToServer(new FactoryWandActionC2S(Action.MODE_SWITCH, null, false));
         requestCooldown = 10;
+    }
+
+    /**
+     * 终端快捷键：玩家身上有终端才发打开请求。
+     *
+     * <p>界面打开时只清空按键队列，不触发；服务端收到请求后会再检查一次背包。</p>
+     *
+     * @param event 客户端 tick
+     */
+    @SubscribeEvent
+    static void onTerminalKey(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen != null || minecraft.player == null) {
+            while (ModKeyMappings.OPEN_TERMINAL.consumeClick()) {
+                // 只清队列
+            }
+            return;
+        }
+        while (ModKeyMappings.OPEN_TERMINAL.consumeClick()) {
+            if (FactoryTerminalItem.isCarriedBy(minecraft.player)) {
+                PacketDistributor.sendToServer(new OpenFactoryGuiC2S());
+            }
+        }
     }
 
     /**

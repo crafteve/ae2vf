@@ -17,6 +17,7 @@ import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.phys.AABB;
@@ -32,7 +33,8 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
  * <p>只主手拿对应绑定杖时画：机器绿、仓库蓝；穿墙可见。按当前维度、64 格距离和视锥裁剪，
  * 一帧只提交两次线框（外层淡光 + 内层亮线），不逐个方块 draw。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
+        value = Dist.CLIENT)
 public final class FactoryLinkRenderer {
     /** 只画 64 格内的框。 */
     private static final double MAX_DISTANCE = 64.0D;
@@ -118,6 +120,10 @@ public final class FactoryLinkRenderer {
 
     private static void drawBoxes(PoseStack pose, List<AABB> boxes, float red, float green,
             float blue, float alpha, double inflate) {
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         BufferBuilder buffer = Tesselator.getInstance().begin(
                 VertexFormat.Mode.LINES, DefaultVertexFormat.POSITION_COLOR_NORMAL);
         for (AABB box : boxes) {
