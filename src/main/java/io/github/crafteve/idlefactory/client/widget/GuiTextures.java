@@ -38,10 +38,20 @@ public final class GuiTextures {
     public static final ResourceLocation SEARCH = id("search");
     /** 搜索清空按钮：固定 7×7。 */
     public static final ResourceLocation SEARCH_CLEAR = id("search_clear");
-    /** 排序方向：升序（5×5 上三角）。 */
+    /** 排序按钮底：6×6 蓝灰九宫格。 */
+    public static final ResourceLocation SORT_BUTTON = id("sort_button");
+    /** 排序键图标：白色漏斗。 */
+    public static final ResourceLocation SORT_KEY = id("sort_key");
+    /** 排序方向：升序（白色上箭头）。 */
     public static final ResourceLocation SORT_ASC = id("sort_asc");
-    /** 排序方向：降序（5×5 下三角）。 */
+    /** 排序方向：降序（白色下箭头）。 */
     public static final ResourceLocation SORT_DESC = id("sort_desc");
+    /** 范围：全部。 */
+    public static final ResourceLocation SCOPE_ALL = id("scope_all");
+    /** 范围：仅物品。 */
+    public static final ResourceLocation SCOPE_ITEMS = id("scope_items");
+    /** 范围：仅流体。 */
+    public static final ResourceLocation SCOPE_FLUIDS = id("scope_fluids");
     /** 细分隔线：1×1，拉伸使用。 */
     public static final ResourceLocation DIVIDER = id("divider");
     /** 粗分隔线：1×1，拉伸使用。 */
@@ -127,8 +137,10 @@ public final class GuiTextures {
     public static final int SEARCH_SIZE = 9;
     /** 搜索清空图标边长。 */
     public static final int SEARCH_CLEAR_SIZE = 7;
-    /** 排序方向箭头边长。 */
-    public static final int SORT_ARROW_SIZE = 5;
+    /** 排序按钮底贴图边长。 */
+    public static final int SORT_BUTTON_SIZE = 6;
+    /** 排序图标边长。 */
+    public static final int SORT_ICON_SIZE = 12;
 
     private GuiTextures() {
         // 纯常量持有类

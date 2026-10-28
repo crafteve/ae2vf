@@ -7,10 +7,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
-import io.github.crafteve.idlefactory.client.widget.PopupMenu;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 
 import net.minecraft.client.gui.Font;
@@ -50,7 +48,7 @@ public final class LineSelectorMenu {
     private static final int SUB_DELETE = 3;
 
     private final Callbacks callbacks;
-    private final PopupMenu submenu = new PopupMenu();
+    private final Submenu submenu = new Submenu();
 
     private boolean open;
     private int anchorX;
@@ -234,7 +232,7 @@ public final class LineSelectorMenu {
                     hovered ? theme.textValue() : theme.textPrimary(), false);
         }
 
-        this.submenu.draw(graphics, font, theme, mouseX, mouseY, GuiLayer.BASE);
+        this.submenu.draw(graphics, font, theme, mouseX, mouseY);
     }
 
     /**
@@ -362,20 +360,20 @@ public final class LineSelectorMenu {
 
     private void openSubmenu(FactorySnapshotBuilder.LineView line, int index, int caretX) {
         this.submenuLine = line;
-        List<PopupMenu.Item> items = new ArrayList<>(4);
-        items.add(new PopupMenu.Item("重命名", PopupMenu.Kind.ACTION, SUB_RENAME));
-        items.add(new PopupMenu.Item("启动",
-                line.running() ? PopupMenu.Kind.DISABLED : PopupMenu.Kind.ACTION, SUB_START));
-        items.add(new PopupMenu.Item("暂停",
-                line.running() ? PopupMenu.Kind.ACTION : PopupMenu.Kind.DISABLED, SUB_PAUSE));
-        items.add(new PopupMenu.Item("删除产线", PopupMenu.Kind.DANGER, SUB_DELETE));
+        List<Submenu.Item> items = new ArrayList<>(4);
+        items.add(new Submenu.Item("重命名", Submenu.Kind.ACTION, SUB_RENAME));
+        items.add(new Submenu.Item("启动",
+                line.running() ? Submenu.Kind.DISABLED : Submenu.Kind.ACTION, SUB_START));
+        items.add(new Submenu.Item("暂停",
+                line.running() ? Submenu.Kind.ACTION : Submenu.Kind.DISABLED, SUB_PAUSE));
+        items.add(new Submenu.Item("删除产线", Submenu.Kind.DANGER, SUB_DELETE));
         int subW = 92;
         int rowY = this.y + FactoryLayout.LINE_MENU_PAD + index * FactoryLayout.LINE_ROW_H;
         int subX = this.x + this.width - 2;
         if (subX + subW > this.layout.panelX + this.layout.panelW - FactoryLayout.PAD) {
             subX = this.x - subW + 2;
         }
-        int subH = PopupMenu.measureHeight(items, FactoryLayout.SUBMENU_ROW_H);
+        int subH = Submenu.measureHeight(items, FactoryLayout.SUBMENU_ROW_H);
         int subY = Math.max(this.layout.panelY + FactoryLayout.PAD,
                 Math.min(rowY, this.layout.panelY + this.layout.panelH
                         - FactoryLayout.PAD - subH));
@@ -457,5 +455,146 @@ public final class LineSelectorMenu {
             }
         }
         return null;
+    }
+
+    /**
+     * 产线二级菜单：重命名 / 启动 / 暂停 / 删除。
+     *
+     * <p>原来是一个独立的通用菜单类，实际只有产线选择器使用；并回这里，避免
+     * 「看起来通用、其实只有一个调用方」的误读。行样式是凸起按钮，与产线列表的
+     * 整行样式不同。</p>
+     */
+    private static final class Submenu {
+        /** 行内边距。 */
+        private static final int PAD = 3;
+
+        /** 菜单项种类。 */
+        enum Kind {
+            /** 普通可点动作。 */
+            ACTION,
+            /** 不可点，灰色。 */
+            DISABLED,
+            /** 危险动作，错误色。 */
+            DANGER;
+
+            /**
+             * 这一项是否能点。
+             *
+             * @return 普通动作与危险项为 {@code true}
+             */
+            boolean clickable() {
+                return this == ACTION || this == DANGER;
+            }
+        }
+
+        /**
+         * 一个菜单项。
+         *
+         * @param label 文案
+         * @param kind  种类
+         * @param id    调用方动作 id
+         */
+        record Item(String label, Kind kind, int id) {
+        }
+
+        private int x;
+        private int y;
+        private int width;
+        private int rowHeight;
+        private List<Item> items = List.of();
+        private boolean open;
+
+        void open(int x, int y, int width, int rowHeight, List<Item> items) {
+            this.x = x;
+            this.y = y;
+            this.width = Math.max(40, width);
+            this.rowHeight = Math.max(12, rowHeight);
+            this.items = new ArrayList<>(items);
+            this.open = true;
+        }
+
+        void close() {
+            this.open = false;
+            this.items = List.of();
+        }
+
+        boolean isOpen() {
+            return this.open;
+        }
+
+        int height() {
+            return measureHeight(this.items, this.rowHeight);
+        }
+
+        static int measureHeight(List<Item> items, int rowHeight) {
+            return items.size() * rowHeight + PAD * 2;
+        }
+
+        boolean contains(double mouseX, double mouseY) {
+            return this.open
+                    && mouseX >= this.x && mouseX < this.x + this.width
+                    && mouseY >= this.y && mouseY < this.y + height();
+        }
+
+        @Nullable
+        Integer hit(double mouseX, double mouseY) {
+            if (!contains(mouseX, mouseY)) {
+                return null;
+            }
+            int index = (int) ((mouseY - this.y - PAD) / this.rowHeight);
+            if (index < 0 || index >= this.items.size()) {
+                return null;
+            }
+            Item item = this.items.get(index);
+            return item.kind().clickable() ? item.id() : null;
+        }
+
+        void draw(GuiGraphics graphics, Font font, GuiTheme theme, int mouseX, int mouseY) {
+            if (!this.open) {
+                return;
+            }
+            int height = height();
+            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
+                    this.width, height);
+            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, this.width, 1);
+            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y + height - 1,
+                    this.width, 1);
+            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, 1, height);
+            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + this.width - 1,
+                    this.y, 1, height);
+            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+                    this.width - 2, 1);
+            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+                    1, height - 2);
+            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1,
+                    this.y + height - 2, this.width - 2, 1);
+            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT,
+                    this.x + this.width - 2, this.y + 1, 1, height - 2);
+            NineSlice.fill(graphics, GuiTextures.HEADER_BG, this.x + 2, this.y + 2,
+                    this.width - 4, height - 4);
+
+            for (int i = 0; i < this.items.size(); i++) {
+                Item item = this.items.get(i);
+                int rowY = this.y + PAD + i * this.rowHeight;
+                NineSlice.button(graphics, this.x + PAD, rowY,
+                        this.width - PAD * 2, this.rowHeight - 2);
+                boolean hovered = mouseX >= this.x + PAD
+                        && mouseX < this.x + this.width - PAD
+                        && mouseY >= rowY && mouseY < rowY + this.rowHeight - 2;
+                if (hovered && item.kind().clickable()) {
+                    NineSlice.fill(graphics, GuiTextures.ROW_ALT, this.x + PAD + 1,
+                            rowY + 1, this.width - PAD * 2 - 2, this.rowHeight - 4);
+                }
+                int color;
+                switch (item.kind()) {
+                    case DISABLED -> color = theme.textDim();
+                    case DANGER -> color = theme.error();
+                    default -> color = hovered ? theme.textValue() : theme.textPrimary();
+                }
+                String label = font.plainSubstrByWidth(item.label(),
+                        this.width - PAD * 2 - 8);
+                graphics.drawString(font, label, this.x + PAD + 5, rowY + 3, color, false);
+            }
+        }
     }
 }

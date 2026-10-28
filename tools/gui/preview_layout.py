@@ -32,7 +32,8 @@ OUT_DIR = os.path.join(ROOT, ".tmp", "mockup")
 PAD, HEADER_H, RIGHT_W, MIN_RIGHT_W, GAP = 4, 22, 170, 170, 4
 TABLE_HEADER_H, ROW_H, FOOTER_H, CELL, GRID_COLS = 18, 26, 14, 18, 9
 TAB_H, TAB_COUNT, SEARCH_H, CRAFT = 16, 2, 14, 3
-SORT_BTN_W, SORT_BTN_GAP = 22, 4
+SORT_BTN_SIZE, SORT_BTN_GAP, SORT_BTN_COUNT = 14, 2, 3
+SORT_GROUP_W = SORT_BTN_COUNT * SORT_BTN_SIZE + (SORT_BTN_COUNT - 1) * SORT_BTN_GAP
 CRAFT_CELL, CRAFT_RESULT, CRAFT_ARROW, LABEL_GAP = 20, 22, 24, 12
 DEFAULT_GUTTER, MAX_PANEL_W, MAX_PANEL_H, MIN_PANEL_W, MIN_PANEL_H = 96, 900, 540, 480, 320
 
@@ -184,8 +185,8 @@ def layout(screen_w: int, screen_h: int, wanted_gutter: int) -> dict:
         table_x=table_x, table_w=table_w, table_header_y=table_header_y, row_top=row_top,
         footer_y=footer_y, rows_visible=rows_visible, xs=xs, widths=widths, ids=ids,
         tab_y=tab_y, search_y=search_y, grid=(grid_x, grid_y), grid_rows=grid_rows,
-        search_w=right_w - 8 - SORT_BTN_W - SORT_BTN_GAP,
-        sort_x=right_x + right_w - 4 - SORT_BTN_W,
+        search_w=right_w - 8 - SORT_GROUP_W - 4,
+        sort_x=right_x + right_w - 4 - SORT_GROUP_W,
         craft=(craft_x, craft_y), craft_label_y=craft_label_y,
         result=(result_x, result_y), inv=(grid_x, inv_y), inv_label_y=inv_label_y,
         hotbar_y=hotbar_y,
@@ -205,6 +206,8 @@ DEMO = [("高炉", WARN, "缺料 12s", "↑2.0 ↓2.0"), ("合金炉", RUN, "就
 def render(screen_w: int, screen_h: int, wanted_gutter: int, out: str) -> None:
     panel_tex, slot_tex, btn_tex, field_tex = tex("panel"), tex("slot"), tex("button"), tex("field")
     div, divd, hdr, alt = tex("divider"), tex("divider_dark"), tex("header_bg"), tex("row_alt")
+    sort_btn_tex = tex("sort_button")
+    sort_icons = (tex("sort_key"), tex("sort_asc"), tex("scope_all"))
 
     L = layout(screen_w, screen_h, wanted_gutter)
     img = Image.new("RGBA", (screen_w, screen_h), (40, 42, 48, 255))
@@ -237,7 +240,10 @@ def render(screen_w: int, screen_h: int, wanted_gutter: int, out: str) -> None:
         nine(img, btn_tex, 1, x, L["tab_y"], w, HEADER_H)
     solid(img, divd, right_x, L["tab_y"], tab_w, 2)
     nine(img, field_tex, 1, right_x + 4, L["search_y"], L["search_w"], SEARCH_H)
-    nine(img, btn_tex, 1, L["sort_x"], L["search_y"], SORT_BTN_W, SEARCH_H)
+    for i in range(SORT_BTN_COUNT):
+        sx = L["sort_x"] + i * (SORT_BTN_SIZE + SORT_BTN_GAP)
+        nine(img, sort_btn_tex, 1, sx, L["search_y"], SORT_BTN_SIZE, SORT_BTN_SIZE)
+        img.alpha_composite(sort_icons[i], (sx + 1, L["search_y"] + 1))
 
     gx, gy = L["grid"]
     for r in range(L["grid_rows"]):
@@ -310,10 +316,6 @@ def render(screen_w: int, screen_h: int, wanted_gutter: int, out: str) -> None:
         draw.text((right_x + i * tab_w + (tab_w - tw) // 2, L["tab_y"] + (HEADER_H - 9) // 2), t,
                   font=font, fill=TEXT if i == 0 else DIM)
     draw.text((right_x + 8, L["search_y"] + 2), "搜索…", font=small, fill=DIM)
-    sort_label = "默"
-    sort_w = int(draw.textlength(sort_label, font=small))
-    draw.text((L["sort_x"] + (SORT_BTN_W - sort_w) // 2, L["search_y"] + 2),
-              sort_label, font=small, fill=DIM)
     draw.text((cx, L["craft_label_y"]), "合成", font=small, fill=DIM)
     draw.text((ix, L["inv_label_y"]), "背包", font=small, fill=DIM)
 

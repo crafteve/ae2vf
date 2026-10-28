@@ -81,6 +81,12 @@ SEARCH_HIGHLIGHT = (0xCA, 0xCD, 0xD9)
 SEARCH_ICON = (0x4D, 0x4D, 0x67)
 SEARCH_CLEAR = (0x4D, 0x4D, 0x67)
 
+# 排序按钮：蓝灰底 + 白色单色图标（AE2 深色按钮风格）
+SORT_BUTTON_BG = (0x87, 0x8F, 0xA5)
+SORT_BUTTON_LIGHT = (0xA6, 0xAE, 0xC2)
+SORT_BUTTON_DARK = (0x5F, 0x68, 0x7D)
+SORT_ICON = (0xF2, 0xF2, 0xF2)
+
 OUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "src", "main", "resources", "assets", "idlefactory", "textures", "gui",
@@ -342,15 +348,84 @@ def chevron_down(size: int = 7) -> Image.Image:
     return img
 
 
-def sort_arrow(size: int = 5, up: bool = True) -> Image.Image:
-    """排序方向箭头：5×5 透明底实心三角，指向升序/降序。"""
+def _hline(img: Image.Image, x1: int, x2: int, y: int, color) -> None:
+    """画一行像素。"""
+    for x in range(x1, x2 + 1):
+        img.putpixel((x, y), color)
+
+
+def _vline(img: Image.Image, x: int, y1: int, y2: int, color) -> None:
+    """画一列像素。"""
+    for y in range(y1, y2 + 1):
+        img.putpixel((x, y), color)
+
+
+def sort_button(width: int = 6, height: int = 6) -> Image.Image:
+    """排序按钮底：蓝灰九宫格 border=1。"""
+    img = Image.new("RGBA", (width, height), SORT_BUTTON_BG)
+    rect(img, 0, 0, width, 1, SORT_BUTTON_LIGHT)
+    rect(img, 0, 0, 1, height, SORT_BUTTON_LIGHT)
+    rect(img, 0, height - 1, width, 1, SORT_BUTTON_DARK)
+    rect(img, width - 1, 0, 1, height, SORT_BUTTON_DARK)
+    return img
+
+
+def sort_key_icon(size: int = 12) -> Image.Image:
+    """排序键图标：白色漏斗。"""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    px = img.load()
-    center = size // 2
-    for row in range(size):
-        half = min(row if up else size - 1 - row, center)
-        for x in range(center - half, center + half + 1):
-            px[x, row] = SEARCH_ICON
+    _hline(img, 2, 9, 2, SORT_ICON)
+    _hline(img, 3, 8, 3, SORT_ICON)
+    _hline(img, 4, 7, 4, SORT_ICON)
+    _hline(img, 5, 6, 5, SORT_ICON)
+    _vline(img, 5, 6, 9, SORT_ICON)
+    _vline(img, 6, 6, 9, SORT_ICON)
+    return img
+
+
+def sort_arrow_icon(size: int = 12, up: bool = True) -> Image.Image:
+    """排序方向箭头：12×12 白色单色。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    if up:
+        _hline(img, 5, 6, 2, SORT_ICON)
+        _hline(img, 4, 7, 3, SORT_ICON)
+        _hline(img, 3, 8, 4, SORT_ICON)
+        _vline(img, 5, 5, 10, SORT_ICON)
+        _vline(img, 6, 5, 10, SORT_ICON)
+    else:
+        _hline(img, 3, 8, 7, SORT_ICON)
+        _hline(img, 4, 7, 8, SORT_ICON)
+        _hline(img, 5, 6, 9, SORT_ICON)
+        _vline(img, 5, 1, 6, SORT_ICON)
+        _vline(img, 6, 1, 6, SORT_ICON)
+    return img
+
+
+def scope_all_icon(size: int = 12) -> Image.Image:
+    """范围「全部」：方块 + 水滴。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    rect(img, 1, 3, 5, 5, SORT_ICON)
+    for i in range(3):
+        _hline(img, 9 - i, 9 + i, 3 + i, SORT_ICON)
+    for y in range(6, 9):
+        _hline(img, 7, 11, y, SORT_ICON)
+    return img
+
+
+def scope_items_icon(size: int = 12) -> Image.Image:
+    """范围「仅物品」：实心方块。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    rect(img, 2, 2, 8, 8, SORT_ICON)
+    return img
+
+
+def scope_fluids_icon(size: int = 12) -> Image.Image:
+    """范围「仅流体」：实心水滴。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    center = 6
+    for i in range(4):
+        _hline(img, center - i, center + i, 2 + i, SORT_ICON)
+    for y in range(6, 9):
+        _hline(img, center - 3, center + 3, y, SORT_ICON)
     return img
 
 
@@ -395,8 +470,13 @@ SPECS = {
     "button_hover": (button_hover, "按钮悬停：6×6 九宫格 border=1"),
     "chevron_right": (chevron_right, "收起箭头：7×7"),
     "chevron_down": (chevron_down, "展开箭头：7×7"),
-    "sort_asc": (lambda: sort_arrow(5, True), "排序升序：5×5 上三角"),
-    "sort_desc": (lambda: sort_arrow(5, False), "排序降序：5×5 下三角"),
+    "sort_button": (sort_button, "排序按钮底：6×6 蓝灰九宫格 border=1"),
+    "sort_key": (sort_key_icon, "排序键图标：12×12 白色漏斗"),
+    "sort_asc": (lambda: sort_arrow_icon(12, True), "排序升序：12×12 白色上箭头"),
+    "sort_desc": (lambda: sort_arrow_icon(12, False), "排序降序：12×12 白色下箭头"),
+    "scope_all": (scope_all_icon, "范围全部：12×12 方块+水滴"),
+    "scope_items": (scope_items_icon, "范围仅物品：12×12 方块"),
+    "scope_fluids": (scope_fluids_icon, "范围仅流体：12×12 水滴"),
 }
 
 
