@@ -3,12 +3,15 @@ package io.github.crafteve.idlefactory.network;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLineActionC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 import io.github.crafteve.idlefactory.network.payload.OpenFactoryGuiC2S;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -23,12 +26,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、仓库动作、产线动作、IO 规则动作、编辑反馈与终端打开界面。
- * 改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
+ * <p>当前包含机器表、仓库快照、仓库动作、产线动作、IO 规则动作、编辑反馈、终端打开界面与
+ * 绑定杖链接同步。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "13";
+    public static final String PROTOCOL_VERSION = "14";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -80,6 +83,14 @@ public final class ModNetwork {
         // 物品入口：终端右键 / 快捷键请求打开界面
         registrar.playToServer(OpenFactoryGuiC2S.TYPE, OpenFactoryGuiC2S.STREAM_CODEC,
                 OpenFactoryGuiC2S::handle);
+
+        // 绑定杖：操作请求 + 链接快照
+        registrar.playToServer(FactoryWandActionC2S.TYPE, FactoryWandActionC2S.STREAM_CODEC,
+                FactoryWandActionC2S::handle);
+        registrar.playToServer(FactoryLinksRequestC2S.TYPE, FactoryLinksRequestC2S.STREAM_CODEC,
+                FactoryLinksRequestC2S::handle);
+        registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
+                FactoryLinksS2C::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }
