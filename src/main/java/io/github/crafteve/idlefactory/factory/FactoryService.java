@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,7 +36,9 @@ import appeng.api.ids.AEComponents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,6 +61,10 @@ public final class FactoryService {
     private static final int INFO_LIMIT = 30;
     /** {@code factory info} 最多列多少台机器。 */
     private static final int INFO_MACHINE_LIMIT = 20;
+    /** 清空仓库确认的有效期：1200 tick = 60 秒。 */
+    private static final long CLEAR_CONFIRM_TICKS = 1200L;
+    /** 玩家 → 待确认的清空请求。 */
+    private static final Map<UUID, PendingClear> PENDING_CLEARS = new HashMap<>();
     /** 准星操作的射线距离（格）。 */
     private static final double REACH = 10.0D;
 
@@ -549,7 +556,7 @@ public final class FactoryService {
             return 0;
         }
         if (factory.storageLink().anchor() != null) {
-            barErr(player, "已绑定仓库，先蹲下右键空气清空");
+            barErr(player, "已绑定仓库，先右键空气清空");
             return 0;
         }
         if (factory.storageMode() != StorageMode.ME) {
@@ -718,7 +725,7 @@ public final class FactoryService {
     }
 
     /**
-     * 蹲下右键已绑定的 ME 方块：只清空这个地址，避免右键任意方块就清空。
+     * 右键已绑定的 ME 方块：只清空这个地址，避免右键任意方块就清空。
      *
      * @param player 发起请求的玩家
      * @param pos    目标方块
@@ -742,7 +749,7 @@ public final class FactoryService {
             matches = ae2.dimension().equals(level.dimension()) && ae2.ringPos().equals(pos);
         }
         if (!matches) {
-            barErr(player, "请蹲下右键已绑定的 ME 方块或天空清空");
+            barErr(player, "请右键已绑定的 ME 方块或右键空气清空");
             return 0;
         }
         factory.bindAnchor(null);
@@ -772,6 +779,399 @@ public final class FactoryService {
         markDirty();
         barOk(player, "已切换为 " + modeLabel(next) + " 模式");
         return 1;
+    }
+
+    /**
+     * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
+     *
+     * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连或还在回收站，
+     * 就补齐/取回整组。这样 Ctrl 连点两次不会出现一半连、一半断。</p>
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标机器
+     * @param chain  是否连锁
+     * @return 变更的台数
+     */
+    public static int toggleMachines(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!level.isLoaded(pos)) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        if (!FactoryLinkFinder.isMachine(level, pos)) {
+            barErr(player, "该方块不是可连接的机器");
+            return 0;
+        }
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.machines(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            barErr(player, "附近没有可连接的机器");
+            return 0;
+        }
+        boolean allConnected = true;
+        for (BlockPos targetPos : targets) {
+            MachineRef ref = factory.machines().byPosition(level.dimension(), targetPos);
+            if (ref == null || factory.machines().isDetached(ref.id())) {
+                allConnected = false;
+                break;
+            }
+        }
+        return allConnected
+                ? disconnectMachineTargets(player, factory, level, targets, chain)
+                : connectMachineTargets(player, factory, level, targets, chain);
+    }
+
+    private static int connectMachineTargets(ServerPlayer player, Factory factory,
+            ServerLevel level, List<BlockPos> targets, boolean chain) {
+        int added = 0;
+        int restored = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
+            if (target != null) {
+                if (factory.machines().isDetached(target.id())) {
+                    factory.machines().setDetached(target.id(), false);
+                    refreshObservation(target);
+                    wakeLines(factory, target.id());
+                    restored++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+            MachineRef ref = MachineRef.of(level.dimension(), targetPos);
+            if (factory.machines().add(ref)) {
+                refreshObservation(ref);
+                added++;
+            } else {
+                skipped++;
+            }
+        }
+        if (added + restored > 0) {
+            markDirty();
+        }
+        if (!chain) {
+            String label = machineLabel(level, targets.getFirst());
+            if (added > 0) {
+                barOk(player, "已连接机器 " + label);
+            } else if (restored > 0) {
+                barOk(player, "已恢复机器 " + label);
+            } else {
+                barErr(player, "该机器已被连接 " + label);
+            }
+            return added + restored;
+        }
+        if (added + restored == 0) {
+            barErr(player, "没有新增机器（已连接或已在回收站）");
+            return 0;
+        }
+        String text = "已连接 " + (added + restored) + " 台";
+        if (restored > 0) {
+            text += "（取回 " + restored + " 台）";
+        }
+        if (skipped > 0) {
+            text += "，跳过 " + skipped + " 台";
+        }
+        barOk(player, text);
+        return added + restored;
+    }
+
+    private static int disconnectMachineTargets(ServerPlayer player, Factory factory,
+            ServerLevel level, List<BlockPos> targets, boolean chain) {
+        int purged = 0;
+        int binned = 0;
+        int already = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
+            if (target == null) {
+                skipped++;
+                continue;
+            }
+            switch (detachOrPurgeSilent(factory, target)) {
+                case PURGED -> purged++;
+                case BINNED -> binned++;
+                case ALREADY -> already++;
+            }
+        }
+        if (purged + binned > 0) {
+            markDirty();
+        }
+        if (!chain) {
+            String label = machineLabel(level, targets.getFirst());
+            if (purged > 0) {
+                barOk(player, "已删除链接 " + label);
+            } else if (binned > 0) {
+                barErr(player, "该机器仍有 IO 配置，已移入回收站 " + label);
+            } else if (already > 0) {
+                barErr(player, "该机器已经在回收站 " + label);
+            } else {
+                barErr(player, "没有可删除的链接");
+            }
+            return purged + binned;
+        }
+        if (purged + binned == 0) {
+            barErr(player, "没有可删除的链接");
+            return 0;
+        }
+        String text = "已删除 " + (purged + binned) + " 台";
+        if (binned > 0) {
+            text += "（回收站 " + binned + " 台）";
+        }
+        if (skipped > 0) {
+            text += "，跳过 " + skipped + " 台";
+        }
+        barOk(player, text);
+        return purged + binned;
+    }
+
+    /**
+     * 仓库 toggle：ME 或容器按当前模式处理；容器连锁按整组 toggle。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标方块
+     * @param chain  是否连锁
+     * @return 变更数量
+     */
+    public static int toggleStorage(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        StorageAnchor anchor = factory.storageLink().anchor();
+        ServerLevel level = player.serverLevel();
+        if (factory.storageMode() == StorageMode.ME) {
+            return toggleMeStorage(player, factory, level, anchor, pos);
+        }
+        return toggleContainerStorage(player, factory, level, anchor, pos, chain);
+    }
+
+    private static int toggleMeStorage(ServerPlayer player, Factory factory, ServerLevel level,
+            StorageAnchor anchor, BlockPos pos) {
+        boolean same = anchor instanceof MeAnchor me
+                && me.dimension().equals(level.dimension()) && me.pos().equals(pos)
+                || anchor instanceof Ae2Anchor ae2
+                && ae2.dimension().equals(level.dimension()) && ae2.ringPos().equals(pos);
+        if (same) {
+            factory.bindAnchor(null);
+            markDirty();
+            barOk(player, "已取消 ME 仓库链接");
+            return 1;
+        }
+        if (anchor != null) {
+            barErr(player, "已绑定其他仓库，先右键空气清空");
+            return 0;
+        }
+        if (!level.isLoaded(pos)) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        if (Ae2Binder.nodeAt(level, pos) == null) {
+            barErr(player, "该方块没有接入 ME 网络");
+            return 0;
+        }
+        factory.bindAnchor(new MeAnchor(level.dimension(), pos));
+        factory.setStorageMode(StorageMode.ME);
+        markDirty();
+        barOk(player, "已绑定 ME 仓库 " + blockLabel(level, pos));
+        return 1;
+    }
+
+    private static int toggleContainerStorage(ServerPlayer player, Factory factory,
+            ServerLevel level, StorageAnchor anchor, BlockPos pos, boolean chain) {
+        if (anchor instanceof MeAnchor || anchor instanceof Ae2Anchor) {
+            barErr(player, "当前是 ME 模式，先清空当前链接");
+            return 0;
+        }
+        ContainerAnchor current = anchor instanceof ContainerAnchor containerAnchor
+                ? containerAnchor : new ContainerAnchor(List.of());
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.containers(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            targets = List.of(pos);
+        }
+        boolean allBound = true;
+        for (BlockPos targetPos : targets) {
+            if (!current.contains(ContainerRef.of(level.dimension(), targetPos).id())) {
+                allBound = false;
+                break;
+            }
+        }
+        if (allBound) {
+            return unbindContainerTargets(player, factory, level, current, targets, chain);
+        }
+        return bindContainerTargets(player, factory, level, current, targets, chain);
+    }
+
+    private static int bindContainerTargets(ServerPlayer player, Factory factory,
+            ServerLevel level, ContainerAnchor current, List<BlockPos> targets, boolean chain) {
+        if (!level.isLoaded(targets.getFirst())) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        BlockPos origin = targets.getFirst();
+        if (Ae2Binder.nodeAt(level, origin) != null) {
+            barErr(player, "这是 ME 网络方块，请切到 ME 模式");
+            return 0;
+        }
+        if (!isAnyContainer(level, origin)) {
+            barErr(player, "该方块不是仓库容器");
+            return 0;
+        }
+        ContainerAnchor next = current;
+        int added = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            if (Ae2Binder.nodeAt(level, targetPos) != null) {
+                skipped++;
+                continue;
+            }
+            ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
+            if (current.contains(ref.id())) {
+                skipped++;
+                continue;
+            }
+            if (next.containers().size() >= ContainerAnchor.MAX_CONTAINERS) {
+                skipped++;
+                continue;
+            }
+            next = next.with(ref);
+            added++;
+        }
+        if (added == 0) {
+            barErr(player, "没有新增容器（已绑过或达到上限 "
+                    + ContainerAnchor.MAX_CONTAINERS + " 个）");
+            return 0;
+        }
+        factory.bindAnchor(next);
+        factory.setStorageMode(StorageMode.CONTAINER);
+        markDirty();
+        if (!chain) {
+            barOk(player, "已绑定容器 " + blockLabel(level, origin));
+            return added;
+        }
+        String text = "已绑定 " + added + " 个容器，共 " + next.containers().size() + " 个";
+        if (skipped > 0) {
+            text += "，跳过 " + skipped + " 个";
+        }
+        barOk(player, text);
+        return added;
+    }
+
+    private static int unbindContainerTargets(ServerPlayer player, Factory factory,
+            ServerLevel level, ContainerAnchor current, List<BlockPos> targets, boolean chain) {
+        ContainerAnchor next = current;
+        int removed = 0;
+        for (BlockPos targetPos : targets) {
+            ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
+            if (current.contains(ref.id())) {
+                next = next.without(ref.id());
+                removed++;
+            }
+        }
+        if (removed == 0) {
+            barErr(player, "该位置没有绑定容器");
+            return 0;
+        }
+        factory.bindAnchor(next.isEmpty() ? null : next);
+        factory.setStorageMode(StorageMode.CONTAINER);
+        markDirty();
+        if (!chain) {
+            String label = blockLabel(level, targets.getFirst());
+            barOk(player, next.isEmpty()
+                    ? "已取消容器链接 " + label + "，仓库已清空"
+                    : "已取消容器链接 " + label);
+            return removed;
+        }
+        barOk(player, "已取消 " + removed + " 个容器"
+                + (next.isEmpty() ? "，仓库已清空" : "，剩余 " + next.containers().size() + " 个"));
+        return removed;
+    }
+
+    /**
+     * 请求清空仓库：先发聊天确认，点击确认后才真正清空。
+     *
+     * @param player 发起请求的玩家
+     * @return 发送确认消息为 {@code 1}
+     */
+    public static int requestClearStorage(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.storageLink().anchor() == null) {
+            barErr(player, "当前没有仓库链接");
+            return 0;
+        }
+        UUID token = UUID.randomUUID();
+        long expiresAt = player.serverLevel().getGameTime() + CLEAR_CONFIRM_TICKS;
+        PENDING_CLEARS.put(player.getUUID(), new PendingClear(token, expiresAt));
+        Component confirm = Component.literal("[✓] 确认").withStyle(style -> style
+                .withColor(ChatFormatting.GREEN)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                        "/idf storage clear confirm " + token))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("清空当前仓库链接"))));
+        Component cancel = Component.literal("[×] 取消").withStyle(style -> style
+                .withColor(ChatFormatting.RED)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                        "/idf storage clear cancel " + token))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("保留当前仓库链接"))));
+        player.sendSystemMessage(Component.literal("[!!] 清空仓库链接？ ").withStyle(ChatFormatting.RED)
+                .append(confirm)
+                .append(Component.literal("  "))
+                .append(cancel));
+        barOk(player, "确认消息已发到聊天栏");
+        return 1;
+    }
+
+    /**
+     * 聊天栏确认/取消清空仓库。
+     *
+     * @param player  点击的玩家
+     * @param token   请求 token
+     * @param confirm {@code true} 清空，{@code false} 取消
+     * @return 成功为 {@code 1}
+     */
+    public static int confirmClearStorage(ServerPlayer player, String token, boolean confirm) {
+        PendingClear pending = PENDING_CLEARS.get(player.getUUID());
+        if (pending == null || !pending.token().toString().equals(token)) {
+            barErr(player, "确认已失效，请重新发起");
+            return 0;
+        }
+        if (player.serverLevel().getGameTime() > pending.expiresAt()) {
+            PENDING_CLEARS.remove(player.getUUID());
+            barErr(player, "确认已过期，请重新发起");
+            return 0;
+        }
+        PENDING_CLEARS.remove(player.getUUID());
+        if (!confirm) {
+            barOk(player, "已取消清空仓库");
+            return 1;
+        }
+        return clearStorage(player);
+    }
+
+    private static String machineLabel(ServerLevel level, BlockPos pos) {
+        return blockLabel(level, pos);
+    }
+
+    private static String blockLabel(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return pos.toShortString();
+        }
+        return pos.toShortString() + "（"
+                + level.getBlockState(pos).getBlock().getName().getString() + "）";
+    }
+
+    private record PendingClear(UUID token, long expiresAt) {
     }
 
     private static String modeLabel(StorageMode mode) {
@@ -1564,12 +1964,14 @@ public final class FactoryService {
 
     /** 动作栏成功提示。 */
     private static void barOk(ServerPlayer player, String text) {
-        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.GREEN), true);
+        player.displayClientMessage(
+                Component.literal("[OK] " + text).withStyle(ChatFormatting.GREEN), true);
     }
 
     /** 动作栏失败提示。 */
     private static void barErr(ServerPlayer player, String text) {
-        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.RED), true);
+        player.displayClientMessage(
+                Component.literal("[!!] " + text).withStyle(ChatFormatting.RED), true);
     }
 
     /** 把档案写回存档容器。 */

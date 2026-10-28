@@ -1820,22 +1820,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 画当前可见的仓库格。
      *
      * <p>可见条目来自 {@link FactoryStorageRepo#view()}，滚动由
-     * {@code storageFirstRow} 控制；同步中/离线由顶栏统计显示，网格只画内容与
-     * 空仓库/无匹配提示。每个格子只画图标和数量，点击与手势由 {@code mouseClicked}
+     * {@code storageFirstRow} 控制；同步中/离线由顶栏统计显示，空仓库/无匹配也不在
+     * 槽位区域写文字。每个格子只画图标和数量，点击与手势由 {@code mouseClicked}
      * 统一处理。</p>
      */
     private void drawStorageEntries(GuiGraphics graphics) {
         FactoryLayout l = this.layout;
-        // 同步中/离线不占网格：状态已经放在顶栏统计，网格只负责显示内容。
+        // 同步中/离线由顶栏统计显示；仓库为空或搜索无匹配时也不在槽位区域放文字。
         if (!this.storageReceived || !this.storageOnline) {
             return;
         }
-        if (this.storageRepo.all().isEmpty()) {
-            drawStorageMessage(graphics, "仓库是空的", this.theme.textDim());
-            return;
-        }
-        if (this.filteredStorageEntries.isEmpty()) {
-            drawStorageMessage(graphics, "没有匹配", this.theme.textDim());
+        if (this.storageRepo.all().isEmpty() || this.filteredStorageEntries.isEmpty()) {
             return;
         }
 
@@ -1851,21 +1846,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 drawStorageEntry(graphics, entry, x, y);
             }
         }
-    }
-
-    /**
-     * 在仓库网格中央画一句空状态提示。
-     *
-     * @param graphics 画布
-     * @param text     提示文字
-     * @param color    文字颜色
-     */
-    private void drawStorageMessage(GuiGraphics graphics, String text, int color) {
-        FactoryLayout l = this.layout;
-        int x = l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL / 2
-                - this.font.width(text) / 2;
-        int y = l.gridY + l.gridRows * FactoryLayout.CELL / 2 - 4;
-        graphics.drawString(this.font, text, x, y, color, false);
     }
 
     /** 画一个仓库格的图标和右下角数量。 */

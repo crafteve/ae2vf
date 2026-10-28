@@ -41,7 +41,7 @@ public final class ClientWandInput {
     }
 
     /**
-     * 左键机器：机器杖连接/断开；取消挖掘由公共事件处理。
+     * 左键方块：机器/存储杖都发 toggle；机器杖取消挖掘由公共事件处理。
      *
      * @param event 左键方块事件
      */
@@ -50,10 +50,15 @@ public final class ClientWandInput {
         if (!event.getLevel().isClientSide || event.getHand() != InteractionHand.MAIN_HAND) {
             return;
         }
-        if (!(event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem)) {
+        Action action;
+        if (event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem) {
+            action = Action.MACHINE_TOGGLE;
+        } else if (event.getEntity().getMainHandItem().getItem()
+                instanceof StorageBindingWandItem) {
+            action = Action.STORAGE_TOGGLE;
+        } else {
             return;
         }
-        Action action = Screen.hasShiftDown() ? Action.MACHINE_DISCONNECT : Action.MACHINE_CONNECT;
         send(action, event.getPos());
     }
 

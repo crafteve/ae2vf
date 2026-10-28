@@ -298,6 +298,23 @@ public final class FactoryCommands {
                 .then(Commands.literal("bind")
                         .executes(audit("storage.bind",
                                 context -> FactoryService.bindContainer(player(context)))))
+                .then(Commands.literal("clear")
+                        .executes(audit("storage.clear.request",
+                                context -> FactoryService.requestClearStorage(player(context))))
+                        .then(Commands.literal("confirm")
+                                .then(Commands.argument("token", StringArgumentType.word())
+                                        .executes(audit("storage.clear.confirm",
+                                                context -> FactoryService.confirmClearStorage(
+                                                        player(context),
+                                                        StringArgumentType.getString(context, "token"),
+                                                        true)))))
+                        .then(Commands.literal("cancel")
+                                .then(Commands.argument("token", StringArgumentType.word())
+                                        .executes(audit("storage.clear.cancel",
+                                                context -> FactoryService.confirmClearStorage(
+                                                        player(context),
+                                                        StringArgumentType.getString(context, "token"),
+                                                        false))))))
                 .then(Commands.literal("unbind")
                         .executes(audit("storage.unbind",
                                 context -> FactoryService.unbindStorage(player(context))))

@@ -14,10 +14,10 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 存储绑定杖：右键方块绑定，蹲下取消，Ctrl 连锁；Shift+滚轮切换 ME / 容器模式。
+ * 存储绑定杖：右键/左键方块 toggle，Ctrl 连锁 toggle；Shift+滚轮切换模式。
  *
  * <p>不可堆叠、无耐久。模式与链接都在服务端工厂上，客户端只发动作；右键在
- * {@link #onItemUseFirst} 里先于容器 GUI 执行，蹲下右键空气则请求清空仓库。</p>
+ * {@link #onItemUseFirst} 里先于容器 GUI 执行，右键空气请求清空仓库（聊天确认）。</p>
  */
 public class StorageBindingWandItem extends Item {
     /**
@@ -28,7 +28,7 @@ public class StorageBindingWandItem extends Item {
     }
 
     /**
-     * 右键方块：先于方块交互发请求，阻止容器/机器 GUI。
+     * 右键方块：先于方块交互发 toggle 请求，阻止容器/机器 GUI。
      *
      * @param stack   物品
      * @param context 使用上下文
@@ -40,33 +40,31 @@ public class StorageBindingWandItem extends Item {
             return InteractionResult.PASS;
         }
         if (context.getLevel().isClientSide) {
-            FactoryWandActionC2S.Action action = Screen.hasShiftDown()
-                    ? FactoryWandActionC2S.Action.STORAGE_UNBIND
-                    : FactoryWandActionC2S.Action.STORAGE_BIND;
             PacketDistributor.sendToServer(new FactoryWandActionC2S(
-                    action, context.getClickedPos(), Screen.hasControlDown()));
+                    FactoryWandActionC2S.Action.STORAGE_TOGGLE,
+                    context.getClickedPos(), Screen.hasControlDown()));
             return InteractionResult.SUCCESS;
         }
         return InteractionResult.CONSUME;
     }
 
     /**
-     * 蹲下右键空气：清空当前仓库链接。
+     * 右键空气：请求清空当前仓库链接；服务端发聊天确认后才真正清空。
      *
      * @param level  当前世界
      * @param player 玩家
      * @param hand   使用的手
-     * @return 蹲下时成功，否则交给后续逻辑
+     * @return 主手时成功，否则交给后续逻辑
      */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (hand != InteractionHand.MAIN_HAND || !player.isShiftKeyDown()) {
+        if (hand != InteractionHand.MAIN_HAND) {
             return InteractionResultHolder.pass(stack);
         }
         if (level.isClientSide) {
             PacketDistributor.sendToServer(new FactoryWandActionC2S(
-                    FactoryWandActionC2S.Action.STORAGE_CLEAR, null, false));
+                    FactoryWandActionC2S.Action.STORAGE_CLEAR_REQUEST, null, false));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }

@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 
@@ -20,13 +19,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 绑定杖的操作请求：机器连接/断开、仓库绑定/取消/清空、切换模式。
+ * 绑定杖的操作请求：机器/仓库 toggle、清空仓库请求、切换模式。
  *
  * <p>客户端只发“我点了什么”，服务端负责校验主手物品、工厂所有权、距离、目标类型和上限。
  * 处理完无论成功失败都回一份 {@link FactoryLinksS2C}，让客户端缓存和服务端一致。</p>
  *
  * @param action 动作
- * @param pos    目标方块；清空/切换模式时为 {@code null}
+ * @param pos    目标方块；清空请求/切换模式时为 {@code null}
  * @param chain  是否连锁
  */
 public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolean chain)
@@ -74,48 +73,22 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
 
     private static void handleAction(ServerPlayer player, FactoryWandActionC2S payload) {
         BlockPos pos = payload.pos();
-        Factory factory = factoryOf(player);
         switch (payload.action()) {
-            case MACHINE_CONNECT -> {
+            case MACHINE_TOGGLE -> {
                 if (pos != null && player.getMainHandItem().getItem()
                         instanceof MachineBindingWandItem) {
-                    FactoryService.connectMachines(player, pos, payload.chain());
+                    FactoryService.toggleMachines(player, pos, payload.chain());
                 }
             }
-            case MACHINE_DISCONNECT -> {
+            case STORAGE_TOGGLE -> {
                 if (pos != null && player.getMainHandItem().getItem()
-                        instanceof MachineBindingWandItem) {
-                    FactoryService.disconnectMachines(player, pos, payload.chain());
+                        instanceof StorageBindingWandItem) {
+                    FactoryService.toggleStorage(player, pos, payload.chain());
                 }
             }
-            case STORAGE_BIND -> {
-                if (pos == null || factory == null
-                        || !(player.getMainHandItem().getItem()
-                        instanceof StorageBindingWandItem)) {
-                    return;
-                }
-                if (factory.storageMode() == StorageMode.ME) {
-                    FactoryService.bindMeStorage(player, pos);
-                } else {
-                    FactoryService.bindContainers(player, pos, payload.chain());
-                }
-            }
-            case STORAGE_UNBIND -> {
-                if (factory == null || !(player.getMainHandItem().getItem()
-                        instanceof StorageBindingWandItem)) {
-                    return;
-                }
-                if (factory.storageMode() == StorageMode.CONTAINER && pos != null) {
-                    FactoryService.unbindContainers(player, pos, payload.chain());
-                } else if (factory.storageMode() == StorageMode.ME && pos != null) {
-                    FactoryService.clearStorageAt(player, pos);
-                } else {
-                    FactoryService.clearStorage(player);
-                }
-            }
-            case STORAGE_CLEAR -> {
+            case STORAGE_CLEAR_REQUEST -> {
                 if (player.getMainHandItem().getItem() instanceof StorageBindingWandItem) {
-                    FactoryService.clearStorage(player);
+                    FactoryService.requestClearStorage(player);
                 }
             }
             case MODE_SWITCH -> {
@@ -143,16 +116,12 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
 
     /** 绑定杖动作。 */
     public enum Action {
-        /** 连接机器。 */
-        MACHINE_CONNECT,
-        /** 断开机器。 */
-        MACHINE_DISCONNECT,
-        /** 绑定仓库（服务端按当前模式分 ME / 容器）。 */
-        STORAGE_BIND,
-        /** 取消仓库绑定（ME 清空，容器按目标取消）。 */
-        STORAGE_UNBIND,
-        /** 清空仓库。 */
-        STORAGE_CLEAR,
+        /** 机器 toggle：已连接则断开，未连接则连接；连锁按整组 toggle。 */
+        MACHINE_TOGGLE,
+        /** 仓库 toggle：已绑定则取消，未绑定则绑定；连锁按整组 toggle。 */
+        STORAGE_TOGGLE,
+        /** 请求清空仓库：服务端发聊天确认，确认后才清。 */
+        STORAGE_CLEAR_REQUEST,
         /** 切换 ME / 容器模式。 */
         MODE_SWITCH
     }
