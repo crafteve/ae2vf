@@ -53,7 +53,7 @@ public final class FactoryLayout {
     /** 搜索框与排序按钮之间的间隙。 */
     public static final int SORT_BTN_GAP = 4;
     /** 排序菜单普通行高。 */
-    public static final int SORT_ROW_H = 14;
+    public static final int SORT_ROW_H = 16;
     /** 合成区边长（3×3）。 */
     public static final int CRAFT = 3;
     /** 合成格子的边长：比物品格子大一圈，让 3×3 占满右区宽度。 */

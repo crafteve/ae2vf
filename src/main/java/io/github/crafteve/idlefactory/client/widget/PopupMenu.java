@@ -13,9 +13,9 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 通用竖向浮层菜单。
  *
- * <p>产线下拉的二级菜单与右区排序菜单都用它；样式与产线下拉一致：右下 2px 硬阴影、外层深色框、
- * 1px 白色内框、每一行是独立凸起按钮。它只负责几何/绘制/命中，不执行动作；调用方拿
- * {@link Item#id()} 自己分发。</p>
+ * <p>产线下拉的二级菜单与右区排序菜单都用它；外框/阴影一致，行样式由 {@link Style} 选择：
+ * 二级菜单用独立凸起按钮，排序菜单用整块列表（行间 1px 分隔线、选中/悬停整行填底）。
+ * 它只负责几何/绘制/命中，不执行动作；调用方拿 {@link Item#id()} 自己分发。</p>
  *
  * <p>菜单项用 {@link Kind} 表达语义，而不是若干个布尔参数：普通动作、当前选中项、危险动作、
  * 置灰项、分组标题。分组标题不画按钮底，只占一行高度并画一条分隔线；选中项在左侧画一条
@@ -29,6 +29,16 @@ public final class PopupMenu {
     private static final int PAD = 3;
     /** 分组标题行的高度；普通行仍由调用方传入。 */
     private static final int HEADER_H = 12;
+
+    /**
+     * 行样式。
+     */
+    public enum Style {
+        /** 每行独立凸起按钮；产线下拉的二级菜单使用。 */
+        BUTTONS,
+        /** 整块列表：行间 1px 分隔线，选中/悬停整行填底；排序菜单使用。 */
+        LIST
+    }
 
     /**
      * 菜单项种类。
@@ -73,10 +83,11 @@ public final class PopupMenu {
     private int width;
     private int rowHeight;
     private List<Item> items = List.of();
+    private Style style = Style.BUTTONS;
     private boolean open;
 
     /**
-     * 打开菜单。
+     * 打开菜单（默认凸起按钮样式）。
      *
      * @param x         左上角 x
      * @param y         左上角 y
@@ -85,11 +96,26 @@ public final class PopupMenu {
      * @param items     菜单项
      */
     public void open(int x, int y, int width, int rowHeight, List<Item> items) {
+        open(x, y, width, rowHeight, items, Style.BUTTONS);
+    }
+
+    /**
+     * 打开菜单并指定行样式。
+     *
+     * @param x         左上角 x
+     * @param y         左上角 y
+     * @param width     宽度
+     * @param rowHeight 普通行高；分组标题固定使用内部高度
+     * @param items     菜单项
+     * @param style     行样式
+     */
+    public void open(int x, int y, int width, int rowHeight, List<Item> items, Style style) {
         this.x = x;
         this.y = y;
         this.width = Math.max(40, width);
         this.rowHeight = Math.max(12, rowHeight);
         this.items = new ArrayList<>(items);
+        this.style = style == null ? Style.BUTTONS : style;
         this.open = true;
     }
 
@@ -220,12 +246,16 @@ public final class PopupMenu {
                 this.width - 4, height - 4);
 
         int cursor = this.y + PAD;
-        for (Item item : this.items) {
+        for (int i = 0; i < this.items.size(); i++) {
+            Item item = this.items.get(i);
             int rowH = heightOf(item, this.rowHeight);
             if (item.kind() == Kind.HEADER) {
                 drawHeader(graphics, font, theme, item, cursor, rowH);
+            } else if (this.style == Style.LIST) {
+                drawListAction(graphics, font, theme, item, cursor, rowH,
+                        mouseX, mouseY, i == this.items.size() - 1);
             } else {
-                drawAction(graphics, font, theme, item, cursor, rowH, mouseX, mouseY);
+                drawButtonAction(graphics, font, theme, item, cursor, rowH, mouseX, mouseY);
             }
             cursor += rowH;
         }
@@ -237,10 +267,44 @@ public final class PopupMenu {
         NineSlice.fill(graphics, GuiTextures.DIVIDER, this.x + PAD, rowY + rowH - 2,
                 this.width - PAD * 2, 1);
         String label = font.plainSubstrByWidth(item.label(), this.width - PAD * 2 - 8);
-        graphics.drawString(font, label, this.x + PAD + 5, rowY + 2, theme.textDim(), false);
+        int textX = this.x + PAD + (this.style == Style.LIST ? 7 : 5);
+        graphics.drawString(font, label, textX, rowY + 2, theme.textDim(), false);
     }
 
-    private void drawAction(GuiGraphics graphics, Font font, GuiTheme theme, Item item,
+    /**
+     * 列表行：整行填底，不画凸起按钮；选中行左侧加强调条，非末行画 1px 分隔线。
+     */
+    private void drawListAction(GuiGraphics graphics, Font font, GuiTheme theme, Item item,
+            int rowY, int rowH, int mouseX, int mouseY, boolean last) {
+        int x = this.x + PAD + 1;
+        int w = this.width - PAD * 2 - 2;
+        boolean hovered = mouseX >= x && mouseX < x + w
+                && mouseY >= rowY && mouseY < rowY + rowH;
+        boolean selected = item.kind() == Kind.ACTION_SELECTED;
+        if (hovered || selected) {
+            NineSlice.fill(graphics, GuiTextures.ROW_ALT, x, rowY, w, rowH - 1);
+        }
+        if (selected) {
+            // 强调条压在填底之上；只表达选中，不替代 hover。
+            graphics.fill(x + 1, rowY + 2, x + 3, rowY + rowH - 3, theme.accent());
+        }
+        if (!last) {
+            NineSlice.fill(graphics, GuiTextures.DIVIDER, x + 2, rowY + rowH - 1,
+                    w - 4, 1);
+        }
+
+        int color;
+        switch (item.kind()) {
+            case DISABLED -> color = theme.textDim();
+            case DANGER -> color = theme.error();
+            case ACTION_SELECTED -> color = theme.textValue();
+            default -> color = hovered ? theme.textValue() : theme.textPrimary();
+        }
+        String label = font.plainSubstrByWidth(item.label(), w - 12);
+        graphics.drawString(font, label, x + 6, rowY + (rowH - 9) / 2 + 1, color, false);
+    }
+
+    private void drawButtonAction(GuiGraphics graphics, Font font, GuiTheme theme, Item item,
             int rowY, int rowH, int mouseX, int mouseY) {
         int buttonH = rowH - 2;
         NineSlice.button(graphics, this.x + PAD, rowY, this.width - PAD * 2, buttonH);

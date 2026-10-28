@@ -10,6 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineView;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.TotalState;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 /**
@@ -138,7 +139,7 @@ final class FactorySort {
         }
         Comparator<FactoryStorageS2C.Entry> primary = switch (key) {
             case DEFAULT -> throw new IllegalStateException("默认排序没有比较器");
-            case COUNT -> Comparator.comparingLong(FactoryStorageS2C.Entry::count);
+            case COUNT -> Comparator.comparingDouble(FactorySort::sortAmount);
             case NAME -> Comparator.comparing(entry -> nameOf.apply(entry.key()),
                     String.CASE_INSENSITIVE_ORDER);
             case MOD -> Comparator
@@ -157,6 +158,21 @@ final class FactorySort {
         Comparator<FactoryStorageS2C.Entry> tie =
                 Comparator.comparing(entry -> entry.key().id().toString());
         return descending ? primary.reversed().thenComparing(tie) : primary.thenComparing(tie);
+    }
+
+    /**
+     * 数量排序值。
+     *
+     * <p>流体在仓库格里按 B 渲染（1000 mB = 1 B），排序也换算成 B，避免显示 "2.0B"
+     * 却按 2000 mB 与物品混排；物品、FE、化学品保持原单位（FE 没有 B 的概念）。</p>
+     *
+     * @param entry 仓库条目
+     * @return 排序用数量
+     */
+    private static double sortAmount(FactoryStorageS2C.Entry entry) {
+        return entry.key().kind() == ResourceKind.FLUID
+                ? entry.count() / 1000.0D
+                : entry.count();
     }
 
     /**

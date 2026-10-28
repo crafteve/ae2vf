@@ -337,15 +337,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     private void rebuildFiltered() {
         FactorySortMenu menu = this.sortMenu;
+        FactorySortMenu.Scope scope = menu == null
+                ? FactorySortMenu.Scope.ALL : menu.storageScope();
         Comparator<FactoryStorageS2C.Entry> comparator = menu == null ? null
                 : FactorySort.storage(menu.storageKey(), menu.storageDescending(),
                         key -> storageSearchFields(key).name(),
                         key -> storageSearchFields(key).modName());
-        if (this.searchQuery.isEmpty()) {
+        if (this.searchQuery.isEmpty() && scope == FactorySortMenu.Scope.ALL) {
             this.storageRepo.configure(null, comparator);
         } else {
-            this.storageRepo.configure(
-                    entry -> this.searchQuery.matches(storageSearchFields(entry.key())),
+            this.storageRepo.configure(entry ->
+                    (this.searchQuery.isEmpty()
+                            || this.searchQuery.matches(storageSearchFields(entry.key())))
+                            && scope.accepts(entry.key().kind()),
                     comparator);
         }
 
@@ -1878,9 +1882,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
             boolean storageTab = this.activeTab == TAB_STORAGE;
             String direction = menu.directionLabel(storageTab);
-            String title = direction.isEmpty()
-                    ? "排序：" + menu.keyLabel(storageTab)
-                    : "排序：" + menu.keyLabel(storageTab) + " · " + direction;
+            String scopeLabel = menu.scopeLabel(storageTab);
+            String title = "排序：" + menu.keyLabel(storageTab)
+                    + (direction.isEmpty() ? "" : " · " + direction)
+                    + (scopeLabel.isEmpty() ? "" : " · " + scopeLabel);
             graphics.renderComponentTooltip(this.font, List.of(
                     Component.literal(title),
                     Component.literal(direction.isEmpty()

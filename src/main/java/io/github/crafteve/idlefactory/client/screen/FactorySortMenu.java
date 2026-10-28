@@ -6,6 +6,7 @@ import java.util.List;
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
 import io.github.crafteve.idlefactory.client.widget.GuiLayer;
 import io.github.crafteve.idlefactory.client.widget.PopupMenu;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,7 +18,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * 菜单的开合、绘制、命中与偏好记忆。仓库与机器各记一套键和方向，存在静态字段里，
  * 关闭界面再打开仍保留；不写存档。</p>
  *
- * <p>菜单分三组：当前范围的排序键、「方向」标题、降序/升序。选中项用
+ * <p>菜单分四组：排序键、「范围」（仅仓库）、「方向」、降序/升序。选中项用
  * {@link PopupMenu.Kind#ACTION_SELECTED} 画强调条；默认顺序下方向行置灰。</p>
  */
 final class FactorySortMenu {
@@ -25,18 +26,62 @@ final class FactorySortMenu {
     private static final int DIR_DESC = 100;
     /** 方向行 id：升序。 */
     private static final int DIR_ASC = 101;
+    /** 范围行 id 起点；仓库专用。 */
+    private static final int SCOPE_BASE = 200;
     /** 菜单最小宽度。 */
-    private static final int MIN_MENU_W = 64;
+    private static final int MIN_MENU_W = 76;
 
     /** 排序变化回调。 */
     interface Callbacks {
-        /** 键或方向变化后调用；调用方负责重建视图。 */
+        /** 键、范围或方向变化后调用；调用方负责重建视图。 */
         void sortChanged();
+    }
+
+    /**
+     * 仓库显示范围。
+     *
+     * <p>FE 视为流体；化学品是目前占位的非物品资源，也归入「仅流体」，
+     * 这样「仅物品」只显示真正的物品。</p>
+     */
+    enum Scope {
+        /** 全部资源。 */
+        ALL("全部"),
+        /** 只显示物品。 */
+        ITEMS("仅物品"),
+        /** 只显示非物品：流体、FE、化学品。 */
+        FLUIDS("仅流体");
+
+        private final String label;
+
+        Scope(String label) {
+            this.label = label;
+        }
+
+        /** 菜单文案。 */
+        String label() {
+            return this.label;
+        }
+
+        /**
+         * 这类资源是否属于当前范围。
+         *
+         * @param kind 资源类型
+         * @return 属于时为 {@code true}
+         */
+        boolean accepts(ResourceKind kind) {
+            return switch (this) {
+                case ALL -> true;
+                case ITEMS -> kind == ResourceKind.ITEM;
+                case FLUIDS -> kind != ResourceKind.ITEM;
+            };
+        }
     }
 
     /** 仓库排序偏好；跨界面打开保留。 */
     private static FactorySort.StorageKey storageKey = FactorySort.StorageKey.DEFAULT;
     private static boolean storageDescending = true;
+    /** 仓库显示范围；与排序键独立记忆。 */
+    private static Scope storageScope = Scope.ALL;
     /** 机器库排序偏好；跨界面打开保留。 */
     private static FactorySort.MachineKey machineKey = FactorySort.MachineKey.DEFAULT;
     private static boolean machineDescending = true;
@@ -99,7 +144,7 @@ final class FactorySortMenu {
             y = Math.max(layout.panelY + FactoryLayout.PAD,
                     layout.searchY - height - 2);
         }
-        this.menu.open(x, y, width, FactoryLayout.SORT_ROW_H, items);
+        this.menu.open(x, y, width, FactoryLayout.SORT_ROW_H, items, PopupMenu.Style.LIST);
     }
 
     /**
@@ -131,13 +176,6 @@ final class FactorySortMenu {
         return false;
     }
 
-    /**
-     * 画菜单；调用方保证它在右区内容之后。
-     *
-     * @param graphics 画布
-     * @param mouseX   鼠标 x
-     * @param mouseY   鼠标 y
-     */
     /**
      * 画菜单；调用方保证它在右区内容之后、tooltip 之前或之后由自己决定。
      *
@@ -180,6 +218,21 @@ final class FactorySortMenu {
     /** 仓库当前是否降序。 */
     boolean storageDescending() {
         return storageDescending;
+    }
+
+    /** 仓库当前显示范围。 */
+    Scope storageScope() {
+        return storageScope;
+    }
+
+    /**
+     * 当前范围文案；机器 tab 或「全部」返回空串。
+     *
+     * @param storageTab 当前 tab
+     * @return 「仅物品」/「仅流体」/空串
+     */
+    String scopeLabel(boolean storageTab) {
+        return storageTab && storageScope != Scope.ALL ? storageScope.label() : "";
     }
 
     /** 机器库当前排序键。 */
@@ -257,6 +310,13 @@ final class FactorySortMenu {
                                 : PopupMenu.Kind.ACTION,
                         key.ordinal()));
             }
+            items.add(new PopupMenu.Item("范围", PopupMenu.Kind.HEADER, -1));
+            for (Scope scope : Scope.values()) {
+                items.add(new PopupMenu.Item(scope.label(),
+                        scope == storageScope ? PopupMenu.Kind.ACTION_SELECTED
+                                : PopupMenu.Kind.ACTION,
+                        SCOPE_BASE + scope.ordinal()));
+            }
             items.add(new PopupMenu.Item("方向", PopupMenu.Kind.HEADER, -1));
             boolean enabled = storageKey != FactorySort.StorageKey.DEFAULT;
             items.add(directionItem("降序", DIR_DESC, enabled, storageDescending));
@@ -291,7 +351,7 @@ final class FactorySortMenu {
     private int measureWidth(List<PopupMenu.Item> items) {
         int width = MIN_MENU_W;
         for (PopupMenu.Item item : items) {
-            width = Math.max(width, this.font.width(item.label()) + 20);
+            width = Math.max(width, this.font.width(item.label()) + 30);
         }
         return width;
     }
@@ -301,6 +361,9 @@ final class FactorySortMenu {
             setDescending(true);
         } else if (id == DIR_ASC) {
             setDescending(false);
+        } else if (this.storageTab && id >= SCOPE_BASE
+                && id < SCOPE_BASE + Scope.values().length) {
+            storageScope = Scope.values()[id - SCOPE_BASE];
         } else if (this.storageTab) {
             FactorySort.StorageKey[] values = FactorySort.StorageKey.values();
             if (id >= 0 && id < values.length) {
