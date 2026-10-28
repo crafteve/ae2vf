@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.item;
 
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
@@ -26,6 +27,9 @@ public class MachineBindingWandItem extends Item {
      */
     @Override
     public InteractionResult useOn(UseOnContext context) {
+        if (context.getHand() != InteractionHand.MAIN_HAND) {
+            return InteractionResult.PASS;
+        }
         return InteractionResult.SUCCESS;
     }
 }

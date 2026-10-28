@@ -34,6 +34,9 @@ public class StorageBindingWandItem extends Item {
      */
     @Override
     public InteractionResult useOn(UseOnContext context) {
+        if (context.getHand() != InteractionHand.MAIN_HAND) {
+            return InteractionResult.PASS;
+        }
         return InteractionResult.SUCCESS;
     }
 
@@ -48,7 +51,7 @@ public class StorageBindingWandItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!player.isShiftKeyDown()) {
+        if (hand != InteractionHand.MAIN_HAND || !player.isShiftKeyDown()) {
             return InteractionResultHolder.pass(stack);
         }
         if (level.isClientSide) {
