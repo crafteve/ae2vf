@@ -46,7 +46,7 @@ public final class ClientWandInput {
      *
      * @param event 左键方块事件
      */
-    @SubscribeEvent
+    @SubscribeEvent(receiveCanceled = true)
     static void onLeftClick(PlayerInteractEvent.LeftClickBlock event) {
         if (!event.getLevel().isClientSide || event.getHand() != InteractionHand.MAIN_HAND) {
             return;
@@ -63,7 +63,7 @@ public final class ClientWandInput {
      *
      * @param event 右键方块事件
      */
-    @SubscribeEvent
+    @SubscribeEvent(receiveCanceled = true)
     static void onRightClick(PlayerInteractEvent.RightClickBlock event) {
         if (!event.getLevel().isClientSide || event.getHand() != InteractionHand.MAIN_HAND) {
             return;
