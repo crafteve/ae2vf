@@ -1095,10 +1095,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         graphics.drawString(this.font, title, iconX + FactoryLayout.CELL + 2, y + 4,
                 this.theme.textPrimary(), false);
+        // “新增机器”是一整行卡片，提示不跟机器名列共用宽度，否则会被截成“从右侧机”。
+        int hintX = iconX + FactoryLayout.CELL + 2;
+        int hintWidth = Math.max(0, cardX + cardW - 4 - hintX);
         graphics.drawString(this.font,
-                this.font.plainSubstrByWidth(hint,
-                        l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 12),
-                iconX + FactoryLayout.CELL + 2, y + 14,
+                this.font.plainSubstrByWidth(hint, hintWidth),
+                hintX, y + 14,
                 hover ? this.theme.statusRun() : this.theme.textDim(), false);
     }
 
