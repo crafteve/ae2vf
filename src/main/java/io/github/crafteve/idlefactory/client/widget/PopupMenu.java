@@ -13,24 +13,59 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 通用竖向浮层菜单。
  *
- * <p>产线下拉的二级菜单用它；样式与产线下拉一致：右下 2px 硬阴影、外层深色框、1px 白色内框、
- * 每一行是独立凸起按钮。它只负责几何/绘制/命中，不执行动作；调用方拿 {@link Item#id()} 自己分发。</p>
+ * <p>产线下拉的二级菜单与右区排序菜单都用它；样式与产线下拉一致：右下 2px 硬阴影、外层深色框、
+ * 1px 白色内框、每一行是独立凸起按钮。它只负责几何/绘制/命中，不执行动作；调用方拿
+ * {@link Item#id()} 自己分发。</p>
+ *
+ * <p>菜单项用 {@link Kind} 表达语义，而不是若干个布尔参数：普通动作、当前选中项、危险动作、
+ * 置灰项、分组标题。分组标题不画按钮底，只占一行高度并画一条分隔线；选中项在左侧画一条
+ * 强调条。这样排序菜单能同时表达「排序方式」分组和「当前选中的排序键」，而产线下拉的行为
+ * 保持不变。</p>
  *
  * <p>坐标是屏幕绝对坐标；宽度由调用方按文本算好并夹在面板内。</p>
  */
 public final class PopupMenu {
     /** 行内边距。 */
     private static final int PAD = 3;
+    /** 分组标题行的高度；普通行仍由调用方传入。 */
+    private static final int HEADER_H = 12;
+
+    /**
+     * 菜单项种类。
+     *
+     * <p>它同时决定是否可点与用什么颜色画，避免调用方传 {@code enabled/danger/selected}
+     * 三个布尔值。</p>
+     */
+    public enum Kind {
+        /** 普通可点动作。 */
+        ACTION,
+        /** 可点，且是当前选中项：左侧强调条 + 青色文字。 */
+        ACTION_SELECTED,
+        /** 可点，删除类动作，错误色。 */
+        DANGER,
+        /** 不可点，灰色文字。 */
+        DISABLED,
+        /** 分组标题：不画按钮底，只画一行灰字和底部 1px 分隔线。 */
+        HEADER;
+
+        /**
+         * 这一项是否能被点击。
+         *
+         * @return 普通动作、选中项、危险项为 {@code true}
+         */
+        public boolean clickable() {
+            return this == ACTION || this == ACTION_SELECTED || this == DANGER;
+        }
+    }
 
     /**
      * 一个菜单项。
      *
-     * @param label   文案
-     * @param enabled 是否可点
-     * @param danger  是否用错误色（删除类）
-     * @param id      调用方自定义的动作 id
+     * @param label 文案
+     * @param kind  种类，决定颜色、可点性与是否画按钮底
+     * @param id    调用方自定义的动作 id；标题与置灰项不会被命中
      */
-    public record Item(String label, boolean enabled, boolean danger, int id) {
+    public record Item(String label, Kind kind, int id) {
     }
 
     private int x;
@@ -46,7 +81,7 @@ public final class PopupMenu {
      * @param x         左上角 x
      * @param y         左上角 y
      * @param width     宽度
-     * @param rowHeight 行高
+     * @param rowHeight 普通行高；分组标题固定使用内部高度
      * @param items     菜单项
      */
     public void open(int x, int y, int width, int rowHeight, List<Item> items) {
@@ -71,7 +106,24 @@ public final class PopupMenu {
 
     /** 菜单总高。 */
     public int height() {
-        return this.items.size() * this.rowHeight + PAD * 2;
+        return measureHeight(this.items, this.rowHeight);
+    }
+
+    /**
+     * 计算一组菜单项的总高度。
+     *
+     * <p>供调用方在 {@link #open} 之前做纵向夹紧；分组标题按固定 12px 计，其余按行高计。</p>
+     *
+     * @param items     菜单项
+     * @param rowHeight 普通行高
+     * @return 含上下内边距的总高度
+     */
+    public static int measureHeight(List<Item> items, int rowHeight) {
+        int height = PAD * 2;
+        for (Item item : items) {
+            height += heightOf(item, rowHeight);
+        }
+        return height;
     }
 
     /** 菜单宽。 */
@@ -107,19 +159,22 @@ public final class PopupMenu {
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 菜单项 id；没命中或项置灰时为 {@code null}
+     * @return 菜单项 id；没命中、标题或置灰项时为 {@code null}
      */
     @Nullable
     public Integer hit(double mouseX, double mouseY) {
         if (!contains(mouseX, mouseY)) {
             return null;
         }
-        int index = (int) ((mouseY - this.y - PAD) / this.rowHeight);
-        if (index < 0 || index >= this.items.size()) {
-            return null;
+        int cursor = this.y + PAD;
+        for (Item item : this.items) {
+            int rowH = heightOf(item, this.rowHeight);
+            if (mouseY >= cursor && mouseY < cursor + rowH) {
+                return item.kind().clickable() ? item.id() : null;
+            }
+            cursor += rowH;
         }
-        Item item = this.items.get(index);
-        return item.enabled() ? item.id() : null;
+        return null;
     }
 
     /**
@@ -155,27 +210,55 @@ public final class PopupMenu {
         NineSlice.fill(graphics, GuiTextures.HEADER_BG, this.x + 2, this.y + 2,
                 this.width - 4, height - 4);
 
-        for (int i = 0; i < this.items.size(); i++) {
-            Item item = this.items.get(i);
-            int rowY = this.y + PAD + i * this.rowHeight;
-            NineSlice.button(graphics, this.x + PAD, rowY, this.width - PAD * 2,
-                    this.rowHeight - 2);
-            boolean hovered = mouseX >= this.x + PAD && mouseX < this.x + this.width - PAD
-                    && mouseY >= rowY && mouseY < rowY + this.rowHeight - 2;
-            if (hovered && item.enabled()) {
-                NineSlice.fill(graphics, GuiTextures.ROW_ALT, this.x + PAD + 1, rowY + 1,
-                        this.width - PAD * 2 - 2, this.rowHeight - 4);
-            }
-            int color;
-            if (!item.enabled()) {
-                color = theme.textDim();
-            } else if (item.danger()) {
-                color = theme.error();
+        int cursor = this.y + PAD;
+        for (Item item : this.items) {
+            int rowH = heightOf(item, this.rowHeight);
+            if (item.kind() == Kind.HEADER) {
+                drawHeader(graphics, font, theme, item, cursor, rowH);
             } else {
-                color = hovered ? theme.textValue() : theme.textPrimary();
+                drawAction(graphics, font, theme, item, cursor, rowH, mouseX, mouseY);
             }
-            String label = font.plainSubstrByWidth(item.label(), this.width - PAD * 2 - 8);
-            graphics.drawString(font, label, this.x + PAD + 5, rowY + 3, color, false);
+            cursor += rowH;
         }
+    }
+
+    private void drawHeader(GuiGraphics graphics, Font font, GuiTheme theme, Item item,
+            int rowY, int rowH) {
+        NineSlice.fill(graphics, GuiTextures.DIVIDER, this.x + PAD, rowY + rowH - 2,
+                this.width - PAD * 2, 1);
+        String label = font.plainSubstrByWidth(item.label(), this.width - PAD * 2 - 8);
+        graphics.drawString(font, label, this.x + PAD + 5, rowY + 2, theme.textDim(), false);
+    }
+
+    private void drawAction(GuiGraphics graphics, Font font, GuiTheme theme, Item item,
+            int rowY, int rowH, int mouseX, int mouseY) {
+        int buttonH = rowH - 2;
+        NineSlice.button(graphics, this.x + PAD, rowY, this.width - PAD * 2, buttonH);
+
+        boolean hovered = mouseX >= this.x + PAD && mouseX < this.x + this.width - PAD
+                && mouseY >= rowY && mouseY < rowY + buttonH;
+        if (item.kind() == Kind.ACTION_SELECTED) {
+            // 强调条画在按钮内侧，避开 1px 外框；只表达选中，不替代 hover 底色。
+            graphics.fill(this.x + PAD + 2, rowY + 1,
+                    this.x + PAD + 4, rowY + buttonH - 1, theme.accent());
+        }
+        if (hovered && item.kind().clickable()) {
+            NineSlice.fill(graphics, GuiTextures.ROW_ALT, this.x + PAD + 1, rowY + 1,
+                    this.width - PAD * 2 - 2, buttonH - 2);
+        }
+
+        int color;
+        switch (item.kind()) {
+            case DISABLED -> color = theme.textDim();
+            case DANGER -> color = theme.error();
+            case ACTION_SELECTED -> color = theme.textValue();
+            default -> color = hovered ? theme.textValue() : theme.textPrimary();
+        }
+        String label = font.plainSubstrByWidth(item.label(), this.width - PAD * 2 - 8);
+        graphics.drawString(font, label, this.x + PAD + 5, rowY + 3, color, false);
+    }
+
+    private static int heightOf(Item item, int rowHeight) {
+        return item.kind() == Kind.HEADER ? HEADER_H : rowHeight;
     }
 }

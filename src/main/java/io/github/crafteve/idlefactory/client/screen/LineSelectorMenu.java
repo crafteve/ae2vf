@@ -362,17 +362,19 @@ public final class LineSelectorMenu {
     private void openSubmenu(FactorySnapshotBuilder.LineView line, int index, int caretX) {
         this.submenuLine = line;
         List<PopupMenu.Item> items = new ArrayList<>(4);
-        items.add(new PopupMenu.Item("重命名", true, false, SUB_RENAME));
-        items.add(new PopupMenu.Item("启动", !line.running(), false, SUB_START));
-        items.add(new PopupMenu.Item("暂停", line.running(), false, SUB_PAUSE));
-        items.add(new PopupMenu.Item("删除产线", true, true, SUB_DELETE));
+        items.add(new PopupMenu.Item("重命名", PopupMenu.Kind.ACTION, SUB_RENAME));
+        items.add(new PopupMenu.Item("启动",
+                line.running() ? PopupMenu.Kind.DISABLED : PopupMenu.Kind.ACTION, SUB_START));
+        items.add(new PopupMenu.Item("暂停",
+                line.running() ? PopupMenu.Kind.ACTION : PopupMenu.Kind.DISABLED, SUB_PAUSE));
+        items.add(new PopupMenu.Item("删除产线", PopupMenu.Kind.DANGER, SUB_DELETE));
         int subW = 92;
         int rowY = this.y + FactoryLayout.LINE_MENU_PAD + index * FactoryLayout.LINE_ROW_H;
         int subX = this.x + this.width - 2;
         if (subX + subW > this.layout.panelX + this.layout.panelW - FactoryLayout.PAD) {
             subX = this.x - subW + 2;
         }
-        int subH = items.size() * FactoryLayout.SUBMENU_ROW_H + 6;
+        int subH = PopupMenu.measureHeight(items, FactoryLayout.SUBMENU_ROW_H);
         int subY = Math.max(this.layout.panelY + FactoryLayout.PAD,
                 Math.min(rowY, this.layout.panelY + this.layout.panelH
                         - FactoryLayout.PAD - subH));
