@@ -89,6 +89,25 @@ public final class FactoryLayout {
     /** 面板最小高。 */
     public static final int MIN_PANEL_H = 320;
 
+    /** 产线下拉每一行的高度。 */
+    public static final int LINE_ROW_H = 16;
+    /** 产线下拉底部“新建产线”行的高度。 */
+    public static final int LINE_ADD_ROW_H = 18;
+    /** 产线下拉的外框/内边距。 */
+    public static final int LINE_MENU_PAD = 3;
+    /** 产线行的二级菜单箭头宽度。 */
+    public static final int LINE_CARET_W = 12;
+    /** 二级菜单每一行的高度。 */
+    public static final int SUBMENU_ROW_H = 16;
+    /** 命名浮层宽。 */
+    public static final int DIALOG_W = 240;
+    /** 命名浮层高。 */
+    public static final int DIALOG_H = 96;
+    /** 确认浮层宽。 */
+    public static final int CONFIRM_W = 240;
+    /** 确认浮层高。 */
+    public static final int CONFIRM_H = 84;
+
     /** 列下标：机器。 */
     public static final int COL_NAME = 0;
     /** 列下标：状态。 */
@@ -322,6 +341,45 @@ public final class FactoryLayout {
     /** 展开详情面板可用于摆放单元格的宽度。 */
     public int ioInnerWidth() {
         return Math.max(0, ioPanelWidth() - IO_PANEL_PAD * 2);
+    }
+
+    /**
+     * 产线下拉的最大高度：从顶栏下沿到面板底边，至少留两行。
+     *
+     * @return 像素高度
+     */
+    public int lineMenuMaxHeight() {
+        int top = this.headerY + HEADER_H + 2;
+        return Math.max(LINE_ROW_H * 2 + LINE_ADD_ROW_H, this.panelY + this.panelH - PAD - top);
+    }
+
+    /**
+     * 产线下拉的最大宽度；名字再长也不许压到右侧面板外。
+     *
+     * @return 像素宽度
+     */
+    public int lineMenuMaxWidth() {
+        return Math.max(120, this.panelW - PAD * 2);
+    }
+
+    /** 命名浮层左上角 x。 */
+    public int dialogX() {
+        return this.panelX + (this.panelW - DIALOG_W) / 2;
+    }
+
+    /** 命名浮层左上角 y。 */
+    public int dialogY() {
+        return this.panelY + (this.panelH - DIALOG_H) / 2;
+    }
+
+    /** 确认浮层左上角 x。 */
+    public int confirmX() {
+        return this.panelX + (this.panelW - CONFIRM_W) / 2;
+    }
+
+    /** 确认浮层左上角 y。 */
+    public int confirmY() {
+        return this.panelY + (this.panelH - CONFIRM_H) / 2;
     }
 
     /**

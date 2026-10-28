@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -80,8 +81,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int REQUEST_INTERVAL = 20;
     /** 仓库 tab 打开时每隔多少 tick 刷新一次仓库快照。 */
     private static final int STORAGE_REQUEST_INTERVAL = 100;
-    /** 编辑反馈在底部状态条停留的 tick。 */
-    private static final int FEEDBACK_TICKS = 80;
     /** tab 下标：仓库。 */
     private static final int TAB_STORAGE = 0;
     /** tab 下标：机器。 */
@@ -92,19 +91,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private SearchEditBox searchBox;
     /** 服务端最近一次给的全量机器视图；左表和机器库都从这份数据派生。 */
     private List<FactorySnapshotBuilder.MachineView> machines = List.of();
+    /** 服务端最近一次给的产线列表；产线下拉从这里取。 */
+    private List<FactorySnapshotBuilder.LineView> lines = List.of();
     /** 服务端是否已经有工厂实例；没有时界面显示创建引导。 */
     private boolean hasFactory;
     /** 工厂整体运行状态，只用于顶栏摘要。 */
     private FactoryState factoryState = FactoryState.CREATED;
     /** 仓库链接是否在线；表格中的数量仍以仓库包为准。 */
     private boolean storageOnline;
-    /** 编辑动作的临时反馈；非空时覆盖底部统计行。 */
-    @Nullable
-    private String feedbackText;
-    /** 反馈是成功还是失败，决定文字颜色。 */
-    private boolean feedbackOk;
-    /** 反馈剩余显示 tick。 */
-    private int feedbackTicks;
     /** 工厂产线总数。 */
     private int lineCount;
     /** 当前运行中的产线数。 */
@@ -116,10 +110,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     /** 当前右区 tab：仓库或机器。 */
     private int activeTab = TAB_STORAGE;
-    /** 左表产线筛选；null 表示还没选择产线，此时左表为空。 */
-    private String lineFilter;
-    /** 产线下拉是否展开。 */
-    private boolean lineMenuOpen;
+    /** 左表当前选中的产线 id；null 表示还没选择产线，此时左表为空。 */
+    @Nullable
+    private UUID selectedLineId;
+    /** 编辑态总控：产线下拉、命名/确认浮层、反馈。 */
+    @Nullable
+    private FactoryEditController editController;
     /** 客户端仓库视图；全量快照在这里做稳定排序和过滤。 */
     private final FactoryStorageRepo storageRepo = new FactoryStorageRepo();
     /** 正在拼装的分片快照；last 到齐后才替换 {@link #storageRepo}。 */
@@ -145,7 +141,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private final Map<ResourceKey, FactorySearchQuery.Fields> storageSearchFields =
             new HashMap<>();
     private static String rememberedSearch = "";
-    private static String rememberedLineFilter;
+    @Nullable
+    private static UUID rememberedLineId;
     /** 本帧鼠标位置，用于槽位背景悬停；{@code renderSlot} 本身不接收鼠标坐标。*/
     private int renderMouseX;
     private int renderMouseY;
@@ -169,8 +166,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         // AbstractContainerScreen 用 imageWidth/imageHeight 计算居中位置；
         // 这里让它们和 FactoryLayout 的 panelW/panelH 完全一致，避免自己再算一份偏移。
         super.init();
-        if (this.lineFilter == null) {
-            this.lineFilter = rememberedLineFilter;
+        if (this.editController == null) {
+            this.editController = new FactoryEditController(this, this.font, this.theme);
+        }
+        this.editController.rebind(this.layout);
+        this.editController.closeAll();
+        if (this.selectedLineId == null) {
+            this.selectedLineId = rememberedLineId;
         }
         positionSlots();
         String previousQuery = this.searchBox == null
@@ -199,8 +201,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     protected void containerTick() {
         super.containerTick();
-        if (this.feedbackTicks > 0) {
-            this.feedbackTicks--;
+        if (this.editController != null) {
+            this.editController.tick();
         }
         if (++this.requestTicker >= REQUEST_INTERVAL) {
             this.requestTicker = 0;
@@ -241,16 +243,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         this.storageOnline = payload.storageOnline();
         this.lineCount = payload.lineCount();
         this.runningLineCount = payload.runningLineCount();
+        this.lines = payload.lines();
         this.machines = payload.machines();
         Set<MachineRef> currentRefs = new HashSet<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
             currentRefs.add(machine.ref());
         }
         this.expandedMachines.retainAll(currentRefs);
-        if (this.lineFilter != null && !lineOptions().contains(this.lineFilter)) {
-            this.lineFilter = null;
+        if (this.selectedLineId != null && findLine(this.selectedLineId) == null) {
+            this.selectedLineId = null;
         }
-        rememberedLineFilter = this.lineFilter;
+        rememberedLineId = this.selectedLineId;
         this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         if (!this.hasFactory) {
             this.storageRepo.clear();
@@ -258,6 +261,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         rebuildFiltered();
         updateColumnWidths();
+        if (this.editController != null) {
+            this.editController.onTable(this.lines, this.selectedLineId, this.hasFactory);
+        }
     }
 
     /**
@@ -300,9 +306,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param payload 反馈
      */
     public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
-        this.feedbackText = payload.message();
-        this.feedbackOk = payload.ok();
-        this.feedbackTicks = FEEDBACK_TICKS;
+        if (this.editController != null) {
+            this.editController.onFeedback(payload);
+        }
     }
 
     /**
@@ -372,12 +378,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 当前产线机器
      */
     private List<FactorySnapshotBuilder.MachineView> tableMachines() {
-        if (this.lineFilter == null) {
+        if (this.selectedLineId == null) {
             return List.of();
         }
         List<FactorySnapshotBuilder.MachineView> filtered = new ArrayList<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            if (machine.lineNames().contains(this.lineFilter)) {
+            if (machine.lineIds().contains(this.selectedLineId)) {
                 filtered.add(machine);
             }
         }
@@ -414,20 +420,65 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return Math.max(72, width);
     }
 
-    private List<String> lineOptions() {
-        List<String> names = new ArrayList<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            for (String name : machine.lineNames()) {
-                if (!names.contains(name)) {
-                    names.add(name);
-                }
-            }
-        }
-        return names;
+    private String lineButtonText() {
+        FactorySnapshotBuilder.LineView line = selectedLine();
+        return line == null ? "选择产线" : line.name();
     }
 
-    private String lineButtonText() {
-        return this.lineFilter == null ? "选择产线" : this.lineFilter;
+    /**
+     * 当前选中的产线。
+     *
+     * @return 产线；未选择或已被删除时为 {@code null}
+     */
+    @Nullable
+    private FactorySnapshotBuilder.LineView selectedLine() {
+        return this.selectedLineId == null ? null : findLine(this.selectedLineId);
+    }
+
+    @Nullable
+    private FactorySnapshotBuilder.LineView findLine(UUID id) {
+        for (FactorySnapshotBuilder.LineView line : this.lines) {
+            if (line.id().equals(id)) {
+                return line;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 选中一条产线；切换后左表从第一行重新显示。
+     *
+     * @param lineId 产线 id；{@code null} 表示清空
+     */
+    void selectLine(@Nullable UUID lineId) {
+        if (java.util.Objects.equals(this.selectedLineId, lineId)) {
+            return;
+        }
+        this.selectedLineId = lineId;
+        rememberedLineId = lineId;
+        this.firstRow = 0;
+        updateColumnWidths();
+    }
+
+    /** 当前选中产线 id，给编辑控制器读。 */
+    @Nullable
+    UUID selectedLineId() {
+        return this.selectedLineId;
+    }
+
+    /** 服务端最近一次给的产线列表。 */
+    List<FactorySnapshotBuilder.LineView> lines() {
+        return this.lines;
+    }
+
+    /** 服务端最近一次给的机器视图。 */
+    List<FactorySnapshotBuilder.MachineView> machines() {
+        return this.machines;
+    }
+
+    /** 玩家是否已有工厂。 */
+    boolean hasFactory() {
+        return this.hasFactory;
     }
 
     private int lineButtonX() {
@@ -436,7 +487,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int lineButtonW() {
-        return Math.max(24, this.font.width(lineButtonText()) + 14);
+        return Math.max(24, Math.min(140, this.font.width(lineButtonText()) + 14));
     }
 
     private int maxStorageFirstRow() {
@@ -589,7 +640,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         drawTable(graphics);
         drawRightPanel(graphics, mouseX, mouseY);
         drawTooltips(graphics, mouseX, mouseY);
-        drawLineMenu(graphics, mouseX, mouseY);
+        if (this.editController != null) {
+            this.editController.draw(graphics, mouseX, mouseY, partialTick);
+        }
     }
 
     @Override
@@ -776,90 +829,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
-     * 画产线下拉。
-     *
-     * <p>菜单只列真实存在的产线，不提供“全部机器”这种伪产线。每一行都包在独立
-     * 凸起小按钮里，外层再套深色/白色双层框和 2px 硬阴影，保证它压在表格和
-     * tooltip 之上。</p>
-     */
-    private void drawLineMenu(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (!this.lineMenuOpen) {
-            return;
-        }
-        List<String> options = lineOptions();
-        int x = lineButtonX();
-        int y = this.layout.headerY + FactoryLayout.HEADER_H + 2;
-        int width = lineMenuWidth(options);
-        int rowH = 16;
-        int height = options.size() * rowH + 6;
-
-        // 右下 2px 硬阴影，做出菜单浮在界面上的层次。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x + 2, y + 2, width, height);
-        // 外层深色描边 + 1px 白色内框。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y, width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y + height - 1, width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y, 1, height);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x + width - 1, y, 1, height);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + 1, width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + 1, 1, height - 2);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + height - 2, width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + width - 2, y + 1, 1, height - 2);
-        NineSlice.fill(graphics, GuiTextures.HEADER_BG, x + 2, y + 2, width - 4, height - 4);
-
-        for (int i = 0; i < options.size(); i++) {
-            int rowY = y + 3 + i * rowH;
-            NineSlice.button(graphics, x + 3, rowY, width - 6, rowH - 2);
-            boolean selected = options.get(i).equals(this.lineFilter);
-            boolean hovered = mouseX >= x + 3 && mouseX < x + width - 3
-                    && mouseY >= rowY && mouseY < rowY + rowH - 2;
-            if (selected || hovered) {
-                NineSlice.fill(graphics, GuiTextures.ROW_ALT, x + 4, rowY + 1,
-                        width - 8, rowH - 4);
-            }
-            graphics.drawString(this.font,
-                    this.font.plainSubstrByWidth(options.get(i), width - 16),
-                    x + 7, rowY + 3,
-                    selected ? this.theme.textValue()
-                            : hovered ? this.theme.textPrimary() : this.theme.textDim(),
-                    false);
-        }
-    }
-
-    private int lineMenuWidth(List<String> options) {
-        int max = this.font.width("选择产线");
-        for (String option : options) {
-            max = Math.max(max, this.font.width(option));
-        }
-        return Math.max(lineButtonW(), max + 24);
-    }
-
-    private boolean clickLineMenu(double mouseX, double mouseY) {
-        if (!this.lineMenuOpen) {
-            return false;
-        }
-        List<String> options = lineOptions();
-        int x = lineButtonX();
-        int y = this.layout.headerY + FactoryLayout.HEADER_H + 2;
-        int width = lineMenuWidth(options);
-        int rowH = 16;
-        if (mouseX >= x && mouseX < x + width
-                && mouseY >= y && mouseY < y + 3 + options.size() * rowH) {
-            int index = (int) ((mouseY - y - 3) / rowH);
-            if (index >= 0 && index < options.size()) {
-                String selected = options.get(index);
-                this.lineFilter = selected;
-                rememberedLineFilter = selected;
-                this.firstRow = 0;
-                updateColumnWidths();
-            }
-            this.lineMenuOpen = false;
-            return true;
-        }
-        this.lineMenuOpen = false;
-        return false;
-    }
-
-    /**
      * 画左侧机器表。
      *
      * <p>表头按 {@link FactoryLayout#columnId(int)} 的显示顺序取，不能假设前 N 列
@@ -896,7 +865,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (total == 0) {
             String message;
-            if (this.lineFilter != null) {
+            if (this.selectedLineId != null) {
                 message = "该产线没有机器";
             } else {
                 message = "先选择一条产线";
@@ -1500,7 +1469,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 机器/输入/输出列。产线下拉展开时跳过 tooltip，避免菜单和提示叠在一起。</p>
      */
     private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (this.lineMenuOpen) {
+        if (this.editController != null && this.editController.isMenuOpen()) {
             return;
         }
         FactoryLayout l = this.layout;
@@ -1910,26 +1879,36 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /**
      * 统一处理鼠标点击。
      *
-     * <p>优先级：产线下拉 → 顶栏按钮/关闭 → tab → 搜索清空 → 左表展开按钮 →
+     * <p>优先级：编辑浮层/产线下拉 → 顶栏按钮/关闭 → tab → 搜索清空 → 左表展开按钮 →
      * 仓库格手势 → 原版 slot 点击。仓库格点击必须走自定义 C2S，不能交给原版
      * 容器逻辑，否则会落到 36 个玩家槽位上。</p>
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         FactoryLayout l = this.layout;
+        boolean onLineButton = button == 0
+                && mouseY >= l.headerY + 3
+                && mouseY < l.headerY + 3 + FactoryLayout.TAB_H
+                && mouseX >= lineButtonX()
+                && mouseX < lineButtonX() + lineButtonW();
+        boolean lineMenuWasOpen = this.editController != null
+                && this.editController.isLineMenuOpen();
+        if (this.editController != null
+                && this.editController.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         if (this.searchBox != null && this.searchBox.isFocused()
                 && !this.searchBox.isMouseOver(mouseX, mouseY)) {
             // 点击别处先退出搜索焦点，否则 R/U 会被 EditBox 当成输入吞掉。
             this.searchBox.setFocused(false);
         }
-        if (clickLineMenu(mouseX, mouseY)) {
-            return true;
-        }
-        if (button == 0 && mouseY >= l.headerY + 3
-                && mouseY < l.headerY + 3 + FactoryLayout.TAB_H
-                && mouseX >= lineButtonX()
-                && mouseX < lineButtonX() + lineButtonW()) {
-            this.lineMenuOpen = !this.lineMenuOpen;
+        if (onLineButton) {
+            // 下拉打开时，控制器已经把这次“点外部”的点击吃掉并关闭了下拉；
+            // 这里不能再 toggle 回去。
+            if (!lineMenuWasOpen && this.editController != null) {
+                this.editController.toggleLineMenu(lineButtonX(),
+                        l.headerY + FactoryLayout.HEADER_H + 2);
+            }
             return true;
         }
         // 关闭按钮和 drawHeader 使用同一坐标：贴着 tab 条左边，不放在面板最右缘。
@@ -2024,6 +2003,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.editController != null
+                && this.editController.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (this.searchBox != null && this.searchBox.isFocused()) {
             if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
                 this.searchBox.setFocused(false);
@@ -2051,6 +2034,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (this.editController != null
+                && this.editController.charTyped(codePoint, modifiers)) {
+            return true;
+        }
         if (this.searchBox != null && this.searchBox.isFocused()
                 && codePoint == ' ' && this.searchBox.getValue().isEmpty()) {
             return true;
@@ -2069,7 +2056,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.searchBox != null) {
             rememberedSearch = this.searchBox.getValue();
         }
-        rememberedLineFilter = this.lineFilter;
+        rememberedLineId = this.selectedLineId;
+        if (this.editController != null) {
+            this.editController.closeAll();
+        }
         super.removed();
     }
 
@@ -2081,6 +2071,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (this.editController != null
+                && this.editController.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
+        }
         FactoryLayout l = this.layout;
         if (this.activeTab == TAB_STORAGE
                 && hasShiftDown()
@@ -2151,6 +2145,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Nullable
     public JeiTarget jeiTargetAt(double mouseX, double mouseY) {
         if (this.layout == null) {
+            return null;
+        }
+        if (this.editController != null && this.editController.isMenuOpen()) {
             return null;
         }
         FactoryLayout l = this.layout;
