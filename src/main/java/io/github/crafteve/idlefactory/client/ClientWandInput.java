@@ -13,7 +13,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -55,29 +54,6 @@ public final class ClientWandInput {
             return;
         }
         Action action = Screen.hasShiftDown() ? Action.MACHINE_DISCONNECT : Action.MACHINE_CONNECT;
-        send(action, event.getPos());
-    }
-
-    /**
-     * 右键方块：机器杖连接/断开，存储杖绑定/取消。
-     *
-     * @param event 右键方块事件
-     */
-    @SubscribeEvent(receiveCanceled = true)
-    static void onRightClick(PlayerInteractEvent.RightClickBlock event) {
-        if (!event.getLevel().isClientSide || event.getHand() != InteractionHand.MAIN_HAND) {
-            return;
-        }
-        ItemStack stack = event.getItemStack();
-        Action action;
-        if (stack.getItem() instanceof MachineBindingWandItem) {
-            action = Screen.hasShiftDown()
-                    ? Action.MACHINE_DISCONNECT : Action.MACHINE_CONNECT;
-        } else if (stack.getItem() instanceof StorageBindingWandItem) {
-            action = Screen.hasShiftDown() ? Action.STORAGE_UNBIND : Action.STORAGE_BIND;
-        } else {
-            return;
-        }
         send(action, event.getPos());
     }
 
@@ -160,6 +136,7 @@ public final class ClientWandInput {
     @SubscribeEvent
     static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         ClientFactoryLinks.clear();
+        FactoryLinkRenderer.clearCache();
         requestCooldown = 0;
     }
 
@@ -171,6 +148,7 @@ public final class ClientWandInput {
     @SubscribeEvent
     static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientFactoryLinks.clear();
+        FactoryLinkRenderer.clearCache();
     }
 
     private static void send(Action action, BlockPos pos) {

@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.item;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -15,8 +16,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 存储绑定杖：右键方块绑定，蹲下取消，Ctrl 连锁；Shift+滚轮切换 ME / 容器模式。
  *
- * <p>不可堆叠、无耐久。模式与链接都在服务端工厂上，客户端只发动作；这里返回
- * {@code SUCCESS} 阻止容器/机器 GUI，蹲下右键空气则请求清空仓库。</p>
+ * <p>不可堆叠、无耐久。模式与链接都在服务端工厂上，客户端只发动作；右键在
+ * {@link #onItemUseFirst} 里先于容器 GUI 执行，蹲下右键空气则请求清空仓库。</p>
  */
 public class StorageBindingWandItem extends Item {
     /**
@@ -27,17 +28,26 @@ public class StorageBindingWandItem extends Item {
     }
 
     /**
-     * 右键方块：阻止方块 GUI，动作由客户端事件发送。
+     * 右键方块：先于方块交互发请求，阻止容器/机器 GUI。
      *
+     * @param stack   物品
      * @param context 使用上下文
-     * @return 固定成功
+     * @return 客户端成功、服务端消费
      */
     @Override
-    public InteractionResult useOn(UseOnContext context) {
+    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
         if (context.getHand() != InteractionHand.MAIN_HAND) {
             return InteractionResult.PASS;
         }
-        return InteractionResult.SUCCESS;
+        if (context.getLevel().isClientSide) {
+            FactoryWandActionC2S.Action action = Screen.hasShiftDown()
+                    ? FactoryWandActionC2S.Action.STORAGE_UNBIND
+                    : FactoryWandActionC2S.Action.STORAGE_BIND;
+            PacketDistributor.sendToServer(new FactoryWandActionC2S(
+                    action, context.getClickedPos(), Screen.hasControlDown()));
+            return InteractionResult.SUCCESS;
+        }
+        return InteractionResult.CONSUME;
     }
 
     /**
