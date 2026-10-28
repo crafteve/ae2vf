@@ -166,8 +166,7 @@ final class IoDetailRender {
         NineSlice.fill(graphics,
                 idleLabel != null ? GuiTextures.STATUS_STRIP_IDLE
                         : FactoryLabels.reasonStrip(effective),
-                card.x() + FactoryLayout.IO_CARD_STRIP_X, card.y() + 2, 1,
-                FactoryLayout.IO_CELL_H - 4);
+                card.x() + 1, card.y() + 2, 1, FactoryLayout.IO_CELL_H - 4);
 
         int slotX = card.x() + FactoryLayout.IO_CARD_PAD;
         int slotY = card.y() + FactoryLayout.IO_CARD_SLOT_Y;

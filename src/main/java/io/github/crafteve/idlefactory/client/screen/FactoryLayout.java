@@ -69,8 +69,6 @@ public final class FactoryLayout {
     public static final int IO_CELL_H = 26;
     /** 配置卡槽位的上边距（相对卡片）。 */
     public static final int IO_CARD_SLOT_Y = 4;
-    /** 配置卡状态条相对卡片左缘的偏移；避开 1px 立体边框，idle 灰色才不会被当成边框。 */
-    public static final int IO_CARD_STRIP_X = 2;
     /** 配置卡第二行控件的上边距（相对卡片）。 */
     public static final int IO_CARD_LINE2_Y = 13;
     /** 配置卡名称/第二行控件的左边缘：槽位右缘再加 4px。 */
