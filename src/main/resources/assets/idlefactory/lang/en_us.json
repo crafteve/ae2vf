@@ -1,4 +1,8 @@
 {
   "screen.idlefactory.title": "Idle Factory",
-  "screen.idlefactory.search_hint": "Search…"
+  "screen.idlefactory.search_hint": "Search…",
+  "itemGroup.idlefactory": "Idle Factory",
+  "item.idlefactory.factory_terminal": "Factory Terminal",
+  "item.idlefactory.machine_binding_wand": "Machine Binding Wand",
+  "item.idlefactory.storage_binding_wand": "Storage Binding Wand"
 }

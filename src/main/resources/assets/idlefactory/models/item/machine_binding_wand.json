@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "idlefactory:item/machine_binding_wand"
+  }
+}
