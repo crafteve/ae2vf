@@ -611,10 +611,15 @@ public final class FactoryEditController {
         if (this.layout == null) {
             return;
         }
-        this.lineMenu.draw(graphics, this.font, this.theme, mouseX, mouseY);
         drawFeedback(graphics);
+        // 物品图标在 z=150 绘制并立即 flush，九宫格/文字却在 z=0；浮层不抬层就会被表格里的
+        // 机器/资源图标穿透。200 在物品之上、tooltip 的 400 之下，浮层打开时 tooltip 已被抑制。
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, 200.0F);
+        this.lineMenu.draw(graphics, this.font, this.theme, mouseX, mouseY);
         this.nameDialog.draw(graphics, mouseX, mouseY, partialTick);
         this.confirmDialog.draw(graphics, mouseX, mouseY);
+        graphics.pose().popPose();
         if (this.dragActive) {
             ItemStack icon = ItemStack.EMPTY;
             if (this.dragMachine != null) {
