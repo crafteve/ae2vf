@@ -679,6 +679,40 @@ public final class FactoryService {
     }
 
     /**
+     * 蹲下右键已绑定的 ME 方块：只清空这个地址，避免右键任意方块就清空。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标方块
+     * @return 清空为 {@code 1}
+     */
+    public static int clearStorageAt(ServerPlayer player, BlockPos pos) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        StorageAnchor anchor = factory.storageLink().anchor();
+        if (anchor == null) {
+            barErr(player, "当前没有仓库链接");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        boolean matches = false;
+        if (anchor instanceof MeAnchor me) {
+            matches = me.dimension().equals(level.dimension()) && me.pos().equals(pos);
+        } else if (anchor instanceof Ae2Anchor ae2) {
+            matches = ae2.dimension().equals(level.dimension()) && ae2.ringPos().equals(pos);
+        }
+        if (!matches) {
+            barErr(player, "请蹲下右键已绑定的 ME 方块或天空清空");
+            return 0;
+        }
+        factory.bindAnchor(null);
+        markDirty();
+        barOk(player, "已清空仓库链接（当前 " + modeLabel(factory.storageMode()) + " 模式）");
+        return 1;
+    }
+
+    /**
      * 切换 ME / 容器模式；有链接时拒绝。
      *
      * @param player 发起请求的玩家

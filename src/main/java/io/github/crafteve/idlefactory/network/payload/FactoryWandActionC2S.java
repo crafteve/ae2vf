@@ -107,6 +107,8 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
                 }
                 if (factory.storageMode() == StorageMode.CONTAINER && pos != null) {
                     FactoryService.unbindContainers(player, pos, payload.chain());
+                } else if (factory.storageMode() == StorageMode.ME && pos != null) {
+                    FactoryService.clearStorageAt(player, pos);
                 } else {
                     FactoryService.clearStorage(player);
                 }
