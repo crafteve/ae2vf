@@ -48,6 +48,12 @@ public final class FactoryLayout {
     public static final int TAB_COUNT = 2;
     /** 搜索框高度。 */
     public static final int SEARCH_H = 14;
+    /** 排序按钮宽度。 */
+    public static final int SORT_BTN_W = 22;
+    /** 搜索框与排序按钮之间的间隙。 */
+    public static final int SORT_BTN_GAP = 4;
+    /** 排序菜单普通行高。 */
+    public static final int SORT_ROW_H = 14;
     /** 合成区边长（3×3）。 */
     public static final int CRAFT = 3;
     /** 合成格子的边长：比物品格子大一圈，让 3×3 占满右区宽度。 */
@@ -352,6 +358,27 @@ public final class FactoryLayout {
     /** 展开详情面板的宽度；和行卡片一样贴着左区两侧。 */
     public int ioPanelWidth() {
         return this.leftW - 4;
+    }
+
+    /**
+     * 搜索行里搜索框的宽度。
+     *
+     * <p>排序按钮占 22px 加 4px 间隙；右区最窄 170 时仍给输入区留 104px，
+     * 足够显示占位符和常见查询。</p>
+     *
+     * @return 像素宽度
+     */
+    public int searchWidth() {
+        return Math.max(48, this.rightW - 8 - SORT_BTN_W - SORT_BTN_GAP);
+    }
+
+    /**
+     * 排序按钮的左边缘；右缘与仓库网格右缘对齐。
+     *
+     * @return x 坐标
+     */
+    public int sortButtonX() {
+        return this.rightX + this.rightW - 4 - SORT_BTN_W;
     }
 
     /** 展开详情面板可用于摆放单元格的宽度。 */

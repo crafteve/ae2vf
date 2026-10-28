@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -120,6 +121,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 编辑态总控：产线下拉、命名/确认浮层、反馈。 */
     @Nullable
     private FactoryEditController editController;
+    /** 右区排序按钮与菜单；仓库/机器各记一套键和方向。 */
+    @Nullable
+    private FactorySortMenu sortMenu;
     /** 客户端仓库视图；全量快照在这里做稳定排序和过滤。 */
     private final FactoryStorageRepo storageRepo = new FactoryStorageRepo();
     /** 正在拼装的分片快照；last 到齐后才替换 {@link #storageRepo}。 */
@@ -177,6 +181,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         this.editController.rebind(this.layout);
         this.editController.closeAll();
+        FactorySortMenu menu = this.sortMenu;
+        if (menu == null) {
+            menu = new FactorySortMenu(this.font, this.theme, this::onSortChanged);
+            this.sortMenu = menu;
+        }
+        menu.close();
         if (this.selectedLineId == null) {
             this.selectedLineId = rememberedLineId;
         }
@@ -185,7 +195,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 ? rememberedSearch
                 : this.searchBox.getValue();
         int searchX = this.layout.rightX + 4;
-        int searchW = this.layout.rightW - 8;
+        int searchW = this.layout.searchWidth();
         this.searchBox = new SearchEditBox(this.font, searchX + 18,
                 this.layout.searchY + 3, searchW - 32, 10,
                 this.theme, Component.literal("搜索…"));
@@ -263,6 +273,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         if (!this.hasFactory) {
             this.storageRepo.clear();
+            this.storageSearchFields.clear();
             this.storageReceived = false;
         }
         rebuildFiltered();
@@ -325,26 +336,50 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 过滤后还要夹紧两个滚动位置，避免搜索把当前页缩短后越界。</p>
      */
     private void rebuildFiltered() {
+        FactorySortMenu menu = this.sortMenu;
+        Comparator<FactoryStorageS2C.Entry> comparator = menu == null ? null
+                : FactorySort.storage(menu.storageKey(), menu.storageDescending(),
+                        key -> storageSearchFields(key).name(),
+                        key -> storageSearchFields(key).modName());
         if (this.searchQuery.isEmpty()) {
-            this.storageRepo.setFilter(null);
-            this.filteredMachines = this.machines;
+            this.storageRepo.configure(null, comparator);
         } else {
-            this.storageRepo.setFilter(entry ->
-                    this.searchQuery.matches(storageSearchFields(entry.key())));
+            this.storageRepo.configure(
+                    entry -> this.searchQuery.matches(storageSearchFields(entry.key())),
+                    comparator);
+        }
 
+        List<FactorySnapshotBuilder.MachineView> visible;
+        if (this.searchQuery.isEmpty()) {
+            visible = this.machines;
+        } else {
             List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>();
             for (FactorySnapshotBuilder.MachineView machine : this.machines) {
                 if (this.searchQuery.matches(machineSearchFields(machine))) {
                     machines.add(machine);
                 }
             }
-            this.filteredMachines = List.copyOf(machines);
+            visible = machines;
         }
+        this.filteredMachines = menu == null ? visible
+                : FactorySort.machines(visible, menu.machineKey(), menu.machineDescending());
+
         this.filteredStorageEntries = this.storageRepo.view();
         this.storageFirstRow = Math.max(0,
                 Math.min(this.storageFirstRow, maxStorageFirstRow()));
         this.machineFirstRow = Math.max(0,
                 Math.min(this.machineFirstRow, maxMachineFirstRow()));
+    }
+
+    /**
+     * 排序键或方向变化后重建视图。
+     *
+     * <p>排序变化会让原来的滚动位置失去意义，所以两个列表都回到顶部；搜索过滤保持不变。</p>
+     */
+    private void onSortChanged() {
+        this.storageFirstRow = 0;
+        this.machineFirstRow = 0;
+        rebuildFiltered();
     }
 
     private FactorySearchQuery.Fields storageSearchFields(ResourceKey key) {
@@ -674,6 +709,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.editController != null) {
             this.editController.draw(graphics, mouseX, mouseY, partialTick);
         }
+        if (this.sortMenu != null) {
+            // 排序菜单是最后一层浮层；打开时 tooltip 已被抑制。
+            this.sortMenu.draw(graphics, mouseX, mouseY);
+        }
     }
 
     @Override
@@ -732,6 +771,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             NineSlice.icon(graphics, GuiTextures.SEARCH_CLEAR,
                     clearButtonX(), l.searchY + 4, GuiTextures.SEARCH_CLEAR_SIZE);
         }
+        drawSortButton(graphics);
         if (this.activeTab == TAB_STORAGE) {
             drawGrid(graphics, l.gridX, l.gridY, FactoryLayout.GRID_COLS, l.gridRows,
                     FactoryLayout.CELL);
@@ -1809,12 +1849,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 机器/输入/输出列。产线下拉展开时跳过 tooltip，避免菜单和提示叠在一起。</p>
      */
     private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
+            // 排序菜单打开时不画任何 tooltip，避免提示盖住菜单项。
+            return;
+        }
         if (this.editController != null && this.editController.isOverlayActive()) {
             return;
         }
         FactoryLayout l = this.layout;
         if (this.searchBox != null && !this.searchBox.isFocused()
-                && mouseX >= l.rightX + 4 && mouseX < l.rightX + l.rightW - 4
+                && mouseX >= l.rightX + 4
+                && mouseX < l.rightX + 4 + l.searchWidth()
                 && mouseY >= l.searchY && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
             graphics.renderComponentTooltip(this.font, List.of(
                     searchHint("@", "按模组"),
@@ -1822,6 +1867,25 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     searchHint("$", "按 tooltip"),
                     searchHint("*", "按注册名"),
                     searchHint("|", "或；空格 与")), mouseX, mouseY);
+            return;
+        }
+
+        FactorySortMenu menu = this.sortMenu;
+        if (menu != null
+                && mouseX >= l.sortButtonX()
+                && mouseX < l.sortButtonX() + FactoryLayout.SORT_BTN_W
+                && mouseY >= l.searchY
+                && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
+            boolean storageTab = this.activeTab == TAB_STORAGE;
+            String direction = menu.directionLabel(storageTab);
+            String title = direction.isEmpty()
+                    ? "排序：" + menu.keyLabel(storageTab)
+                    : "排序：" + menu.keyLabel(storageTab) + " · " + direction;
+            graphics.renderComponentTooltip(this.font, List.of(
+                    Component.literal(title),
+                    Component.literal(direction.isEmpty()
+                            ? "左键选择排序" : "左键更改 · Shift+左键翻转方向")),
+                    mouseX, mouseY);
             return;
         }
 
@@ -2300,8 +2364,42 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && mouseX < lineButtonX() + lineButtonW();
         boolean lineMenuWasOpen = this.editController != null
                 && this.editController.isLineMenuOpen();
+        // 关闭按钮和 drawHeader 使用同一坐标：贴着 tab 条左边，不放在面板最右缘。
+        int closeX = l.rightX - 6 - CLOSE_SIZE;
+        boolean onCloseButton = mouseX >= closeX && mouseX < closeX + CLOSE_SIZE
+                && mouseY >= l.headerY + 4 && mouseY < l.headerY + 4 + CLOSE_SIZE;
+        boolean onSortButton = isSortButton(mouseX, mouseY);
+        boolean onTabBar = isTabBar(mouseX, mouseY);
+
+        FactorySortMenu sortMenu = this.sortMenu;
+        if (sortMenu != null && sortMenu.isOpen()) {
+            if (onSortButton) {
+                sortMenu.close();
+                return true;
+            }
+            if (sortMenu.mouseClicked(mouseX, mouseY, button)) {
+                return true;
+            }
+            // 点菜单外部：已关闭；点 tab/产线按钮/关闭按钮时继续原动作，
+            // 其他位置只关菜单，避免误触仓库格或搜索框。
+            if (!onTabBar && !onLineButton && !onCloseButton) {
+                return true;
+            }
+        }
+
         if (this.editController != null
                 && this.editController.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (onSortButton) {
+            if (button == 0 && sortMenu != null) {
+                boolean storageTab = this.activeTab == TAB_STORAGE;
+                if (hasShiftDown()) {
+                    sortMenu.flipDirection(storageTab);
+                } else {
+                    sortMenu.toggle(l, storageTab);
+                }
+            }
             return true;
         }
         if (onLineButton) {
@@ -2313,19 +2411,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
             return true;
         }
-        // 关闭按钮和 drawHeader 使用同一坐标：贴着 tab 条左边，不放在面板最右缘。
-        int closeX = l.rightX - 6 - CLOSE_SIZE;
-        if (mouseX >= closeX && mouseX < closeX + CLOSE_SIZE
-                && mouseY >= l.headerY + 4 && mouseY < l.headerY + 4 + CLOSE_SIZE) {
+        if (onCloseButton) {
             this.onClose();
             return true;
         }
         int tabWidth = l.rightW / FactoryLayout.TAB_COUNT;
-        if (mouseY >= l.tabY && mouseY < l.tabY + FactoryLayout.HEADER_H
-                && mouseX >= l.rightX && mouseX < l.rightX + l.rightW) {
+        if (onTabBar) {
             int tab = Math.min(FactoryLayout.TAB_COUNT - 1,
                     (int) ((mouseX - l.rightX) / tabWidth));
             this.activeTab = tab;
+            if (sortMenu != null) {
+                sortMenu.close();
+            }
             if (tab == TAB_STORAGE) {
                 requestStorage();
             }
@@ -2383,8 +2480,36 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
+    /**
+     * 鼠标是否落在排序按钮上。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 在按钮内为 {@code true}
+     */
+    private boolean isSortButton(double mouseX, double mouseY) {
+        FactoryLayout l = this.layout;
+        return mouseX >= l.sortButtonX()
+                && mouseX < l.sortButtonX() + FactoryLayout.SORT_BTN_W
+                && mouseY >= l.searchY
+                && mouseY < l.searchY + FactoryLayout.SEARCH_H;
+    }
+
+    /**
+     * 鼠标是否落在右区 tab 条上。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 在 tab 条内为 {@code true}
+     */
+    private boolean isTabBar(double mouseX, double mouseY) {
+        FactoryLayout l = this.layout;
+        return mouseY >= l.tabY && mouseY < l.tabY + FactoryLayout.HEADER_H
+                && mouseX >= l.rightX && mouseX < l.rightX + l.rightW;
+    }
+
     private int clearButtonX() {
-        return this.layout.rightX + this.layout.rightW - 14;
+        return this.layout.rightX + 4 + this.layout.searchWidth() - 14;
     }
 
     /**
@@ -2397,7 +2522,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         int x = l.rightX + 4;
         int y = l.searchY;
-        int w = l.rightW - 8;
+        int w = l.searchWidth();
         int h = FactoryLayout.SEARCH_H;
 
         NineSlice.fill(graphics, GuiTextures.SEARCH_BG, x + 2, y + 2, w - 4, h - 4);
@@ -2415,10 +2540,56 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         NineSlice.fill(graphics, GuiTextures.SEARCH_HIGHLIGHT, x + w - 2, y + 1, 1, h - 2);
     }
 
+    /**
+     * 搜索行右侧的排序按钮。
+     *
+     * <p>按钮底是凸起贴图；内容只有当前排序键的单字和 5×5 方向三角。菜单打开时叠一层
+     * 悬停底并把内容下移 1px，做出按下的感觉。默认顺序不画三角。</p>
+     */
+    private void drawSortButton(GuiGraphics graphics) {
+        FactoryLayout l = this.layout;
+        FactorySortMenu menu = this.sortMenu;
+        if (menu == null) {
+            return;
+        }
+        boolean open = menu.isOpen();
+        NineSlice.button(graphics, l.sortButtonX(), l.searchY,
+                FactoryLayout.SORT_BTN_W, FactoryLayout.SEARCH_H);
+        if (open) {
+            NineSlice.buttonHover(graphics, l.sortButtonX() + 1, l.searchY + 1,
+                    FactoryLayout.SORT_BTN_W - 2, FactoryLayout.SEARCH_H - 2);
+        }
+        boolean storageTab = this.activeTab == TAB_STORAGE;
+        String glyph = menu.glyph(storageTab);
+        boolean arrow = menu.arrowVisible(storageTab);
+        int textY = l.searchY + (FactoryLayout.SEARCH_H - 9) / 2 + 1 + (open ? 1 : 0);
+        int contentW = this.font.width(glyph)
+                + (arrow ? GuiTextures.SORT_ARROW_SIZE + 1 : 0);
+        int textX = l.sortButtonX() + (FactoryLayout.SORT_BTN_W - contentW) / 2;
+        graphics.drawString(this.font, glyph, textX, textY,
+                open ? this.theme.textValue() : this.theme.textPrimary(), false);
+        if (arrow) {
+            int arrowX = textX + this.font.width(glyph) + 1;
+            int arrowY = l.searchY
+                    + (FactoryLayout.SEARCH_H - GuiTextures.SORT_ARROW_SIZE) / 2
+                    + (open ? 1 : 0);
+            NineSlice.icon(graphics, menu.descending(storageTab)
+                    ? GuiTextures.SORT_DESC : GuiTextures.SORT_ASC,
+                    arrowX, arrowY, GuiTextures.SORT_ARROW_SIZE);
+        }
+    }
+
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (this.editController != null
                 && this.editController.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
+            if (keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                this.sortMenu.close();
+            }
+            // 菜单打开时吞掉 E/Q 等按键，避免误关界面或丢物品。
             return true;
         }
         if (this.searchBox != null && this.searchBox.isFocused()) {
@@ -2452,6 +2623,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && this.editController.charTyped(codePoint, modifiers)) {
             return true;
         }
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
+            return true;
+        }
         if (this.searchBox != null && this.searchBox.isFocused()
                 && codePoint == ' ' && this.searchBox.getValue().isEmpty()) {
             return true;
@@ -2474,6 +2648,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.editController != null) {
             this.editController.closeAll();
         }
+        if (this.sortMenu != null) {
+            this.sortMenu.close();
+        }
         super.removed();
     }
 
@@ -2490,6 +2667,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
             double dragY) {
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
+            return true;
+        }
         if (this.editController != null
                 && this.editController.mouseDragged(mouseX, mouseY, button)) {
             return true;
@@ -2507,6 +2687,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
+            return true;
+        }
         if (this.editController != null
                 && this.editController.mouseReleased(mouseX, mouseY, button)) {
             return true;
@@ -2524,6 +2707,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (this.editController != null
                 && this.editController.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
+        }
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
             return true;
         }
         if (ioScrollAt(mouseX, mouseY, scrollY)) {
@@ -2599,6 +2785,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Nullable
     public JeiTarget jeiTargetAt(double mouseX, double mouseY) {
         if (this.layout == null) {
+            return null;
+        }
+        if (this.sortMenu != null && this.sortMenu.isOpen()) {
             return null;
         }
         if (this.editController != null && this.editController.isOverlayActive()) {

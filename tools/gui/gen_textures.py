@@ -342,6 +342,18 @@ def chevron_down(size: int = 7) -> Image.Image:
     return img
 
 
+def sort_arrow(size: int = 5, up: bool = True) -> Image.Image:
+    """排序方向箭头：5×5 透明底实心三角，指向升序/降序。"""
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    px = img.load()
+    center = size // 2
+    for row in range(size):
+        half = min(row if up else size - 1 - row, center)
+        for x in range(center - half, center + half + 1):
+            px[x, row] = SEARCH_ICON
+    return img
+
+
 # ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
@@ -383,6 +395,8 @@ SPECS = {
     "button_hover": (button_hover, "按钮悬停：6×6 九宫格 border=1"),
     "chevron_right": (chevron_right, "收起箭头：7×7"),
     "chevron_down": (chevron_down, "展开箭头：7×7"),
+    "sort_asc": (lambda: sort_arrow(5, True), "排序升序：5×5 上三角"),
+    "sort_desc": (lambda: sort_arrow(5, False), "排序降序：5×5 下三角"),
 }
 
 

@@ -237,14 +237,14 @@ public final class PopupMenu {
 
         boolean hovered = mouseX >= this.x + PAD && mouseX < this.x + this.width - PAD
                 && mouseY >= rowY && mouseY < rowY + buttonH;
-        if (item.kind() == Kind.ACTION_SELECTED) {
-            // 强调条画在按钮内侧，避开 1px 外框；只表达选中，不替代 hover 底色。
-            graphics.fill(this.x + PAD + 2, rowY + 1,
-                    this.x + PAD + 4, rowY + buttonH - 1, theme.accent());
-        }
         if (hovered && item.kind().clickable()) {
             NineSlice.fill(graphics, GuiTextures.ROW_ALT, this.x + PAD + 1, rowY + 1,
                     this.width - PAD * 2 - 2, buttonH - 2);
+        }
+        if (item.kind() == Kind.ACTION_SELECTED) {
+            // 强调条最后画，压在 hover 底色之上；只表达选中，不替代 hover。
+            graphics.fill(this.x + PAD + 2, rowY + 1,
+                    this.x + PAD + 4, rowY + buttonH - 1, theme.accent());
         }
 
         int color;

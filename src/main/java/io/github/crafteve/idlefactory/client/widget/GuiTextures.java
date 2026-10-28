@@ -38,6 +38,10 @@ public final class GuiTextures {
     public static final ResourceLocation SEARCH = id("search");
     /** 搜索清空按钮：固定 7×7。 */
     public static final ResourceLocation SEARCH_CLEAR = id("search_clear");
+    /** 排序方向：升序（5×5 上三角）。 */
+    public static final ResourceLocation SORT_ASC = id("sort_asc");
+    /** 排序方向：降序（5×5 下三角）。 */
+    public static final ResourceLocation SORT_DESC = id("sort_desc");
     /** 细分隔线：1×1，拉伸使用。 */
     public static final ResourceLocation DIVIDER = id("divider");
     /** 粗分隔线：1×1，拉伸使用。 */
@@ -123,6 +127,8 @@ public final class GuiTextures {
     public static final int SEARCH_SIZE = 9;
     /** 搜索清空图标边长。 */
     public static final int SEARCH_CLEAR_SIZE = 7;
+    /** 排序方向箭头边长。 */
+    public static final int SORT_ARROW_SIZE = 5;
 
     private GuiTextures() {
         // 纯常量持有类

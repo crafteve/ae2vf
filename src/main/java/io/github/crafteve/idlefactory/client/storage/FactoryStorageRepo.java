@@ -1,9 +1,13 @@
 package io.github.crafteve.idlefactory.client.storage;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+
+import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
@@ -15,6 +19,9 @@ import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
  * 只在快照之间做差异，不把点击命中和搜索直接绑在原始列表下标上。这样仓库数量刷新时，选中格、
  * 过滤结果和滚动位置不会因为服务端重排而乱跳。</p>
  *
+ * <p>{@link #all()} 始终是「稳定身份顺序」；过滤与排序只作用于 {@link #view()}。排序规则由
+ * 调用方以 {@link Comparator} 传入，本类不认识任何排序键，避免 storage 包反过来依赖界面。</p>
+ *
  * <p>不直接复用 AE2 的 {@code Repo}：它绑死 {@code GridInventoryEntry}、{@code AEKey} 和
  * {@code MEStorageMenu}，而本项目的仓库后端可能是容器组。</p>
  */
@@ -22,13 +29,19 @@ public final class FactoryStorageRepo {
     private final Map<ResourceKey, FactoryStorageS2C.Entry> byKey = new LinkedHashMap<>();
     private List<FactoryStorageS2C.Entry> all = List.of();
     private List<FactoryStorageS2C.Entry> view = List.of();
-    private Predicate<FactoryStorageS2C.Entry> filter = entry -> true;
+    /** 搜索过滤；{@code null} 表示不过滤。 */
+    @Nullable
+    private Predicate<FactoryStorageS2C.Entry> filter;
+    /** 视图排序；{@code null} 表示保持稳定身份顺序。 */
+    @Nullable
+    private Comparator<FactoryStorageS2C.Entry> comparator;
 
     /**
      * 用服务端快照替换当前仓库。
      *
      * <p>已有 key 沿用上一次的显示顺序，新 key 才按服务端顺序追加。仓库数量变化不重排，
-     * Shift 连续取物时不会因为服务端按数量降序重排而跳格。</p>
+     * Shift 连续取物时不会因为服务端按数量降序重排而跳格。排序只影响 {@link #view()}，
+     * 不改这份稳定顺序。</p>
      */
     public void replace(List<FactoryStorageS2C.Entry> entries) {
         Map<ResourceKey, FactoryStorageS2C.Entry> incoming = new LinkedHashMap<>();
@@ -51,25 +64,34 @@ public final class FactoryStorageRepo {
         this.rebuildView();
     }
 
-    /** 清空仓库；没有工厂时使用。 */
+    /** 清空仓库数据；过滤与排序设置保留，下一份快照继续使用。 */
     public void clear() {
         this.byKey.clear();
         this.all = List.of();
         this.view = List.of();
     }
 
-    /** 设置搜索过滤；传 {@code null} 表示不过滤。 */
-    public void setFilter(Predicate<FactoryStorageS2C.Entry> newFilter) {
-        this.filter = newFilter == null ? entry -> true : newFilter;
+    /**
+     * 设置过滤与排序，一次重建可见视图。
+     *
+     * <p>排序在过滤之后执行；两者都为 {@code null} 时直接复用 {@link #all()}，不做多余拷贝。</p>
+     *
+     * @param newFilter     搜索过滤；{@code null} 表示不过滤
+     * @param newComparator 视图排序；{@code null} 表示保持稳定身份顺序
+     */
+    public void configure(@Nullable Predicate<FactoryStorageS2C.Entry> newFilter,
+            @Nullable Comparator<FactoryStorageS2C.Entry> newComparator) {
+        this.filter = newFilter;
+        this.comparator = newComparator;
         this.rebuildView();
     }
 
-    /** 当前全部条目，按服务端顺序。 */
+    /** 当前全部条目，按稳定身份顺序（未过滤、未排序）。 */
     public List<FactoryStorageS2C.Entry> all() {
         return this.all;
     }
 
-    /** 当前过滤后的可见条目。 */
+    /** 当前过滤并排序后的可见条目。 */
     public List<FactoryStorageS2C.Entry> view() {
         return this.view;
     }
@@ -100,10 +122,19 @@ public final class FactoryStorageRepo {
     }
 
     private void rebuildView() {
-        if (this.filter == null) {
+        if (this.filter == null && this.comparator == null) {
             this.view = this.all;
             return;
         }
-        this.view = this.all.stream().filter(this.filter).toList();
+        List<FactoryStorageS2C.Entry> visible = new ArrayList<>(this.all.size());
+        for (FactoryStorageS2C.Entry entry : this.all) {
+            if (this.filter == null || this.filter.test(entry)) {
+                visible.add(entry);
+            }
+        }
+        if (this.comparator != null) {
+            visible.sort(this.comparator);
+        }
+        this.view = List.copyOf(visible);
     }
 }
