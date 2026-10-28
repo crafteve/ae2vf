@@ -568,7 +568,15 @@ public final class FactoryService {
             return 0;
         }
         ServerLevel level = player.serverLevel();
-        if (!level.isLoaded(pos) || !isAnyContainer(level, pos)) {
+        if (!level.isLoaded(pos)) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        if (Ae2Binder.nodeAt(level, pos) != null) {
+            barErr(player, "这是 ME 网络方块，请切换到 ME 模式");
+            return 0;
+        }
+        if (!isAnyContainer(level, pos)) {
             barErr(player, "目标不是仓库容器");
             return 0;
         }
@@ -583,6 +591,10 @@ public final class FactoryService {
         int added = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
+            if (Ae2Binder.nodeAt(level, targetPos) != null) {
+                skipped++;
+                continue;
+            }
             ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
             if (current.contains(ref.id())) {
                 skipped++;
