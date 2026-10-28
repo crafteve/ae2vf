@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
@@ -99,7 +100,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
      * @param context 上下文
      */
     public static void handle(FactoryLinksS2C payload, IPayloadContext context) {
-        // 客户端缓存在下一阶段接入；先保留包结构，避免协议版本反复改。
+        ClientFactoryLinksHandler.handle(payload, context);
     }
 
     private static void write(RegistryFriendlyByteBuf buf, FactoryLinksS2C payload) {
