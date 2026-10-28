@@ -21,6 +21,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageLink;
@@ -30,6 +31,7 @@ import io.github.crafteve.idlefactory.menu.FactoryMenu;
 
 import appeng.api.ids.AEComponents;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -328,24 +330,379 @@ public final class FactoryService {
      * @return 命令结果
      */
     private static int detachOrPurge(ServerPlayer player, Factory factory, MachineRef target) {
-        if (factory.machines().isDetached(target.id())) {
+        DetachResult result = detachOrPurgeSilent(factory, target);
+        if (result == DetachResult.ALREADY) {
             info(player, "这台机器已经在回收站里了（/idf factory bin 查看）");
             return 1;
         }
-        Set<UUID> referenced = FactoryBin.referenced(factory);
-        if (!referenced.contains(target.id())) {
-            FactoryBin.purge(factory, target.id());
-            markDirty();
+        markDirty();
+        if (result == DetachResult.PURGED) {
             ok(player, "已删除机器 [" + target.shortId() + "]（这台机器没有配过规则，随时可以 connect 回来）");
             return 1;
         }
-        factory.machines().setDetached(target.id(), true);
-        markDirty();
         String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, target.id()));
         int rules = FactoryRefs.ruleCountOf(factory, target.id());
         ok(player, "已移入回收站 [" + target.shortId() + "] · 规则保留（" + lines
                 + " · " + rules + " 条）· /idf factory connect 可恢复");
         return 1;
+    }
+
+    /**
+     * 断开一台机器，不发送聊天回执；供连锁断开汇总用。
+     *
+     * @param factory 工厂
+     * @param target  机器
+     * @return 处理结果
+     */
+    private static DetachResult detachOrPurgeSilent(Factory factory, MachineRef target) {
+        if (factory.machines().isDetached(target.id())) {
+            return DetachResult.ALREADY;
+        }
+        Set<UUID> referenced = FactoryBin.referenced(factory);
+        if (!referenced.contains(target.id())) {
+            FactoryBin.purge(factory, target.id());
+            return DetachResult.PURGED;
+        }
+        factory.machines().setDetached(target.id(), true);
+        return DetachResult.BINNED;
+    }
+
+    /** 单台断开的三种结果。 */
+    private enum DetachResult {
+        /** 没配过规则，已从机器库删除。 */
+        PURGED,
+        /** 配过规则，已移入回收站。 */
+        BINNED,
+        /** 本来就在回收站。 */
+        ALREADY
+    }
+
+    // ------------------------------------------------------------------
+    // 绑定杖：机器与仓库
+    // ------------------------------------------------------------------
+
+    /**
+     * 连接准星目标机器；连锁时走 6 邻接 BFS。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标机器
+     * @param chain  是否连锁
+     * @return 新接入 / 取回的台数
+     */
+    public static int connectMachines(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!level.isLoaded(pos)) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        if (!FactoryLinkFinder.isMachine(level, pos)) {
+            barErr(player, "目标不是可连接的机器");
+            return 0;
+        }
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.machines(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            barErr(player, "附近没有可连接的机器");
+            return 0;
+        }
+        int added = 0;
+        int restored = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            MachineRef target = MachineRef.of(level.dimension(), targetPos);
+            if (factory.machines().byId(target.id()).isPresent()) {
+                if (factory.machines().isDetached(target.id())) {
+                    factory.machines().setDetached(target.id(), false);
+                    refreshObservation(target);
+                    wakeLines(factory, target.id());
+                    restored++;
+                } else {
+                    skipped++;
+                }
+                continue;
+            }
+            if (factory.machines().add(target)) {
+                refreshObservation(target);
+                added++;
+            } else {
+                skipped++;
+            }
+        }
+        if (added + restored > 0) {
+            markDirty();
+        }
+        String text = "已连接 " + (added + restored) + " 台";
+        if (restored > 0) {
+            text += "（取回 " + restored + "）";
+        }
+        if (skipped > 0) {
+            text += " · 跳过 " + skipped + " 台";
+        }
+        barOk(player, text);
+        return added + restored;
+    }
+
+    /**
+     * 断开目标机器；连锁时走 6 邻接 BFS，逐台复用回收站语义。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标机器
+     * @param chain  是否连锁
+     * @return 删除 + 回收的台数
+     */
+    public static int disconnectMachines(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        MachineRef origin = factory.machines().byPosition(level.dimension(), pos);
+        if (origin == null) {
+            barErr(player, "这个位置没有接入的机器");
+            return 0;
+        }
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.machines(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            targets = List.of(pos);
+        }
+        int purged = 0;
+        int binned = 0;
+        int already = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
+            if (target == null) {
+                skipped++;
+                continue;
+            }
+            switch (detachOrPurgeSilent(factory, target)) {
+                case PURGED -> purged++;
+                case BINNED -> binned++;
+                case ALREADY -> already++;
+            }
+        }
+        if (purged + binned > 0) {
+            markDirty();
+        }
+        if (purged + binned == 0) {
+            barErr(player, already > 0 ? "这些机器已经在回收站里了" : "没有可断开的机器");
+            return 0;
+        }
+        String text = "已断开 " + (purged + binned) + " 台（删除 " + purged
+                + " · 回收站 " + binned + "）";
+        if (already > 0) {
+            text += " · 已在回收站 " + already + " 台";
+        }
+        if (skipped > 0) {
+            text += " · 跳过 " + skipped + " 台";
+        }
+        barOk(player, text);
+        return purged + binned;
+    }
+
+    /**
+     * 把目标方块绑成 ME 接入点。
+     *
+     * <p>A 模式只允许一个地址；目标必须有 ME 网络节点。已有地址时拒绝，要求先清空。</p>
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标方块
+     * @return 成功为 {@code 1}
+     */
+    public static int bindMeStorage(ServerPlayer player, BlockPos pos) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.storageLink().anchor() != null) {
+            barErr(player, "已绑定仓库，先蹲下右键空气清空");
+            return 0;
+        }
+        if (factory.storageMode() != StorageMode.ME) {
+            barErr(player, "当前是容器模式，先用 Shift+滚轮 切换");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!level.isLoaded(pos)) {
+            barErr(player, "目标区块未加载");
+            return 0;
+        }
+        if (Ae2Binder.nodeAt(level, pos) == null) {
+            barErr(player, "目标没有接入 ME 网络");
+            return 0;
+        }
+        factory.bindAnchor(new MeAnchor(level.dimension(), pos));
+        factory.setStorageMode(StorageMode.ME);
+        markDirty();
+        barOk(player, "已绑定 ME 接入点 " + pos.toShortString());
+        return 1;
+    }
+
+    /**
+     * 绑定容器仓库；连锁时走 6 邻接 BFS。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标容器
+     * @param chain  是否连锁
+     * @return 新增容器数
+     */
+    public static int bindContainers(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        StorageAnchor anchor = factory.storageLink().anchor();
+        if (anchor instanceof MeAnchor || anchor instanceof Ae2Anchor) {
+            barErr(player, "当前是 ME 模式，先清空当前链接");
+            return 0;
+        }
+        if (factory.storageMode() != StorageMode.CONTAINER) {
+            barErr(player, "当前是 ME 模式，先用 Shift+滚轮 切换");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        if (!level.isLoaded(pos) || !isAnyContainer(level, pos)) {
+            barErr(player, "目标不是仓库容器");
+            return 0;
+        }
+        ContainerAnchor current = anchor instanceof ContainerAnchor containerAnchor
+                ? containerAnchor : new ContainerAnchor(List.of());
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.containers(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            targets = List.of(pos);
+        }
+        int added = 0;
+        int skipped = 0;
+        for (BlockPos targetPos : targets) {
+            ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
+            if (current.contains(ref.id())) {
+                skipped++;
+                continue;
+            }
+            if (current.containers().size() >= ContainerAnchor.MAX_CONTAINERS) {
+                skipped++;
+                continue;
+            }
+            current = current.with(ref);
+            added++;
+        }
+        if (added == 0) {
+            barErr(player, "没有新增容器（已绑过或达到上限 "
+                    + ContainerAnchor.MAX_CONTAINERS + " 个）");
+            return 0;
+        }
+        factory.bindAnchor(current);
+        factory.setStorageMode(StorageMode.CONTAINER);
+        markDirty();
+        String text = "已绑定 " + added + " 个容器，共 " + current.containers().size() + " 个";
+        if (skipped > 0) {
+            text += " · 跳过 " + skipped + " 个";
+        }
+        barOk(player, text);
+        return added;
+    }
+
+    /**
+     * 取消容器绑定；连锁时取消整群。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标容器
+     * @param chain  是否连锁
+     * @return 取消的容器数
+     */
+    public static int unbindContainers(ServerPlayer player, BlockPos pos, boolean chain) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        StorageAnchor anchor = factory.storageLink().anchor();
+        if (!(anchor instanceof ContainerAnchor current)) {
+            barErr(player, "当前不是容器模式");
+            return 0;
+        }
+        ServerLevel level = player.serverLevel();
+        List<BlockPos> targets = chain
+                ? FactoryLinkFinder.containers(level, pos)
+                : List.of(pos);
+        if (targets.isEmpty()) {
+            targets = List.of(pos);
+        }
+        ContainerAnchor next = current;
+        int removed = 0;
+        for (BlockPos targetPos : targets) {
+            ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
+            if (current.contains(ref.id())) {
+                next = next.without(ref.id());
+                removed++;
+            }
+        }
+        if (removed == 0) {
+            barErr(player, "这个位置没有绑定容器");
+            return 0;
+        }
+        factory.bindAnchor(next.isEmpty() ? null : next);
+        factory.setStorageMode(StorageMode.CONTAINER);
+        markDirty();
+        barOk(player, "已取消 " + removed + " 个容器"
+                + (next.isEmpty() ? "，仓库已清空" : "，剩余 " + next.containers().size() + " 个"));
+        return removed;
+    }
+
+    /**
+     * 清空当前仓库地址，保留模式。
+     *
+     * @param player 发起请求的玩家
+     * @return 清空为 {@code 1}
+     */
+    public static int clearStorage(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.storageLink().anchor() == null) {
+            barErr(player, "当前没有仓库链接");
+            return 0;
+        }
+        factory.bindAnchor(null);
+        markDirty();
+        barOk(player, "已清空仓库链接（当前 " + modeLabel(factory.storageMode()) + " 模式）");
+        return 1;
+    }
+
+    /**
+     * 切换 ME / 容器模式；有链接时拒绝。
+     *
+     * @param player 发起请求的玩家
+     * @return 成功为 {@code 1}
+     */
+    public static int switchStorageMode(ServerPlayer player) {
+        Factory factory = ownedFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.storageLink().anchor() != null) {
+            barErr(player, "先清空当前链接再切换模式");
+            return 0;
+        }
+        StorageMode next = factory.storageMode() == StorageMode.ME
+                ? StorageMode.CONTAINER : StorageMode.ME;
+        factory.setStorageMode(next);
+        markDirty();
+        barOk(player, "已切换为 " + modeLabel(next) + " 模式");
+        return 1;
+    }
+
+    private static String modeLabel(StorageMode mode) {
+        return mode == StorageMode.ME ? "ME" : "容器";
     }
 
     // ------------------------------------------------------------------
@@ -765,7 +1122,7 @@ public final class FactoryService {
         return "量子环未供电 / 未成型 / 频道不足";
     }
 
-    private static boolean isAnyContainer(ServerLevel level, BlockPos pos) {
+    static boolean isAnyContainer(ServerLevel level, BlockPos pos) {
         if (level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null) {
             return true;
         }
@@ -1130,6 +1487,16 @@ public final class FactoryService {
     /** 警告输出。 */
     private static void warn(ServerPlayer player, String text) {
         FactoryMessages.send(player, FactoryMessages.warn(text));
+    }
+
+    /** 动作栏成功提示。 */
+    private static void barOk(ServerPlayer player, String text) {
+        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.GREEN), true);
+    }
+
+    /** 动作栏失败提示。 */
+    private static void barErr(ServerPlayer player, String text) {
+        player.displayClientMessage(Component.literal(text).withStyle(ChatFormatting.RED), true);
     }
 
     /** 把档案写回存档容器。 */
