@@ -93,6 +93,34 @@ public final class FactorySnapshotBuilder {
     }
 
     /**
+     * 一条产线在界面上的样子。
+     *
+     * <p>只来自配置层：id、名字、运行开关、机器数。产线菜单和左表筛选用它，不读观测。</p>
+     *
+     * @param id           产线 id
+     * @param name         产线名
+     * @param running      是否运行
+     * @param machineCount 产线里的机器数
+     */
+    public record LineView(UUID id, String name, boolean running, int machineCount) {
+    }
+
+    /**
+     * 生成产线列表（按登记顺序）。
+     *
+     * @param factory 工厂
+     * @return 产线视图
+     */
+    public static List<LineView> lines(Factory factory) {
+        List<LineView> views = new ArrayList<>(factory.lines().size());
+        for (PassiveLine line : factory.lines().all()) {
+            views.add(new LineView(line.id(), line.name(), line.running(),
+                    line.groups().size()));
+        }
+        return views;
+    }
+
+    /**
      * 一台机器在界面上的样子。
      *
      * @param ref       机器引用（坐标 + id）
@@ -101,6 +129,7 @@ public final class FactorySnapshotBuilder {
      * @param blockId   观测到的方块 id；未知时 {@code null}
      * @param presence  无向能力
      * @param lineNames 挂在哪些产线上
+     * @param lineIds   挂在哪些产线上（与 lineNames 同序，界面按 id 筛选用）
      * @param ruleCount 配了几条规则
      * @param inputs    输入规则（界面明细用）
      * @param outputs   输出规则（界面明细用）
@@ -118,7 +147,7 @@ public final class FactorySnapshotBuilder {
      */
     public record MachineView(MachineRef ref, boolean detached, Health health,
             @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
-            List<String> lineNames, int ruleCount,
+            List<String> lineNames, List<UUID> lineIds, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
@@ -127,6 +156,8 @@ public final class FactorySnapshotBuilder {
             List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons) {
 
         public MachineView {
+            lineNames = List.copyOf(lineNames);
+            lineIds = List.copyOf(lineIds);
             inputs = List.copyOf(inputs);
             outputs = List.copyOf(outputs);
             inputRates = List.copyOf(inputRates);
@@ -320,6 +351,7 @@ public final class FactorySnapshotBuilder {
                     observation.blockId(),
                     observation.presence(),
                     FactoryRefs.lineNamesOf(factory, ref.id()),
+                    FactoryRefs.lineIdsOf(factory, ref.id()),
                     inputs.size() + outputs.size(),
                     inputs, outputs, inputRates, outputRates,
                     sinceMove, blocked, observation.workState(), inputFull,

@@ -24,6 +24,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
+import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
@@ -79,6 +80,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int REQUEST_INTERVAL = 20;
     /** 仓库 tab 打开时每隔多少 tick 刷新一次仓库快照。 */
     private static final int STORAGE_REQUEST_INTERVAL = 100;
+    /** 编辑反馈在底部状态条停留的 tick。 */
+    private static final int FEEDBACK_TICKS = 80;
     /** tab 下标：仓库。 */
     private static final int TAB_STORAGE = 0;
     /** tab 下标：机器。 */
@@ -95,6 +98,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private FactoryState factoryState = FactoryState.CREATED;
     /** 仓库链接是否在线；表格中的数量仍以仓库包为准。 */
     private boolean storageOnline;
+    /** 编辑动作的临时反馈；非空时覆盖底部统计行。 */
+    @Nullable
+    private String feedbackText;
+    /** 反馈是成功还是失败，决定文字颜色。 */
+    private boolean feedbackOk;
+    /** 反馈剩余显示 tick。 */
+    private int feedbackTicks;
     /** 工厂产线总数。 */
     private int lineCount;
     /** 当前运行中的产线数。 */
@@ -189,6 +199,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     protected void containerTick() {
         super.containerTick();
+        if (this.feedbackTicks > 0) {
+            this.feedbackTicks--;
+        }
         if (++this.requestTicker >= REQUEST_INTERVAL) {
             this.requestTicker = 0;
             requestTable();
@@ -276,6 +289,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         this.storageTruncated = payload.truncated();
         this.storageReceived = true;
         rebuildFiltered();
+    }
+
+    /**
+     * 收到编辑动作的服务端反馈。
+     *
+     * <p>界面打开时聊天栏不可见，所以反馈在左表底部临时显示；命名浮层/IO 编辑区后续会
+     * 在自己的状态行里显示同一份文案。</p>
+     *
+     * @param payload 反馈
+     */
+    public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
+        this.feedbackText = payload.message();
+        this.feedbackOk = payload.ok();
+        this.feedbackTicks = FEEDBACK_TICKS;
     }
 
     /**

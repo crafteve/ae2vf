@@ -1,0 +1,53 @@
+package io.github.crafteve.idlefactory.network;
+
+import java.util.List;
+import java.util.Optional;
+
+import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+/**
+ * 工厂整表的唯一发送出口。
+ *
+ * <p>请求路径和“编辑动作完成后立即刷新”共用一个实现，避免两处各自构建视图、漏字段或排序不同。
+ * 读路径不探世界：机器状态全部来自 {@link FactorySnapshotBuilder} 对观测缓存的读取。</p>
+ */
+public final class FactoryTableSnapshots {
+    private FactoryTableSnapshots() {
+        // 纯静态工具类
+    }
+
+    /**
+     * 立即把当前工厂的机器表 + 产线列表发给玩家。
+     *
+     * @param player      目标玩家
+     * @param containerId 菜单容器 id；过期界面自行忽略
+     */
+    public static void send(ServerPlayer player, int containerId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            PacketDistributor.sendToPlayer(player, FactoryTableS2C.empty(containerId));
+            return;
+        }
+        Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
+        if (factory.isEmpty()) {
+            PacketDistributor.sendToPlayer(player, FactoryTableS2C.empty(containerId));
+            return;
+        }
+        Factory owner = factory.get();
+        List<FactorySnapshotBuilder.MachineView> machines =
+                FactorySnapshotBuilder.machines(owner, runtime.observations(),
+                        player.serverLevel().getGameTime());
+        FactorySnapshotBuilder.FactoryHealth health =
+                FactorySnapshotBuilder.health(owner, machines);
+        List<FactorySnapshotBuilder.LineView> lines = FactorySnapshotBuilder.lines(owner);
+        PacketDistributor.sendToPlayer(player, new FactoryTableS2C(
+                containerId, true, owner.state(), owner.storageLink().online(),
+                health.lines(), health.runningLines(), lines, machines));
+    }
+}

@@ -45,13 +45,17 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param storageOnline   仓库是否在线
  * @param lineCount       产线数
  * @param runningLineCount 运行中的产线数
+ * @param lines           产线列表（界面菜单/筛选）
  * @param machines        机器库视图（含回收站）
  */
 public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState state,
         boolean storageOnline, int lineCount, int runningLineCount,
+        List<FactorySnapshotBuilder.LineView> lines,
         List<FactorySnapshotBuilder.MachineView> machines) implements CustomPacketPayload {
 
     private static final int MAX_MACHINES = 512;
+    private static final int MAX_LINES = 64;
+    private static final int MAX_LINE_NAME = 64;
     private static final int MAX_LINE_NAMES = 8;
     private static final int MAX_RULES_PER_SIDE = 16;
 
@@ -64,13 +68,14 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
             StreamCodec.of(FactoryTableS2C::write, FactoryTableS2C::read);
 
     public FactoryTableS2C {
+        lines = List.copyOf(lines);
         machines = List.copyOf(machines);
     }
 
     /** 没有工厂时的空表。 */
     public static FactoryTableS2C empty(int containerId) {
         return new FactoryTableS2C(containerId, false, FactoryState.CREATED, false, 0, 0,
-                List.of());
+                List.of(), List.of());
     }
 
     @Override
@@ -95,6 +100,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         buf.writeBoolean(payload.storageOnline());
         buf.writeVarInt(payload.lineCount());
         buf.writeVarInt(payload.runningLineCount());
+        writeLines(buf, payload.lines());
         buf.writeVarInt(payload.machines().size());
         for (FactorySnapshotBuilder.MachineView machine : payload.machines()) {
             writeMachine(buf, machine);
@@ -108,13 +114,43 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         boolean storageOnline = buf.readBoolean();
         int lineCount = buf.readVarInt();
         int runningLineCount = buf.readVarInt();
+        List<FactorySnapshotBuilder.LineView> lines = readLines(buf);
         int count = readCount(buf, MAX_MACHINES, "machines");
         List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
         return new FactoryTableS2C(containerId, hasFactory, state, storageOnline,
-                lineCount, runningLineCount, machines);
+                lineCount, runningLineCount, lines, machines);
+    }
+
+    private static void writeLines(RegistryFriendlyByteBuf buf,
+            List<FactorySnapshotBuilder.LineView> lines) {
+        int count = Math.min(lines.size(), MAX_LINES);
+        buf.writeVarInt(count);
+        for (int i = 0; i < count; i++) {
+            FactorySnapshotBuilder.LineView line = lines.get(i);
+            buf.writeUUID(line.id());
+            buf.writeUtf(line.name(), MAX_LINE_NAME);
+            buf.writeBoolean(line.running());
+            buf.writeVarInt(Math.max(0, line.machineCount()));
+        }
+    }
+
+    private static List<FactorySnapshotBuilder.LineView> readLines(RegistryFriendlyByteBuf buf) {
+        int count = readCount(buf, MAX_LINES, "lines");
+        List<FactorySnapshotBuilder.LineView> lines = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            UUID id = buf.readUUID();
+            String name = buf.readUtf(MAX_LINE_NAME);
+            boolean running = buf.readBoolean();
+            int machineCount = buf.readVarInt();
+            if (machineCount < 0) {
+                throw new DecoderException("invalid line machine count: " + machineCount);
+            }
+            lines.add(new FactorySnapshotBuilder.LineView(id, name, running, machineCount));
+        }
+        return lines;
     }
 
     private static void writeMachine(RegistryFriendlyByteBuf buf,
@@ -129,7 +165,11 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         buf.writeByte(kindMask(machine.presence()));
         buf.writeVarInt(machine.lineNames().size());
         for (String name : machine.lineNames()) {
-            buf.writeUtf(name, 64);
+            buf.writeUtf(name, MAX_LINE_NAME);
+        }
+        buf.writeVarInt(machine.lineIds().size());
+        for (UUID lineId : machine.lineIds()) {
+            buf.writeUUID(lineId);
         }
         buf.writeVarInt(machine.ruleCount());
         writeRules(buf, machine.inputs());
@@ -158,7 +198,12 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         int lineCount = readCount(buf, MAX_LINE_NAMES, "line names");
         List<String> lineNames = new ArrayList<>(lineCount);
         for (int i = 0; i < lineCount; i++) {
-            lineNames.add(buf.readUtf(64));
+            lineNames.add(buf.readUtf(MAX_LINE_NAME));
+        }
+        int lineIdCount = readCount(buf, MAX_LINE_NAMES, "line ids");
+        List<UUID> lineIds = new ArrayList<>(lineIdCount);
+        for (int i = 0; i < lineIdCount; i++) {
+            lineIds.add(buf.readUUID());
         }
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
@@ -178,7 +223,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
         return new FactorySnapshotBuilder.MachineView(ref, detached, health, blockId,
-                presence, lineNames, ruleCount, inputs, outputs, inputRates, outputRates,
+                presence, lineNames, lineIds, ruleCount, inputs, outputs, inputRates, outputRates,
                 sinceMoveTicks, blockedTicks, workState, inputFull, sinceInputMoveTicks,
                 inputReason, outputReason, inputReasons, outputReasons);
     }

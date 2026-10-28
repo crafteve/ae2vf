@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.network;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
@@ -35,6 +36,18 @@ public final class ClientFactoryTableHandler {
         FactoryScreen screen = currentScreen(payload.containerId());
         if (screen != null) {
             screen.acceptStorage(payload);
+        }
+    }
+
+    /**
+     * 处理编辑动作的反馈。
+     *
+     * @param payload 负载
+     */
+    public static void handleFeedback(FactoryEditFeedbackS2C payload) {
+        FactoryScreen screen = currentScreen(payload.containerId());
+        if (screen != null) {
+            screen.acceptEditFeedback(payload);
         }
     }
 

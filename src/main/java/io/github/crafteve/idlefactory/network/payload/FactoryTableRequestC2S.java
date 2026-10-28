@@ -1,21 +1,15 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
+import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
-
-import java.util.List;
-import java.util.Optional;
 
 /**
  * 客户端请求当前工厂的机器表。
@@ -57,26 +51,7 @@ public record FactoryTableRequestC2S(int containerId) implements CustomPacketPay
                     || menu.containerId != payload.containerId()) {
                 return;
             }
-            FactoryRuntime runtime = FactoryRuntime.get();
-            if (runtime == null) {
-                PacketDistributor.sendToPlayer(player, FactoryTableS2C.empty(payload.containerId()));
-                return;
-            }
-            Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
-            if (factory.isEmpty()) {
-                PacketDistributor.sendToPlayer(player, FactoryTableS2C.empty(payload.containerId()));
-                return;
-            }
-            Factory owner = factory.get();
-            List<FactorySnapshotBuilder.MachineView> machines =
-                    FactorySnapshotBuilder.machines(owner, runtime.observations(),
-                            player.serverLevel().getGameTime());
-            FactorySnapshotBuilder.FactoryHealth health =
-                    FactorySnapshotBuilder.health(owner, machines);
-            PacketDistributor.sendToPlayer(player, new FactoryTableS2C(
-                    payload.containerId(), true, owner.state(),
-                    owner.storageLink().online(), health.lines(), health.runningLines(),
-                    machines));
+            FactoryTableSnapshots.send(player, payload.containerId());
         });
     }
 }
