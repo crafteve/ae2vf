@@ -223,7 +223,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `LineSelectorMenu.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -240,6 +240,8 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 11. 模糊规则没有候选 ≠ 输入堵塞：仓库缺料是 `WAITING_MATERIAL`，只有 `inputFull`（机器满 / 拒收）才是 `INPUT_BLOCKED`。
 12. 流体图标不透明：仓库格的悬停描边必须画在图标之后，否则只剩 1px 暗边。
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
+14. 新增浮层必须在 `GuiLayer` 里加枚举项再引用，调用点禁止写 z 魔法数字；浮层被物品/数量盖住、或反过来盖住 tooltip，基本都是层级散落导致的。
+15. 排序键 / 方向 / 范围偏好保存在客户端 `static` 字段，关闭界面再打开保留，重启游戏回默认；不写存档。
 
 ### 6.3 文档偏差
 
