@@ -127,9 +127,9 @@ def terminal():
     gradient_round_rect(img, (13, 21, 51, 41), 2, GLASS_TOP, GLASS_BOTTOM)
     draw.rounded_rectangle([sc(13), sc(21), sc(51), sc(41)], radius=sc(2),
                            outline=(0x05, 0x09, 0x0E), width=sc(2))
-    # 玻璃斜反光
-    poly(draw, [(15, 23), (25, 23), (17, 38), (15, 38)], (0x9A, 0xD8, 0xE8, 30))
-    line(draw, [(15, 23), (49, 23)], (0x9A, 0xD8, 0xE8, 70), 1)
+    # 玻璃斜反光：用不透明色，避免手持时整块屏幕透出世界
+    poly(draw, [(15, 23), (25, 23), (17, 38), (15, 38)], (0x2A, 0x4A, 0x5A))
+    line(draw, [(15, 23), (49, 23)], (0x5A, 0x8A, 0x9A), 1)
 
     # 屏幕网格
     for x in (23, 32, 41):
@@ -176,6 +176,13 @@ def terminal():
     line(draw, [(38, 10), (38, 15)], (0x38, 0xE1, 0xF0, 120), 1)
     for x, y in ((28, 9), (47, 12), (35, 1), (44, 3)):
         ellipse(draw, x - 0.5, y - 0.5, x + 0.5, y + 0.5, (0x9A, 0xF6, 0xFF, 180))
+
+    # 屏幕区域强制不透明：半透明像素会让手持模型透出后面的世界
+    for y in range(21, 42):
+        for x in range(13, 52):
+            r, g, b, a = img.getpixel((x, y))
+            if a > 0:
+                img.putpixel((x, y), (r, g, b, 255))
     return img
 
 
