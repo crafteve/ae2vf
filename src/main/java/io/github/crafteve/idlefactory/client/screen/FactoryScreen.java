@@ -854,7 +854,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             status = "未创建";
             statusColor = this.theme.statusIdle();
         } else if (activeLine != null) {
-            // 顶栏状态描述的是当前产线，不是仓库连接；仓库在线由右侧统计单独显示。
+            // 顶栏状态描述的是当前产线，不是仓库连接；仓库在线状态由右侧统计显示。
             if (!activeLine.running()) {
                 status = "已暂停";
                 statusColor = this.theme.error();
@@ -876,7 +876,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         // 顶栏右侧同时要放统计和关闭按钮。窄屏（例如 640 逻辑宽）下，
         // 统计是最不重要的信息，放不下就直接省略，优先保证状态和关闭按钮可读。
-        int storageColor = this.storageOnline ? this.theme.statusRun() : this.theme.error();
+        int storageColor = storageStatusColor();
         List<TextPart> stats = List.of(
                 new TextPart(Integer.toString(this.machines.size()), this.theme.textValue()),
                 new TextPart(" 台", this.theme.textPrimary()),
@@ -885,7 +885,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 new TextPart(" 线", this.theme.textPrimary()),
                 new TextPart(" · ", this.theme.textPrimary()),
                 new TextPart("仓库", storageColor),
-                new TextPart(this.storageOnline ? "在线" : "离线", storageColor));
+                new TextPart(storageStatusText(), storageColor));
         int closeX = l.rightX - 6 - CLOSE_SIZE;
         int statsX = closeX - 8 - partsWidth(stats);
         if (statsX > statusEnd + 8) {
@@ -896,6 +896,35 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.drawString(this.font, "x",
                 closeX + (CLOSE_SIZE - this.font.width("x")) / 2, textY,
                 this.theme.textPrimary(), false);
+    }
+
+    /**
+     * 顶栏统计里的仓库状态：同步中、在线、离线。
+     *
+     * <p>没有工厂时显示未创建；仓库快照还没到时显示同步中，避免刚打开界面就误报离线。</p>
+     *
+     * @return 状态文字
+     */
+    private String storageStatusText() {
+        if (!this.hasFactory) {
+            return "未创建";
+        }
+        if (!this.storageReceived) {
+            return "同步中";
+        }
+        return this.storageOnline ? "在线" : "离线";
+    }
+
+    /**
+     * 顶栏仓库状态颜色：同步中/未创建用 idle，在线用 run，离线用 error。
+     *
+     * @return 主题颜色
+     */
+    private int storageStatusColor() {
+        if (!this.hasFactory || !this.storageReceived) {
+            return this.theme.statusIdle();
+        }
+        return this.storageOnline ? this.theme.statusRun() : this.theme.error();
     }
 
     /**
@@ -1791,31 +1820,22 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 画当前可见的仓库格。
      *
      * <p>可见条目来自 {@link FactoryStorageRepo#view()}，滚动由
-     * {@code storageFirstRow} 控制；同步中/离线/空仓库/无匹配分别显示不同提示。
-     * 每个格子只画图标和数量，点击与手势由 {@code mouseClicked} 统一处理。</p>
+     * {@code storageFirstRow} 控制；同步中/离线由顶栏统计显示，网格只画内容与
+     * 空仓库/无匹配提示。每个格子只画图标和数量，点击与手势由 {@code mouseClicked}
+     * 统一处理。</p>
      */
     private void drawStorageEntries(GuiGraphics graphics) {
         FactoryLayout l = this.layout;
-        int centerX = l.gridX;
-        int centerY = l.gridY + l.gridRows * FactoryLayout.CELL / 2 - 4;
-        if (!this.storageReceived) {
-            graphics.drawString(this.font, "同步中…", centerX, centerY,
-                    this.theme.textDim(), false);
-            return;
-        }
-        if (!this.storageOnline) {
-            graphics.drawString(this.font, "仓库离线", centerX, centerY,
-                    this.theme.error(), false);
+        // 同步中/离线不占网格：状态已经放在顶栏统计，网格只负责显示内容。
+        if (!this.storageReceived || !this.storageOnline) {
             return;
         }
         if (this.storageRepo.all().isEmpty()) {
-            graphics.drawString(this.font, "仓库是空的", centerX, centerY,
-                    this.theme.textDim(), false);
+            drawStorageMessage(graphics, "仓库是空的", this.theme.textDim());
             return;
         }
         if (this.filteredStorageEntries.isEmpty()) {
-            graphics.drawString(this.font, "没有匹配", centerX, centerY,
-                    this.theme.textDim(), false);
+            drawStorageMessage(graphics, "没有匹配", this.theme.textDim());
             return;
         }
 
@@ -1831,6 +1851,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 drawStorageEntry(graphics, entry, x, y);
             }
         }
+    }
+
+    /**
+     * 在仓库网格中央画一句空状态提示。
+     *
+     * @param graphics 画布
+     * @param text     提示文字
+     * @param color    文字颜色
+     */
+    private void drawStorageMessage(GuiGraphics graphics, String text, int color) {
+        FactoryLayout l = this.layout;
+        int x = l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL / 2
+                - this.font.width(text) / 2;
+        int y = l.gridY + l.gridRows * FactoryLayout.CELL / 2 - 4;
+        graphics.drawString(this.font, text, x, y, color, false);
     }
 
     /** 画一个仓库格的图标和右下角数量。 */

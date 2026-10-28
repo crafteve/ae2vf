@@ -10,6 +10,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.BlockProbe;
@@ -74,17 +75,43 @@ public final class FactoryService {
      * <p>入口有三个：{@code /idf gui}、手持工厂终端右键、终端快捷键。快捷键在客户端先查一次
      * 背包，服务端收到请求后再查一次；三条入口最终都走这里，不另写打开逻辑。</p>
      *
-     * <p>不要求玩家已经有工厂——P0 界面里还是假数据，先让人看得到比先让人建好更重要。真正的
-     * 空状态（没有工厂时提示创建）留到 P1。</p>
+     * <p>第一次打开时自动给玩家建一个工厂，省掉先执行 {@code /idf create} 的空状态。
+     * 创建失败只记日志，不挡打开；界面仍会显示未创建。</p>
      *
      * @param player 发起请求的玩家
      * @return 命令结果（{@code 1} 已请求打开）
      */
     public static int openGui(ServerPlayer player) {
+        ensureFactory(player);
         player.openMenu(new SimpleMenuProvider(
                 (containerId, playerInventory, ignored) -> new FactoryMenu(containerId, playerInventory),
                 Component.translatable("screen.idlefactory.title")));
         return 1;
+    }
+
+    /**
+     * 保证玩家有工厂：没有就静默创建，已有就不动。
+     *
+     * <p>创建逻辑与 {@link #create(ServerPlayer)} 共用 id 规则，但不发指令回执；自动创建
+     * 不应该在第一次打开终端时刷屏。</p>
+     *
+     * @param player 玩家
+     */
+    private static void ensureFactory(ServerPlayer player) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return;
+        }
+        if (runtime.manager().byOwner(player.getUUID()).isPresent()) {
+            return;
+        }
+        UUID id = nextId(runtime, player.getUUID());
+        Factory factory = new Factory(id, player.getUUID());
+        if (!runtime.manager().add(factory)) {
+            IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
+            return;
+        }
+        runtime.markDirty();
     }
 
     // ------------------------------------------------------------------
