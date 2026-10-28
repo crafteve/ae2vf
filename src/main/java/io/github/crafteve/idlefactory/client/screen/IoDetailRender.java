@@ -166,7 +166,8 @@ final class IoDetailRender {
         NineSlice.fill(graphics,
                 idleLabel != null ? GuiTextures.STATUS_STRIP_IDLE
                         : FactoryLabels.reasonStrip(effective),
-                card.x() + 1, card.y() + 2, 1, FactoryLayout.IO_CELL_H - 4);
+                card.x() + FactoryLayout.IO_CARD_STRIP_X, card.y() + 2, 1,
+                FactoryLayout.IO_CELL_H - 4);
 
         int slotX = card.x() + FactoryLayout.IO_CARD_PAD;
         int slotY = card.y() + FactoryLayout.IO_CARD_SLOT_Y;
@@ -218,11 +219,8 @@ final class IoDetailRender {
             return;
         }
         IoCardControls.Rect rect = IoCardControls.matchRect(card.x(), card.y());
-        boolean enabled = IoCardControls.matchEnabled(spec);
-        boolean hovered = enabled && inside(mouseX, mouseY, rect);
-        if (!enabled) {
-            NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
-        } else if (hovered) {
+        boolean hovered = inside(mouseX, mouseY, rect);
+        if (hovered) {
             NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
         } else {
             NineSlice.slice(graphics, GuiTextures.BUTTON_MATCH, GuiTextures.BUTTON_SIZE, 1,
@@ -231,7 +229,7 @@ final class IoDetailRender {
         String label = IoCardControls.matchLabel(spec);
         graphics.drawString(font, label,
                 rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
-                enabled ? MATCH_TEXT : theme.textDim(), false);
+                MATCH_TEXT, false);
     }
 
     private static void drawScrollbar(GuiGraphics graphics, IoDetailLayout.Detail detail) {

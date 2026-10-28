@@ -162,17 +162,9 @@ final class IoCardControls {
     }
 
     /**
-     * 匹配按钮是否可点：只有无组件物品能在模糊/精确间切换。
-     *
-     * @param spec 规则
-     * @return 可点时为 {@code true}
-     */
-    static boolean matchEnabled(ResourceSpec spec) {
-        return spec.key().kind() == ResourceKind.ITEM && !spec.key().hasComponents();
-    }
-
-    /**
      * 是否显示匹配按钮：物品才显示；流体/FE 固定精确。
+     *
+     * <p>带组件物品也可以切换模糊：模糊只按注册名匹配所有变体，组件快照仍用于精确模式。</p>
      *
      * @param spec 规则
      * @return 显示时为 {@code true}

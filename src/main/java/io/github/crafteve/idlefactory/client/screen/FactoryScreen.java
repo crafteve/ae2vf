@@ -1347,7 +1347,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 }
             }
             case MATCH -> {
-                if (button == 0 && IoCardControls.matchEnabled(spec)) {
+                if (button == 0) {
                     MatchMode next = spec.mode() == MatchMode.IGNORE_COMPONENTS
                             ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
                     this.editController.updateRule(machine, side, spec, spec.face(), next);
@@ -2004,13 +2004,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
             case MATCH -> {
                 lines.add(FactoryLabels.colored("匹配模式", tt.title()));
-                if (!IoCardControls.matchEnabled(spec)) {
-                    lines.add(FactoryLabels.colored("带组件物品固定精确匹配", tt.label()));
-                } else {
-                    lines.add(FactoryLabels.colored(spec.fuzzy()
-                            ? "模糊（忽略组件），点击改精确"
-                            : "精确（含组件），点击改模糊", tt.label()));
-                }
+                lines.add(FactoryLabels.colored(spec.fuzzy()
+                        ? "模糊（忽略组件），点击改精确"
+                        : "精确（含组件），点击改模糊", tt.label()));
                 graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
                 return;
             }

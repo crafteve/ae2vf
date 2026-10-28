@@ -25,8 +25,9 @@ import net.minecraft.world.item.ItemStack;
  * <p>面只认绝对六向；{@code face == null} 表示不限面。</p>
  *
  * <p>匹配模式只对物品有意义：没有组件的规则默认 {@link MatchMode#IGNORE_COMPONENTS}，
- * 带组件的规则一定是 {@link MatchMode#EXACT}。旧存档没有 {@code Mode} 字段，按模糊读入，
- * 保持老版本「按 id 搬」的语义。</p>
+ * 带组件的规则默认 {@link MatchMode#EXACT}，但两者都可以显式切换。旧存档没有 {@code Mode}
+ * 字段的物品规则按模糊读入，保持老版本「按 id 搬」的语义；带组件快照却没有 {@code Mode}
+ * 的旧规则按精确读入，避免丢掉玩家明确写下来的组件。</p>
  *
  * @param key    资源
  * @param face   面；{@code null} 表示不限
@@ -58,8 +59,9 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
     /**
      * 规范化模式与 key 的关系。
      *
-     * <p>流体/能量没有组件语义，一律精确；「模糊 + 带组件 key」这种矛盾输入按精确处理，
-     * 组件才是玩家真正写下来的意图。</p>
+     * <p>流体/能量没有组件语义，一律精确；物品保留调用方给出的模式，未给出时按 key 是否
+     * 带组件取默认。带组件的 key 也可以显式使用 {@link MatchMode#IGNORE_COMPONENTS}，
+     * 表示只按注册名匹配所有变体。</p>
      */
     public ResourceSpec {
         Objects.requireNonNull(key, "key");
@@ -67,9 +69,6 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
             mode = MatchMode.EXACT;
         } else if (mode == null) {
             mode = defaultMode(key);
-        }
-        if (mode == MatchMode.IGNORE_COMPONENTS && key.hasComponents()) {
-            mode = MatchMode.EXACT;
         }
     }
 
@@ -135,7 +134,8 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
      * 从 NBT 读回来。
      *
      * <p>只认新格式；旧版只有 {@code Item/Face}，读不出来就丢弃这条规则——当前阶段不兼容旧存档。
-     * 有 {@code Stack} 的规则一律精确匹配；没有 {@code Mode} 的物品规则按模糊读入。</p>
+     * 有 {@code Stack} 的规则读取 {@code Mode}；旧档缺 {@code Mode} 时按精确读入。没有
+     * {@code Mode} 的无组件物品规则按模糊读入。</p>
      *
      * @param tag        存档标签
      * @param registries 注册表访问
@@ -166,7 +166,8 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
                 IdleFactory.LOGGER.warn("IdleFactory: 物品规则组件解码失败，丢弃规则 {}", id);
                 return null;
             }
-            return new ResourceSpec(ResourceKey.item(stack), face, amount, MatchMode.EXACT);
+            return new ResourceSpec(ResourceKey.item(stack), face, amount,
+                    readMode(tag, MatchMode.EXACT));
         }
 
         MatchMode mode = readMode(tag, kind);
@@ -174,8 +175,11 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
     }
 
     private static MatchMode readMode(CompoundTag tag, ResourceKind kind) {
-        MatchMode fallback = kind == ResourceKind.ITEM
-                ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
+        return readMode(tag, kind == ResourceKind.ITEM
+                ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT);
+    }
+
+    private static MatchMode readMode(CompoundTag tag, MatchMode fallback) {
         if (!tag.contains(TAG_MODE)) {
             return fallback;
         }
