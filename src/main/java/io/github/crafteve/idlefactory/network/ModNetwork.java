@@ -9,6 +9,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.OpenFactoryGuiC2S;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -22,12 +23,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、仓库动作、产线动作、IO 规则动作与编辑反馈。改包结构时记得递增
- * {@link #PROTOCOL_VERSION}。</p>
+ * <p>当前包含机器表、仓库快照、仓库动作、产线动作、IO 规则动作、编辑反馈与终端打开界面。
+ * 改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "12";
+    public static final String PROTOCOL_VERSION = "13";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -75,6 +76,10 @@ public final class ModNetwork {
                 FactoryRuleActionC2S::handle);
         registrar.playToClient(FactoryEditFeedbackS2C.TYPE, FactoryEditFeedbackS2C.STREAM_CODEC,
                 FactoryEditFeedbackS2C::handle);
+
+        // 物品入口：终端右键 / 快捷键请求打开界面
+        registrar.playToServer(OpenFactoryGuiC2S.TYPE, OpenFactoryGuiC2S.STREAM_CODEC,
+                OpenFactoryGuiC2S::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }

@@ -1,6 +1,8 @@
 {
   "screen.idlefactory.title": "Idle Factory",
   "screen.idlefactory.search_hint": "Search…",
+  "key.categories.idlefactory": "Idle Factory",
+  "key.idlefactory.open_terminal": "Open Factory Terminal",
   "itemGroup.idlefactory": "Idle Factory",
   "item.idlefactory.factory_terminal": "Factory Terminal",
   "item.idlefactory.machine_binding_wand": "Machine Binding Wand",
