@@ -41,6 +41,16 @@ public final class ItemAdapter implements ResourceAdapter {
         return ResourceKey.item(this.sample);
     }
 
+    /**
+     * 这台机器当前真正能收下多少。
+     *
+     * <p>不能把所有空槽直接当成容量：熔炉的燃料槽、输出槽同样是空槽，却不会收铁矿石。
+     * 旧实现按空位数累计容量，模拟插入又为 0，于是被误判成「该面拒收」。这里逐槽调用
+     * {@code insertItem(..., simulate = true)}，只累计处理器真正点头的数量；容量为 0 时
+     * {@link IoTransfer#feed} 会走「机器已满」，而不是「该面拒收」。</p>
+     *
+     * @return 当前可接受的数量
+     */
     @Override
     public long capacity() {
         long total = 0L;
@@ -50,7 +60,12 @@ public final class ItemAdapter implements ResourceAdapter {
                 continue;
             }
             int limit = Math.min(this.handler.getSlotLimit(slot), this.sample.getMaxStackSize());
-            total += Math.max(0, limit - inSlot.getCount());
+            int room = limit - inSlot.getCount();
+            if (room <= 0) {
+                continue;
+            }
+            ItemStack leftover = this.handler.insertItem(slot, this.sample.copyWithCount(room), true);
+            total += room - leftover.getCount();
         }
         return total;
     }
