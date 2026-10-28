@@ -22,6 +22,8 @@ public final class GuiTextures {
     public static final ResourceLocation SLOT_HOVER = id("slot_hover");
     /** 凸起按钮：九宫格，边框 1。 */
     public static final ResourceLocation BUTTON = id("button");
+    /** 黄色匹配按钮：九宫格，边框 1。 */
+    public static final ResourceLocation BUTTON_MATCH = id("button_match");
     /** 输入框：九宫格，边框 1。 */
     public static final ResourceLocation FIELD = id("field");
     /** 搜索框纯色底：1×1，拉伸使用。 */

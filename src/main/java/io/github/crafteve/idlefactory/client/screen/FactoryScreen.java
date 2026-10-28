@@ -19,7 +19,9 @@ import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactoryState;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
+import io.github.crafteve.idlefactory.factory.line.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
@@ -134,6 +136,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private int storageRequestTicker;
     /** 已展开的机器；同一时间最多一台，快照刷新后仍能保持展开。 */
     private final Set<MachineRef> expandedMachines = new HashSet<>();
+    /** 展开 IO 面板的像素滚动。 */
+    private int ioScroll;
 
     private FactorySearchQuery searchQuery = FactorySearchQuery.EMPTY;
     private List<FactoryStorageS2C.Entry> filteredStorageEntries = List.of();
@@ -353,7 +357,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactorySnapshotBuilder.MachineView machine) {
         String id = machine.blockId() == null ? "" : machine.blockId().toString();
         String namespace = machine.blockId() == null ? "" : machine.blockId().getNamespace();
-        String name = blockName(machine.blockId());
+        String name = FactoryLabels.blockName(machine.blockId());
         if (!machine.lineNames().isEmpty()) {
             name += " " + String.join(" ", machine.lineNames());
         }
@@ -368,8 +372,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private int maxFirstRow() {
-        // 行高可变，最后一台机器可以滚到顶部；旧实现按固定 rowsVisible 算会卡住。
-        return Math.max(0, tableMachines().size() - 1);
+        // 最后一行是“新增机器”空槽，下标等于机器数；它可以滚到顶部。
+        if (this.selectedLineId == null) {
+            return 0;
+        }
+        return Math.max(0, tableMachines().size());
     }
 
     /**
@@ -400,7 +407,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int output = 72;
         for (FactorySnapshotBuilder.MachineView machine : tableMachines()) {
             name = Math.max(name,
-                    this.font.width(blockName(machine.blockId())) + FactoryLayout.CELL + 12);
+                    this.font.width(FactoryLabels.blockName(machine.blockId())) + FactoryLayout.CELL + 12);
             input = Math.max(input, ruleWidth(machine.inputs(), machine.inputRates()));
             output = Math.max(output, ruleWidth(machine.outputs(), machine.outputRates()));
         }
@@ -417,6 +424,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     rules.get(i).key().kind());
             width += FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
         }
+        // 末尾空槽是拖放目标，列宽必须给它留位置。
+        width += FactoryLayout.CELL + 2;
         return Math.max(72, width);
     }
 
@@ -771,8 +780,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         String line = lineButtonText();
         int buttonW = lineButtonW();
         NineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
-        graphics.drawString(this.font, line,
-                x + (buttonW - this.font.width(line)) / 2, textY,
+        String lineLabel = this.font.plainSubstrByWidth(line, buttonW - 8);
+        graphics.drawString(this.font, lineLabel,
+                x + (buttonW - this.font.width(lineLabel)) / 2, textY,
                 this.theme.textPrimary(), false);
         x += buttonW + 8;
 
@@ -848,32 +858,32 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     color, false);
         }
 
+        if (this.selectedLineId == null) {
+            graphics.drawString(this.font, "先选择一条产线", l.tableX, l.footerY + 3,
+                    this.theme.textDim(), false);
+            drawTableFrame(graphics);
+            return;
+        }
+
         List<FactorySnapshotBuilder.MachineView> table = tableMachines();
         int total = table.size();
         int shown = 0;
         int y = l.rowTop;
-        for (int i = this.firstRow; i < total; i++) {
+        // 最后一行是“新增机器”空槽；selectedLineId 非空时始终存在。
+        for (int i = this.firstRow; i <= total; i++) {
             if (y + FactoryLayout.ROW_H > l.footerY) {
                 break;
             }
-            FactorySnapshotBuilder.MachineView machine = table.get(i);
-            int detailHeight = detailHeight(machine, y);
-            drawRow(graphics, machine, y, detailHeight);
-            y += FactoryLayout.ROW_H + detailHeight;
-            shown++;
-        }
-
-        if (total == 0) {
-            String message;
-            if (this.selectedLineId != null) {
-                message = "该产线没有机器";
+            if (i < total) {
+                FactorySnapshotBuilder.MachineView machine = table.get(i);
+                int detailHeight = detailHeight(machine, y);
+                drawRow(graphics, machine, y, detailHeight);
+                y += FactoryLayout.ROW_H + detailHeight;
             } else {
-                message = "先选择一条产线";
+                drawAddMachineRow(graphics, y);
+                y += FactoryLayout.ROW_H;
             }
-            graphics.drawString(this.font, message, l.tableX, l.footerY + 3,
-                    this.theme.textDim(), false);
-            drawTableFrame(graphics);
-            return;
+            shown++;
         }
 
         int ready = 0;
@@ -950,11 +960,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
         NineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
                 FactoryLayout.CELL);
-        ItemStack icon = blockStack(machine.blockId());
+        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
 
-        String name = blockName(machine.blockId());
+        String name = FactoryLabels.blockName(machine.blockId());
         int nameWidth = l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 10;
         graphics.drawString(this.font,
                 this.font.plainSubstrByWidth(name, nameWidth),
@@ -979,25 +989,384 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 stateX + 9, textY, status.color(), false);
 
         if (l.hasColumn(FactoryLayout.COL_INPUT)) {
-            drawRuleIcons(graphics, machine.inputs(), machine.inputRates(),
-                    machine.inputReasons(),
-                    l.columnX(FactoryLayout.COL_INPUT) + 2, y + 4,
-                    l.columnW(FactoryLayout.COL_INPUT) - 4);
+            int stripX = l.columnX(FactoryLayout.COL_INPUT) + 2;
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.inputs(),
+                    machine.inputRates(), stripX, y + 4,
+                    l.columnW(FactoryLayout.COL_INPUT) - 4, true);
+            RuleStrip.draw(graphics, this.font, this.theme, strip, machine.inputs(),
+                    machine.inputRates(), machine.inputReasons(), this.renderMouseX,
+                    this.renderMouseY, this.editController != null
+                            && this.editController.isDraggingResource());
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
-            drawRuleIcons(graphics, machine.outputs(), machine.outputRates(),
-                    machine.outputReasons(),
-                    l.columnX(FactoryLayout.COL_OUTPUT) + 2, y + 4,
+            int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.outputs(),
+                    machine.outputRates(), stripX, y + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                            - FactoryLayout.EXPAND_BUTTON - 2);
+                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+            RuleStrip.draw(graphics, this.font, this.theme, strip, machine.outputs(),
+                    machine.outputRates(), machine.outputReasons(), this.renderMouseX,
+                    this.renderMouseY, this.editController != null
+                            && this.editController.isDraggingResource());
         }
         drawExpandButton(graphics, y, isOpen(machine));
         if (detailHeight > 0) {
-            IoDetailRender.Detail detail = IoDetailRender.layout(l, machine,
-                    y + FactoryLayout.ROW_H, detailHeight, this.font);
+            IoDetailLayout.Detail detail = IoDetailLayout.layout(l, machine,
+                    y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
             IoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
-                    this.renderMouseX, this.renderMouseY);
+                    this.renderMouseX, this.renderMouseY,
+                    this.editController != null && this.editController.isDraggingResource());
         }
+    }
+
+    /**
+     * 画“新增机器”行：机器列是一个空槽，整行都是拖拽放置目标。
+     *
+     * @param graphics 画布
+     * @param y        行顶部
+     */
+    private void drawAddMachineRow(GuiGraphics graphics, int y) {
+        FactoryLayout l = this.layout;
+        int cardX = l.leftX + 2;
+        int cardW = l.leftW - 4;
+        NineSlice.card(graphics, cardX, y, cardW, FactoryLayout.ROW_H - 1);
+
+        boolean dragging = this.editController != null
+                && this.editController.isDraggingMachine();
+        boolean hover = dragging && addMachineRowContains(this.renderMouseX, this.renderMouseY);
+        if (hover) {
+            NineSlice.fill(graphics, GuiTextures.ROW_ALT, cardX + 1, y + 1,
+                    cardW - 2, FactoryLayout.ROW_H - 3);
+        }
+
+        int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
+        NineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL, FactoryLayout.CELL);
+        String plus = "+";
+        graphics.drawString(this.font, plus,
+                iconX + (FactoryLayout.CELL - this.font.width(plus)) / 2, y + 8,
+                this.theme.textDim(), false);
+
+        String title = "新增机器";
+        String hint;
+        if (dragging) {
+            String name = this.editController == null ? "" : this.editController.draggedMachineName();
+            hint = hover ? "松手放入 " + name : "放到这里";
+        } else {
+            hint = "从右侧机器库拖入";
+        }
+        graphics.drawString(this.font, title, iconX + FactoryLayout.CELL + 2, y + 4,
+                this.theme.textPrimary(), false);
+        graphics.drawString(this.font,
+                this.font.plainSubstrByWidth(hint,
+                        l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 12),
+                iconX + FactoryLayout.CELL + 2, y + 14,
+                hover ? this.theme.statusRun() : this.theme.textDim(), false);
+    }
+
+    /**
+     * “新增机器”行的顶部 y；放不下时为 {@code null}。
+     *
+     * <p>绘制、命中、拖放都用这一个函数，避免滚动/展开后坐标漂移。</p>
+     *
+     * @return 行顶部 y
+     */
+    @Nullable
+    private Integer addMachineRowY() {
+        if (this.selectedLineId == null) {
+            return null;
+        }
+        List<FactorySnapshotBuilder.MachineView> table = tableMachines();
+        int y = this.layout.rowTop;
+        for (int i = this.firstRow; i < table.size(); i++) {
+            if (y + FactoryLayout.ROW_H > this.layout.footerY) {
+                return null;
+            }
+            y += FactoryLayout.ROW_H + detailHeight(table.get(i), y);
+        }
+        return y + FactoryLayout.ROW_H <= this.layout.footerY ? y : null;
+    }
+
+    /**
+     * 鼠标是否在“新增机器”行上。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中为 {@code true}
+     */
+    boolean addMachineRowContains(double mouseX, double mouseY) {
+        Integer y = addMachineRowY();
+        return y != null
+                && mouseY >= y && mouseY < y + FactoryLayout.ROW_H
+                && mouseX >= this.layout.leftX + 2
+                && mouseX < this.layout.leftX + this.layout.leftW - 2;
+    }
+
+    /**
+     * 鼠标下的机器库卡片（机器 tab）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 机器视图；没命中为 {@code null}
+     */
+    @Nullable
+    FactorySnapshotBuilder.MachineView machineAt(double mouseX, double mouseY) {
+        if (this.activeTab != TAB_MACHINES) {
+            return null;
+        }
+        FactoryLayout l = this.layout;
+        int gridW = FactoryLayout.GRID_COLS * FactoryLayout.CELL;
+        int gridH = l.gridRows * FactoryLayout.CELL;
+        if (mouseX < l.gridX || mouseX >= l.gridX + gridW
+                || mouseY < l.gridY || mouseY >= l.gridY + gridH) {
+            return null;
+        }
+        int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
+        int index = this.machineFirstRow + row;
+        if (row >= machineRowsVisible() || index < 0 || index >= this.filteredMachines.size()) {
+            return null;
+        }
+        return this.filteredMachines.get(index);
+    }
+
+    /**
+     * 鼠标下的左表机器行（机器列），用作“拖回机器库”的源。
+     *
+     * <p>不只认 18×18 图标：机器名也算，减少“必须精准按住图标”的摩擦。</p>
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 机器视图；没命中为 {@code null}
+     */
+    @Nullable
+    FactorySnapshotBuilder.MachineView machineIconAt(double mouseX, double mouseY) {
+        if (this.selectedLineId == null) {
+            return null;
+        }
+        TableHit hit = tableHitAt(mouseY);
+        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            return null;
+        }
+        int x = this.layout.columnX(FactoryLayout.COL_NAME) + 2;
+        int width = this.layout.columnW(FactoryLayout.COL_NAME) - 4;
+        return inside(mouseX, mouseY, x, hit.y() + 2,
+                width, FactoryLayout.ROW_H - 4) ? hit.machine() : null;
+    }
+
+    /**
+     * 鼠标是否落在机器库网格上（移出机器的拖放目标）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中为 {@code true}
+     */
+    boolean isInMachineLibrary(double mouseX, double mouseY) {
+        if (this.activeTab != TAB_MACHINES) {
+            return false;
+        }
+        FactoryLayout l = this.layout;
+        return mouseX >= l.gridX
+                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
+                && mouseY >= l.gridY
+                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL;
+    }
+
+    /**
+     * 一个 IO 空卡的放置目标。
+     *
+     * @param machine 机器
+     * @param side    输入/输出
+     */
+    record IoDropTarget(FactorySnapshotBuilder.MachineView machine, IoSide side) {
+    }
+
+    /**
+     * 鼠标下的 IO 空卡/空槽；拖动资源时用它决定放到哪一侧。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 目标；没命中为 {@code null}
+     */
+    @Nullable
+    IoDropTarget ioDropTargetAt(double mouseX, double mouseY) {
+        TableHit hit = tableHitAt(mouseY);
+        if (hit == null) {
+            return null;
+        }
+        FactorySnapshotBuilder.MachineView machine = hit.machine();
+        if (hit.detailHeight() > 0 && mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+            if (card != null && card.empty()) {
+                return new IoDropTarget(machine, card.input() ? IoSide.INPUT : IoSide.OUTPUT);
+            }
+            return null;
+        }
+        if (mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            return null;
+        }
+        FactoryLayout l = this.layout;
+        if (l.hasColumn(FactoryLayout.COL_INPUT)
+                && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.inputs(),
+                    machine.inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
+                    hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
+            if (RuleStrip.hitAdd(strip, mouseX, mouseY)) {
+                return new IoDropTarget(machine, IoSide.INPUT);
+            }
+        }
+        if (l.hasColumn(FactoryLayout.COL_OUTPUT)
+                && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.outputs(),
+                    machine.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
+                    hit.y() + 4,
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
+                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+            if (RuleStrip.hitAdd(strip, mouseX, mouseY)) {
+                return new IoDropTarget(machine, IoSide.OUTPUT);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 鼠标是否在仓库网格上；拖规则回仓库删除时用它判断目标。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中为 {@code true}
+     */
+    boolean isInStorageGrid(double mouseX, double mouseY) {
+        if (this.activeTab != TAB_STORAGE) {
+            return false;
+        }
+        FactoryLayout l = this.layout;
+        return mouseX >= l.gridX
+                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
+                && mouseY >= l.gridY
+                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL;
+    }
+
+    /**
+     * 滚轮落在展开的 IO 面板上时，滚动卡片而不是表格。
+     *
+     * @param mouseX  屏幕 x
+     * @param mouseY  屏幕 y
+     * @param scrollY 滚轮量
+     * @return 是否消费
+     */
+    private boolean ioScrollAt(double mouseX, double mouseY, double scrollY) {
+        TableHit hit = tableHitAt(mouseY);
+        if (hit == null || hit.detailHeight() <= 0
+                || mouseY < hit.y() + FactoryLayout.ROW_H) {
+            return false;
+        }
+        if (mouseX < this.layout.leftX
+                || mouseX >= this.layout.leftX + this.layout.leftW) {
+            return false;
+        }
+        IoDetailLayout.Detail detail = IoDetailLayout.layout(this.layout, hit.machine(),
+                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
+        if (detail.maxScroll() <= 0) {
+            return true;
+        }
+        int step = (int) Math.round(scrollY * FactoryLayout.IO_SCROLL_STEP);
+        this.ioScroll = Math.max(0, Math.min(detail.maxScroll(), this.ioScroll - step));
+        return true;
+    }
+
+    /**
+     * 点击展开区卡片上的控件；空卡只作为拖放目标，不响应单击。
+     *
+     * @param machine 机器
+     * @param card    卡片
+     * @param mouseX  屏幕 x
+     * @param mouseY  屏幕 y
+     * @param button  鼠标键
+     * @return 是否消费
+     */
+    boolean handleIoCardMouse(FactorySnapshotBuilder.MachineView machine,
+            IoDetailLayout.Card card, double mouseX, double mouseY, int button) {
+        if (button != 0) {
+            return true;
+        }
+        IoSide side = card.input() ? IoSide.INPUT : IoSide.OUTPUT;
+        if (card.empty()) {
+            return true;
+        }
+        List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
+        if (card.ruleIndex() >= rules.size()) {
+            return true;
+        }
+        ResourceSpec spec = rules.get(card.ruleIndex());
+        IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
+                false, spec, mouseX, mouseY);
+        if (this.editController == null) {
+            return true;
+        }
+        switch (hit.kind()) {
+            case DELETE -> this.editController.removeRule(machine, side, spec);
+            case FACE -> this.editController.updateRule(machine, side, spec,
+                    IoCardControls.FACES[hit.faceIndex()], spec.mode());
+            case MATCH -> {
+                if (IoCardControls.matchEnabled(spec)) {
+                    MatchMode next = spec.mode() == MatchMode.IGNORE_COMPONENTS
+                            ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
+                    this.editController.updateRule(machine, side, spec, spec.face(), next);
+                }
+            }
+            case BODY -> this.editController.beginRuleDrag(machine, side, spec, mouseX, mouseY);
+            default -> {
+                // 空卡/未命中：不动作。
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 点击紧凑输入/输出列的规则图标：开始一次“拖回仓库删除”的拖拽。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @param button 鼠标键
+     * @return 是否消费
+     */
+    boolean handleRuleStripMouse(double mouseX, double mouseY, int button) {
+        if (button != 0 || this.editController == null) {
+            return false;
+        }
+        TableHit hit = tableHitAt(mouseY);
+        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            return false;
+        }
+        FactoryLayout l = this.layout;
+        if (l.hasColumn(FactoryLayout.COL_INPUT)
+                && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, hit.machine().inputs(),
+                    hit.machine().inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
+                    hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
+            RuleStrip.Entry entry = RuleStrip.hitRule(strip, mouseX, mouseY);
+            if (entry != null && entry.ruleIndex() < hit.machine().inputs().size()) {
+                this.editController.beginRuleDrag(hit.machine(), IoSide.INPUT,
+                        hit.machine().inputs().get(entry.ruleIndex()), mouseX, mouseY);
+                return true;
+            }
+            return RuleStrip.hitAdd(strip, mouseX, mouseY);
+        }
+        if (l.hasColumn(FactoryLayout.COL_OUTPUT)
+                && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
+            RuleStrip.Layout strip = RuleStrip.layout(this.font, hit.machine().outputs(),
+                    hit.machine().outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
+                    hit.y() + 4,
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
+                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+            RuleStrip.Entry entry = RuleStrip.hitRule(strip, mouseX, mouseY);
+            if (entry != null && entry.ruleIndex() < hit.machine().outputs().size()) {
+                this.editController.beginRuleDrag(hit.machine(), IoSide.OUTPUT,
+                        hit.machine().outputs().get(entry.ruleIndex()), mouseX, mouseY);
+                return true;
+            }
+            return RuleStrip.hitAdd(strip, mouseX, mouseY);
+        }
+        return false;
     }
 
     /**
@@ -1014,7 +1383,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (!this.expandedMachines.contains(machine.ref())) {
             return 0;
         }
-        int required = IoDetailRender.requiredHeight(this.layout, machine, this.font);
+        int required = IoDetailLayout.requiredHeight(this.layout, machine, this.font);
         int available = Math.max(0, this.layout.footerY - rowY - FactoryLayout.ROW_H);
         return Math.min(required, available);
     }
@@ -1116,6 +1485,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             this.expandedMachines.add(ref);
             ensureExpansionVisible(ref);
         }
+        this.ioScroll = 0;
         this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         return true;
     }
@@ -1149,55 +1519,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return;
             }
         }
-        int required = IoDetailRender.requiredHeight(this.layout, table.get(index), this.font);
+        int required = IoDetailLayout.requiredHeight(this.layout, table.get(index), this.font);
         int available = Math.max(0, this.layout.footerY - y - FactoryLayout.ROW_H);
         if (required > available) {
             this.firstRow = index;
-        }
-    }
-
-    /**
-     * 在一列宽度内画最多 3 条规则摘要。
-     *
-     * <p>每条由「18px 凹槽 + 速率文字」组成；如果第 2 条起会超出给定宽度，
-     * 就提前停止并画 {@code +N}，保证右侧展开按钮和状态文字不被顶出去。</p>
-     */
-    private void drawRuleIcons(GuiGraphics graphics, List<ResourceSpec> rules,
-            List<Long> rates, List<IoResult.Reason> reasons, int x, int y, int maxWidth) {
-        if (rules.isEmpty()) {
-            NineSlice.slot(graphics, x, y, FactoryLayout.CELL, FactoryLayout.CELL);
-            String empty = "未配置";
-            graphics.drawString(this.font,
-                    this.font.plainSubstrByWidth(empty, Math.max(0, maxWidth - FactoryLayout.CELL - 2)),
-                    x + FactoryLayout.CELL + 2, y + 5, this.theme.textDim(), false);
-            return;
-        }
-        int cursor = x;
-        int shown = 0;
-        int limit = Math.min(rules.size(), 3);
-        while (shown < limit) {
-            ResourceSpec spec = rules.get(shown);
-            long rate = shown < rates.size() ? rates.get(shown) : 0L;
-            IoResult.Reason reason = shown < reasons.size()
-                    ? reasons.get(shown) : IoResult.Reason.NO_ITEM;
-            int rateColor = FactoryLabels.rateColorUi(rate, reason, this.theme);
-            String rateText = FactoryLabels.rateText(rate, spec.key().kind());
-            int valueWidth = this.font.width(rateText);
-            int entryWidth = FactoryLayout.CELL + 2 + valueWidth + 6;
-            if (shown > 0 && cursor + entryWidth > x + maxWidth) {
-                break;
-            }
-            NineSlice.slot(graphics, cursor, y, FactoryLayout.CELL,
-                    FactoryLayout.CELL);
-            drawResourceIcon(graphics, rules.get(shown).key(), cursor + 1, y + 1);
-            graphics.drawString(this.font, rateText, cursor + FactoryLayout.CELL + 2,
-                    y + 5, rateColor, false);
-            cursor += entryWidth;
-            shown++;
-        }
-        if (rules.size() > shown) {
-            graphics.drawString(this.font, "+" + (rules.size() - shown),
-                    cursor, y + 4, this.theme.textValue(), false);
         }
     }
 
@@ -1271,22 +1596,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
     private int statusColor(FactorySnapshotBuilder.MachineView machine) {
         return statusOf(machine).color();
-    }
-
-    private static ItemStack blockStack(ResourceLocation blockId) {
-        if (blockId == null) {
-            return ItemStack.EMPTY;
-        }
-        Item item = BuiltInRegistries.BLOCK.get(blockId).asItem();
-        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
-    }
-
-    private static String blockName(ResourceLocation blockId) {
-        if (blockId == null) {
-            return "未知机器";
-        }
-        var block = BuiltInRegistries.BLOCK.get(blockId);
-        return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();
     }
 
     private void drawResourceIcon(GuiGraphics graphics, ResourceKey key, int x, int y) {
@@ -1469,7 +1778,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 机器/输入/输出列。产线下拉展开时跳过 tooltip，避免菜单和提示叠在一起。</p>
      */
     private void drawTooltips(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (this.editController != null && this.editController.isMenuOpen()) {
+        if (this.editController != null && this.editController.isOverlayActive()) {
             return;
         }
         FactoryLayout l = this.layout;
@@ -1525,6 +1834,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
 
+        if (addMachineRowContains(mouseX, mouseY)) {
+            graphics.renderComponentTooltip(this.font, List.of(
+                    FactoryLabels.colored("新增机器", this.theme.tooltip().title()),
+                    FactoryLabels.colored("在右侧机器库按住左键拖一台机器到这里",
+                            this.theme.tooltip().label())), mouseX, mouseY);
+            return;
+        }
+
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
             TableHit hit = tableHitAt(mouseY);
@@ -1537,9 +1854,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 drawExpandTooltip(graphics, machine, mouseX, mouseY);
                 return;
             }
-            IoDetailRender.Cell cell = detailCellAt(hit, mouseX, mouseY);
-            if (cell != null) {
-                drawCellTooltip(graphics, machine, cell, mouseX, mouseY);
+            IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+            if (card != null) {
+                drawCardTooltip(graphics, machine, card, mouseX, mouseY);
                 return;
             }
             // 列规则提示只对基础行有效；展开区不再回落成列提示。
@@ -1576,18 +1893,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
-     * 鼠标命中的展开区单元格。
+     * 鼠标命中的展开区卡片。
      *
-     * @return 单元格；没展开或没命中为 {@code null}
+     * @return 卡片；没展开或没命中为 {@code null}
      */
     @Nullable
-    private IoDetailRender.Cell detailCellAt(TableHit hit, double mouseX, double mouseY) {
+    private IoDetailLayout.Card detailCardAt(TableHit hit, double mouseX, double mouseY) {
         if (hit.detailHeight() <= 0) {
             return null;
         }
-        IoDetailRender.Detail detail = IoDetailRender.layout(this.layout, hit.machine(),
-                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font);
-        return IoDetailRender.hit(detail, mouseX, mouseY);
+        IoDetailLayout.Detail detail = IoDetailLayout.layout(this.layout, hit.machine(),
+                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
+        return IoDetailLayout.cardAt(detail, mouseX, mouseY);
     }
 
     /** 展开按钮的提示；和输出列规则提示区分开。 */
@@ -1608,32 +1925,71 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
-    /** 展开区单元格的完整信息：面、速率和诊断。 */
-    private void drawCellTooltip(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, IoDetailRender.Cell cell,
+    /** 展开区卡片的完整信息：规则内容、面、匹配和控件说明。 */
+    private void drawCardTooltip(GuiGraphics graphics,
+            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
             int mouseX, int mouseY) {
-        List<ResourceSpec> rules = cell.input() ? machine.inputs() : machine.outputs();
-        if (cell.ruleIndex() >= rules.size()) {
+        List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
+        GuiTheme.Tooltip tt = this.theme.tooltip();
+        List<Component> lines = new ArrayList<>();
+        if (card.empty()) {
+            lines.add(FactoryLabels.colored(card.input() ? "输入空卡" : "输出空卡", tt.title()));
+            lines.add(FactoryLabels.colored("从仓库拖一个资源到这里新增规则", tt.label()));
+            graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
             return;
         }
-        ResourceSpec spec = rules.get(cell.ruleIndex());
-        long rate = machine.ruleRate(cell.input(), cell.ruleIndex());
-        List<IoResult.Reason> reasons = cell.input()
-                ? machine.inputReasons() : machine.outputReasons();
-        IoResult.Reason reason = cell.ruleIndex() < reasons.size()
-                ? reasons.get(cell.ruleIndex()) : IoResult.Reason.NO_ITEM;
+        if (card.ruleIndex() >= rules.size()) {
+            return;
+        }
+        ResourceSpec spec = rules.get(card.ruleIndex());
+        IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
+                false, spec, mouseX, mouseY);
+        switch (hit.kind()) {
+            case DELETE -> {
+                lines.add(FactoryLabels.colored("删除规则", tt.title()));
+                lines.add(FactoryLabels.colored("点 x 删除；也可以拖回仓库", tt.label()));
+                graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+                return;
+            }
+            case FACE -> {
+                lines.add(FactoryLabels.colored("设置面", tt.title()));
+                lines.add(FactoryLabels.colored("点击设为「"
+                        + IoCardControls.FACE_LABELS[hit.faceIndex()] + "」", tt.label()));
+                graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+                return;
+            }
+            case MATCH -> {
+                lines.add(FactoryLabels.colored("匹配模式", tt.title()));
+                if (!IoCardControls.matchEnabled(spec)) {
+                    lines.add(FactoryLabels.colored("带组件物品固定精确匹配", tt.label()));
+                } else {
+                    lines.add(FactoryLabels.colored(spec.fuzzy()
+                            ? "模糊（忽略组件），点击改精确"
+                            : "精确（含组件），点击改模糊", tt.label()));
+                }
+                graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
+                return;
+            }
+            default -> {
+                // 卡片空白处：回落到规则详情。
+            }
+        }
 
-        List<Component> lines = new ArrayList<>();
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        long rate = machine.ruleRate(card.input(), card.ruleIndex());
+        List<IoResult.Reason> reasons = card.input()
+                ? machine.inputReasons() : machine.outputReasons();
+        IoResult.Reason reason = card.ruleIndex() < reasons.size()
+                ? reasons.get(card.ruleIndex()) : IoResult.Reason.NO_ITEM;
+
         lines.add(Component.empty()
-                .append(FactoryLabels.colored(cell.input() ? "输入" : "输出", tt.title()))
+                .append(FactoryLabels.colored(card.input() ? "输入" : "输出", tt.title()))
                 .append(FactoryLabels.colored(" #", tt.label()))
-                .append(FactoryLabels.colored(Integer.toString(cell.ruleIndex() + 1),
+                .append(FactoryLabels.colored(Integer.toString(card.ruleIndex() + 1),
                         tt.index()))
                 .append(FactoryLabels.colored(" · ", tt.label()))
                 .append(FactoryLabels.colored(FactoryLabels.name(spec.key()), tt.title())));
         lines.add(FactoryLabels.faceLine(
-                cell.input() ? "输入面：" : "输出面：",
+                card.input() ? "输入面：" : "输出面：",
                 faceName(spec), FactoryLabels.faceEn(spec), this.theme));
         if (spec.fuzzy()) {
             lines.add(FactoryLabels.coloredBold("忽略组件", 0xFFFF55));
@@ -1641,7 +1997,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), reason, this.theme)));
-        lines.add(FactoryLabels.state(reason, cell.input(), this.theme));
+        lines.add(FactoryLabels.state(reason, card.input(), this.theme));
+        lines.add(FactoryLabels.colored("点 x 删除；拖回仓库也可删除", tt.label()));
         graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
     }
 
@@ -1694,7 +2051,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new java.util.ArrayList<>();
         GuiTheme.Tooltip tt = this.theme.tooltip();
-        lines.add(FactoryLabels.colored(blockName(machine.blockId()), tt.title()));
+        lines.add(FactoryLabels.colored(FactoryLabels.blockName(machine.blockId()), tt.title()));
         lines.add(FactoryLabels.coloredBold(statusText(machine), statusColor(machine)));
         lines.add(FactoryLabels.colored(machine.ref().dimension().location()
                 + " " + machine.ref().pos().toShortString(), tt.label()));
@@ -1766,7 +2123,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int iconSlotY = cardY + 2;
         NineSlice.slot(graphics, iconSlotX, iconSlotY,
                 FactoryLayout.CELL, FactoryLayout.CELL);
-        ItemStack icon = blockStack(machine.blockId());
+        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconSlotX + 1, iconSlotY + 1);
 
@@ -1784,7 +2141,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         int nameWidth = Math.max(18, lampX - textX - 4);
         graphics.drawString(this.font,
-                this.font.plainSubstrByWidth(blockName(machine.blockId()), nameWidth),
+                this.font.plainSubstrByWidth(FactoryLabels.blockName(machine.blockId()), nameWidth),
                 textX, nameY, CARD_NAME, false);
         graphics.drawString(this.font, statusText, statusX, nameY, status.color(), false);
 
@@ -1803,6 +2160,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.drawString(this.font, rulesValue,
                 rulesX + this.font.width(rulesLabel), lineY,
                 this.theme.textValue(), false);
+
+        if (this.editController != null && this.editController.isDragSource(machine.ref())) {
+            graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0x66000000);
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1848,7 +2209,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 条目；空气格、非仓库 tab 或不在网格内时为 {@code null}
      */
     @Nullable
-    private FactoryStorageS2C.Entry storageEntryAt(double mouseX, double mouseY) {
+    FactoryStorageS2C.Entry storageEntryAt(double mouseX, double mouseY) {
         FactoryLayout l = this.layout;
         if (this.activeTab != TAB_STORAGE
                 || mouseX < l.gridX
@@ -1886,6 +2247,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         FactoryLayout l = this.layout;
+        if (this.searchBox != null && this.searchBox.isFocused()
+                && !this.searchBox.isMouseOver(mouseX, mouseY)) {
+            // 点击别处先退出搜索焦点，否则 R/U 会被 EditBox 当成输入吞掉。
+            this.searchBox.setFocused(false);
+        }
         boolean onLineButton = button == 0
                 && mouseY >= l.headerY + 3
                 && mouseY < l.headerY + 3 + FactoryLayout.TAB_H
@@ -1896,11 +2262,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.editController != null
                 && this.editController.mouseClicked(mouseX, mouseY, button)) {
             return true;
-        }
-        if (this.searchBox != null && this.searchBox.isFocused()
-                && !this.searchBox.isMouseOver(mouseX, mouseY)) {
-            // 点击别处先退出搜索焦点，否则 R/U 会被 EditBox 当成输入吞掉。
-            this.searchBox.setFocused(false);
         }
         if (onLineButton) {
             // 下拉打开时，控制器已经把这次“点外部”的点击吃掉并关闭了下拉；
@@ -1940,6 +2301,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         if (clickMachineExpand(mouseX, mouseY)) {
             return true;
+        }
+        if (handleRuleStripMouse(mouseX, mouseY, button)) {
+            return true;
+        }
+        TableHit ioHit = tableHitAt(mouseY);
+        if (ioHit != null && ioHit.detailHeight() > 0
+                && mouseY >= ioHit.y() + FactoryLayout.ROW_H) {
+            IoDetailLayout.Card card = detailCardAt(ioHit, mouseX, mouseY);
+            if (card != null) {
+                handleIoCardMouse(ioHit.machine(), card, mouseX, mouseY, button);
+                return true;
+            }
         }
         if (this.activeTab == TAB_STORAGE
                 && mouseX >= l.gridX
@@ -2064,6 +2437,43 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
+     * 鼠标拖动：优先交给编辑控制器做机器/资源拖拽。
+     *
+     * @param mouseX     屏幕 x
+     * @param mouseY     屏幕 y
+     * @param button     鼠标键
+     * @param dragX      水平拖动量
+     * @param dragY      垂直拖动量
+     * @return 是否消费
+     */
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
+            double dragY) {
+        if (this.editController != null
+                && this.editController.mouseDragged(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    /**
+     * 鼠标松开：优先交给编辑控制器结算拖放。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @param button 鼠标键
+     * @return 是否消费
+     */
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (this.editController != null
+                && this.editController.mouseReleased(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
+    }
+
+    /**
      * 滚轮：仓库格上的 Shift+滚轮是「移动一个」，其余位置是列表滚动。
      *
      * <p>Shift 只在仓库格里接管，避免玩家想滚动列表时误触发存取。左表、仓库、
@@ -2073,6 +2483,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (this.editController != null
                 && this.editController.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
+        }
+        if (ioScrollAt(mouseX, mouseY, scrollY)) {
             return true;
         }
         FactoryLayout l = this.layout;
@@ -2147,7 +2560,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (this.layout == null) {
             return null;
         }
-        if (this.editController != null && this.editController.isMenuOpen()) {
+        if (this.editController != null && this.editController.isOverlayActive()) {
             return null;
         }
         FactoryLayout l = this.layout;
@@ -2197,7 +2610,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
                     FactorySnapshotBuilder.MachineView machine =
                             this.filteredMachines.get(index);
-                    ItemStack stack = blockStack(machine.blockId());
+                    ItemStack stack = FactoryLabels.blockStack(machine.blockId());
                     if (!stack.isEmpty()) {
                         return new JeiTarget(stack, new Rect2i(iconX, iconY,
                                 FactoryLayout.CELL, FactoryLayout.CELL));
@@ -2218,17 +2631,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     return null;
                 }
 
-                // 展开区单元格：位置必须和绘制共用同一份排版。
-                IoDetailRender.Cell cell = detailCellAt(hit, mouseX, mouseY);
-                if (cell != null) {
-                    List<ResourceSpec> rules = cell.input()
-                            ? machine.inputs() : machine.outputs();
-                    if (cell.ruleIndex() < rules.size()) {
-                        ItemStack stack = iconStack(rules.get(cell.ruleIndex()).key());
-                        if (!stack.isEmpty()) {
-                            return new JeiTarget(stack, new Rect2i(
-                                    cell.x() + 4, cell.y() + 5,
-                                    FactoryLayout.CELL, FactoryLayout.CELL));
+                // 展开区配置卡：只有左上角资源槽是 JEI 目标；面/匹配/删除按钮不返回。
+                IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+                if (card != null) {
+                    if (!card.empty()
+                            && inside(mouseX, mouseY, card.x() + 3, card.y() + 3,
+                                    FactoryLayout.CELL, FactoryLayout.CELL)) {
+                        List<ResourceSpec> rules = card.input()
+                                ? machine.inputs() : machine.outputs();
+                        if (card.ruleIndex() < rules.size()) {
+                            ItemStack stack = iconStack(rules.get(card.ruleIndex()).key());
+                            if (!stack.isEmpty()) {
+                                return new JeiTarget(stack, new Rect2i(
+                                        card.x() + 4, card.y() + 4,
+                                        FactoryLayout.CELL, FactoryLayout.CELL));
+                            }
                         }
                     }
                     return null;
@@ -2242,7 +2659,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 int iconX = l.columnX(FactoryLayout.COL_NAME) + 4;
                 if (inside(mouseX, mouseY, iconX, y + 4,
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
-                    ItemStack stack = blockStack(machine.blockId());
+                    ItemStack stack = FactoryLabels.blockStack(machine.blockId());
                     if (!stack.isEmpty()) {
                         return new JeiTarget(stack, new Rect2i(iconX, y + 4,
                                 FactoryLayout.CELL, FactoryLayout.CELL));

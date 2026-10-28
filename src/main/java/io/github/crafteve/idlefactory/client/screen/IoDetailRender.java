@@ -1,9 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
+import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
@@ -13,14 +13,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * 左表机器行的展开详情：输入/输出规则面板。
+ * 展开 IO 面板的绘制层：段头、配置卡、空卡、滚动条。
  *
- * <p>数据来自服务端快照里的 {@link FactorySnapshotBuilder.MachineView}，面板只做排版：
- * 每个配置规则生成一个单元格，显示图标、速率、面和最近一次诊断。槽位数量严格等于
- * 规则条数，0 条时只留一行「未配置」。</p>
- *
- * <p>绘制、tooltip 和 JEI 命中都必须先调用 {@link #layout}，否则三套坐标会各算各的。
- * 面板高度由动画进度决定，但只有整行单元格会画出来，避免半行贴图。</p>
+ * <p>只读 {@link IoDetailLayout.Detail} 的绝对坐标；不自己算布局。卡片控件（面、匹配、删除）
+ * 的矩形来自 {@link IoCardControls}，和点击命中共用一份。</p>
  */
 final class IoDetailRender {
     /** 深色段头上的冷白。 */
@@ -33,260 +29,54 @@ final class IoDetailRender {
     }
 
     /**
-     * 一个规则单元格。
-     *
-     * @param x         左边缘
-     * @param y         上边缘
-     * @param width     宽度
-     * @param height    高度
-     * @param input     是否输入侧
-     * @param ruleIndex 在该侧规则列表里的下标
-     */
-    record Cell(int x, int y, int width, int height, boolean input, int ruleIndex) {
-    }
-
-    /**
-     * 一个段（输入或输出）。
-     *
-     * @param input   是否输入侧
-     * @param headerY 段头上边缘
-     * @param rules   该侧规则条数
-     */
-    record Section(boolean input, int headerY, int rules) {
-    }
-
-    /**
-     * 一次排版的结果。
-     *
-     * @param x             面板左边缘
-     * @param y             面板上边缘
-     * @param width         面板宽度
-     * @param height        当前动画高度（已夹紧）
-     * @param sections      两个段
-     * @param cells         可见单元格
-     * @param inputUnshown  输入侧因高度不足没画出的条数
-     * @param outputUnshown 输出侧因高度不足没画出的条数
-     */
-    record Detail(int x, int y, int width, int height,
-            List<Section> sections, List<Cell> cells,
-            int inputUnshown, int outputUnshown) {
-
-        Detail {
-            sections = List.copyOf(sections);
-            cells = List.copyOf(cells);
-        }
-    }
-
-    /** 单元格高度。 */
-    private static final int CELL_H = FactoryLayout.IO_CELL_H;
-    /** 单元格之间的间距。 */
-    private static final int GAP = FactoryLayout.IO_GAP;
-    /** 名字之外固定占用的宽度：图标、左右内边距、速率与名字之间的间隔。 */
-    private static final int CELL_CHROME = 76;
-
-    /**
-     * 一个规则单元格相对段内容起点的位置。
-     *
-     * @param x         左边缘（相对内容区）
-     * @param rowY      所在行的 y（相对内容区）
-     * @param width     宽度；整行卡等于内容区宽度
-     * @param ruleIndex 在该侧规则列表里的下标
-     */
-    private record Placement(int x, int rowY, int width, int ruleIndex) {
-    }
-
-    /**
-     * 展开面板的完整所需高度（未夹紧）。
-     *
-     * @param layout  布局
-     * @param machine 机器视图
-     * @param font    字体，用来判断名字是否需要整行
-     * @return 高度
-     */
-    static int requiredHeight(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
-            Font font) {
-        return FactoryLayout.IO_PANEL_PAD * 2
-                + sectionHeight(place(layout, machine.inputs(), font))
-                + FactoryLayout.IO_SECTION_GAP
-                + sectionHeight(place(layout, machine.outputs(), font));
-    }
-
-    /**
-     * 计算当前动画高度下的面板与单元格位置。
-     *
-     * @param layout         布局
-     * @param machine        机器视图
-     * @param topY           面板上边缘（基础行底部）
-     * @param animatedHeight 动画后的高度
-     * @param font           字体，用来判断名字是否需要整行
-     * @return 排版结果
-     */
-    static Detail layout(FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
-            int topY, int animatedHeight, Font font) {
-        int height = Math.max(0, animatedHeight);
-        int x = layout.leftX + 2;
-        int width = layout.ioPanelWidth();
-        int contentX = x + FactoryLayout.IO_PANEL_PAD;
-        int bottomLimit = topY + height - FactoryLayout.IO_PANEL_PAD;
-
-        List<Section> sections = new ArrayList<>(2);
-        List<Cell> cells = new ArrayList<>();
-        int cursorY = topY + FactoryLayout.IO_PANEL_PAD;
-
-        List<Placement> inputPlacements = place(layout, machine.inputs(), font);
-        int inputRules = machine.inputs().size();
-        int inputUnshown = addSection(sections, cells, true, inputRules, cursorY,
-                contentX, inputPlacements, bottomLimit);
-        cursorY += sectionHeight(inputPlacements) + FactoryLayout.IO_SECTION_GAP;
-
-        List<Placement> outputPlacements = place(layout, machine.outputs(), font);
-        int outputRules = machine.outputs().size();
-        int outputUnshown = addSection(sections, cells, false, outputRules, cursorY,
-                contentX, outputPlacements, bottomLimit);
-
-        return new Detail(x, topY, width, height, sections, cells, inputUnshown, outputUnshown);
-    }
-
-    /**
-     * 排一段规则：短名字两列，长名字整行，后面的卡片自动换行。
-     *
-     * <p>只做相对坐标；绝对坐标由 {@link #layout} 加上段头起点。整行卡关行，半行卡按
-     * {@link FactoryLayout#ioCellsPerRow()} 的列数排。</p>
-     */
-    private static List<Placement> place(FactoryLayout layout, List<ResourceSpec> rules, Font font) {
-        int innerW = layout.ioInnerWidth();
-        int cellW = Math.min(layout.ioCellWidth(), innerW);
-        if (rules.isEmpty() || innerW <= 0) {
-            return List.of();
-        }
-        List<Placement> result = new ArrayList<>(rules.size());
-        int rowY = 0;
-        int used = 0;
-        for (int i = 0; i < rules.size(); i++) {
-            ResourceSpec spec = rules.get(i);
-            int width = needsFullRow(font, spec, cellW) ? innerW : cellW;
-            if (used > 0 && (width >= innerW || used + GAP + width > innerW)) {
-                rowY += CELL_H + GAP;
-                used = 0;
-            }
-            int cellX = used == 0 ? 0 : used + GAP;
-            result.add(new Placement(cellX, rowY, width, i));
-            used = used == 0 ? width : used + GAP + width;
-            if (width >= innerW || used >= innerW) {
-                rowY += CELL_H + GAP;
-                used = 0;
-            }
-        }
-        return result;
-    }
-
-    /**
-     * 这一条规则是否需要占满一行。
-     *
-     * <p>按名字像素宽度估算：名字 + 图标/速率/边距超过标准半宽就整行。这样长药水名不会被
-     * 截成一半，短名字仍然保持两列。</p>
-     */
-    private static boolean needsFullRow(Font font, ResourceSpec spec, int cellW) {
-        return font.width(FactoryLabels.name(spec.key())) + CELL_CHROME > cellW;
-    }
-
-    /** 一段（输入或输出）需要的高度；0 条规则时仍留一行给「未配置」。 */
-    private static int sectionHeight(List<Placement> placements) {
-        int rowsHeight = placements.isEmpty()
-                ? CELL_H
-                : placements.get(placements.size() - 1).rowY() + CELL_H;
-        return FactoryLayout.IO_SECTION_H + GAP + rowsHeight;
-    }
-
-    /**
-     * 追加一段并收集放得下的单元格。
-     *
-     * @return 因高度不足没放下的条数
-     */
-    private static int addSection(List<Section> sections, List<Cell> cells,
-            boolean input, int rules, int headerY, int contentX,
-            List<Placement> placements, int bottomLimit) {
-        sections.add(new Section(input, headerY, rules));
-        if (rules <= 0) {
-            return 0;
-        }
-        int startY = headerY + FactoryLayout.IO_SECTION_H + GAP;
-        for (Placement placement : placements) {
-            int cellY = startY + placement.rowY();
-            if (cellY + CELL_H > bottomLimit) {
-                return rules - placement.ruleIndex();
-            }
-            cells.add(new Cell(contentX + placement.x(), cellY,
-                    placement.width(), CELL_H, input, placement.ruleIndex()));
-        }
-        return 0;
-    }
-
-    /**
-     * 鼠标命中的单元格。
-     *
-     * @param detail 排版结果
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 单元格；没命中为 {@code null}
-     */
-    static Cell hit(Detail detail, double mouseX, double mouseY) {
-        for (Cell cell : detail.cells()) {
-            if (inside(mouseX, mouseY, cell.x(), cell.y(), cell.width(), cell.height())) {
-                return cell;
-            }
-        }
-        return null;
-    }
-
-    /**
      * 画整个展开面板。
      *
-     * @param graphics 画布
-     * @param font     字体
-     * @param theme    主题
-     * @param layout   布局
-     * @param machine  机器视图
-     * @param detail   排版结果
-     * @param mouseX   鼠标 x（用于单元格悬停）
-     * @param mouseY   鼠标 y
+     * @param graphics         画布
+     * @param font             字体
+     * @param theme            主题
+     * @param layout           主布局（取内宽等）
+     * @param machine          机器视图
+     * @param detail           滚动布局
+     * @param mouseX           鼠标 x
+     * @param mouseY           鼠标 y
+     * @param draggingResource 是否正在拖资源
      */
     static void draw(GuiGraphics graphics, Font font, GuiTheme theme, FactoryLayout layout,
-            FactorySnapshotBuilder.MachineView machine, Detail detail, int mouseX, int mouseY) {
-        if (detail.height() <= 0) {
+            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Detail detail,
+            int mouseX, int mouseY, boolean draggingResource) {
+        if (detail.panelH() <= 0 || detail.panelW() <= 0) {
             return;
         }
-        NineSlice.ioPanel(graphics, detail.x(), detail.y(), detail.width(), detail.height());
+        NineSlice.ioPanel(graphics, detail.panelX(), detail.panelY(),
+                detail.panelW(), detail.panelH());
 
-        for (Section section : detail.sections()) {
-            drawSection(graphics, font, theme, layout, machine, detail, section);
+        graphics.enableScissor(detail.panelX() + 1, detail.panelY() + 1,
+                detail.panelX() + detail.panelW() - 1,
+                detail.panelY() + detail.panelH() - 1);
+        for (IoDetailLayout.Section section : detail.sections()) {
+            drawSection(graphics, font, theme, layout, detail, section);
         }
-        for (Cell cell : detail.cells()) {
-            drawCell(graphics, font, theme, machine, cell, mouseX, mouseY);
+        for (IoDetailLayout.Card card : detail.cards()) {
+            if (card.y() + FactoryLayout.IO_CARD_H < detail.panelY()
+                    || card.y() > detail.panelY() + detail.panelH()) {
+                continue;
+            }
+            if (card.empty()) {
+                drawEmptyCard(graphics, font, theme, card, mouseX, mouseY, draggingResource);
+            } else {
+                drawRuleCard(graphics, font, theme, machine, card, mouseX, mouseY);
+            }
         }
-
-        int unshown = detail.inputUnshown() + detail.outputUnshown();
-        if (unshown > 0) {
-            String note = "还有 " + unshown + " 条";
-            graphics.drawString(font, note,
-                    detail.x() + detail.width() - 4 - font.width(note),
-                    detail.y() + detail.height() - 11, theme.textDim(), false);
-        }
+        graphics.disableScissor();
+        drawScrollbar(graphics, detail);
     }
 
-    /** 画一个段头和它的「未配置」占位。 */
     private static void drawSection(GuiGraphics graphics, Font font, GuiTheme theme,
-            FactoryLayout layout, FactorySnapshotBuilder.MachineView machine,
-            Detail detail, Section section) {
-        if (section.headerY() + FactoryLayout.IO_SECTION_H > detail.y() + detail.height() - 1) {
-            return;
-        }
-        int contentX = detail.x() + FactoryLayout.IO_PANEL_PAD;
+            FactoryLayout layout, IoDetailLayout.Detail detail, IoDetailLayout.Section section) {
+        int contentX = detail.panelX() + FactoryLayout.IO_PANEL_PAD;
         int innerW = layout.ioInnerWidth();
-        // 深色卡片：上/左亮边、下/右 2px 深阴影，和浅色物品卡同一套立体。
-        NineSlice.ioHeader(graphics, contentX, section.headerY(),
-                innerW, FactoryLayout.IO_SECTION_H);
-
+        NineSlice.ioHeader(graphics, contentX, section.headerY(), innerW,
+                FactoryLayout.IO_SECTION_H);
         String label = (section.input() ? "输入" : "输出") + " · ";
         String count = Integer.toString(section.rules());
         graphics.drawString(font, label, contentX + 4, section.headerY() + 2,
@@ -296,75 +86,160 @@ final class IoDetailRender {
         graphics.drawString(font, " 条", contentX + 4 + font.width(label) + font.width(count),
                 section.headerY() + 2, HEADER_TEXT, false);
 
-        long rate = section.input() ? machine.rateIn() : machine.rateOut();
-        String rateText = FactoryLabels.count(rate) + "/s";
+        String rateText = FactoryLabels.count(section.rate()) + "/s";
         graphics.drawString(font, rateText,
-                contentX + innerW - 4 - font.width(rateText),
-                section.headerY() + 2,
-                rate > 0L ? theme.statusRun() : HEADER_TEXT, false);
-
-        if (section.rules() == 0) {
-            int textY = section.headerY() + FactoryLayout.IO_SECTION_H
-                    + FactoryLayout.IO_GAP + (FactoryLayout.IO_CELL_H - 9) / 2;
-            graphics.drawString(font, "未配置", contentX + 4, textY, theme.textDim(), false);
-        }
+                contentX + innerW - 4 - font.width(rateText), section.headerY() + 2,
+                section.rate() > 0L ? theme.statusRun() : HEADER_TEXT, false);
     }
 
-    /** 画一个规则单元格：状态条、图标槽、速率、面与诊断。 */
-    private static void drawCell(GuiGraphics graphics, Font font, GuiTheme theme,
-            FactorySnapshotBuilder.MachineView machine, Cell cell, int mouseX, int mouseY) {
-        List<ResourceSpec> rules = cell.input() ? machine.inputs() : machine.outputs();
-        if (cell.ruleIndex() >= rules.size()) {
+    private static void drawEmptyCard(GuiGraphics graphics, Font font, GuiTheme theme,
+            IoDetailLayout.Card card, int mouseX, int mouseY, boolean draggingResource) {
+        boolean hovered = inside(mouseX, mouseY, card.x(), card.y(),
+                card.width(), FactoryLayout.IO_CARD_H);
+        if (hovered) {
+            NineSlice.ioCellHover(graphics, card.x(), card.y(),
+                    card.width(), FactoryLayout.IO_CARD_H);
+        } else {
+            NineSlice.ioCell(graphics, card.x(), card.y(),
+                    card.width(), FactoryLayout.IO_CARD_H);
+        }
+        int slotX = card.x() + (card.width() - FactoryLayout.CELL) / 2;
+        int slotY = card.y() + 8;
+        NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
+        graphics.drawString(font, "+",
+                slotX + (FactoryLayout.CELL - font.width("+")) / 2, slotY + 5,
+                draggingResource && hovered ? theme.statusRun() : theme.textDim(), false);
+        String hint = "拖入资源";
+        graphics.drawString(font, hint,
+                card.x() + (card.width() - font.width(hint)) / 2, card.y() + 31,
+                draggingResource && hovered ? theme.statusRun() : theme.textDim(), false);
+    }
+
+    private static void drawRuleCard(GuiGraphics graphics, Font font, GuiTheme theme,
+            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
+            int mouseX, int mouseY) {
+        List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
+        if (card.ruleIndex() >= rules.size()) {
             return;
         }
-        ResourceSpec spec = rules.get(cell.ruleIndex());
-        long rate = cell.input() ? machine.ruleRate(true, cell.ruleIndex())
-                : machine.ruleRate(false, cell.ruleIndex());
-        List<IoResult.Reason> reasons = cell.input()
+        ResourceSpec spec = rules.get(card.ruleIndex());
+        long rate = machine.ruleRate(card.input(), card.ruleIndex());
+        List<IoResult.Reason> reasons = card.input()
                 ? machine.inputReasons() : machine.outputReasons();
-        IoResult.Reason reason = cell.ruleIndex() < reasons.size()
-                ? reasons.get(cell.ruleIndex()) : IoResult.Reason.NO_ITEM;
+        IoResult.Reason reason = card.ruleIndex() < reasons.size()
+                ? reasons.get(card.ruleIndex()) : IoResult.Reason.NO_ITEM;
 
-        boolean hovered = inside(mouseX, mouseY, cell.x(), cell.y(), cell.width(), cell.height());
+        boolean hovered = inside(mouseX, mouseY, card.x(), card.y(),
+                card.width(), FactoryLayout.IO_CARD_H);
         if (hovered) {
-            NineSlice.ioCellHover(graphics, cell.x(), cell.y(), cell.width(), cell.height());
+            NineSlice.ioCellHover(graphics, card.x(), card.y(),
+                    card.width(), FactoryLayout.IO_CARD_H);
         } else {
-            NineSlice.ioCell(graphics, cell.x(), cell.y(), cell.width(), cell.height());
+            NineSlice.ioCell(graphics, card.x(), card.y(),
+                    card.width(), FactoryLayout.IO_CARD_H);
         }
         NineSlice.fill(graphics, FactoryLabels.reasonStrip(reason),
-                cell.x() + 1, cell.y() + 2, 1, cell.height() - 4);
+                card.x() + 1, card.y() + 2, 1, FactoryLayout.IO_CARD_H - 4);
 
-        int slotX = cell.x() + 3;
-        int slotY = cell.y() + 4;
+        int slotX = card.x() + 3;
+        int slotY = card.y() + 3;
         NineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
         ResourceIconRenderer.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
+        int textX = slotX + FactoryLayout.CELL + 3;
+        int deleteX = card.x() + card.width() - FactoryLayout.IO_DELETE_SIZE - 3;
+        int nameWidth = Math.max(0, deleteX - textX - 2);
+        graphics.drawString(font,
+                font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
+                textX, card.y() + 4, theme.textPrimary(), false);
         String rateText = FactoryLabels.rateText(rate, spec.key().kind());
-        int rateColor = FactoryLabels.rateColorUi(rate, reason, theme);
-        int rateWidth = font.width(rateText);
-        int rateX = cell.x() + cell.width() - 4 - rateWidth;
-        int textX = slotX + FactoryLayout.CELL + 4;
-        int nameWidth = rateX - textX - 4;
-        if (nameWidth > 0) {
-            graphics.drawString(font,
-                    font.plainSubstrByWidth(FactoryLabels.name(spec.key()), nameWidth),
-                    textX, cell.y() + 4, theme.textPrimary(), false);
-        }
-        graphics.drawString(font, rateText, rateX, cell.y() + 4, rateColor, false);
+        graphics.drawString(font, rateText, textX, card.y() + 14,
+                FactoryLabels.rateColorUi(rate, reason, theme), false);
 
-        int lineY = cell.y() + 14;
-        String face = FactoryLabels.face(spec);
-        graphics.drawString(font, face, textX, lineY, theme.textFace(), false);
-        int reasonX = textX + font.width(face) + 4;
-        int reasonWidth = cell.x() + cell.width() - 4 - reasonX;
-        String reasonText = FactoryLabels.reason(reason, cell.input());
-        graphics.drawString(font, font.plainSubstrByWidth(reasonText, Math.max(0, reasonWidth)),
-                reasonX, lineY, FactoryLabels.reasonColor(reason, theme), false);
+        drawDelete(graphics, font, theme, card, mouseX, mouseY);
+        drawFaceButtons(graphics, font, theme, card, spec, mouseX, mouseY);
+        drawMatch(graphics, font, theme, card, spec, mouseX, mouseY);
     }
 
-    /** 鼠标是否落在给定矩形内。 */
-    private static boolean inside(double mouseX, double mouseY,
-            int x, int y, int width, int height) {
+    private static void drawDelete(GuiGraphics graphics, Font font, GuiTheme theme,
+            IoDetailLayout.Card card, int mouseX, int mouseY) {
+        IoCardControls.Rect rect = IoCardControls.deleteRect(card.x(), card.y(), card.width());
+        boolean hovered = inside(mouseX, mouseY, rect);
+        if (hovered) {
+            NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+        } else {
+            NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+        }
+        graphics.drawString(font, "x",
+                rect.x() + (rect.width() - font.width("x")) / 2, rect.y() + 2,
+                hovered ? theme.error() : theme.textPrimary(), false);
+    }
+
+    private static void drawFaceButtons(GuiGraphics graphics, Font font, GuiTheme theme,
+            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
+        for (int i = 0; i < IoCardControls.FACES.length; i++) {
+            IoCardControls.Rect rect = IoCardControls.faceRect(card.x(), card.y(), i);
+            boolean hovered = inside(mouseX, mouseY, rect);
+            if (hovered) {
+                NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+            } else {
+                NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+            }
+            if (IoCardControls.faceSelected(spec, i)) {
+                NineSlice.fill(graphics, GuiTextures.ROW_ALT, rect.x() + 1, rect.y() + 1,
+                        rect.width() - 2, rect.height() - 2);
+            }
+            String label = IoCardControls.FACE_LABELS[i];
+            graphics.drawString(font, label,
+                    rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
+                    IoCardControls.faceSelected(spec, i)
+                            ? theme.textValue() : theme.textPrimary(), false);
+        }
+    }
+
+    private static void drawMatch(GuiGraphics graphics, Font font, GuiTheme theme,
+            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
+        if (!IoCardControls.matchVisible(spec)) {
+            return;
+        }
+        IoCardControls.Rect rect = IoCardControls.matchRect(card.x(), card.y());
+        boolean enabled = IoCardControls.matchEnabled(spec);
+        boolean hovered = enabled && inside(mouseX, mouseY, rect);
+        if (!enabled) {
+            NineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+        } else if (hovered) {
+            NineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
+        } else {
+            NineSlice.slice(graphics, GuiTextures.BUTTON_MATCH, GuiTextures.BUTTON_SIZE, 1,
+                    rect.x(), rect.y(), rect.width(), rect.height());
+        }
+        String label = IoCardControls.matchLabel(spec);
+        graphics.drawString(font, label,
+                rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
+                enabled ? 0xFF4A3200 : theme.textDim(), false);
+    }
+
+    private static void drawScrollbar(GuiGraphics graphics, IoDetailLayout.Detail detail) {
+        if (detail.maxScroll() <= 0) {
+            return;
+        }
+        int trackX = detail.panelX() + detail.panelW() - 4;
+        int trackY = detail.panelY() + 4;
+        int trackH = Math.max(1, detail.panelH() - 8);
+        int thumbH = Math.max(12,
+                trackH * detail.panelH() / Math.max(1, detail.contentH() + 8));
+        int thumbY = trackY + (trackH - thumbH) * detail.scroll()
+                / Math.max(1, detail.maxScroll());
+        graphics.fill(trackX, trackY, trackX + 2, trackY + trackH, 0x40000000);
+        graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0xFF4D6A8A);
+    }
+
+    private static boolean inside(double mouseX, double mouseY, IoCardControls.Rect rect) {
+        return inside(mouseX, mouseY, rect.x(), rect.y(), rect.width(), rect.height());
+    }
+
+    private static boolean inside(double mouseX, double mouseY, int x, int y, int width,
+            int height) {
         return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + height;
     }
 }

@@ -67,6 +67,22 @@ public final class FactoryLayout {
     public static final int IO_SECTION_H = 12;
     /** 单个规则单元格高度。 */
     public static final int IO_CELL_H = 26;
+    /** 配置卡高度：比只读单元格高，容纳两行面按钮和匹配按钮。 */
+    public static final int IO_CARD_H = 54;
+    /** 配置卡顶部信息区高度。 */
+    public static final int IO_CARD_TOP_H = 22;
+    /** 配置卡面按钮宽。 */
+    public static final int IO_FACE_BTN_W = 16;
+    /** 配置卡面按钮高。 */
+    public static final int IO_FACE_BTN_H = 12;
+    /** 面按钮之间的间距。 */
+    public static final int IO_FACE_GAP = 1;
+    /** 配置卡内边距。 */
+    public static final int IO_CARD_PAD = 3;
+    /** 配置卡删除按钮边长。 */
+    public static final int IO_DELETE_SIZE = 12;
+    /** 展开区滚轮一次滚动的像素。 */
+    public static final int IO_SCROLL_STEP = 20;
     /** 单个规则单元格最大宽度。 */
     public static final int IO_CELL_W = 132;
     /** 单个规则单元格最小宽度；再窄就放不下「速率 + 面 + 诊断」。 */

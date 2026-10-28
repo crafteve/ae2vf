@@ -42,6 +42,11 @@ BUTTON_BG = (0xD8, 0xD9, 0xDF)
 BUTTON_DARK = (0x87, 0x8F, 0xA5)
 BUTTON_LIGHT = (0xF2, 0xF2, 0xF2)
 
+# 匹配按钮（黄色）
+MATCH_BG = (0xF2, 0xD2, 0x7A)
+MATCH_DARK = (0xA8, 0x7E, 0x22)
+MATCH_LIGHT = (0xFF, 0xEF, 0xB8)
+
 # 输入框
 FIELD_BG = (0x9A, 0x9F, 0xB4)
 FIELD_BORDER = (0x4D, 0x4D, 0x67)
@@ -148,6 +153,17 @@ def button(width: int = 6, height: int = 6, border: int = 1) -> Image.Image:
     rect(img, 0, height - 1, width, 1, BUTTON_DARK)
     rect(img, width - 1, 0, 1, height, BUTTON_DARK)
     img.load()[0, height - 1] = BUTTON_DARK
+    return img
+
+
+def match_button(width: int = 6, height: int = 6) -> Image.Image:
+    """黄色匹配按钮：与普通按钮同一套凸起，换成暖黄调色板。"""
+    img = Image.new("RGBA", (width, height), MATCH_BG)
+    rect(img, 0, 0, width, 1, MATCH_LIGHT)
+    rect(img, 0, 0, 1, height, MATCH_LIGHT)
+    rect(img, 0, height - 1, width, 1, MATCH_DARK)
+    rect(img, width - 1, 0, 1, height, MATCH_DARK)
+    img.load()[0, height - 1] = MATCH_DARK
     return img
 
 
@@ -336,6 +352,7 @@ SPECS = {
     "slot": (slot, "凹槽格子：九宫格 border=1"),
     "slot_hover": (slot_hover, "仓库悬停格：18×18 浅蓝底"),
     "button": (button, "凸起按钮：九宫格 border=1"),
+    "button_match": (match_button, "黄色匹配按钮：九宫格 border=1"),
     "field": (field, "输入框：九宫格 border=1"),
     "search_bg": (lambda: solid(SEARCH_BG), "搜索框纯色底：1×1"),
     "search_border": (lambda: solid(SEARCH_BORDER), "搜索框边框：1×1"),

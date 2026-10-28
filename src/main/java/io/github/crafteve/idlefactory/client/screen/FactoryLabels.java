@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.Locale;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.client.theme.GuiTheme;
 import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
@@ -27,6 +29,34 @@ import net.minecraft.world.item.Items;
 final class FactoryLabels {
     private FactoryLabels() {
         // 纯静态工具类
+    }
+
+    /**
+     * 机器方块对应的物品图标。
+     *
+     * @param blockId 观测到的方块 id
+     * @return 图标；未知方块返回空栈
+     */
+    static ItemStack blockStack(@Nullable ResourceLocation blockId) {
+        if (blockId == null) {
+            return ItemStack.EMPTY;
+        }
+        Item item = BuiltInRegistries.BLOCK.get(blockId).asItem();
+        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+    }
+
+    /**
+     * 机器方块的显示名。
+     *
+     * @param blockId 观测到的方块 id
+     * @return 名称；未知方块返回注册名或“未知机器”
+     */
+    static String blockName(@Nullable ResourceLocation blockId) {
+        if (blockId == null) {
+            return "未知机器";
+        }
+        var block = BuiltInRegistries.BLOCK.get(blockId);
+        return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();
     }
 
     /**
