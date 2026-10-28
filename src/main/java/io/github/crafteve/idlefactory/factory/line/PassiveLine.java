@@ -26,7 +26,7 @@ public final class PassiveLine {
     private static final String TAG_GROUPS = "Groups";
 
     private final UUID id;
-    private final String name;
+    private String name;
     private boolean running;
     private final List<IoGroup> groups = new ArrayList<>();
 
@@ -47,6 +47,18 @@ public final class PassiveLine {
     /** 产线名。 */
     public String name() {
         return this.name;
+    }
+
+    /**
+     * 只改产线名，id 不变。
+     *
+     * <p>界面重命名和 {@code /idf line <line> rename} 共用；名字的唯一性和保留字由
+     * {@code LineActions} 在外面校验，这里不做业务判断。</p>
+     *
+     * @param name 新名字（已由调用方 trim）
+     */
+    public void rename(String name) {
+        this.name = name;
     }
 
     /** 是否运行中。 */

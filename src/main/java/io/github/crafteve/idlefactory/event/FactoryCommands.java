@@ -214,6 +214,12 @@ public final class FactoryCommands {
                         .then(Commands.literal("delete")
                                 .executes(audit("line.delete",
                                         context -> LineService.delete(player(context), lineRef(context)))))
+                        .then(Commands.literal("rename")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(audit("line.rename",
+                                                context -> LineService.rename(player(context),
+                                                        lineRef(context),
+                                                        StringArgumentType.getString(context, "name"))))))
                         .then(Commands.literal("add")
                                 .then(Commands.argument("machine", StringArgumentType.word())
                                         .suggests(freeMachines())

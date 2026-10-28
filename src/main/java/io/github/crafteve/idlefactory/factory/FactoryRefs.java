@@ -29,7 +29,8 @@ public final class FactoryRefs {
      * {@code /idf line create}。建线时直接拒绝这些名字，比事后猜「为什么这条线点不到」便宜。</p>
      */
     private static final List<String> RESERVED_NAMES = List.of(
-            "create", "delete", "info", "start", "end", "add", "remove", "manage", "list");
+            "create", "delete", "info", "start", "end", "add", "remove", "manage", "list",
+            "rename");
 
     private FactoryRefs() {
         // 纯静态工具类
@@ -163,6 +164,23 @@ public final class FactoryRefs {
             }
         }
         return names;
+    }
+
+    /**
+     * 一台机器挂在哪些产线上（按产线登记顺序），给界面按 id 精确筛选。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return 产线 id 列表；与 {@link #lineNamesOf} 同序
+     */
+    public static List<UUID> lineIdsOf(Factory factory, UUID machineId) {
+        List<UUID> ids = new ArrayList<>();
+        for (PassiveLine line : factory.lines().all()) {
+            if (line.groupByMachine(machineId).isPresent()) {
+                ids.add(line.id());
+            }
+        }
+        return ids;
     }
 
     /**

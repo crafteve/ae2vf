@@ -108,6 +108,45 @@ public final class IoGroup {
         return this.outputs.removeIf(spec -> spec.key().equals(key));
     }
 
+    /**
+     * 按资源替换一条输入规则。
+     *
+     * <p>界面在配置卡上改面或匹配模式时用；规则的身份仍是 key，只换面/模式，
+     * 不改变列表顺序。</p>
+     *
+     * @param key         原规则 key
+     * @param replacement 新规则；key 必须与原规则一致
+     * @return 是否找到并替换
+     */
+    public boolean replaceInput(ResourceKey key, ResourceSpec replacement) {
+        return replace(this.inputs, key, replacement);
+    }
+
+    /**
+     * 按资源替换一条输出规则。
+     *
+     * @param key         原规则 key
+     * @param replacement 新规则；key 必须与原规则一致
+     * @return 是否找到并替换
+     */
+    public boolean replaceOutput(ResourceKey key, ResourceSpec replacement) {
+        return replace(this.outputs, key, replacement);
+    }
+
+    private static boolean replace(List<ResourceSpec> specs, ResourceKey key,
+            ResourceSpec replacement) {
+        if (!replacement.key().equals(key)) {
+            return false;
+        }
+        for (int i = 0; i < specs.size(); i++) {
+            if (specs.get(i).key().equals(key)) {
+                specs.set(i, replacement);
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Nullable
     private static ResourceSpec find(List<ResourceSpec> specs, ResourceKey key) {
         for (ResourceSpec spec : specs) {
