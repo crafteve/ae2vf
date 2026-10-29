@@ -298,9 +298,9 @@ public final class LineActions {
      */
     public static Result addRule(Factory factory, UUID lineId, UUID machineId, IoSide side,
             ResourceKey key, @Nullable Direction face, MatchMode mode) {
-        Optional<MachineIoGroup> ioFound = requireIo(factory, lineId, machineId);
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
-            return Result.err("机器不在该产线里");
+            return Result.err("找不到机器");
         }
         MachineIoGroup io = ioFound.get();
         String resourceError = validateResource(key);
@@ -319,7 +319,7 @@ public final class LineActions {
         if (!added) {
             return Result.err(sideName(side) + "里已经有 " + key.describe() + " 了");
         }
-        afterRuleChange(factory, lineId, machineId);
+        afterRuleChange(factory, machineId);
         return Result.ok("已加" + sideName(side) + "：" + spec.describe(), lineId);
     }
 
@@ -337,9 +337,9 @@ public final class LineActions {
      */
     public static Result updateRule(Factory factory, UUID lineId, UUID machineId, IoSide side,
             ResourceKey key, @Nullable Direction face, MatchMode mode) {
-        Optional<MachineIoGroup> ioFound = requireIo(factory, lineId, machineId);
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
-            return Result.err("机器不在该产线里");
+            return Result.err("找不到机器");
         }
         MachineIoGroup io = ioFound.get();
         ResourceSpec current = find(rules(io, side), key);
@@ -354,7 +354,7 @@ public final class LineActions {
         if (!replaced) {
             return Result.err(sideName(side) + "里没有 " + key.describe());
         }
-        afterRuleChange(factory, lineId, machineId);
+        afterRuleChange(factory, machineId);
         return Result.ok("已更新" + sideName(side) + "：" + replacement.describe(), lineId);
     }
 
@@ -370,9 +370,9 @@ public final class LineActions {
      */
     public static Result removeRule(Factory factory, UUID lineId, UUID machineId, IoSide side,
             ResourceKey key) {
-        Optional<MachineIoGroup> ioFound = requireIo(factory, lineId, machineId);
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
-            return Result.err("机器不在该产线里");
+            return Result.err("找不到机器");
         }
         MachineIoGroup io = ioFound.get();
         boolean removed = side == IoSide.INPUT
@@ -381,7 +381,7 @@ public final class LineActions {
         if (!removed) {
             return Result.err(sideName(side) + "里没有 " + key.describe());
         }
-        afterRuleChange(factory, lineId, machineId);
+        afterRuleChange(factory, machineId);
         return Result.ok("已移除" + sideName(side) + "：" + key.describe(), lineId);
     }
 
@@ -437,11 +437,7 @@ public final class LineActions {
         };
     }
 
-    private static Optional<MachineIoGroup> requireIo(Factory factory, UUID lineId, UUID machineId) {
-        Optional<PassiveLine> line = factory.config().lines().byId(lineId);
-        if (line.isEmpty() || !line.get().containsMachine(machineId)) {
-            return Optional.empty();
-        }
+    private static Optional<MachineIoGroup> requireIo(Factory factory, UUID machineId) {
         return factory.config().machines().byId(machineId).map(Machine::io);
     }
 
@@ -463,10 +459,12 @@ public final class LineActions {
         return side == IoSide.INPUT ? "输入" : "输出";
     }
 
-    private static void afterRuleChange(Factory factory, UUID lineId, UUID machineId) {
+    private static void afterRuleChange(Factory factory, UUID machineId) {
         markDirty();
-        forgetRoutes(lineId, machineId);
-        wakeGroup(lineId, machineId);
+        FactoryRefs.lineOf(factory, machineId).ifPresent(line -> {
+            forgetRoutes(line.id(), machineId);
+            wakeGroup(line.id(), machineId);
+        });
     }
 
     private static void markDirty() {

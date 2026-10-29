@@ -1096,7 +1096,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     idleLabel != null);
         }
         drawExpandButton(graphics, y, isOpen(machine));
-        int deleteX = l.leftX + l.leftW - 14;
+        int deleteX = deleteButtonX();
         boolean deleteHovered = this.renderMouseX >= deleteX && this.renderMouseX < deleteX + 12
                 && this.renderMouseY >= y + 4 && this.renderMouseY < y + FactoryLayout.ROW_H - 4;
         graphics.drawString(this.font, "×", deleteX, y + (FactoryLayout.ROW_H - 8) / 2,
@@ -1238,9 +1238,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
         }
-        int x = this.layout.leftX + this.layout.leftW - 14;
+        int x = deleteButtonX();
         return inside(mouseX, mouseY, x, hit.y() + 2, 12, FactoryLayout.ROW_H - 4)
                 ? hit.machine() : null;
+    }
+
+    /** 机器行删除叉号的 x；放在展开按钮左侧。 */
+    private int deleteButtonX() {
+        return expandButtonX() - 16;
     }
 
     /**
