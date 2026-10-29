@@ -14,6 +14,7 @@ import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
@@ -107,6 +108,18 @@ public final class LineRunner {
                     id -> new ItemVariantIndex());
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
                     groupState.routes, generation, factoryVariants, now);
+            // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
+            // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
+            // 都算“路没问题”，清掉连续计数。详见 noteRejected。
+            if (observations != null) {
+                ObservationKey key = ObservationKey.of(target);
+                if (result.inputReason() == IoResult.Reason.REJECTED
+                        || result.outputReason() == IoResult.Reason.REJECTED) {
+                    observations.noteRejected(key);
+                } else {
+                    observations.noteSuccess(key);
+                }
+            }
             DiagStats.LineStats stats = factory.stats().line(line.id());
             // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
             stats.group(target.id()).setRuleReasons(result.inputReasons(), result.outputReasons());
