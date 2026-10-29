@@ -76,7 +76,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 界面入口
+    // ---- 01. 界面入口（openGui / ensureFactory） ----
+    // 负责打开终端菜单并保证玩家有工厂；入口是 /idf gui、终端右键与快捷键，ensureFactory 只被 openGui 调用。
     // ------------------------------------------------------------------
 
     /**
@@ -125,7 +126,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 工厂生命周期
+    // ---- 02. 工厂生命周期（create / delete / info） ----
+    // 负责创建、删除与打印工厂摘要；由 /idf create、/idf delete 与 /idf factory info 调用，info 的逐行渲染也在本节。
     // ------------------------------------------------------------------
 
     /**
@@ -246,7 +248,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 机器库
+    // ---- 03. 机器库：准星接入与断开（connectMachine / disconnectMachine） ----
+    // 负责准星选中机器的接入、断开与回收站分流；由 /idf factory connect 与 /idf factory disconnect 调用。
     // ------------------------------------------------------------------
 
     /**
@@ -415,7 +418,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 绑定杖：机器与仓库
+    // ---- 04. 占用门禁（GateFilter / claimedByOther / filterClaimed） ----
+    // 负责绑定前的全服占用检查与拒绝文案；被机器 toggle、仓库 toggle 与容器连锁三条路径复用。
     // ------------------------------------------------------------------
 
     /**
@@ -489,6 +493,11 @@ public final class FactoryService {
         }
         return new GateFilter(open, blocked);
     }
+
+    // ------------------------------------------------------------------
+    // ---- 05. 旧版批量绑定（全仓库无调用） ----
+    // 负责按坐标批量接入与断开的旧入口；connectMachines、disconnectMachines、bindMeStorage、bindContainers、unbindContainers 均已无调用。
+    // ------------------------------------------------------------------
 
     /**
      * 连接准星目标机器；连锁时走 6 邻接 BFS。
@@ -778,6 +787,11 @@ public final class FactoryService {
         return removed;
     }
 
+    // ------------------------------------------------------------------
+    // ---- 06. 清空与切换仓库（clearStorage / clearStorageAt / switchStorageMode） ----
+    // 负责清空仓库地址与 ME / 容器模式切换；clearStorage 由确认流程调用，switchStorageMode 由绑定杖调用，clearStorageAt 已无调用。
+    // ------------------------------------------------------------------
+
     /**
      * 清空当前仓库地址，保留模式。
      *
@@ -855,6 +869,11 @@ public final class FactoryService {
         barOk(player, "已切换为 " + modeLabel(next) + " 模式");
         return 1;
     }
+
+    // ------------------------------------------------------------------
+    // ---- 07. 绑定杖：机器 toggle（toggleMachines / connectMachineTargets / disconnectMachineTargets） ----
+    // 负责绑定杖左键的整组开关与逐台执行；由 FactoryWandActionC2S 的 MACHINE_TOGGLE 调用。
+    // ------------------------------------------------------------------
 
     /**
      * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
@@ -1032,6 +1051,11 @@ public final class FactoryService {
         barOk(player, text);
         return purged + binned;
     }
+
+    // ------------------------------------------------------------------
+    // ---- 08. 绑定杖：仓库 toggle（toggleStorage / toggleMeStorage / toggleContainerStorage） ----
+    // 负责绑定杖右键的仓库开关，按 ME 与容器模式分派；由 FactoryWandActionC2S 的 STORAGE_TOGGLE 调用。
+    // ------------------------------------------------------------------
 
     /**
      * 仓库 toggle：ME 或容器按当前模式处理；容器连锁按整组 toggle。
@@ -1222,6 +1246,11 @@ public final class FactoryService {
         return removed;
     }
 
+    // ------------------------------------------------------------------
+    // ---- 09. 清空确认与标签工具（requestClearStorage / confirmClearStorage / PendingClear） ----
+    // 负责清空仓库的两步确认与聊天栏点击指令，并提供机器、方块与模式的显示名；由绑定杖与 /idf storage clear 调用。
+    // ------------------------------------------------------------------
+
     /**
      * 请求清空仓库：先发聊天确认，点击确认后才真正清空。
      *
@@ -1307,7 +1336,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 回收站
+    // ---- 10. 回收站（binInfo / binRestore / binPurge） ----
+    // 负责回收站条目的列出、取回与清理；由 /idf factory bin 的 info、restore 与 purge 调用。
     // ------------------------------------------------------------------
 
     /**
@@ -1459,7 +1489,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 仓库（ME 存储）
+    // ---- 11. ME 仓库：旧版量子环绑定（connectStorage） ----
+    // 负责用量子纠缠奇点按频率绑定旧式量子环；由 /idf storage connect 调用，新绑定已改走绑定杖的 MeAnchor。
     // ------------------------------------------------------------------
 
     /**
@@ -1508,7 +1539,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 仓库（方块容器）
+    // ---- 12. 容器仓库维护（bindContainer / unbindStorage / setContainerPriority / pruneStorage） ----
+    // 负责容器仓库的增删、优先级与已缺失清理；由 /idf storage 的 bind、unbind、priority 与 prune 调用。
     // ------------------------------------------------------------------
 
     /**
@@ -1687,6 +1719,11 @@ public final class FactoryService {
         return 1;
     }
 
+    // ------------------------------------------------------------------
+    // ---- 13. 仓库判定与展示辅助（containerState / ae2Issue / isAnyContainer） ----
+    // 负责容器状态、AE2 离线原因与「是不是容器」的判定；被仓库摘要、仓库绑定与连锁查找共用。
+    // ------------------------------------------------------------------
+
     /**
      * 容器状态的一句话。
      *
@@ -1735,6 +1772,11 @@ public final class FactoryService {
         }
         return level.getBlockEntity(pos) instanceof Container;
     }
+
+    // ------------------------------------------------------------------
+    // ---- 14. 仓库摘要与存取（storageInfo / storageGet / storagePut） ----
+    // 负责仓库内容摘要、取出与存入；由 /idf storage 的 info、get 与 put 调用。
+    // ------------------------------------------------------------------
 
     /**
      * 仓库摘要：类型、容器列表、物品。
@@ -1901,7 +1943,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // 内部工具
+    // ---- 15. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage / nextId） ----
+    // 负责取当前工厂、解析在线仓库、刷新观测、唤醒产线与生成工厂 id；本文件所有公开方法共用。
     // ------------------------------------------------------------------
 
     /**
@@ -2022,6 +2065,11 @@ public final class FactoryService {
         } while (runtime.manager().byId(id).isPresent());
         return id;
     }
+
+    // ------------------------------------------------------------------
+    // ---- 16. 内部工具：背包、文案与回执（countInInventory / msg / markDirty） ----
+    // 负责背包装卸、资源与物品文案、聊天与动作栏回执；markDirty 是本文件唯一的档案落盘入口。
+    // ------------------------------------------------------------------
 
     /** 背包里与样本同物品的总数。 */
     private static int countInInventory(ServerPlayer player, ItemStack template) {
