@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory.capability;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;

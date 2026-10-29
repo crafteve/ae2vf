@@ -8,9 +8,18 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
+import io.github.crafteve.idlefactory.factory.capability.FaceCache;
+import io.github.crafteve.idlefactory.factory.capability.FaceTable;
+import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
+import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
+import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.probe.WorkState;
+
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -53,6 +62,13 @@ public final class ObservationService {
     private final MinecraftServer server;
     /** 键 → 观测。插入顺序稳定，便于诊断输出。 */
     private final Map<ObservationKey, Observation> observations = new LinkedHashMap<>();
+    /**
+     * 面表缓存：和观察表同一拍进出（引用集里有才留），但住在 capability 包。
+     *
+     * <p>观察只留健康和时钟，地图搬到能力档案室——失效时机本来就和 handler 一致
+     * （能力失效一起清），住一起天经地义。</p>
+     */
+    private final FaceCache faceCache = new FaceCache();
     /** 维度 → 能力句柄缓存（P3）。 */
     private final Map<ResourceKey<Level>, LevelCapabilityCache> capabilityCaches = new HashMap<>();
     /** 能力失效事件标脏的位置，下一 tick 优先重探。 */
@@ -106,7 +122,9 @@ public final class ObservationService {
             if (observation == null) {
                 continue;
             }
-            observation.invalidateFaces();
+            // 脏的是“地图”不是“病历”：面表作废走面表缓存，病历等下面的 probe 重写。
+            // 能力失效事件不改变方块 id，光复探抓不到它，必须在这里显式清。
+            this.faceCache.invalidate(key);
             probe(key, observation);
             this.probesLastTick++;
             dirtyBudget--;
@@ -152,6 +170,8 @@ public final class ObservationService {
             }
             return true;
         });
+        // 面表缓存同一拍：引用集之外的连表带代数一起丢，和观察表同生共死。
+        this.faceCache.sweep(referenced);
     }
 
     /**
@@ -202,10 +222,7 @@ public final class ObservationService {
             this.frozenFaces.add(key);
             return;
         }
-        Observation observation = this.observations.get(key);
-        if (observation != null) {
-            observation.invalidateFaces();
-        }
+        this.faceCache.invalidate(key);
     }
 
     /**
@@ -266,24 +283,37 @@ public final class ObservationService {
     }
 
     /**
-     * 取面表，惰性构建并缓存。
+     * 读缓存的面表；没建过时返回空表。
      *
-     * <p>只对 {@link Health#PRESENT} 的位置有效；其余情况返回 {@link FaceTable#EMPTY}。</p>
+     * <p>纯读，绝不碰世界——原来在这里偷偷建表（贵，21 次查询）是最大的毛病。
+     * 需要内容时调 {@link #ensureFaces}，由调用方显式承担那 21 次查询。</p>
      *
      * @param located 机器引用或容器引用
      * @return 面表
      */
     public FaceTable faces(Located located) {
+        FaceTable cached = this.faceCache.get(ObservationKey.of(located));
+        return cached == null ? FaceTable.EMPTY : cached;
+    }
+
+    /**
+     * 确保面表建好：缓存没有就当场建一次。
+     *
+     * <p>贵（21 次能力查询），只允许真正要用表的调用方调——目前只有容器仓库的取面窄化，
+     * 拿不到表它会退回全六面，所以调不调用都不影响正确性，只影响 IO 少试几个面。
+     * 健康不是 PRESENT 或区块没加载时返回空表，不建（建了也是错的）。</p>
+     *
+     * @param located 机器引用或容器引用
+     * @return 面表
+     */
+    public FaceTable ensureFaces(Located located) {
         ObservationKey key = ObservationKey.of(located);
-        Observation observation = this.observations.get(key);
-        if (observation == null) {
-            return FaceTable.EMPTY;
-        }
-        FaceTable cached = observation.faces();
+        FaceTable cached = this.faceCache.get(key);
         if (cached != null) {
             return cached;
         }
-        if (observation.health() != Health.PRESENT) {
+        Observation observation = this.observations.get(key);
+        if (observation == null || observation.health() != Health.PRESENT) {
             return FaceTable.EMPTY;
         }
         ServerLevel level = this.server.getLevel(key.dimension());
@@ -291,19 +321,21 @@ public final class ObservationService {
             return FaceTable.EMPTY;
         }
         FaceTable table = BlockProbe.faces(level, key.pos());
-        observation.applyFaces(table);
+        this.faceCache.put(key, table);
         return table;
     }
 
     /**
      * 面表代数：每次面表被作废都会 +1，路由表拿它判断自己过没过期。
      *
+     * <p>代数住在面表缓存里，这里只是转发——病历本（{@code Observation}）里已经没有
+     * 代数这个字段了，它只留健康和时钟。</p>
+     *
      * @param located 机器引用或容器引用
      * @return 代数；没登记过时为 {@code 0}
      */
     public long facesGeneration(Located located) {
-        Observation observation = this.observations.get(ObservationKey.of(located));
-        return observation == null ? 0L : observation.facesGeneration();
+        return this.faceCache.generation(ObservationKey.of(located));
     }
 
     /**
@@ -354,10 +386,19 @@ public final class ObservationService {
 
     private void probe(ObservationKey key, Observation observation) {
         Health before = observation.health();
+        ResourceLocation oldBlock = observation.blockId();
+        ResourceLocation oldBe = observation.beTypeId();
         BlockProbe.Presence presence = BlockProbe.presence(this.server, key);
         observation.applyProbe(presence, this.tick);
         if (before != observation.health()) {
             this.transitions.add(new Transition(key, before, observation.health(), this.tick));
+        }
+        if (before != observation.health()
+                || !Objects.equals(oldBlock, observation.blockId())
+                || !Objects.equals(oldBe, observation.beTypeId())) {
+            // 方块换过／可用性变了：面表一定过期。以前这行藏在 applyProbe 里，
+            // 现在判和清分开——病历只管记，动手的是面表缓存。
+            this.faceCache.invalidate(key);
         }
     }
 

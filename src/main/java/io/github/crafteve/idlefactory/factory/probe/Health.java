@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory.probe;
 
 /**
  * 一个方块位置的观测结论。

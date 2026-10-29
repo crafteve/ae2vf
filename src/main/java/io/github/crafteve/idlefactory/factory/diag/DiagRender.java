@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
+import io.github.crafteve.idlefactory.factory.io.DiagEvent;
+import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;

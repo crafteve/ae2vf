@@ -21,11 +21,13 @@ import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.io.DiagEvent;
+import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.registry.LinkRegistry;
-import io.github.crafteve.idlefactory.factory.registry.LinkRole;
-import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
+import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 

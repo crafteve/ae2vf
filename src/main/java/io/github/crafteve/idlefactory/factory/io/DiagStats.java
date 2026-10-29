@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.diag;
+package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.io.IoResult;
-import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 
 /**

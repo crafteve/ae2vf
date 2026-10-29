@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.registry;
+package io.github.crafteve.idlefactory.factory.links;
 
 /**
  * 占用角色：机器还是仓库。

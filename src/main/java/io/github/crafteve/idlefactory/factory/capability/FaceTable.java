@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory.capability;
 
 import java.util.Collection;
 import java.util.Collections;

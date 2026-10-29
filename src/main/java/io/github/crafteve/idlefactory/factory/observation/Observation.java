@@ -7,6 +7,9 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
+import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.probe.WorkState;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.resources.ResourceLocation;
@@ -21,7 +24,8 @@ import net.minecraft.resources.ResourceLocation;
  * 制造垃圾。线程模型和服务端一致——只有服务器线程碰它。</p>
  *
  * <p>两个身份字段（{@link #blockId()} 与 {@link #beTypeId()}）用来回答「还是不是那个东西」和
- * 「有没有升级」：任一个变了，说明这个位置换过方块，缓存的面表立刻作废。</p>
+ * 「有没有升级」：任一个变了，说明这个位置换过方块——{@code ObservationService} 凭它们
+ * 判断面表过期（面表本身住在 capability 包，这里的字段只负责举证）。</p>
  */
 public final class Observation {
     /** 还没探测过的占位。只读共享，永远不要对它调用包内写方法。 */
@@ -55,10 +59,6 @@ public final class Observation {
     private ResourceLocation beTypeId;
     private final EnumSet<ResourceKind> presence = EnumSet.noneOf(ResourceKind.class);
     private boolean legacyContainer;
-    @Nullable
-    private FaceTable faces;
-    /** 面表代数：每次作废 +1。路由表靠它判断自己是否过期。 */
-    private long facesGeneration;
     private long observedAtTick = -1L;
     private long missingSince = -1L;
     private long nextProbeTick;
@@ -138,17 +138,6 @@ public final class Observation {
     /** 是不是原版 {@code Container}（给没有注册能力的模组方块兜底）。 */
     public boolean legacyContainer() {
         return this.legacyContainer;
-    }
-
-    /** 缓存的面表；还没建过时为 {@code null}。 */
-    @Nullable
-    public FaceTable faces() {
-        return this.faces;
-    }
-
-    /** 面表代数。每次作废 +1，路由表用它判过期。 */
-    public long facesGeneration() {
-        return this.facesGeneration;
     }
 
     /** 最后一次探测的 tick；从没探过为 {@code -1}。 */
@@ -250,30 +239,9 @@ public final class Observation {
             this.nextWorkProbeTick = 0L;
         }
 
-        if (before != result.health() || identityChanged) {
-            // 方块换过／可用性变了：面表一定过期
-            this.invalidateFaces();
-        }
+        // 注意：这里不再清面表——面表住在 capability 包，过期判断是 Service 的事：
+        // 它拿这里的 health/blockId/beTypeId 和探之前的值比，变了就调面表缓存作废。
+        // 把“判”和“清”拆开，病历只管记，Service 管动手。
         this.nextProbeTick = tick + this.probeInterval;
-    }
-
-    /**
-     * 写入缓存的面表。
-     *
-     * @param table 面表
-     */
-    void applyFaces(FaceTable table) {
-        this.faces = table;
-    }
-
-    /**
-     * 让缓存的面表作废。
-     *
-     * <p>能力失效事件（模组改了面配置）不会改变方块 id，所以 {@link #applyProbe} 的
-     * 「身份变了」判断抓不到它——靠这个方法显式清。</p>
-     */
-    void invalidateFaces() {
-        this.faces = null;
-        this.facesGeneration++;
     }
 }

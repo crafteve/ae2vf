@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.observation.Located;
-import io.github.crafteve.idlefactory.factory.registry.LinkIds;
+import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;

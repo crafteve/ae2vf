@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.registry;
+package io.github.crafteve.idlefactory.factory.links;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;

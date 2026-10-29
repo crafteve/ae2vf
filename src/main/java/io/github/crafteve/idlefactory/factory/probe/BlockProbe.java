@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory.probe;
 
 import java.util.Collections;
 import java.util.EnumMap;
@@ -8,6 +8,8 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.capability.FaceTable;
+import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;

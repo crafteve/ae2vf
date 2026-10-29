@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory.probe;
 
 /**
  * 机器是否在工作的观测结论。

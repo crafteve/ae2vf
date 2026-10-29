@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.diag;
+package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.UUID;
 

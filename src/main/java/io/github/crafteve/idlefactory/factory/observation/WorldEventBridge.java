@@ -5,7 +5,7 @@ import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.registry.LinkIds;
+import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;

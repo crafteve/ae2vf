@@ -8,9 +8,9 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.observation.FaceTable;
-import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
@@ -692,7 +692,9 @@ public final class ContainerStorage implements Storage {
         if (observation.health() != Health.PRESENT) {
             return EnumSet.allOf(Direction.class);
         }
-        FaceTable table = observations.faces(ref);
+        // 需要内容就显式建表：建表贵（21 次查询），但建好就缓存；拿不到表
+        // （没建过、没加载）就退回全六面——正确性不受影响，只是多试几个面。
+        FaceTable table = observations.ensureFaces(ref);
         if (!table.any()) {
             return EnumSet.allOf(Direction.class);
         }

@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.observation.BlockProbe;
-import io.github.crafteve.idlefactory.factory.observation.Health;
+import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
+import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 
 import net.minecraft.core.BlockPos;
