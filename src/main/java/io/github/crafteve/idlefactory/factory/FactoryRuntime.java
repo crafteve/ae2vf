@@ -17,6 +17,7 @@ import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.registry.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
@@ -67,6 +68,14 @@ public final class FactoryRuntime {
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
     private final LineRunner lineRunner = new LineRunner();
+    /**
+     * 全服占用索引：统一 id → 认领。
+     *
+     * <p>它只是真相的索引，不是真相本身——真相永远在各工厂的记录里，索引只负责让门禁
+     * 查得快。每次档案变化就全量重建一次（O(总数)，只发生在配置变更时），所以它和档案
+     * 不可能打架：要么一起新，要么一起旧。</p>
+     */
+    private final LinkRegistry links = new LinkRegistry();
     /** 每 tick 复用的「被引用位置集合」，避免反复分配。 */
     private final Set<ObservationKey> observedKeys = new HashSet<>();
     /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组；actionbar 用。 */
@@ -128,6 +137,16 @@ public final class FactoryRuntime {
         return this.manager;
     }
 
+    /**
+     * 全服占用索引。
+     *
+     * <p>门禁查它，对账读它；写它的只有 {@link #markDirty} 和 {@link #load}，都是全量重建，
+     * 所以调用方永远不用担心“改了档案忘改索引”。</p>
+     */
+    public LinkRegistry links() {
+        return this.links;
+    }
+
     /** IO 执行器。 */
     public LineRunner lineRunner() {
         return this.lineRunner;
@@ -163,9 +182,15 @@ public final class FactoryRuntime {
      *
      * <p>不能只 {@code setDirty()}：{@code FactoryStore.save()} 写的是它自己的 {@code records}，
      * 而 {@code records} 只在 {@code setRecords(...)} 时更新。先同步，再让存档去写盘。</p>
+     *
+     * <p>顺手把占用索引全量重建一遍：所有改配置的入口（绑定、解绑、删线、删工厂……）最终都
+     * 走到这里，所以这里是唯一的同步点——以后新增修改路径，只要它调了 {@code markDirty}，
+     * 索引就自动是新的，不存在“改了档案忘改索引”这种漏法。重建是 O(总数)，只发生在人手
+     * 频率的配置变更时，tick 里不走这里。</p>
      */
     public void markDirty() {
         save();
+        this.links.rebuild(this.manager);
     }
 
     /**
@@ -195,6 +220,7 @@ public final class FactoryRuntime {
                 new Ae2StorageResolver(this.server),
                 new ContainerStorageResolver(this.server, this.observations)));
         this.manager.loadFrom(this.store.records());
+        this.links.rebuild(this.manager);
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage();
         }

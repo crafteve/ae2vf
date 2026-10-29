@@ -102,6 +102,12 @@ public final class FactoryLinkFinder {
             if (!level.isLoaded(pos) || level.getBlockState(pos).getBlock() != targetBlock) {
                 continue;
             }
+            // 轻过滤：没有方块实体的不可能是有效目标（机器和容器的判定都要 BE）。
+            // 这一步只是跳过贵的能力探测，结论还是下面的全量校验说了算；
+            // 无效块本来就不扩展，和原来行为一致。
+            if (level.getBlockEntity(pos) == null) {
+                continue;
+            }
             if (!valid.test(pos)) {
                 continue;
             }

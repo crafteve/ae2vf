@@ -19,6 +19,9 @@ import io.github.crafteve.idlefactory.factory.observation.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.registry.LinkIds;
+import io.github.crafteve.idlefactory.factory.registry.LinkRegistry;
+import io.github.crafteve.idlefactory.factory.registry.LinkRole;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
@@ -416,6 +419,78 @@ public final class FactoryService {
     // ------------------------------------------------------------------
 
     /**
+     * 门禁过滤结果：放行的目标，以及被别家占了而跳过的数量。
+     *
+     * @param open    放行的目标坐标
+     * @param blocked 被别的工厂占了的数量
+     */
+    private record GateFilter(List<BlockPos> open, int blocked) {
+    }
+
+    /**
+     * 查占用表：这个位置有没有被别的工厂占着。
+     *
+     * <p>门禁只拦“别人家的”，自家的位置一律放行——toggle 点自家已连的机器是断开，
+     * 点自家已绑的容器是取消，要是连自家都拦，toggle 就断不开了。运行时没好时当没人
+     * 占（能走到这里说明工厂是有的，运行时一定在）。</p>
+     *
+     * @param factory 当前工厂
+     * @param level   所在维度
+     * @param pos     目标坐标
+     * @return 别人家的认领；空地或自家时为空
+     */
+    private static Optional<LinkRegistry.Claim> claimedByOther(Factory factory, ServerLevel level,
+            BlockPos pos) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return Optional.empty();
+        }
+        Optional<LinkRegistry.Claim> claim =
+                runtime.links().get(LinkIds.of(level.dimension(), pos));
+        if (claim.isEmpty() || claim.get().factoryId().equals(factory.id())) {
+            return Optional.empty();
+        }
+        return claim;
+    }
+
+    /**
+     * 把一条认领翻译成人话：谁家的、机器还是仓库。
+     *
+     * @param claim 认领
+     * @return 如“工厂 ab12cd34 的机器”
+     */
+    private static String describeClaim(LinkRegistry.Claim claim) {
+        String owner = claim.factoryId().toString().substring(0, 8);
+        String role = claim.role() == LinkRole.MACHINE ? "机器" : "仓库";
+        return "工厂 " + owner + " 的" + role;
+    }
+
+    /**
+     * 按占用表过滤一批目标：被别的工厂占的跳过并计数，自家的和空地放行。
+     *
+     * <p>连锁是“先按世界事实找全，再按归属过滤”——BFS 只管找同 id 连通群，
+     * 归属判断统一收敛在这里，两步各干各的，行为可预测。</p>
+     *
+     * @param factory 当前工厂
+     * @param level   所在维度
+     * @param targets 候选坐标
+     * @return 过滤结果
+     */
+    private static GateFilter filterClaimed(Factory factory, ServerLevel level,
+            List<BlockPos> targets) {
+        List<BlockPos> open = new ArrayList<>(targets.size());
+        int blocked = 0;
+        for (BlockPos targetPos : targets) {
+            if (claimedByOther(factory, level, targetPos).isPresent()) {
+                blocked++;
+            } else {
+                open.add(targetPos);
+            }
+        }
+        return new GateFilter(open, blocked);
+    }
+
+    /**
      * 连接准星目标机器；连锁时走 6 邻接 BFS。
      *
      * @param player 发起请求的玩家
@@ -802,6 +877,18 @@ public final class FactoryService {
             barErr(player, "目标区块未加载");
             return 0;
         }
+        // 轻检查：没有方块实体的不可能是机器。泥土、石头死在这一步，
+        // 省掉后面贵的能力探测；注意这只是“跳过贵检查”，结论还是贵检查说了算。
+        if (level.getBlockEntity(pos) == null) {
+            barErr(player, "该方块不是可连接的机器");
+            return 0;
+        }
+        // 查占用表：被别人家占了直接拒绝，自家放行（toggle 要能断开自家的）。
+        Optional<LinkRegistry.Claim> claim = claimedByOther(factory, level, pos);
+        if (claim.isPresent()) {
+            barErr(player, "该位置已被" + describeClaim(claim.get()) + "占用");
+            return 0;
+        }
         if (!FactoryLinkFinder.isMachine(level, pos)) {
             barErr(player, "该方块不是可连接的机器");
             return 0;
@@ -813,6 +900,16 @@ public final class FactoryService {
             barErr(player, "附近没有可连接的机器");
             return 0;
         }
+        int blocked = 0;
+        if (chain) {
+            GateFilter filter = filterClaimed(factory, level, targets);
+            targets = filter.open();
+            blocked = filter.blocked();
+            if (targets.isEmpty()) {
+                barErr(player, "这组机器都被别的工厂占了");
+                return 0;
+            }
+        }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
             MachineRef ref = factory.machines().byPosition(level.dimension(), targetPos);
@@ -822,12 +919,12 @@ public final class FactoryService {
             }
         }
         return allConnected
-                ? disconnectMachineTargets(player, factory, level, targets, chain)
-                : connectMachineTargets(player, factory, level, targets, chain);
+                ? disconnectMachineTargets(player, factory, level, targets, chain, blocked)
+                : connectMachineTargets(player, factory, level, targets, chain, blocked);
     }
 
     private static int connectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain) {
+            ServerLevel level, List<BlockPos> targets, boolean chain, int blocked) {
         int added = 0;
         int restored = 0;
         int skipped = 0;
@@ -877,12 +974,15 @@ public final class FactoryService {
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
         }
+        if (blocked > 0) {
+            text += "，被占用 " + blocked + " 台";
+        }
         barOk(player, text);
         return added + restored;
     }
 
     private static int disconnectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain) {
+            ServerLevel level, List<BlockPos> targets, boolean chain, int blocked) {
         int purged = 0;
         int binned = 0;
         int already = 0;
@@ -925,6 +1025,9 @@ public final class FactoryService {
         }
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
+        }
+        if (blocked > 0) {
+            text += "，被占用 " + blocked + " 台";
         }
         barOk(player, text);
         return purged + binned;
@@ -969,6 +1072,12 @@ public final class FactoryService {
         }
         if (!level.isLoaded(pos)) {
             barErr(player, "目标区块未加载");
+            return 0;
+        }
+        // 查占用表：这块地被别人家占了（机器或仓库）就不能再绑 ME，自家放行。
+        Optional<LinkRegistry.Claim> claim = claimedByOther(factory, level, pos);
+        if (claim.isPresent()) {
+            barErr(player, "该位置已被" + describeClaim(claim.get()) + "占用");
             return 0;
         }
         if (Ae2Binder.nodeAt(level, pos) == null) {
@@ -1024,12 +1133,24 @@ public final class FactoryService {
             barErr(player, "该方块不是仓库容器");
             return 0;
         }
+        // 查占用表：起点被别人家占了直接拒绝（自家放行，toggle 不断自己）。
+        Optional<LinkRegistry.Claim> originClaim = claimedByOther(factory, level, origin);
+        if (originClaim.isPresent()) {
+            barErr(player, "该位置已被" + describeClaim(originClaim.get()) + "占用");
+            return 0;
+        }
         ContainerAnchor next = current;
         int added = 0;
         int skipped = 0;
+        int blocked = 0;
         for (BlockPos targetPos : targets) {
             if (Ae2Binder.nodeAt(level, targetPos) != null) {
                 skipped++;
+                continue;
+            }
+            // 连锁里的每一台也要过门禁：被别家占的跳过并计数，不拦整组。
+            if (claimedByOther(factory, level, targetPos).isPresent()) {
+                blocked++;
                 continue;
             }
             ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
@@ -1045,8 +1166,12 @@ public final class FactoryService {
             added++;
         }
         if (added == 0) {
-            barErr(player, "没有新增容器（已绑过或达到上限 "
-                    + ContainerAnchor.MAX_CONTAINERS + " 个）");
+            if (blocked > 0 && skipped == 0) {
+                barErr(player, "这些容器都被别的工厂占了");
+            } else {
+                barErr(player, "没有新增容器（已绑过或达到上限 "
+                        + ContainerAnchor.MAX_CONTAINERS + " 个）");
+            }
             return 0;
         }
         factory.bindAnchor(next);
@@ -1059,6 +1184,9 @@ public final class FactoryService {
         String text = "已绑定 " + added + " 个容器，共 " + next.containers().size() + " 个";
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 个";
+        }
+        if (blocked > 0) {
+            text += "，被占用 " + blocked + " 个";
         }
         barOk(player, text);
         return added;
