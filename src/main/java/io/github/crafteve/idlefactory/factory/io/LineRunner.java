@@ -91,6 +91,11 @@ public final class LineRunner {
                 sleepIfIdle(groupState, now);
                 continue;
             }
+            if (factory.live().isMachineMissing(target.id())) {
+                // 方块没了，机器仍在库；等方块回来时再唤醒
+                sleepIfIdle(groupState, now);
+                continue;
+            }
             if (observations != null && !runnable(observations, target)) {
                 sleepIfIdle(groupState, now);
                 continue;

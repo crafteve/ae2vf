@@ -326,27 +326,22 @@ public final class FactoryRuntime {
             MachineRef ref = machine.ref();
             switch (transition.to()) {
                 case MISSING, NO_DIMENSION -> {
-                    factory.live().stats().record(DiagEvent.of(now,
-                            DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
-                            transition.to().describe() + "，已进回收站"));
-                    boolean referenced = FactoryBin.referenced(factory).contains(ref.id());
-                    boolean retired = factory.config().machines().isRetired(ref.id());
-                    if (FactoryBin.purgeable(referenced, retired, transition.to())) {
-                        // 没配过规则，直接删——玩家随时可以 connect 回来
-                        FactoryBin.purge(factory, ref.id());
-                        // 档案变了就得同步索引：只 save 会让占用表留下幽灵认领。
-                        this.markDirty();
-                    } else if (!retired) {
-                        // 玩家自己断开的机器不再提醒：他已经说过不要了
+                    if (factory.live().markMachineMissing(ref.id())) {
+                        factory.live().stats().record(DiagEvent.of(now,
+                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(),
+                                null, transition.to().describe() + "，机器仍留在机器库"));
                         this.missingNotices.merge(factory.id(), 1, Integer::sum);
                     }
                 }
                 case PRESENT -> {
+                    boolean wasMissing = factory.live().clearMachineMissing(ref.id());
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
                         this.wakeLines(factory, ref.id());
-                        this.restoredNotices.merge(factory.id(), 1, Integer::sum);
+                        if (wasMissing) {
+                            this.restoredNotices.merge(factory.id(), 1, Integer::sum);
+                        }
                     }
                 }
                 default -> {
@@ -423,7 +418,7 @@ public final class FactoryRuntime {
             int restored = this.restoredNotices.getOrDefault(factoryId, 0);
             if (missing > 0) {
                 player.displayClientMessage(FactoryMessages.warn(
-                        missing + " 台机器失联 · /idf factory bin"), true);
+                        missing + " 台机器失联 · /idf factory info"), true);
             } else if (restored > 0) {
                 player.displayClientMessage(FactoryMessages.ok(
                         restored + " 台机器回来了 · 规则已恢复"), true);

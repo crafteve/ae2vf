@@ -109,6 +109,7 @@ public final class FactorySnapshotBuilder {
      *
      * @param ref       机器引用（坐标 + id）
      * @param retired   玩家是否已把机器退役（回收站）
+     * @param machineMissing 方块是否已经消失（观测事实）
      * @param health    观测结论
      * @param blockId   观测到的方块 id；未知时 {@code null}
      * @param presence  无向能力
@@ -129,7 +130,7 @@ public final class FactorySnapshotBuilder {
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
-    public record MachineView(MachineRef ref, boolean retired, Health health,
+    public record MachineView(MachineRef ref, boolean retired, boolean machineMissing, Health health,
             @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
             List<String> lineNames, List<UUID> lineIds, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
@@ -210,7 +211,7 @@ public final class FactorySnapshotBuilder {
          * @return 总状态
          */
         public TotalState totalState() {
-            if (binned() || this.health != Health.PRESENT) {
+            if (binned() || this.machineMissing || this.health != Health.PRESENT) {
                 return TotalState.OFFLINE;
             }
             if (this.lineNames.isEmpty() || this.ruleCount == 0) {
@@ -333,6 +334,7 @@ public final class FactorySnapshotBuilder {
 
             views.add(new MachineView(ref,
                     factory.config().machines().isRetired(ref.id()),
+                    factory.live().isMachineMissing(ref.id()),
                     observation.health(),
                     observation.blockId(),
                     observation.presence(),
