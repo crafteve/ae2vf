@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -44,7 +43,7 @@ public record ContainerRef(UUID id, ResourceKey<Level> dimension, BlockPos pos, 
      * @return 新引用，优先级 0
      */
     public static ContainerRef of(ResourceKey<Level> dimension, BlockPos pos) {
-        return new ContainerRef(LinkIds.of(dimension, pos), dimension, pos, 0);
+        return new ContainerRef(BlockKey.of(dimension, pos).id(), dimension, pos, 0);
     }
 
     /**

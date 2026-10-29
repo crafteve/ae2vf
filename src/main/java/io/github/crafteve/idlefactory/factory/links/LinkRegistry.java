@@ -69,7 +69,7 @@ public final class LinkRegistry {
     /**
      * 从档案重建整张表。启动、删档、对账时调；调一次就是一次全量自愈。
      *
-     * <p>键一律按坐标现派生（{@link LinkIds}），不信任记录里存的 id——存量漂移了也对得上。
+     * <p>键一律按坐标现派生（{@link BlockKey#id()}），不信任记录里存的 id——存量漂移了也对得上。
      * 冲突只报告不解决：先登记的保留生效，后到的进冲突列表。</p>
      *
      * @param manager 工厂档案柜
@@ -101,7 +101,7 @@ public final class LinkRegistry {
     /**
      * 按统一 id 查占用。
      *
-     * @param id 统一 id（{@link LinkIds} 派生）
+     * @param id 统一 id（{@link BlockKey#id()} 派生）
      * @return 认领；没人占时为空
      */
     public Optional<Claim> get(UUID id) {
@@ -142,7 +142,7 @@ public final class LinkRegistry {
 
     private void put(UUID factoryId, LinkRole role, ResourceKey<Level> dimension, BlockPos pos,
             List<Conflict> conflicts) {
-        UUID id = LinkIds.of(dimension, pos);
+        UUID id = BlockKey.of(dimension, pos).id();
         Claim existing = this.byId.get(id);
         Claim claim = new Claim(factoryId, role);
         if (existing != null && (!existing.factoryId().equals(factoryId)

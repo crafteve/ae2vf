@@ -5,7 +5,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -33,7 +32,7 @@ public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
     /**
      * 按坐标生成目标。id 是确定性的，所以重复登记同一个方块会自然去重。
      *
-     * <p>派生规则和容器共用一套（{@link LinkIds}），角色不参与——同一个方块当机器还是
+     * <p>派生规则和容器共用一套（{@link BlockKey#id()}），角色不参与——同一个方块当机器还是
      * 当容器是同一个 id。</p>
      *
      * @param dimension 维度
@@ -41,7 +40,7 @@ public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
      * @return 新目标
      */
     public static MachineRef of(ResourceKey<Level> dimension, BlockPos pos) {
-        return new MachineRef(LinkIds.of(dimension, pos), dimension, pos);
+        return new MachineRef(BlockKey.of(dimension, pos).id(), dimension, pos);
     }
 
     /**

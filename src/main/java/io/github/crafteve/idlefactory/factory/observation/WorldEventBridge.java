@@ -6,7 +6,6 @@ import java.util.Map;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -70,7 +69,7 @@ public final class WorldEventBridge {
         ResourceKey<Level> dimension = level.dimension();
         // 过滤器：没登记的位置直接丢，连标脏队列都不进。
         // 派生一次统一 id 是一次 MD5（亚微秒级），比一次能力探测便宜两个数量级。
-        if (runtime.links().get(LinkIds.of(dimension, pos)).isEmpty()) {
+        if (runtime.links().get(BlockKey.of(dimension, pos).id()).isEmpty()) {
             return;
         }
         long now = level.getServer().overworld().getGameTime();

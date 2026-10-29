@@ -19,7 +19,6 @@ import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.links.LinkIds;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
@@ -451,7 +450,7 @@ public final class FactoryService {
             return Optional.empty();
         }
         Optional<LinkRegistry.Claim> claim =
-                runtime.links().get(LinkIds.of(level.dimension(), pos));
+                runtime.links().get(BlockKey.of(level.dimension(), pos).id());
         if (claim.isEmpty() || claim.get().factoryId().equals(factory.id())) {
             return Optional.empty();
         }
