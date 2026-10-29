@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.line.IoSide;
 import io.github.crafteve.idlefactory.factory.line.LineActions;
@@ -95,11 +96,11 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
 
     private static LineActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
         return switch (payload.action()) {
-            case ADD -> LineActions.addRule(factory, payload.lineId(), payload.machineId(),
+            case ADD -> MachineActions.addRule(factory, payload.lineId(), payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case UPDATE -> LineActions.updateRule(factory, payload.lineId(), payload.machineId(),
+            case UPDATE -> MachineActions.updateRule(factory, payload.lineId(), payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case REMOVE -> LineActions.removeRule(factory, payload.lineId(), payload.machineId(),
+            case REMOVE -> MachineActions.removeRule(factory, payload.lineId(), payload.machineId(),
                     payload.side(), payload.key());
         };
     }

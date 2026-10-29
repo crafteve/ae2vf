@@ -77,7 +77,8 @@
 ## 6. 文件
 
 ```
-factory/line/LineActions.java          指令与界面共用的写入口
+factory/line/LineActions.java          产线 / 引用的写入口
+factory/MachineActions.java           机器 IO 规则的写入口
 factory/line/IoSide.java               输入/输出枚举
 network/FactoryTableSnapshots.java     整表快照唯一发送出口
 network/payload/FactoryLineActionC2S.java

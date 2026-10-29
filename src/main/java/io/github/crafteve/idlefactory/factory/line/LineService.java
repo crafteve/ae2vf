@@ -11,6 +11,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
@@ -489,7 +490,7 @@ public final class LineService {
             return 0;
         }
         // mode 传 null = 沿用旧命令默认（无组件物品模糊），界面会显式传精确。
-        return send(player, LineActions.addRule(factory, line.id(), machine.id(), side,
+        return send(player, MachineActions.addRule(factory, line.id(), machine.id(), side,
                 key, parseFace(face), null));
     }
 
@@ -511,7 +512,7 @@ public final class LineService {
         if (io == null) {
             return 0;
         }
-        return send(player, LineActions.removeRule(factory, line.id(), machine.id(), side, key));
+        return send(player, MachineActions.removeRule(factory, line.id(), machine.id(), side, key));
     }
 
     // ------------------------------------------------------------------

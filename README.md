@@ -140,6 +140,7 @@ Mekanism 的 NeoForge 能量适配器 `canExtract` / `canReceive` 恒为 true，
 factory/                        工厂主体（服务端权威）
 ├── Factory / FactoryManager / FactoryStore / FactoryRuntime
 ├── FactoryService              指令入口
+├── MachineActions              机器 IO 规则的写入口
 ├── FactoryRefs / FactoryMessages / FactorySnapshotBuilder
 ├── resource/                   资源模型
 │   └── ResourceKind / ResourceKey / ResourceSpec
