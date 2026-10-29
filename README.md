@@ -30,7 +30,7 @@
 
 - **工厂实例**：一人一个，确定性 UUID，`FactoryStore` 存档级持久化
 - **仓库**：AE2 量子环或方块容器组，支持物品 / 流体 / FE，离线降级为空仓库
-- **机器库**：准星接入 / 断开。断开与失联都进回收站，规则保留；只有没配过规则的机器才直接删
+- **机器库**：准星接入 / 删除。方块没了只标记失联（UI 画屏障），机器和规则留在库；只有显式删除才移除机器
 - **观测层**：全局方块观测（机器与容器共用一张表），预算 8 次/tick、指数退避、能力失效事件标脏；读路径不探世界
 - **被动产线**：create / delete / add / remove / start / end / info / manage
 - **IO 规则**：资源类型 + 注册名 + 绝对六向面，输入输出各自独立
@@ -62,12 +62,10 @@
 /idf create
 /idf delete
 
-/idf factory connect                 准星选机器，接入机器库（命中回收站时直接取回）
-/idf factory disconnect [id]         准星断开 / 按短 id 断开
-/idf factory info                    工厂摘要 + 机器库 + 回收站计数
-/idf factory bin                     回收站列表（规则都保留着）
-/idf factory bin restore <id>        从回收站取回
-/idf factory bin purge [id]          清理回收站（无参 = 清理所有已无引用的）
+/idf factory connect                 准星选机器，接入机器库
+/idf factory disconnect [id]         删除机器（有规则时需再加 confirm）
+/idf factory disconnect confirm      确认删除准星机器
+/idf factory info                    工厂摘要 + 机器库 + 失联计数
 
 /idf line                            列出所有产线
 /idf line create <name>              新建产线
@@ -142,7 +140,6 @@ Mekanism 的 NeoForge 能量适配器 `canExtract` / `canReceive` 恒为 true，
 factory/                        工厂主体（服务端权威）
 ├── Factory / FactoryManager / FactoryStore / FactoryRuntime
 ├── FactoryService              指令入口
-├── FactoryBin                  回收站：谓词 + 级联清理
 ├── FactoryRefs / FactoryMessages / FactorySnapshotBuilder
 ├── resource/                   资源模型
 │   └── ResourceKind / ResourceKey / ResourceSpec
@@ -154,9 +151,9 @@ factory/                        工厂主体（服务端权威）
 │   └── Storage / StorageLink / StorageAnchor（AE2 / 容器）
 │   └── Ae2Storage / ContainerStorage / DispatchingStorageResolver
 ├── machine/                    机器库
-│   └── MachineLibrary / MachineRef
-├── line/                       被动产线
-│   └── PassiveLine / IoGroup / LineLibrary / LineService
+│   └── MachineLibrary / Machine / MachineIoGroup / MachineRef
+├── line/                       被动产线（只存机器引用）
+│   └── PassiveLine / LineLibrary / LineService
 ├── io/                         IO 执行
 │   └── IoTransfer / GroupRunner / LineRunner / RunnerState / IoResult
 │   └── RuleResolver / ItemCandidates / ItemVariantIndex
@@ -185,7 +182,7 @@ client/
 - 仓库离线 = 空仓库，工厂表现为「没料」，不是「网络断线」
 - **三层事实**：配置（写档）→ 观测（可重建）→ 路由/执行（瞬态）。读路径只读观测，不探世界
 - **`observation` 包零工厂依赖**：它只认 `Located`（位置），机器和容器都是它的消费者
-- **未加载 ≠ 不存在**：存在性判断必须先过 `isLoaded`；失联只进回收站，不删配置
+- **未加载 ≠ 不存在**：存在性判断必须先过 `isLoaded`；失联只标记，不删配置
 - **界面的静态外观来自贴图**：Java 只 blit 九宫格，不画边框与斜边
 
 ## 构建

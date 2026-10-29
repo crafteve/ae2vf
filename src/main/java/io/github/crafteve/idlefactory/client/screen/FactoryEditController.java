@@ -720,10 +720,13 @@ public final class FactoryEditController {
         if (this.layout == null) {
             return;
         }
-        String message = machine.ruleCount() > 0
-                ? "机器 [" + machine.ref().shortId() + "] 还有 " + machine.ruleCount()
-                        + " 条 IO 配置。\n删除后规则无法恢复。"
-                : "删除机器 [" + machine.ref().shortId() + "]？";
+        if (machine.ruleCount() == 0) {
+            sendLineAction(FactoryLineActionC2S.Action.DELETE_MACHINE, null,
+                    machine.ref().id(), null);
+            return;
+        }
+        String message = "机器 [" + machine.ref().shortId() + "] 还有 " + machine.ruleCount()
+                + " 条 IO 配置。\n删除后规则无法恢复。";
         this.confirmDialog.open("删除机器", message, "删除",
                 () -> sendLineAction(FactoryLineActionC2S.Action.DELETE_MACHINE, null,
                         machine.ref().id(), null),
