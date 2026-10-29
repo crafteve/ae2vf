@@ -55,13 +55,13 @@ public final class FactoryLive {
     }
 
     /**
-     * 重新解析仓库地址。解析失败降级成空仓库，不抛异常。
+     * 重新解析仓库地址；只由 {@link Factory} 调用。解析失败降级成空仓库，不抛异常。
      *
      * @param anchor   仓库地址；{@code null} 表示未绑定
      * @param resolver 后端解析器；{@code null} 表示运行时尚未就绪
      * @return 在线状态是否发生变化
      */
-    public boolean refresh(@Nullable StorageAnchor anchor, @Nullable StorageResolver resolver) {
+    boolean refresh(@Nullable StorageAnchor anchor, @Nullable StorageResolver resolver) {
         boolean wasOnline = this.storageOnline;
         if (anchor == null) {
             this.storage = EmptyStorage.INSTANCE;

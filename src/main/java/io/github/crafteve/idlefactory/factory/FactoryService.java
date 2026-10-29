@@ -551,7 +551,7 @@ public final class FactoryService {
         }
         StorageMode next = factory.config().storageMode() == StorageMode.ME
                 ? StorageMode.CONTAINER : StorageMode.ME;
-        factory.config().setStorageMode(next);
+        factory.setStorageMode(next);
         markDirty();
         barOk(player, "已切换为 " + modeLabel(next) + " 模式");
         return 1;
@@ -937,7 +937,7 @@ public final class FactoryService {
             return 0;
         }
         factory.bindStorage(next.isEmpty() ? null : next, storageResolver());
-        factory.config().setStorageMode(StorageMode.CONTAINER);
+        factory.setStorageMode(StorageMode.CONTAINER);
         markDirty();
         if (!chain) {
             String label = blockLabel(level, targets.getFirst());

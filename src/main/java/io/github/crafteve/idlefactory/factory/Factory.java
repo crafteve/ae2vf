@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
 /**
@@ -54,6 +55,15 @@ public final class Factory {
     public void bindStorage(@Nullable StorageAnchor anchor, @Nullable StorageResolver resolver) {
         this.config.setStorageAnchor(anchor);
         this.live.refresh(this.config.storageAnchor(), resolver);
+    }
+
+    /**
+     * 改仓库接入模式。调用方负责保证当前地址为空。
+     *
+     * @param mode 新模式
+     */
+    void setStorageMode(StorageMode mode) {
+        this.config.setStorageMode(mode);
     }
 
     /**

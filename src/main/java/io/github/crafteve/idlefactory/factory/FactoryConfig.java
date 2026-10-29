@@ -53,11 +53,11 @@ public final class FactoryConfig {
     }
 
     /**
-     * 改仓库接入模式；调用方负责保证当前地址为空。
+     * 改仓库接入模式；只由 {@link Factory} 调用，调用方负责保证当前地址为空。
      *
      * @param mode 新模式
      */
-    public void setStorageMode(StorageMode mode) {
+    void setStorageMode(StorageMode mode) {
         this.storageMode = mode;
     }
 
@@ -68,11 +68,12 @@ public final class FactoryConfig {
     }
 
     /**
-     * 设置仓库地址。非空地址会顺手把模式推到对应类型；解绑时保留当前模式。
+     * 设置仓库地址；只由 {@link Factory#bindStorage} 调用。非空地址会顺手把模式推到对应类型，
+     * 解绑时保留当前模式。
      *
      * @param anchor 新地址；{@code null} 表示解绑
      */
-    public void setStorageAnchor(@Nullable StorageAnchor anchor) {
+    void setStorageAnchor(@Nullable StorageAnchor anchor) {
         this.storageAnchor = anchor;
         if (anchor instanceof ContainerAnchor) {
             this.storageMode = StorageMode.CONTAINER;
