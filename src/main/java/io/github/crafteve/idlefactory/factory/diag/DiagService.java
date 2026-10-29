@@ -141,7 +141,7 @@ public final class DiagService {
         long now = observations.currentTick();
         int shown = 0;
         for (MachineRef ref : factory.machines().all()) {
-            Observation observation = observations.observe(ref);
+            Observation observation = observations.observe(ref.blockKey());
             boolean detached = factory.machines().isDetached(ref.id());
             if (observation.health() == Health.PRESENT && !detached) {
                 continue;

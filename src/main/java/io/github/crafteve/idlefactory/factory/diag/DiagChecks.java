@@ -95,7 +95,7 @@ public final class DiagChecks {
         }
         if (observations != null) {
             // why 是现场体检：先刷新这一台，再看结论
-            Observation observation = observations.refresh(machine);
+            Observation observation = observations.refresh(machine.blockKey());
             if (observation.health() == Health.UNLOADED) {
                 return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
             }

@@ -127,6 +127,6 @@ public final class FactoryBin {
         if (ref == null) {
             return null;
         }
-        return observations.observe(ref).health();
+        return observations.observe(ref.blockKey()).health();
     }
 }

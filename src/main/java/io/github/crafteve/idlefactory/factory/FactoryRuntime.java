@@ -282,12 +282,12 @@ public final class FactoryRuntime {
         this.observedKeys.clear();
         for (Factory factory : this.manager.all()) {
             for (MachineRef ref : factory.machines().all()) {
-                this.observedKeys.add(BlockKey.of(ref.dimension(), ref.pos()));
+                this.observedKeys.add(ref.blockKey());
             }
             // 仓库容器和机器共用同一张方块级观测
             if (factory.storageLink().anchor() instanceof ContainerAnchor anchor) {
                 for (ContainerRef container : anchor.containers()) {
-                    this.observedKeys.add(BlockKey.of(container.dimension(), container.pos()));
+                    this.observedKeys.add(container.blockKey());
                 }
             }
         }

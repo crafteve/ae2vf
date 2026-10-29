@@ -4,7 +4,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.observation.Located;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
@@ -24,7 +24,7 @@ import net.minecraft.world.level.Level;
  * @param dimension 机器所在维度
  * @param pos       机器方块坐标
  */
-public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) implements Located {
+public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) {
 
     private static final String TAG_ID = "Id";
     private static final String TAG_DIMENSION = "Dimension";
@@ -42,6 +42,15 @@ public record MachineRef(UUID id, ResourceKey<Level> dimension, BlockPos pos) im
      */
     public static MachineRef of(ResourceKey<Level> dimension, BlockPos pos) {
         return new MachineRef(LinkIds.of(dimension, pos), dimension, pos);
+    }
+
+    /**
+     * 这个目标的位置键。
+     *
+     * @return 位置键
+     */
+    public BlockKey blockKey() {
+        return BlockKey.of(this.dimension, this.pos);
     }
 
     /**

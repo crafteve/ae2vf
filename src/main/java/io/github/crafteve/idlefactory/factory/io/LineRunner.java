@@ -102,7 +102,7 @@ public final class LineRunner {
             }
 
             LevelCapabilityCache caps = observations == null ? null : observations.capabilities(level);
-            long generation = observations == null ? 0L : observations.facesGeneration(target);
+            long generation = observations == null ? 0L : observations.facesGeneration(target.blockKey());
             ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                     id -> new ItemVariantIndex());
             GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
@@ -155,7 +155,7 @@ public final class LineRunner {
      * 几十 tick 内就会被探到）。这样 IO 永远不会绕过探测预算去打一个尖峰。</p>
      */
     private static boolean runnable(ObservationService observations, MachineRef target) {
-        Observation observation = observations.observe(target);
+        Observation observation = observations.observe(target.blockKey());
         return observation.health().alive();
     }
 

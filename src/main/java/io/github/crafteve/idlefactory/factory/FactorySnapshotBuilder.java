@@ -315,7 +315,8 @@ public final class FactorySnapshotBuilder {
             long now) {
         List<MachineView> views = new ArrayList<>(factory.machines().size());
         for (MachineRef ref : factory.machines().all()) {
-            Observation observation = observations == null ? Observation.UNKNOWN : observations.observe(ref);
+            Observation observation = observations == null
+                    ? Observation.UNKNOWN : observations.observe(ref.blockKey());
             Optional<IoGroup> group = FactoryRefs.groupOf(factory, ref.id());
             List<ResourceSpec> inputs = group.map(IoGroup::inputs).orElse(List.of());
             List<ResourceSpec> outputs = group.map(IoGroup::outputs).orElse(List.of());

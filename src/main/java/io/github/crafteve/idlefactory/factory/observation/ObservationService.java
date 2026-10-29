@@ -32,7 +32,7 @@ import net.minecraft.world.level.Level;
  * <b>报迁移</b>（PRESENT↔UNLOADED↔MISSING 的变化交给上层）。</p>
  *
  * <p>它<b>不</b>改配置、<b>不</b>做 IO、<b>不</b>碰任何 {@code Factory}——被引用的键集合由
- * {@code FactoryRuntime} 每 tick 传进来。这样观测层可以保持零工厂依赖（见 {@link Located}）。</p>
+ * {@code FactoryRuntime} 每 tick 传进来。这样观测层可以保持零工厂依赖（见 {@link BlockKey}）。</p>
  *
  * <p>预算与退避是刻意的：平时排队的只有“有事的”（新的、刚脏过、失联、未加载），
  * 长期安静的 PRESENT 会一路退到 10 分钟一探——稳态下每 tick 的探测次数只和事件数
@@ -261,22 +261,21 @@ public final class ObservationService {
     /**
      * 读观测（不探测、不创建）。
      *
-     * @param located 机器引用或容器引用
+     * @param key 位置键
      * @return 观测；没被登记过时返回只读的 {@link Observation#UNKNOWN}
      */
-    public Observation observe(Located located) {
-        Observation found = this.observations.get(BlockKey.of(located.dimension(), located.pos()));
+    public Observation observe(BlockKey key) {
+        Observation found = this.observations.get(key);
         return found == null ? Observation.UNKNOWN : found;
     }
 
     /**
      * 立即探测一次并返回结果（命令、接入、诊断用）。
      *
-     * @param located 机器引用或容器引用
+     * @param key 位置键
      * @return 刷新后的观测
      */
-    public Observation refresh(Located located) {
-        BlockKey key = BlockKey.of(located.dimension(), located.pos());
+    public Observation refresh(BlockKey key) {
         Observation observation = this.observations.computeIfAbsent(key, ignored -> new Observation());
         probe(key, observation);
         probeWork(key, observation);
@@ -289,11 +288,11 @@ public final class ObservationService {
      * <p>纯读，绝不碰世界——原来在这里偷偷建表（贵，21 次查询）是最大的毛病。
      * 需要内容时调 {@link #ensureFaces}，由调用方显式承担那 21 次查询。</p>
      *
-     * @param located 机器引用或容器引用
+     * @param key 位置键
      * @return 面表
      */
-    public FaceTable faces(Located located) {
-        FaceTable cached = this.faceCache.get(BlockKey.of(located.dimension(), located.pos()));
+    public FaceTable faces(BlockKey key) {
+        FaceTable cached = this.faceCache.get(key);
         return cached == null ? FaceTable.EMPTY : cached;
     }
 
@@ -304,11 +303,10 @@ public final class ObservationService {
      * 拿不到表它会退回全六面，所以调不调用都不影响正确性，只影响 IO 少试几个面。
      * 健康不是 PRESENT 或区块没加载时返回空表，不建（建了也是错的）。</p>
      *
-     * @param located 机器引用或容器引用
+     * @param key 位置键
      * @return 面表
      */
-    public FaceTable ensureFaces(Located located) {
-        BlockKey key = BlockKey.of(located.dimension(), located.pos());
+    public FaceTable ensureFaces(BlockKey key) {
         FaceTable cached = this.faceCache.get(key);
         if (cached != null) {
             return cached;
@@ -332,11 +330,11 @@ public final class ObservationService {
      * <p>代数住在面表缓存里，这里只是转发——病历本（{@code Observation}）里已经没有
      * 代数这个字段了，它只留健康和时钟。</p>
      *
-     * @param located 机器引用或容器引用
+     * @param key 位置键
      * @return 代数；没登记过时为 {@code 0}
      */
-    public long facesGeneration(Located located) {
-        return this.faceCache.generation(BlockKey.of(located.dimension(), located.pos()));
+    public long facesGeneration(BlockKey key) {
+        return this.faceCache.generation(key);
     }
 
     /**

@@ -1703,7 +1703,7 @@ public final class FactoryService {
         List<ContainerRef> keep = new ArrayList<>(anchor.containers().size());
         int removed = 0;
         for (ContainerRef ref : anchor.containers()) {
-            if (observations.observe(ref).health().gone()) {
+            if (observations.observe(ref.blockKey()).health().gone()) {
                 removed++;
             } else {
                 keep.add(ref);
@@ -1806,7 +1806,7 @@ public final class FactoryService {
             int unloaded = 0;
             int missing = 0;
             for (ContainerRef ref : containerAnchor.containers()) {
-                Health health = observations == null ? Health.UNKNOWN : observations.observe(ref).health();
+                Health health = observations == null ? Health.UNKNOWN : observations.observe(ref.blockKey()).health();
                 switch (health) {
                     case PRESENT -> present++;
                     case UNLOADED -> unloaded++;
@@ -2027,7 +2027,7 @@ public final class FactoryService {
     @Nullable
     private static Observation refreshObservation(MachineRef target) {
         ObservationService observations = observations();
-        return observations == null ? null : observations.refresh(target);
+        return observations == null ? null : observations.refresh(target.blockKey());
     }
 
     /**
