@@ -29,6 +29,14 @@ public final class Observation {
 
     /** 正常状态的复探间隔（tick）。 */
     private static final int PRESENT_INTERVAL = 100;
+    /**
+     * 安静 PRESENT 的复探间隔上限（tick）：12000 = 10 分钟。
+     *
+     * <p>长期无变化、无事件的机器没有资格一直占预算：连续安静几次后一路退到这里，
+     * 之后只靠事件唤醒（能力失效、邻居更新、chunk 加载）。这就是“稳态探测次数和对象
+     * 总数解耦”——排队的只剩有事的，没事的不在队列里。</p>
+     */
+    private static final int QUIET_PRESENT_MAX_INTERVAL = 12000;
     /** 未加载时的复探间隔（tick）：加载后要尽快发现。 */
     private static final int UNLOADED_INTERVAL = 40;
     /** 失联复探的起始间隔与上限。 */
@@ -56,6 +64,13 @@ public final class Observation {
     private long nextProbeTick;
     private int goneProbes;
     private int probeInterval = PRESENT_INTERVAL;
+    /**
+     * 连续安静次数：健康一直是 PRESENT 且方块身份没换，一次探完 +1。
+     *
+     * <p>脏事件触发的复探如果结论不变也照样 +1——它只是提前确认了一次“没事”，
+     * 不改变“没事”的事实。任何健康迁移或换方块都清零。</p>
+     */
+    private int quietProbes;
 
     Observation() {
         // 只能由同包的 ObservationService 创建
@@ -202,12 +217,24 @@ public final class Observation {
                 this.missingSince = tick;
             }
             this.goneProbes++;
+            this.quietProbes = 0;
             int shift = Math.min(Math.max(this.goneProbes - 1, 0), 5);
             this.probeInterval = Math.min(MISSING_MIN_INTERVAL << shift, MISSING_MAX_INTERVAL);
         } else if (result.health() == Health.PRESENT) {
             this.missingSince = -1L;
             this.goneProbes = 0;
-            this.probeInterval = PRESENT_INTERVAL;
+            if (before == Health.PRESENT && !identityChanged) {
+                // 一直好好的：安静计数 +1，间隔指数拉长，直到 10 分钟一探。
+                // 从 100 起翻 7 次正好到顶（100→…→6400→封顶 12000）。
+                this.quietProbes++;
+                int shift = Math.min(this.quietProbes, 7);
+                this.probeInterval = Math.min(PRESENT_INTERVAL << shift,
+                        QUIET_PRESENT_MAX_INTERVAL);
+            } else {
+                // 刚恢复或刚换过方块：回到正常节奏，重新开始数安静。
+                this.quietProbes = 0;
+                this.probeInterval = PRESENT_INTERVAL;
+            }
             if (before != Health.PRESENT) {
                 this.workState = WorkState.UNKNOWN;
                 this.workObservedAtTick = -1L;

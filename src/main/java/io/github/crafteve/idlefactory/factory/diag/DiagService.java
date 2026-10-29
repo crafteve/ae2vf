@@ -127,7 +127,8 @@ public final class DiagService {
                 "观测 " + stats.total() + " 条 · 就绪 " + stats.present()
                         + " · 未加载 " + stats.unloaded() + " · 失联 " + stats.missing()
                         + " · 未探测 " + stats.unknown()
-                        + " · 本 tick 探测 " + stats.probesLastTick()));
+                        + " · 本 tick 探测 " + stats.probesLastTick()
+                        + " · 待消化 " + stats.dirtyPending()));
         int routes = 0;
         for (PassiveLine line : factory.lines().all()) {
             routes += runtime.lineRunner().routeCount(line.id());

@@ -24,14 +24,21 @@ import net.minecraft.world.level.Level;
  * <p>它<b>不</b>改配置、<b>不</b>做 IO、<b>不</b>碰任何 {@code Factory}——被引用的键集合由
  * {@code FactoryRuntime} 每 tick 传进来。这样观测层可以保持零工厂依赖（见 {@link Located}）。</p>
  *
- * <p>预算与退避是刻意的：一次全量探测 100 台机器要 400 次能力查询，摊到 8/tick 就是十几个 tick；
- * 稳态下 PRESENT 每 5 秒复探一次，平均每 tick 只要 1 台。</p>
+ * <p>预算与退避是刻意的：平时排队的只有“有事的”（新的、刚脏过、失联、未加载），
+ * 长期安静的 PRESENT 会一路退到 10 分钟一探——稳态下每 tick 的探测次数只和事件数
+ * 相关，和对象总数解耦。</p>
  */
 public final class ObservationService {
     /** 每 tick 最多主动探测几个到期条目。 */
     private static final int PROBE_BUDGET_PER_TICK = 8;
-    /** 每 tick 最多处理几个「被失效事件标脏」的条目。 */
-    private static final int DIRTY_BUDGET_PER_TICK = 32;
+    /**
+     * 每 tick 最多处理几个「被失效事件标脏」的条目。
+     *
+     * <p>标脏是事件驱动的（能力失效、邻居更新、chunk 加载），平时用不满，事件 burst
+     * 时才顶满——预算在这里的语义是 backlog 消化速度，不是摊薄。超了顺延到下 tick，
+     * tick 不爆。</p>
+     */
+    private static final int DIRTY_BUDGET_PER_TICK = 64;
     /** 每 tick 最多探测几个工作状态。 */
     private static final int WORK_BUDGET_PER_TICK = 16;
 
@@ -257,7 +264,7 @@ public final class ObservationService {
             }
         }
         return new Stats(this.observations.size(), present, unloaded, missing, unknown,
-                this.probesLastTick, this.tick);
+                this.probesLastTick, this.dirty.size(), this.tick);
     }
 
     private void probe(ObservationKey key, Observation observation) {
@@ -297,9 +304,10 @@ public final class ObservationService {
      * @param missing       失联（含维度不存在）
      * @param unknown       未探测
      * @param probesLastTick 本 tick 主动探测次数
+     * @param dirtyPending  还没消化的标脏数（事件 burst 时会涨）
      * @param tick          服务内部时钟
      */
     public record Stats(int total, int present, int unloaded, int missing, int unknown,
-                        int probesLastTick, long tick) {
+                        int probesLastTick, int dirtyPending, long tick) {
     }
 }
