@@ -281,6 +281,15 @@ public final class FactoryService {
             err(player, "服务端未就绪");
             return 0;
         }
+        // 指令路径也是绑定入口，必须和绑定杖走同一套占用规则；自占同角色交给下面的
+        // byId 判断（可能是回收站取回，也可能是数据修复）。
+        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
+        LinkGate.ClaimCheck claim =
+                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
+        if (claim.blocked()) {
+            err(player, gateMessage(claim));
+            return 0;
+        }
         MachineRef target = MachineRef.of(level.dimension(), pos);
         BlockProbe.Presence presence = BlockProbe.presence(server,
                 BlockKey.of(target.dimension(), target.pos()));
@@ -418,43 +427,18 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 04. 占用门禁（GateFilter / claimedByOther / filterClaimed） ----
+    // ---- 04. 占用门禁（LinkGate / GateFilter） ----
     // 负责绑定前的全服占用检查与拒绝文案；被机器 toggle、仓库 toggle 与容器连锁三条路径复用。
     // ------------------------------------------------------------------
 
     /**
-     * 门禁过滤结果：放行的目标，以及被别家占了而跳过的数量。
+     * 门禁过滤结果：放行的目标，以及被别家占、角色冲突而跳过的数量。
      *
-     * @param open    放行的目标坐标
-     * @param blocked 被别的工厂占了的数量
+     * @param open         放行的目标坐标
+     * @param blockedOther 被别的工厂占了的数量
+     * @param blockedRole  位置属于自己、但角色不是本次操作角色的数量
      */
-    private record GateFilter(List<BlockPos> open, int blocked) {
-    }
-
-    /**
-     * 查占用表：这个位置有没有被别的工厂占着。
-     *
-     * <p>门禁只拦“别人家的”，自家的位置一律放行——toggle 点自家已连的机器是断开，
-     * 点自家已绑的容器是取消，要是连自家都拦，toggle 就断不开了。运行时没好时当没人
-     * 占（能走到这里说明工厂是有的，运行时一定在）。</p>
-     *
-     * @param factory 当前工厂
-     * @param level   所在维度
-     * @param pos     目标坐标
-     * @return 别人家的认领；空地或自家时为空
-     */
-    private static Optional<LinkRegistry.Claim> claimedByOther(Factory factory, ServerLevel level,
-            BlockPos pos) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return Optional.empty();
-        }
-        Optional<LinkRegistry.Claim> claim =
-                runtime.links().get(BlockKey.of(level.dimension(), pos).id());
-        if (claim.isEmpty() || claim.get().factoryId().equals(factory.id())) {
-            return Optional.empty();
-        }
-        return claim;
+    private record GateFilter(List<BlockPos> open, int blockedOther, int blockedRole) {
     }
 
     /**
@@ -464,34 +448,65 @@ public final class FactoryService {
      * @return 如“工厂 ab12cd34 的机器”
      */
     private static String describeClaim(LinkRegistry.Claim claim) {
-        String owner = claim.factoryId().toString().substring(0, 8);
-        String role = claim.role() == LinkRole.MACHINE ? "机器" : "仓库";
-        return "工厂 " + owner + " 的" + role;
+        return "工厂 " + claim.factoryId().toString().substring(0, 8) + " 的" + roleName(claim.role());
     }
 
     /**
-     * 按占用表过滤一批目标：被别的工厂占的跳过并计数，自家的和空地放行。
+     * 角色名。
      *
-     * <p>连锁是“先按世界事实找全，再按归属过滤”——BFS 只管找同 id 连通群，
-     * 归属判断统一收敛在这里，两步各干各的，行为可预测。</p>
+     * @param role 角色
+     * @return “机器”或“仓库”
+     */
+    private static String roleName(LinkRole role) {
+        return role == LinkRole.MACHINE ? "机器" : "仓库";
+    }
+
+    /**
+     * 把一次占用检查翻译成拒绝理由；不该拒绝时返回 {@code null}。
      *
+     * @param check 检查结果
+     * @return 拒绝文案；放行时为 {@code null}
+     */
+    @Nullable
+    private static String gateMessage(LinkGate.ClaimCheck check) {
+        LinkRegistry.Claim claim = check.claim();
+        if (claim == null) {
+            return null;
+        }
+        if (check.kind() == LinkGate.ClaimCheck.Kind.SELF_OTHER) {
+            return "这个位置已经是你的" + roleName(claim.role()) + "，先解除再操作";
+        }
+        return "该位置已被" + describeClaim(claim) + "占用";
+    }
+
+    /**
+     * 按占用表过滤一批目标：空地和自己的同角色目标放行，别人的和别人角色的分别计数。
+     *
+     * <p>连锁是“先按世界事实找全，再按归属过滤”——BFS 的半径与数量上限都在
+     * {@code FactoryLinkFinder} 里按筛选前计算，这里只分流，过滤后不补位、不重扫。</p>
+     *
+     * @param gate    本次操作的占用表
      * @param factory 当前工厂
+     * @param role    本次操作的角色
      * @param level   所在维度
      * @param targets 候选坐标
      * @return 过滤结果
      */
-    private static GateFilter filterClaimed(Factory factory, ServerLevel level,
-            List<BlockPos> targets) {
+    private static GateFilter filterClaimed(LinkGate gate, Factory factory, LinkRole role,
+            ServerLevel level, List<BlockPos> targets) {
         List<BlockPos> open = new ArrayList<>(targets.size());
-        int blocked = 0;
+        int blockedOther = 0;
+        int blockedRole = 0;
         for (BlockPos targetPos : targets) {
-            if (claimedByOther(factory, level, targetPos).isPresent()) {
-                blocked++;
-            } else {
-                open.add(targetPos);
+            LinkGate.ClaimCheck check =
+                    gate.check(BlockKey.of(level.dimension(), targetPos), factory.id(), role);
+            switch (check.kind()) {
+                case FREE, SELF_SAME -> open.add(targetPos);
+                case SELF_OTHER -> blockedRole++;
+                case OTHER -> blockedOther++;
             }
         }
-        return new GateFilter(open, blocked);
+        return new GateFilter(open, blockedOther, blockedRole);
     }
 
     // ------------------------------------------------------------------
@@ -575,32 +590,33 @@ public final class FactoryService {
             barErr(player, "该方块不是可连接的机器");
             return 0;
         }
-        // 查占用表：被别人家占了直接拒绝，自家放行（toggle 要能断开自家的）。
-        Optional<LinkRegistry.Claim> claim = claimedByOther(factory, level, pos);
-        if (claim.isPresent()) {
-            barErr(player, "该位置已被" + describeClaim(claim.get()) + "占用");
+        // 本次操作现算一张占用表：先扫一遍档案，之后每个目标 O(1) 查表。
+        // 释放只允许「自己的 + 同角色」；别的工厂、自己另一个角色都拒绝。
+        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
+        LinkGate.ClaimCheck origin =
+                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
+        if (origin.blocked()) {
+            barErr(player, gateMessage(origin));
             return 0;
         }
         if (!FactoryLinkFinder.isMachine(level, pos)) {
             barErr(player, "该方块不是可连接的机器");
             return 0;
         }
-        List<BlockPos> targets = chain
+        List<BlockPos> found = chain
                 ? FactoryLinkFinder.machines(level, pos)
                 : List.of(pos);
-        if (targets.isEmpty()) {
+        if (found.isEmpty()) {
             barErr(player, "附近没有可连接的机器");
             return 0;
         }
-        int blocked = 0;
-        if (chain) {
-            GateFilter filter = filterClaimed(factory, level, targets);
-            targets = filter.open();
-            blocked = filter.blocked();
-            if (targets.isEmpty()) {
-                barErr(player, "这组机器都被别的工厂占了");
-                return 0;
-            }
+        // BFS 的半径与数量上限按筛选前计算；这里只按占用表分流，过滤后不补位、不重扫。
+        GateFilter filter = filterClaimed(gate, factory, LinkRole.MACHINE, level, found);
+        List<BlockPos> targets = filter.open();
+        if (targets.isEmpty()) {
+            barErr(player, filter.blockedRole() > 0 && filter.blockedOther() == 0
+                    ? "这些位置已经是你的仓库，先解除" : "这组机器都被别的工厂占了");
+            return 0;
         }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
@@ -611,12 +627,15 @@ public final class FactoryService {
             }
         }
         return allConnected
-                ? disconnectMachineTargets(player, factory, level, targets, chain, blocked)
-                : connectMachineTargets(player, factory, level, targets, chain, blocked);
+                ? disconnectMachineTargets(player, factory, level, targets, chain,
+                        filter.blockedOther(), filter.blockedRole())
+                : connectMachineTargets(player, factory, level, targets, chain,
+                        filter.blockedOther(), filter.blockedRole());
     }
 
     private static int connectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain, int blocked) {
+            ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
+            int blockedRole) {
         int added = 0;
         int restored = 0;
         int skipped = 0;
@@ -666,15 +685,19 @@ public final class FactoryService {
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
         }
-        if (blocked > 0) {
-            text += "，被占用 " + blocked + " 台";
+        if (blockedOther > 0) {
+            text += "，被别家占用 " + blockedOther + " 台";
+        }
+        if (blockedRole > 0) {
+            text += "，角色冲突 " + blockedRole + " 台";
         }
         barOk(player, text);
         return added + restored;
     }
 
     private static int disconnectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain, int blocked) {
+            ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
+            int blockedRole) {
         int purged = 0;
         int binned = 0;
         int already = 0;
@@ -718,8 +741,11 @@ public final class FactoryService {
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
         }
-        if (blocked > 0) {
-            text += "，被占用 " + blocked + " 台";
+        if (blockedOther > 0) {
+            text += "，被别家占用 " + blockedOther + " 台";
+        }
+        if (blockedRole > 0) {
+            text += "，角色冲突 " + blockedRole + " 台";
         }
         barOk(player, text);
         return purged + binned;
@@ -753,6 +779,14 @@ public final class FactoryService {
 
     private static int toggleMeStorage(ServerPlayer player, Factory factory, ServerLevel level,
             StorageAnchor anchor, BlockPos pos) {
+        // 先查占用：释放只允许「自己的 + 仓库」角色；别的工厂、自己的机器都拒绝。
+        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
+        LinkGate.ClaimCheck claim =
+                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.STORAGE);
+        if (claim.blocked()) {
+            barErr(player, gateMessage(claim));
+            return 0;
+        }
         boolean same = anchor instanceof MeAnchor me
                 && me.dimension().equals(level.dimension()) && me.pos().equals(pos)
                 || anchor instanceof Ae2Anchor ae2
@@ -769,12 +803,6 @@ public final class FactoryService {
         }
         if (!level.isLoaded(pos)) {
             barErr(player, "目标区块未加载");
-            return 0;
-        }
-        // 查占用表：这块地被别人家占了（机器或仓库）就不能再绑 ME，自家放行。
-        Optional<LinkRegistry.Claim> claim = claimedByOther(factory, level, pos);
-        if (claim.isPresent()) {
-            barErr(player, "该位置已被" + describeClaim(claim.get()) + "占用");
             return 0;
         }
         if (Ae2Binder.nodeAt(level, pos) == null) {
@@ -796,11 +824,25 @@ public final class FactoryService {
         }
         ContainerAnchor current = anchor instanceof ContainerAnchor containerAnchor
                 ? containerAnchor : new ContainerAnchor(List.of());
-        List<BlockPos> targets = chain
+        List<BlockPos> found = chain
                 ? FactoryLinkFinder.containers(level, pos)
                 : List.of(pos);
+        if (found.isEmpty()) {
+            found = List.of(pos);
+        }
+        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
+        LinkGate.ClaimCheck origin =
+                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.STORAGE);
+        if (origin.blocked()) {
+            barErr(player, gateMessage(origin));
+            return 0;
+        }
+        // BFS 的半径与数量上限按筛选前计算；这里只按占用表分流，过滤后不补位、不重扫。
+        GateFilter filter = filterClaimed(gate, factory, LinkRole.STORAGE, level, found);
+        List<BlockPos> targets = filter.open();
         if (targets.isEmpty()) {
-            targets = List.of(pos);
+            barErr(player, "这些位置都不能绑定");
+            return 0;
         }
         boolean allBound = true;
         for (BlockPos targetPos : targets) {
@@ -812,11 +854,13 @@ public final class FactoryService {
         if (allBound) {
             return unbindContainerTargets(player, factory, level, current, targets, chain);
         }
-        return bindContainerTargets(player, factory, level, current, targets, chain);
+        return bindContainerTargets(player, factory, level, current, targets, chain,
+                filter.blockedOther(), filter.blockedRole());
     }
 
     private static int bindContainerTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, ContainerAnchor current, List<BlockPos> targets, boolean chain) {
+            ServerLevel level, ContainerAnchor current, List<BlockPos> targets, boolean chain,
+            int blockedOther, int blockedRole) {
         if (!level.isLoaded(targets.getFirst())) {
             barErr(player, "目标区块未加载");
             return 0;
@@ -830,24 +874,12 @@ public final class FactoryService {
             barErr(player, "该方块不是仓库容器");
             return 0;
         }
-        // 查占用表：起点被别人家占了直接拒绝（自家放行，toggle 不断自己）。
-        Optional<LinkRegistry.Claim> originClaim = claimedByOther(factory, level, origin);
-        if (originClaim.isPresent()) {
-            barErr(player, "该位置已被" + describeClaim(originClaim.get()) + "占用");
-            return 0;
-        }
         ContainerAnchor next = current;
         int added = 0;
         int skipped = 0;
-        int blocked = 0;
         for (BlockPos targetPos : targets) {
             if (Ae2Binder.nodeAt(level, targetPos) != null) {
                 skipped++;
-                continue;
-            }
-            // 连锁里的每一台也要过门禁：被别家占的跳过并计数，不拦整组。
-            if (claimedByOther(factory, level, targetPos).isPresent()) {
-                blocked++;
                 continue;
             }
             ContainerRef ref = ContainerRef.of(level.dimension(), targetPos);
@@ -863,8 +895,10 @@ public final class FactoryService {
             added++;
         }
         if (added == 0) {
-            if (blocked > 0 && skipped == 0) {
+            if (blockedOther > 0) {
                 barErr(player, "这些容器都被别的工厂占了");
+            } else if (blockedRole > 0) {
+                barErr(player, "这些位置已经是你的机器，先解除");
             } else {
                 barErr(player, "没有新增容器（已绑过或达到上限 "
                         + ContainerAnchor.MAX_CONTAINERS + " 个）");
@@ -882,8 +916,11 @@ public final class FactoryService {
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 个";
         }
-        if (blocked > 0) {
-            text += "，被占用 " + blocked + " 个";
+        if (blockedOther > 0) {
+            text += "，被别家占用 " + blockedOther + " 个";
+        }
+        if (blockedRole > 0) {
+            text += "，角色冲突 " + blockedRole + " 个";
         }
         barOk(player, text);
         return added;
@@ -1242,6 +1279,15 @@ public final class FactoryService {
         }
         if (!isAnyContainer(level, pos)) {
             err(player, "这个方块不是仓库容器（物品 / 流体 / 能量）");
+            return 0;
+        }
+        // 指令路径也是绑定入口，必须和绑定杖走同一套占用规则；自占同角色交给下面的
+        // contains 判断。
+        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
+        LinkGate.ClaimCheck claim =
+                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.STORAGE);
+        if (claim.blocked()) {
+            err(player, gateMessage(claim));
             return 0;
         }
 
