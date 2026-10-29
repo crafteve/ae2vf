@@ -1096,11 +1096,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     idleLabel != null);
         }
         drawExpandButton(graphics, y, isOpen(machine));
-        int deleteX = deleteButtonX();
-        boolean deleteHovered = this.renderMouseX >= deleteX && this.renderMouseX < deleteX + 12
+        int removeX = lineRemoveButtonX();
+        boolean removeHovered = this.renderMouseX >= removeX && this.renderMouseX < removeX + 12
                 && this.renderMouseY >= y + 4 && this.renderMouseY < y + FactoryLayout.ROW_H - 4;
-        graphics.drawString(this.font, "×", deleteX, y + (FactoryLayout.ROW_H - 8) / 2,
-                deleteHovered ? this.theme.error() : this.theme.textDim(), false);
+        graphics.drawString(this.font, "×", removeX, y + (FactoryLayout.ROW_H - 8) / 2,
+                removeHovered ? this.theme.error() : this.theme.textDim(), false);
         if (detailHeight > 0) {
             IoDetailLayout.Detail detail = IoDetailLayout.layout(l, machine,
                     y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
@@ -1223,14 +1223,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
-     * 鼠标下的删除按钮（机器行最右侧的叉号）。
+     * 鼠标下的“移出产线”按钮（左表机器行最右侧的叉号）。
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
      * @return 机器视图；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView deleteButtonAt(double mouseX, double mouseY) {
+    FactorySnapshotBuilder.MachineView lineRemoveButtonAt(double mouseX, double mouseY) {
         if (this.activeTab != TAB_MACHINES) {
             return null;
         }
@@ -1238,14 +1238,36 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
         }
-        int x = deleteButtonX();
+        int x = lineRemoveButtonX();
         return inside(mouseX, mouseY, x, hit.y() + 2, 12, FactoryLayout.ROW_H - 4)
                 ? hit.machine() : null;
     }
 
-    /** 机器行删除叉号的 x；放在展开按钮左侧。 */
-    private int deleteButtonX() {
+    /** 左表机器行“移出产线”叉号的 x；放在展开按钮左侧。 */
+    private int lineRemoveButtonX() {
         return expandButtonX() - 16;
+    }
+
+    /**
+     * 鼠标下的机器库删除按钮（右侧机器卡片右下角的叉号）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 机器视图；没命中为 {@code null}
+     */
+    @Nullable
+    FactorySnapshotBuilder.MachineView libraryDeleteButtonAt(double mouseX, double mouseY) {
+        FactorySnapshotBuilder.MachineView machine = machineAt(mouseX, mouseY);
+        if (machine == null) {
+            return null;
+        }
+        int row = (int) ((mouseY - this.layout.gridY) / FactoryLayout.ROW_H);
+        int cardX = this.layout.gridX + 2;
+        int cardW = FactoryLayout.GRID_COLS * FactoryLayout.CELL - 4;
+        int cardY = this.layout.gridY + row * FactoryLayout.ROW_H + 1;
+        int x = cardX + cardW - 12;
+        int y = cardY + 13 - 1;
+        return inside(mouseX, mouseY, x, y, 10, 10) ? machine : null;
     }
 
     /**
@@ -2286,16 +2308,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         String rulesLabel = "规则 ";
         String rulesValue = Integer.toString(machine.ruleCount());
         int rulesWidth = this.font.width(rulesLabel) + this.font.width(rulesValue);
-        int lineWidth = Math.max(12, right - rulesWidth - 6 - textX);
+        int deleteX = cardX + cardW - 12;
+        int rulesX = deleteX - 6 - rulesWidth;
+        int lineWidth = Math.max(12, rulesX - 6 - textX);
         graphics.drawString(this.font, this.font.plainSubstrByWidth(lines, lineWidth),
                 textX, lineY,
                 machine.lineNames().isEmpty()
                         ? this.theme.textDim() : this.theme.textValue(), false);
-        int rulesX = right - rulesWidth;
         graphics.drawString(this.font, rulesLabel, rulesX, lineY, CARD_META, false);
         graphics.drawString(this.font, rulesValue,
                 rulesX + this.font.width(rulesLabel), lineY,
                 this.theme.textValue(), false);
+        boolean deleteHovered = this.renderMouseX >= deleteX && this.renderMouseX < deleteX + 10
+                && this.renderMouseY >= lineY - 1 && this.renderMouseY < lineY + 9;
+        graphics.drawString(this.font, "×", deleteX, lineY,
+                deleteHovered ? this.theme.error() : this.theme.textDim(), false);
 
         if (this.editController != null && this.editController.isDragSource(machine.ref())) {
             graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0x66000000);
@@ -2402,6 +2429,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         boolean onTabBar = isTabBar(mouseX, mouseY);
         int sortButton = isSortButtonAt(mouseX, mouseY);
 
+        if (button == 0 && this.editController != null
+                && !this.editController.isOverlayActive()) {
+            FactorySnapshotBuilder.MachineView libraryDelete =
+                    libraryDeleteButtonAt(mouseX, mouseY);
+            if (libraryDelete != null) {
+                this.editController.confirmDeleteMachine(libraryDelete);
+                return true;
+            }
+        }
         if (this.editController != null
                 && this.editController.mouseClicked(mouseX, mouseY, button)) {
             return true;
@@ -2445,10 +2481,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return true;
         }
         if (button == 0 && this.editController != null) {
-            FactorySnapshotBuilder.MachineView deleteTarget =
-                    deleteButtonAt(mouseX, mouseY);
-            if (deleteTarget != null) {
-                this.editController.confirmDeleteMachine(deleteTarget);
+            FactorySnapshotBuilder.MachineView removeTarget =
+                    lineRemoveButtonAt(mouseX, mouseY);
+            if (removeTarget != null) {
+                this.editController.removeMachineFromLine(removeTarget);
                 return true;
             }
         }

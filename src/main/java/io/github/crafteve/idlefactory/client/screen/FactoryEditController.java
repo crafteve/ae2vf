@@ -712,6 +712,20 @@ public final class FactoryEditController {
     }
 
     /**
+     * 把机器移出当前产线；机器和规则回到机器库。
+     *
+     * @param machine 机器
+     */
+    public void removeMachineFromLine(FactorySnapshotBuilder.MachineView machine) {
+        UUID lineId = this.screen.selectedLineId();
+        if (lineId == null) {
+            return;
+        }
+        sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE, lineId,
+                machine.ref().id(), null);
+    }
+
+    /**
      * 打开删除机器的确认框；有规则时由调用方显示规则数。
      *
      * @param machine 机器
