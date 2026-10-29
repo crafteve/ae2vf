@@ -9,6 +9,6 @@ package io.github.crafteve.idlefactory.factory.links;
 public enum LinkRole {
     /** 机器库里的机器。 */
     MACHINE,
-    /** 仓库地址：ME 方块、旧量子环或容器。 */
+    /** 仓库地址：ME 方块或容器。 */
     STORAGE
 }

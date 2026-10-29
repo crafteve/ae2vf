@@ -7,7 +7,6 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
@@ -28,11 +27,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 服务端 → 客户端：当前仓库模式和所有已绑定坐标。
  *
  * <p>客户端只用它画绿/蓝框，不拿它做业务判断。机器只发未断开（回收站里的不发）；仓库地址
- * 按类型展开成坐标列表：ME 一个、旧量子环一个、容器最多
+ * 按类型展开成坐标列表：ME 一个、容器最多
  * {@link ContainerAnchor#MAX_CONTAINERS} 个。</p>
  *
  * @param mode     当前仓库模式
- * @param storage  仓库坐标（ME / 旧量子环 / 容器）
+ * @param storage  仓库坐标（ME / 容器）
  * @param machines 未断开的已连接机器
  */
 public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> machines)
@@ -72,8 +71,6 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
         StorageAnchor anchor = factory.storageLink().anchor();
         if (anchor instanceof MeAnchor me) {
             storage.add(new Link(me.dimension(), me.pos()));
-        } else if (anchor instanceof Ae2Anchor ae2) {
-            storage.add(new Link(ae2.dimension(), ae2.ringPos()));
         } else if (anchor instanceof ContainerAnchor containers) {
             for (ContainerRef ref : containers.containers()) {
                 storage.add(new Link(ref.dimension(), ref.pos()));

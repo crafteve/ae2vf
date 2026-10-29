@@ -14,7 +14,6 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
@@ -87,8 +86,6 @@ public final class LinkRegistry {
             StorageAnchor anchor = factory.storageLink().anchor();
             if (anchor instanceof MeAnchor me) {
                 put(factory.id(), LinkRole.STORAGE, me.dimension(), me.pos(), conflicts);
-            } else if (anchor instanceof Ae2Anchor ae2) {
-                put(factory.id(), LinkRole.STORAGE, ae2.dimension(), ae2.ringPos(), conflicts);
             } else if (anchor instanceof ContainerAnchor containers) {
                 for (ContainerRef ref : containers.containers()) {
                     put(factory.id(), LinkRole.STORAGE, ref.dimension(), ref.pos(), conflicts);

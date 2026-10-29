@@ -22,7 +22,6 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
@@ -32,8 +31,6 @@ import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
-
-import appeng.api.ids.AEComponents;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -788,9 +785,7 @@ public final class FactoryService {
             return 0;
         }
         boolean same = anchor instanceof MeAnchor me
-                && me.dimension().equals(level.dimension()) && me.pos().equals(pos)
-                || anchor instanceof Ae2Anchor ae2
-                && ae2.dimension().equals(level.dimension()) && ae2.ringPos().equals(pos);
+                && me.dimension().equals(level.dimension()) && me.pos().equals(pos);
         if (same) {
             factory.bindAnchor(null);
             markDirty();
@@ -818,7 +813,7 @@ public final class FactoryService {
 
     private static int toggleContainerStorage(ServerPlayer player, Factory factory,
             ServerLevel level, StorageAnchor anchor, BlockPos pos, boolean chain) {
-        if (anchor instanceof MeAnchor || anchor instanceof Ae2Anchor) {
+        if (anchor instanceof MeAnchor) {
             barErr(player, "当前是 ME 模式，先清空当前链接");
             return 0;
         }
@@ -1199,57 +1194,7 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 11. ME 仓库：旧版量子环绑定（connectStorage） ----
-    // 负责用量子纠缠奇点按频率绑定旧式量子环；由 /idf storage connect 调用，新绑定已改走绑定杖的 MeAnchor。
-    // ------------------------------------------------------------------
-
-    /**
-     * 把主手上的量子纠缠奇点绑到玩家自己的工厂。
-     *
-     * <p>成功后奇点消失。这块是工厂与 AE2 的组装点：{@link Ae2Binder} 负责「频率 → 量子环」，
-     * 这里只负责「删物品、写档案、发提示」。</p>
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
-     */
-    public static int connectStorage(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        ItemStack held = player.getMainHandItem();
-        if (!Ae2Binder.isSingularity(held)) {
-            err(player, "主手请拿量子纠缠奇点");
-            return 0;
-        }
-        long frequency = held.getOrDefault(AEComponents.ENTANGLED_SINGULARITY_ID, 0L);
-        if (frequency == 0L) {
-            err(player, "奇点没有有效频率");
-            return 0;
-        }
-        StorageAnchor current = factory.storageLink().anchor();
-        if (current instanceof ContainerAnchor) {
-            err(player, "当前已绑定容器仓库，先执行 /idf storage unbind 再连 AE2");
-            return 0;
-        }
-        // 已是 AE2 时允许覆盖：换网络是常见操作，旧奇点已经消耗掉，重绑消耗新的
-        Ae2Anchor anchor = Ae2Binder.anchor(player.serverLevel(), frequency);
-        if (anchor == null) {
-            err(player, "找不到对应的量子环（环的区块加载了吗？）");
-            return 0;
-        }
-        factory.bindAnchor(anchor);
-        factory.setStorageMode(StorageMode.ME);
-        held.shrink(1);
-        player.getInventory().setChanged();
-        markDirty();
-        ok(player, "已绑定仓库：freq=" + frequency + " @ " + anchor.dimension().location()
-                + " " + anchor.ringPos().toShortString());
-        return 1;
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 12. 容器仓库维护（bindContainer / unbindStorage / setContainerPriority / pruneStorage） ----
+    // ---- 11. 容器仓库维护（bindContainer / unbindStorage / setContainerPriority / pruneStorage） ----
     // 负责容器仓库的增删、优先级与已缺失清理；由 /idf storage 的 bind、unbind、priority 与 prune 调用。
     // ------------------------------------------------------------------
 
@@ -1439,8 +1384,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 13. 仓库判定与展示辅助（containerState / ae2Issue / isAnyContainer） ----
-    // 负责容器状态、AE2 离线原因与「是不是容器」的判定；被仓库摘要、仓库绑定与连锁查找共用。
+    // ---- 12. 仓库判定与展示辅助（containerState / isAnyContainer） ----
+    // 负责容器状态与「是不是容器」的判定；被仓库摘要、仓库绑定与连锁查找共用。
     // ------------------------------------------------------------------
 
     /**
@@ -1458,27 +1403,6 @@ public final class FactoryService {
         };
     }
 
-    /**
-     * AE2 仓库离线时尽量说清楚「为什么」。
-     *
-     * @param server 服务端
-     * @param anchor 地址
-     * @return 原因文本
-     */
-    private static String ae2Issue(MinecraftServer server, Ae2Anchor anchor) {
-        ServerLevel level = server.getLevel(anchor.dimension());
-        if (level == null) {
-            return "维度不存在";
-        }
-        if (!level.isLoaded(anchor.ringPos())) {
-            return "量子环所在区块未加载";
-        }
-        if (Ae2Binder.node(level, anchor.frequency()) == null) {
-            return "找不到该频率的量子环（环被拆了？奇点没配对？）";
-        }
-        return "量子环未供电 / 未成型 / 频道不足";
-    }
-
     static boolean isAnyContainer(ServerLevel level, BlockPos pos) {
         if (level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null) != null) {
             return true;
@@ -1493,7 +1417,7 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 14. 仓库摘要与存取（storageInfo / storageGet / storagePut） ----
+    // ---- 13. 仓库摘要与存取（storageInfo / storageGet / storagePut） ----
     // 负责仓库内容摘要、取出与存入；由 /idf storage 的 info、get 与 put 调用。
     // ------------------------------------------------------------------
 
@@ -1513,7 +1437,7 @@ public final class FactoryService {
         StorageAnchor anchor = link.anchor();
         if (anchor == null) {
             err(player, "还没有绑定仓库");
-            info(player, "容器：准星对准箱子执行 /idf storage bind；AE2：主手拿量子纠缠奇点执行 /idf storage connect");
+            info(player, "容器：准星对准箱子执行 /idf storage bind；ME：用存储链接杖右键 ME 网络方块");
             return 0;
         }
         info(player, "仓库：" + anchor.describe() + " · " + (link.online() ? "在线" : "离线"));
@@ -1547,11 +1471,6 @@ public final class FactoryService {
                     + (unloaded > 0 ? " · 未加载 " + unloaded : "")
                     + (missing > 0 ? " · 已缺失 " + missing : "") + "）"
                     + (missing > 0 ? " · /idf storage prune 清理已缺失" : ""));
-        } else if (anchor instanceof Ae2Anchor ae2 && !link.online()) {
-            MinecraftServer server = player.getServer();
-            if (server != null) {
-                warn(player, "AE2 仓库离线：" + ae2Issue(server, ae2));
-            }
         }
 
         if (!link.online()) {
@@ -1662,7 +1581,7 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 15. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage / nextId） ----
+    // ---- 14. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage / nextId） ----
     // 负责取当前工厂、解析在线仓库、刷新观测、唤醒产线与生成工厂 id；本文件所有公开方法共用。
     // ------------------------------------------------------------------
 
@@ -1700,11 +1619,11 @@ public final class FactoryService {
     private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
         factory.refreshStorage();
         if (factory.storageLink().anchor() == null) {
-            err(player, "你还没有绑定仓库：主手拿量子纠缠奇点执行 /idlefactory storage connect");
+            err(player, "你还没有绑定仓库：用存储链接杖右键 ME 网络方块，或对准箱子执行 /idf storage bind");
             return null;
         }
         if (!factory.storageLink().online()) {
-            err(player, "仓库未连接（网络没电或量子环离线）");
+            err(player, "仓库未连接（网络没电、频道不足，或 ME 接入点区块未加载）");
             return null;
         }
         return factory.storage();
@@ -1786,7 +1705,7 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 16. 内部工具：背包、文案与回执（countInInventory / msg / markDirty） ----
+    // ---- 15. 内部工具：背包、文案与回执（countInInventory / msg / markDirty） ----
     // 负责背包装卸、资源与物品文案、聊天与动作栏回执；markDirty 是本文件唯一的档案落盘入口。
     // ------------------------------------------------------------------
 

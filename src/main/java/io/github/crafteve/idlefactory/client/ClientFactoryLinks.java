@@ -46,7 +46,7 @@ public final class ClientFactoryLinks {
         return mode;
     }
 
-    /** 仓库坐标（ME 一个 / 旧量子环一个 / 容器多个）。 */
+    /** 仓库坐标（ME 一个 / 容器多个）。 */
     public static List<FactoryLinksS2C.Link> storage() {
         return storage;
     }

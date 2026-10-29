@@ -292,9 +292,6 @@ public final class FactoryCommands {
 
     private static LiteralArgumentBuilder<CommandSourceStack> storage(RegisterCommandsEvent event) {
         return Commands.literal("storage")
-                .then(Commands.literal("connect")
-                        .executes(audit("storage.connect",
-                                context -> FactoryService.connectStorage(player(context)))))
                 .then(Commands.literal("bind")
                         .executes(audit("storage.bind",
                                 context -> FactoryService.bindContainer(player(context)))))

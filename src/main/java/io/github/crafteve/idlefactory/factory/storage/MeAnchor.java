@@ -12,8 +12,8 @@ import net.minecraft.world.level.Level;
 /**
  * ME 仓库地址：直接记录接入 ME 网络的方块坐标。
  *
- * <p>这是存储链接杖 A 模式的新地址类型；旧存档里的 {@link Ae2Anchor} 仍能读，但新绑定不再
- * 产生量子环地址。解析时按坐标拿 {@code IGridNode}，再读整个网络的存储。</p>
+ * <p>这是存储链接杖 A 模式绑定的地址：解析时按坐标拿 {@code IGridNode}，再读整个网络的
+ * 存储。</p>
  *
  * @param dimension 方块所在维度
  * @param pos       方块坐标
