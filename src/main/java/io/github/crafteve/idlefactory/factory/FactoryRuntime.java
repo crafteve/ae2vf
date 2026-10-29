@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.factory.io.LineRunner;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
@@ -77,7 +77,7 @@ public final class FactoryRuntime {
      */
     private final LinkRegistry links = new LinkRegistry();
     /** 每 tick 复用的「被引用位置集合」，避免反复分配。 */
-    private final Set<ObservationKey> observedKeys = new HashSet<>();
+    private final Set<BlockKey> observedKeys = new HashSet<>();
     /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组；actionbar 用。 */
     private final Map<UUID, Integer> missingNotices = new HashMap<>();
     private final Map<UUID, Integer> restoredNotices = new HashMap<>();
@@ -282,12 +282,12 @@ public final class FactoryRuntime {
         this.observedKeys.clear();
         for (Factory factory : this.manager.all()) {
             for (MachineRef ref : factory.machines().all()) {
-                this.observedKeys.add(ObservationKey.of(ref));
+                this.observedKeys.add(BlockKey.of(ref.dimension(), ref.pos()));
             }
             // 仓库容器和机器共用同一张方块级观测
             if (factory.storageLink().anchor() instanceof ContainerAnchor anchor) {
                 for (ContainerRef container : anchor.containers()) {
-                    this.observedKeys.add(ObservationKey.of(container));
+                    this.observedKeys.add(BlockKey.of(container.dimension(), container.pos()));
                 }
             }
         }

@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
@@ -111,7 +111,7 @@ public final class LineRunner {
             // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
             // 都算“路没问题”，清掉连续计数。详见 noteRejected。
             if (observations != null) {
-                ObservationKey key = ObservationKey.of(target);
+                BlockKey key = BlockKey.of(target.dimension(), target.pos());
                 if (result.inputReason() == IoResult.Reason.REJECTED
                         || result.outputReason() == IoResult.Reason.REJECTED) {
                     observations.noteRejected(key);

@@ -6,10 +6,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -80,7 +79,7 @@ public final class FactoryLinkFinder {
         }
         MinecraftServer server = level.getServer();
         BlockProbe.Presence presence = BlockProbe.presence(server,
-                ObservationKey.of(MachineRef.of(level.dimension(), pos)));
+                BlockKey.of(level.dimension(), pos));
         return presence.health() == Health.PRESENT && !presence.kinds().isEmpty();
     }
 

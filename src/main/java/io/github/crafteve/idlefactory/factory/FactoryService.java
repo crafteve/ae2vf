@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.links.LinkIds;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
@@ -283,7 +283,8 @@ public final class FactoryService {
             return 0;
         }
         MachineRef target = MachineRef.of(level.dimension(), pos);
-        BlockProbe.Presence presence = BlockProbe.presence(server, ObservationKey.of(target));
+        BlockProbe.Presence presence = BlockProbe.presence(server,
+                BlockKey.of(target.dimension(), target.pos()));
         if (presence.health() != Health.PRESENT || presence.kinds().isEmpty()) {
             err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;

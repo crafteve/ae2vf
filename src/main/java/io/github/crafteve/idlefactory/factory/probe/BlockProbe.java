@@ -9,7 +9,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;
@@ -32,7 +32,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
  *
  * <p>两档成本，别混用：</p>
  * <ul>
- *   <li>{@link #presence(MinecraftServer, ObservationKey)}：加载判定 + 方块 id + 方块实体 + 三项
+ *   <li>{@link #presence(MinecraftServer, BlockKey)}：加载判定 + 方块 id + 方块实体 + 三项
  *       无向能力，约 4 次能力查询。只回答「它还是不是一台能用的机器」。</li>
  *   <li>{@link #faces(ServerLevel, BlockPos)}：7 向 × 3 类 = 21 次能力查询。只回答「哪个面能干什么」，
  *       调用方必须缓存（{@link Observation} 负责）。</li>
@@ -97,7 +97,7 @@ public final class BlockProbe {
      * @param key    观测键
      * @return 探测结果
      */
-    public static Presence presence(MinecraftServer server, ObservationKey key) {
+    public static Presence presence(MinecraftServer server, BlockKey key) {
         ServerLevel level = server.getLevel(key.dimension());
         if (level == null) {
             return Presence.empty(Health.NO_DIMENSION);

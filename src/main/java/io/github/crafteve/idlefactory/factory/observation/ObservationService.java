@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import io.github.crafteve.idlefactory.factory.capability.FaceCache;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
@@ -61,7 +62,7 @@ public final class ObservationService {
 
     private final MinecraftServer server;
     /** 键 → 观测。插入顺序稳定，便于诊断输出。 */
-    private final Map<ObservationKey, Observation> observations = new LinkedHashMap<>();
+    private final Map<BlockKey, Observation> observations = new LinkedHashMap<>();
     /**
      * 面表缓存：和观察表同一拍进出（引用集里有才留），但住在 capability 包。
      *
@@ -72,22 +73,22 @@ public final class ObservationService {
     /** 维度 → 能力句柄缓存（P3）。 */
     private final Map<ResourceKey<Level>, LevelCapabilityCache> capabilityCaches = new HashMap<>();
     /** 能力失效事件标脏的位置，下一 tick 优先重探。 */
-    private final Set<ObservationKey> dirty = new HashSet<>();
+    private final Set<BlockKey> dirty = new HashSet<>();
     /** 本 tick 产生的迁移，取走即清空。 */
     private final List<Transition> transitions = new ArrayList<>();
     /** 位置 → 连续 REJECTED 次数（成功一次就清零）。 */
-    private final Map<ObservationKey, Integer> rejectStreaks = new HashMap<>();
+    private final Map<BlockKey, Integer> rejectStreaks = new HashMap<>();
     /** 位置 → 上次刷面表的 tick（冷却用）。 */
-    private final Map<ObservationKey, Long> lastFaceRefresh = new HashMap<>();
+    private final Map<BlockKey, Long> lastFaceRefresh = new HashMap<>();
     /** 位置 → 熔断窗口（起点，窗口内刷新次数）。 */
-    private final Map<ObservationKey, FaceWindow> faceWindows = new HashMap<>();
+    private final Map<BlockKey, FaceWindow> faceWindows = new HashMap<>();
     /**
      * 面表被冻结的位置：只睡不刷，等成功一次再解冻。
      *
      * <p>冻结的意思是“这地方的面表一直在变，刷了也白刷，先别浪费探测”——注意冻的是
      * 刷新动作，不是健康结论，更不是 IO 本身。</p>
      */
-    private final Set<ObservationKey> frozenFaces = new HashSet<>();
+    private final Set<BlockKey> frozenFaces = new HashSet<>();
 
     private long tick;
     private int probesLastTick;
@@ -104,19 +105,19 @@ public final class ObservationService {
      *
      * @param referenced 当前所有工厂引用到的位置；不在里面的观测会被清掉（mark-sweep）
      */
-    public void tick(Set<ObservationKey> referenced) {
+    public void tick(Set<BlockKey> referenced) {
         this.tick++;
         this.probesLastTick = 0;
 
-        for (ObservationKey key : referenced) {
+        for (BlockKey key : referenced) {
             this.observations.computeIfAbsent(key, ignored -> new Observation());
         }
 
         // 1) 事件标脏的优先：能力变了，面表一定过期
         int dirtyBudget = DIRTY_BUDGET_PER_TICK;
-        Iterator<ObservationKey> dirtyIterator = this.dirty.iterator();
+        Iterator<BlockKey> dirtyIterator = this.dirty.iterator();
         while (dirtyIterator.hasNext() && dirtyBudget > 0) {
-            ObservationKey key = dirtyIterator.next();
+            BlockKey key = dirtyIterator.next();
             dirtyIterator.remove();
             Observation observation = this.observations.get(key);
             if (observation == null) {
@@ -132,7 +133,7 @@ public final class ObservationService {
 
         // 2) 到期复探
         int budget = PROBE_BUDGET_PER_TICK;
-        for (Map.Entry<ObservationKey, Observation> entry : this.observations.entrySet()) {
+        for (Map.Entry<BlockKey, Observation> entry : this.observations.entrySet()) {
             if (budget <= 0) {
                 break;
             }
@@ -147,7 +148,7 @@ public final class ObservationService {
 
         // 3) 工作状态：独立预算，只探加载中的机器
         int workBudget = WORK_BUDGET_PER_TICK;
-        for (Map.Entry<ObservationKey, Observation> entry : this.observations.entrySet()) {
+        for (Map.Entry<BlockKey, Observation> entry : this.observations.entrySet()) {
             if (workBudget <= 0) {
                 break;
             }
@@ -181,7 +182,7 @@ public final class ObservationService {
      *
      * @param key 位置
      */
-    public void markDirty(ObservationKey key) {
+    public void markDirty(BlockKey key) {
         this.dirty.add(key);
     }
 
@@ -197,7 +198,7 @@ public final class ObservationService {
      *
      * @param key 位置
      */
-    public void noteRejected(ObservationKey key) {
+    public void noteRejected(BlockKey key) {
         if (this.frozenFaces.contains(key)) {
             return;
         }
@@ -232,7 +233,7 @@ public final class ObservationService {
      *
      * @param key 位置
      */
-    public void noteSuccess(ObservationKey key) {
+    public void noteSuccess(BlockKey key) {
         this.rejectStreaks.remove(key);
         this.frozenFaces.remove(key);
     }
@@ -264,7 +265,7 @@ public final class ObservationService {
      * @return 观测；没被登记过时返回只读的 {@link Observation#UNKNOWN}
      */
     public Observation observe(Located located) {
-        Observation found = this.observations.get(ObservationKey.of(located));
+        Observation found = this.observations.get(BlockKey.of(located.dimension(), located.pos()));
         return found == null ? Observation.UNKNOWN : found;
     }
 
@@ -275,7 +276,7 @@ public final class ObservationService {
      * @return 刷新后的观测
      */
     public Observation refresh(Located located) {
-        ObservationKey key = ObservationKey.of(located);
+        BlockKey key = BlockKey.of(located.dimension(), located.pos());
         Observation observation = this.observations.computeIfAbsent(key, ignored -> new Observation());
         probe(key, observation);
         probeWork(key, observation);
@@ -292,7 +293,7 @@ public final class ObservationService {
      * @return 面表
      */
     public FaceTable faces(Located located) {
-        FaceTable cached = this.faceCache.get(ObservationKey.of(located));
+        FaceTable cached = this.faceCache.get(BlockKey.of(located.dimension(), located.pos()));
         return cached == null ? FaceTable.EMPTY : cached;
     }
 
@@ -307,7 +308,7 @@ public final class ObservationService {
      * @return 面表
      */
     public FaceTable ensureFaces(Located located) {
-        ObservationKey key = ObservationKey.of(located);
+        BlockKey key = BlockKey.of(located.dimension(), located.pos());
         FaceTable cached = this.faceCache.get(key);
         if (cached != null) {
             return cached;
@@ -335,7 +336,7 @@ public final class ObservationService {
      * @return 代数；没登记过时为 {@code 0}
      */
     public long facesGeneration(Located located) {
-        return this.faceCache.generation(ObservationKey.of(located));
+        return this.faceCache.generation(BlockKey.of(located.dimension(), located.pos()));
     }
 
     /**
@@ -358,7 +359,7 @@ public final class ObservationService {
     }
 
     /** 只读视图，诊断输出用。 */
-    public Map<ObservationKey, Observation> view() {
+    public Map<BlockKey, Observation> view() {
         return Collections.unmodifiableMap(this.observations);
     }
 
@@ -384,7 +385,7 @@ public final class ObservationService {
                 this.probesLastTick, this.dirty.size(), this.tick);
     }
 
-    private void probe(ObservationKey key, Observation observation) {
+    private void probe(BlockKey key, Observation observation) {
         Health before = observation.health();
         ResourceLocation oldBlock = observation.blockId();
         ResourceLocation oldBe = observation.beTypeId();
@@ -402,7 +403,7 @@ public final class ObservationService {
         }
     }
 
-    private void probeWork(ObservationKey key, Observation observation) {
+    private void probeWork(BlockKey key, Observation observation) {
         ServerLevel level = this.server.getLevel(key.dimension());
         WorkState state = level == null
                 ? WorkState.UNKNOWN
@@ -418,7 +419,7 @@ public final class ObservationService {
      * @param to   新结论
      * @param tick 发生时刻（服务内部时钟）
      */
-    public record Transition(ObservationKey key, Health from, Health to, long tick) {
+    public record Transition(BlockKey key, Health from, Health to, long tick) {
     }
 
     /**

@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 
 /**
  * 面表缓存：位置 →（面表，代数）。
@@ -16,15 +16,14 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
  * 代数判过期，需要内容时调用方显式建表——禁止在读路径里偷偷建表，那是原来
  * {@code faces()} 最大的毛病。</p>
  *
- * <p>包依赖说明：这里只借用了 observation 的 {@link ObservationKey} 当键（纯类型复用），
- * 从不调用 {@code ObservationService} 的任何方法——调用方向永远是
- * observation → capability，反向为零。</p>
+ * <p>包依赖说明：键类型 {@link BlockKey} 住在最底层的 {@code location} 包，本包只向下
+ * 依赖它；从不调用 {@code ObservationService} 的任何方法。</p>
  */
 public final class FaceCache {
     private record Entry(@Nullable FaceTable table, long generation) {
     }
 
-    private final Map<ObservationKey, Entry> tables = new HashMap<>();
+    private final Map<BlockKey, Entry> tables = new HashMap<>();
 
     /**
      * 取缓存的面表。
@@ -33,7 +32,7 @@ public final class FaceCache {
      * @return 面表；没建过时为 {@code null}（调用方负责退回全六面）
      */
     @Nullable
-    public FaceTable get(ObservationKey key) {
+    public FaceTable get(BlockKey key) {
         Entry entry = this.tables.get(key);
         return entry == null ? null : entry.table();
     }
@@ -44,7 +43,7 @@ public final class FaceCache {
      * @param key   位置
      * @param table 建好的面表
      */
-    public void put(ObservationKey key, FaceTable table) {
+    public void put(BlockKey key, FaceTable table) {
         Entry entry = this.tables.get(key);
         long generation = entry == null ? 0L : entry.generation();
         this.tables.put(key, new Entry(table, generation));
@@ -56,7 +55,7 @@ public final class FaceCache {
      *
      * @param key 位置
      */
-    public void invalidate(ObservationKey key) {
+    public void invalidate(BlockKey key) {
         Entry entry = this.tables.get(key);
         long generation = entry == null ? 1L : entry.generation() + 1L;
         this.tables.put(key, new Entry(null, generation));
@@ -68,7 +67,7 @@ public final class FaceCache {
      * @param key 位置
      * @return 代数
      */
-    public long generation(ObservationKey key) {
+    public long generation(BlockKey key) {
         Entry entry = this.tables.get(key);
         return entry == null ? 0L : entry.generation();
     }
@@ -78,7 +77,7 @@ public final class FaceCache {
      *
      * @param referenced 当前所有工厂引用到的位置
      */
-    public void sweep(Set<ObservationKey> referenced) {
+    public void sweep(Set<BlockKey> referenced) {
         this.tables.keySet().removeIf(key -> !referenced.contains(key));
     }
 

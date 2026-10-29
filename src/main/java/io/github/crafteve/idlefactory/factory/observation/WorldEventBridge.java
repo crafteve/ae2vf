@@ -5,6 +5,7 @@ import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.links.LinkIds;
 
 import net.minecraft.core.BlockPos;
@@ -42,7 +43,7 @@ public final class WorldEventBridge {
     private static final long COOLDOWN_TTL_TICKS = 1200L;
 
     /** 位置 → 上次标脏时刻（游戏时间），防红石抖动。只活在服务器线程。 */
-    private static final Map<ObservationKey, Long> NEIGHBOR_COOLDOWN = new HashMap<>();
+    private static final Map<BlockKey, Long> NEIGHBOR_COOLDOWN = new HashMap<>();
 
     private WorldEventBridge() {
         // 纯静态事件处理
@@ -73,7 +74,7 @@ public final class WorldEventBridge {
             return;
         }
         long now = level.getServer().overworld().getGameTime();
-        ObservationKey key = new ObservationKey(dimension, pos);
+        BlockKey key = new BlockKey(dimension, pos);
         Long last = NEIGHBOR_COOLDOWN.get(key);
         if (last != null && now - last < NEIGHBOR_COOLDOWN_TICKS) {
             return;
@@ -106,7 +107,7 @@ public final class WorldEventBridge {
             return;
         }
         ChunkPos chunk = event.getChunk().getPos();
-        for (ObservationKey key : runtime.links().byChunk(chunk)) {
+        for (BlockKey key : runtime.links().byChunk(chunk)) {
             if (key.dimension().equals(level.dimension())) {
                 runtime.observations().markDirty(key);
             }

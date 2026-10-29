@@ -9,10 +9,10 @@
  * （{@code io} 的事）、展示（{@code diag} 与根包的事）、占用归属（{@code links} 的事）。
  * 本包不写存档。</p>
  *
- * <p><b>依赖方向</b>：本包读 {@code probe}（探测结果类型）、{@code capability}（面表缓存）、
- * {@code links}（事件过滤查表），绝不反向——那三个包谁也不许 import 本包的东西
- * （{@code ObservationKey} 借出去当键是唯一的例外，纯类型复用）。观测的键是「位置」，
- * 不是「角色」——机器和容器都是同一个原子观测的消费者。</p>
+ * <p><b>依赖方向</b>：本包读 {@code location}（位置键）、{@code probe}（探测结果类型）、
+ * {@code capability}（面表缓存）、{@code links}（事件过滤查表），绝不反向——那三个包
+ * 谁也不许 import 本包的东西。观测的键是「位置」，不是「角色」——机器和容器都是同一个
+ * 原子观测的消费者。</p>
  *
  * <p><b>唯一读世界的地方</b>是 {@link io.github.crafteve.idlefactory.factory.probe.BlockProbe}。
  * 执行层（{@code GroupRunner} / {@code ContainerStorage}）仍可直接取 handler 来搬运，但不得据此

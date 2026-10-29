@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;
@@ -44,7 +44,7 @@ public final class LevelCapabilityCache {
     }
 
     private final ServerLevel level;
-    private final Consumer<ObservationKey> onInvalidate;
+    private final Consumer<BlockKey> onInvalidate;
     /** 键 → handler；值为 {@code null} 表示「查过了，没有」。 */
     private final Map<Key, Object> handlers = new HashMap<>();
     /** 位置 → 监听器强引用（NeoForge 只持弱引用）。 */
@@ -56,7 +56,7 @@ public final class LevelCapabilityCache {
      * @param level        所在维度
      * @param onInvalidate 某个位置的能力可能变了时回调（只做标脏，不许查世界）
      */
-    public LevelCapabilityCache(ServerLevel level, Consumer<ObservationKey> onInvalidate) {
+    public LevelCapabilityCache(ServerLevel level, Consumer<BlockKey> onInvalidate) {
         this.level = level;
         this.onInvalidate = onInvalidate;
     }
@@ -159,6 +159,6 @@ public final class LevelCapabilityCache {
         this.listeners.remove(pos);
         this.handlers.keySet().removeIf(key -> key.pos().equals(pos));
         // 只标脏，不查世界：NeoForge 明确禁止在监听器里查询能力
-        this.onInvalidate.accept(new ObservationKey(this.level.dimension(), pos));
+        this.onInvalidate.accept(new BlockKey(this.level.dimension(), pos));
     }
 }

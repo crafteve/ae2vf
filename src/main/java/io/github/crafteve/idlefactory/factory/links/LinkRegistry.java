@@ -13,7 +13,7 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.observation.ObservationKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.storage.Ae2Anchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
@@ -61,10 +61,10 @@ public final class LinkRegistry {
     /**
      * 区块 → 该区块内的占用键（带坐标）。
      *
-     * <p>值用 {@link ObservationKey} 而不用 id：chunk 事件过来时只有坐标，UUID 反解不出
+     * <p>值用 {@link BlockKey} 而不用 id：chunk 事件过来时只有坐标，UUID 反解不出
      * 坐标——值里带坐标，事件过滤和复探才不用回工厂翻记录。</p>
      */
-    private final Map<ChunkPos, Set<ObservationKey>> byChunk = new HashMap<>();
+    private final Map<ChunkPos, Set<BlockKey>> byChunk = new HashMap<>();
 
     /**
      * 从档案重建整张表。启动、删档、对账时调；调一次就是一次全量自愈。
@@ -125,8 +125,8 @@ public final class LinkRegistry {
      * @param chunk 区块坐标
      * @return 只读集合；没有时为空集
      */
-    public Set<ObservationKey> byChunk(ChunkPos chunk) {
-        Set<ObservationKey> found = this.byChunk.get(chunk);
+    public Set<BlockKey> byChunk(ChunkPos chunk) {
+        Set<BlockKey> found = this.byChunk.get(chunk);
         return found == null ? Set.of() : Collections.unmodifiableSet(found);
     }
 
@@ -154,6 +154,6 @@ public final class LinkRegistry {
         this.byId.put(id, claim);
         this.byFactory.computeIfAbsent(factoryId, ignored -> new HashSet<>()).add(id);
         this.byChunk.computeIfAbsent(new ChunkPos(pos), ignored -> new HashSet<>())
-                .add(new ObservationKey(dimension, pos));
+                .add(new BlockKey(dimension, pos));
     }
 }
