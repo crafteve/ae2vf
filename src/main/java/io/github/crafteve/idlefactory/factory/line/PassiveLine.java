@@ -1,9 +1,7 @@
 package io.github.crafteve.idlefactory.factory.line;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -14,21 +12,23 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * 一条被动产线。
+ * 一条被动产线：一组机器的引用。
  *
- * <p>它管一组 IO 组（每台机器一个），自己只有「运行 / 停止」两态。第一版不执行搬运，
- * {@link #running()} 只是给后面的执行器看的开关。</p>
+ * <p>产线不再持有 IO 规则；机器自己带规则。从产线移除机器只是删引用，机器和规则都留在机器库。</p>
+ *
+ * <p>第一版一台机器只能属于一条产线；加入时由调用方保证不重复。</p>
  */
 public final class PassiveLine {
     private static final String TAG_ID = "Id";
     private static final String TAG_NAME = "Name";
     private static final String TAG_RUNNING = "Running";
-    private static final String TAG_GROUPS = "Groups";
+    private static final String TAG_MACHINE_IDS = "MachineIds";
+    private static final String TAG_MACHINE_ID = "Id";
 
     private final UUID id;
     private String name;
     private boolean running;
-    private final List<IoGroup> groups = new ArrayList<>();
+    private final List<UUID> machineIds = new ArrayList<>();
 
     /**
      * @param id   产线 id
@@ -52,9 +52,6 @@ public final class PassiveLine {
     /**
      * 只改产线名，id 不变。
      *
-     * <p>界面重命名和 {@code /idf line <line> rename} 共用；名字的唯一性和保留字由
-     * {@code LineActions} 在外面校验，这里不做业务判断。</p>
-     *
      * @param name 新名字（已由调用方 trim）
      */
     public void rename(String name) {
@@ -66,57 +63,48 @@ public final class PassiveLine {
         return this.running;
     }
 
-    /** 启动 / 停止。第一版只改开关，不触发搬运。 */
+    /** 启动 / 停止。 */
     public void setRunning(boolean running) {
         this.running = running;
     }
 
-    /** 所有 IO 组（只读）。 */
-    public List<IoGroup> groups() {
-        return List.copyOf(this.groups);
+    /** 产线里的机器 id（只读，保留登记顺序）。 */
+    public List<UUID> machineIds() {
+        return List.copyOf(this.machineIds);
+    }
+
+    /** 机器数。 */
+    public int machineCount() {
+        return this.machineIds.size();
+    }
+
+    /** 是否包含这台机器。 */
+    public boolean containsMachine(UUID machineId) {
+        return this.machineIds.contains(machineId);
     }
 
     /**
-     * 加一个 IO 组。
+     * 加一台机器引用。
      *
-     * @param group 组
-     * @return 是否加入；这台机器已在产线里时返回 {@code false}
+     * @param machineId 机器 id
+     * @return 是否加入；已存在时返回 {@code false}
      */
-    public boolean addGroup(IoGroup group) {
-        if (groupByMachine(group.machineId()).isPresent()) {
+    public boolean addMachine(UUID machineId) {
+        if (this.machineIds.contains(machineId)) {
             return false;
         }
-        this.groups.add(group);
+        this.machineIds.add(machineId);
         return true;
     }
 
     /**
-     * 按机器 id 移除组。
+     * 移除一台机器引用。
      *
-     * @param machineId 机器库里的机器 id
+     * @param machineId 机器 id
      * @return 是否真的移除了
      */
-    public boolean removeGroupByMachine(UUID machineId) {
-        return this.groups.removeIf(group -> group.machineId().equals(machineId));
-    }
-
-    /**
-     * 批量移除机器（机器库对账时用）。
-     *
-     * @param machineIds 机器 id 集合
-     */
-    public void removeGroupsFor(Collection<UUID> machineIds) {
-        this.groups.removeIf(group -> machineIds.contains(group.machineId()));
-    }
-
-    /** 按机器 id 找组。 */
-    public Optional<IoGroup> groupByMachine(UUID machineId) {
-        for (IoGroup group : this.groups) {
-            if (group.machineId().equals(machineId)) {
-                return Optional.of(group);
-            }
-        }
-        return Optional.empty();
+    public boolean removeMachine(UUID machineId) {
+        return this.machineIds.remove(machineId);
     }
 
     /** 给界面和指令用的短 id（前 8 位）。 */
@@ -127,7 +115,7 @@ public final class PassiveLine {
     /**
      * 序列化成 NBT。
      *
-     * @param registries 注册表访问，物品组件编码需要
+     * @param registries 注册表访问（本类不需要，保留签名）
      * @return 新标签
      */
     public CompoundTag save(HolderLookup.Provider registries) {
@@ -135,11 +123,13 @@ public final class PassiveLine {
         tag.putUUID(TAG_ID, this.id);
         tag.putString(TAG_NAME, this.name);
         tag.putBoolean(TAG_RUNNING, this.running);
-        ListTag groupList = new ListTag();
-        for (IoGroup group : this.groups) {
-            groupList.add(group.save(registries));
+        ListTag refs = new ListTag();
+        for (UUID machineId : this.machineIds) {
+            CompoundTag ref = new CompoundTag();
+            ref.putUUID(TAG_MACHINE_ID, machineId);
+            refs.add(ref);
         }
-        tag.put(TAG_GROUPS, groupList);
+        tag.put(TAG_MACHINE_IDS, refs);
         return tag;
     }
 
@@ -147,7 +137,7 @@ public final class PassiveLine {
      * 从 NBT 读回来。
      *
      * @param tag        存档标签
-     * @param registries 注册表访问，物品组件解码需要
+     * @param registries 注册表访问（本类不需要，保留签名）
      * @return 产线；字段缺失时返回 {@code null}
      */
     @Nullable
@@ -157,11 +147,11 @@ public final class PassiveLine {
         }
         PassiveLine line = new PassiveLine(tag.getUUID(TAG_ID), tag.getString(TAG_NAME));
         line.running = tag.getBoolean(TAG_RUNNING);
-        ListTag groupList = tag.getList(TAG_GROUPS, Tag.TAG_COMPOUND);
-        for (int i = 0; i < groupList.size(); i++) {
-            IoGroup group = IoGroup.load(groupList.getCompound(i), registries);
-            if (group != null) {
-                line.groups.add(group);
+        ListTag refs = tag.getList(TAG_MACHINE_IDS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < refs.size(); i++) {
+            CompoundTag ref = refs.getCompound(i);
+            if (ref.hasUUID(TAG_MACHINE_ID)) {
+                line.machineIds.add(ref.getUUID(TAG_MACHINE_ID));
             }
         }
         return line;

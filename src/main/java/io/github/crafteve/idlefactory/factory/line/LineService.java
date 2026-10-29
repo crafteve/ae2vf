@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.factory.line;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -10,6 +11,8 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
@@ -67,7 +70,7 @@ public final class LineService {
                     .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
                     .append(FactoryMessages.text(line.running() ? "运行" : "停止",
                             line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                    .append(FactoryMessages.text(" · " + line.groups().size() + " 台", FactoryMessages.INFO));
+                    .append(FactoryMessages.text(" · " + line.machineCount() + " 台", FactoryMessages.INFO));
             FactoryMessages.send(player, row);
         }
         return 1;
@@ -182,17 +185,18 @@ public final class LineService {
                 .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
                 .append(FactoryMessages.text(line.running() ? "运行" : "停止",
                         line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + line.groups().size() + " 台", FactoryMessages.INFO));
+                .append(FactoryMessages.text(" · " + line.machineCount() + " 台", FactoryMessages.INFO));
         FactoryMessages.send(player, head);
 
-        for (IoGroup group : line.groups()) {
-            Optional<MachineRef> target = factory.config().machines().byId(group.machineId());
+        for (UUID machineId : line.machineIds()) {
+            Optional<Machine> target = factory.config().machines().byId(machineId);
             if (target.isEmpty()) {
                 FactoryMessages.send(player, FactoryMessages.err(
-                        "  机器 " + group.machineId() + " 已不在机器库"));
+                        "  机器 " + machineId + " 已不在机器库"));
                 continue;
             }
-            MachineRef machine = target.get();
+            Machine machineEntry = target.get();
+            MachineRef machine = machineEntry.ref();
             String where = machine.dimension().location() + " " + machine.pos().toShortString();
             MutableComponent row = Component.empty()
                     .append(FactoryMessages.text("  ", FactoryMessages.INFO))
@@ -200,9 +204,9 @@ public final class LineService {
                     .append(FactoryMessages.text(" " + where, FactoryMessages.INFO));
             FactoryMessages.send(player, row);
             FactoryMessages.send(player, FactoryMessages.text(
-                    "    输入: " + describeSpecs(group.inputs()), FactoryMessages.PLAIN));
+                    "    输入: " + describeSpecs(machineEntry.io().inputs()), FactoryMessages.PLAIN));
             FactoryMessages.send(player, FactoryMessages.text(
-                    "    输出: " + describeSpecs(group.outputs()), FactoryMessages.PLAIN));
+                    "    输出: " + describeSpecs(machineEntry.io().outputs()), FactoryMessages.PLAIN));
         }
         return 1;
     }
@@ -284,17 +288,17 @@ public final class LineService {
         if (machine == null) {
             return 0;
         }
-        IoGroup group = requireGroup(player, line, machine);
-        if (group == null) {
+        MachineIoGroup io = requireIo(player, factory, line, machine);
+        if (io == null) {
             return 0;
         }
         String where = machine.dimension().location() + " " + machine.pos().toShortString();
         FactoryMessages.send(player, FactoryMessages.info(
                 "产线 " + line.name() + " / 机器 [" + machine.shortId() + "] " + where));
         FactoryMessages.send(player, FactoryMessages.text(
-                "  输入: " + describeSpecs(group.inputs()), FactoryMessages.PLAIN));
+                "  输入: " + describeSpecs(io.inputs()), FactoryMessages.PLAIN));
         FactoryMessages.send(player, FactoryMessages.text(
-                "  输出: " + describeSpecs(group.outputs()), FactoryMessages.PLAIN));
+                "  输出: " + describeSpecs(io.outputs()), FactoryMessages.PLAIN));
         return 1;
     }
 
@@ -480,8 +484,8 @@ public final class LineService {
         if (machine == null) {
             return 0;
         }
-        IoGroup group = requireGroup(player, line, machine);
-        if (group == null) {
+        MachineIoGroup io = requireIo(player, factory, line, machine);
+        if (io == null) {
             return 0;
         }
         // mode 传 null = 沿用旧命令默认（无组件物品模糊），界面会显式传精确。
@@ -503,8 +507,8 @@ public final class LineService {
         if (machine == null) {
             return 0;
         }
-        IoGroup group = requireGroup(player, line, machine);
-        if (group == null) {
+        MachineIoGroup io = requireIo(player, factory, line, machine);
+        if (io == null) {
             return 0;
         }
         return send(player, LineActions.removeRule(factory, line.id(), machine.id(), side, key));
@@ -554,16 +558,22 @@ public final class LineService {
     }
 
     @Nullable
-    private static IoGroup requireGroup(ServerPlayer player, PassiveLine line, MachineRef machine) {
-        Optional<IoGroup> group = line.groupByMachine(machine.id());
-        if (group.isEmpty()) {
+    private static MachineIoGroup requireIo(ServerPlayer player, Factory factory, PassiveLine line,
+            MachineRef machine) {
+        if (!line.containsMachine(machine.id())) {
             FactoryMessages.send(player, FactoryMessages.err(
                     "机器 " + machine.shortId() + " 不在产线 " + line.name() + " 里"));
             FactoryMessages.send(player, FactoryMessages.info(
                     "先用 /idf line " + line.shortId() + " add " + machine.shortId()));
             return null;
         }
-        return group.get();
+        Optional<Machine> entry = factory.config().machines().byId(machine.id());
+        if (entry.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err(
+                    "机器 " + machine.shortId() + " 不在机器库"));
+            return null;
+        }
+        return entry.get().io();
     }
 
     @Nullable

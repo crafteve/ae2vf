@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -12,8 +11,9 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
@@ -99,7 +99,7 @@ public final class FactorySnapshotBuilder {
             long remaining = Math.max(0L, sleepRemaining.getOrDefault(line.id(), 0L));
             boolean sleeping = line.running() && remaining > 0L;
             views.add(new LineView(line.id(), line.name(), line.running(),
-                    line.groups().size(), sleeping, sleeping ? remaining : 0L));
+                    line.machineCount(), sleeping, sleeping ? remaining : 0L));
         }
         return views;
     }
@@ -287,12 +287,13 @@ public final class FactorySnapshotBuilder {
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
             long now) {
         List<MachineView> views = new ArrayList<>(factory.config().machines().size());
-        for (MachineRef ref : factory.config().machines().all()) {
+        for (Machine machine : factory.config().machines().all()) {
+            MachineRef ref = machine.ref();
             Observation observation = observations == null
                     ? Observation.UNKNOWN : observations.observe(ref.blockKey());
-            Optional<IoGroup> group = FactoryRefs.groupOf(factory, ref.id());
-            List<ResourceSpec> inputs = group.map(IoGroup::inputs).orElse(List.of());
-            List<ResourceSpec> outputs = group.map(IoGroup::outputs).orElse(List.of());
+            MachineIoGroup io = machine.io();
+            List<ResourceSpec> inputs = io.inputs();
+            List<ResourceSpec> outputs = io.outputs();
 
             DiagStats.GroupStats stats = FactoryRefs.lineOf(factory, ref.id())
                     .map(line -> factory.live().stats().line(line.id()).groupOrNull(ref.id()))

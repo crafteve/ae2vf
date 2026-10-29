@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -296,9 +297,9 @@ public final class FactoryService {
             err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;
         }
-        Optional<MachineRef> existing = factory.config().machines().byId(target.id());
+        Optional<Machine> existing = factory.config().machines().byId(target.id());
         if (existing.isPresent()) {
-            MachineRef ref = existing.get();
+            MachineRef ref = existing.get().ref();
             if (!factory.config().machines().isRetired(ref.id())) {
                 err(player, "这台机器已经接入过了：" + ref.shortId());
                 return 0;
@@ -341,12 +342,12 @@ public final class FactoryService {
             return 0;
         }
         ServerLevel level = player.serverLevel();
-        MachineRef target = factory.config().machines().byPosition(level.dimension(), pos);
-        if (target == null) {
+        Machine targetMachine = factory.config().machines().byPosition(level.dimension(), pos);
+        if (targetMachine == null) {
             err(player, "这个位置没有接入的机器");
             return 0;
         }
-        return detachOrPurge(player, factory, target);
+        return detachOrPurge(player, factory, targetMachine.ref());
     }
 
     /**
@@ -361,12 +362,12 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
+        Optional<Machine> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        return detachOrPurge(player, factory, target.get());
+        return detachOrPurge(player, factory, target.get().ref());
     }
 
     /**
@@ -619,7 +620,8 @@ public final class FactoryService {
         }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
-            MachineRef ref = factory.config().machines().byPosition(level.dimension(), targetPos);
+            Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
+            MachineRef ref = machine == null ? null : machine.ref();
             if (ref == null || factory.config().machines().isRetired(ref.id())) {
                 allConnected = false;
                 break;
@@ -639,7 +641,8 @@ public final class FactoryService {
         int restored = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
-            MachineRef target = factory.config().machines().byPosition(level.dimension(), targetPos);
+            Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
+            MachineRef target = existing == null ? null : existing.ref();
             if (target != null) {
                 if (factory.config().machines().isRetired(target.id())) {
                     factory.config().machines().setRetired(target.id(), false);
@@ -702,7 +705,8 @@ public final class FactoryService {
         int already = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
-            MachineRef target = factory.config().machines().byPosition(level.dimension(), targetPos);
+            Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
+            MachineRef target = existing == null ? null : existing.ref();
             if (target == null) {
                 skipped++;
                 continue;
@@ -1102,12 +1106,12 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
+        Optional<Machine> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        MachineRef ref = target.get();
+        MachineRef ref = target.get().ref();
         if (!factory.config().machines().isRetired(ref.id())) {
             err(player, "这台机器不在回收站（它只是失联了；方块回来会自动恢复）");
             return 0;
@@ -1170,12 +1174,12 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
+        Optional<Machine> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        MachineRef ref = target.get();
+        MachineRef ref = target.get().ref();
         Health health = FactoryBin.healthOf(factory, observations(), ref.id());
         if (!FactoryBin.binned(factory.config().machines().isRetired(ref.id()),
                 health == null ? Health.UNKNOWN : health)) {
@@ -1691,7 +1695,7 @@ public final class FactoryService {
             return;
         }
         for (PassiveLine line : factory.config().lines().all()) {
-            if (line.groupByMachine(machineId).isPresent()) {
+            if (line.containsMachine(machineId)) {
                 runtime.lineRunner().wake(line.id());
             }
         }

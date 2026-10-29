@@ -11,11 +11,11 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
@@ -185,7 +185,7 @@ public final class DiagRender {
         }
 
         int blocked = blockedGroups(stats);
-        row.append(FactoryMessages.text(" · 卡 " + blocked + "/" + line.groups().size(),
+        row.append(FactoryMessages.text(" · 卡 " + blocked + "/" + line.machineCount(),
                 blocked > 0 ? FactoryMessages.WARN : FactoryMessages.INFO));
         row.append(FactoryMessages.text(" · IO " + formatMs(DiagService.ioCostAvgMs()),
                 FactoryMessages.DIM));
@@ -215,7 +215,7 @@ public final class DiagRender {
                 .append(FactoryMessages.lineLink(line.shortId()))
                 .append(FactoryMessages.text(" " + line.name() + " · "
                         + (line.running() ? "运行" : "停止")
-                        + " · " + line.groups().size() + " 组 · "
+                        + " · " + line.machineCount() + " 组 · "
                         + sleepText(now, sleepUntil, sleepSince), FactoryMessages.INFO)));
 
         rows.add(FactoryMessages.text("  入 " + ratesText(stats.rateIn())
@@ -230,27 +230,28 @@ public final class DiagRender {
         }
 
         int shown = 0;
-        for (IoGroup group : line.groups()) {
+        for (UUID machineId : line.machineIds()) {
             if (shown >= 4) {
-                rows.add(FactoryMessages.text("  … 还有 " + (line.groups().size() - shown) + " 台",
+                rows.add(FactoryMessages.text("  … 还有 " + (line.machineCount() - shown) + " 台",
                         FactoryMessages.DIM));
                 break;
             }
-            rows.add(machineRow(factory, group, stats, reasons, now));
+            rows.add(machineRow(factory, machineId, stats, reasons, now));
             shown++;
         }
         return rows;
     }
 
-    private static Component machineRow(Factory factory, IoGroup group, DiagStats.LineStats stats,
+    private static Component machineRow(Factory factory, UUID machineId, DiagStats.LineStats stats,
             Map<UUID, String> reasons, long now) {
-        MachineRef machine = factory.config().machines().byId(group.machineId()).orElse(null);
-        String id = machine == null ? shortId(group.machineId()) : machine.shortId();
-        DiagStats.GroupStats groupStats = stats.group(group.machineId());
+        Machine entry = factory.config().machines().byId(machineId).orElse(null);
+        MachineRef machine = entry == null ? null : entry.ref();
+        String id = machine == null ? shortId(machineId) : machine.shortId();
+        DiagStats.GroupStats groupStats = stats.group(machineId);
 
         if (groupStats.blockedSince() >= 0L) {
             long blockedSeconds = Math.max(0L, (now - groupStats.blockedSince()) / 20L);
-            String reason = reasons.getOrDefault(group.machineId(), "未知原因");
+            String reason = reasons.getOrDefault(machineId, "未知原因");
             return FactoryMessages.text("  " + id + " · 卡 " + blockedSeconds + "s · " + reason,
                     FactoryMessages.WARN);
         }

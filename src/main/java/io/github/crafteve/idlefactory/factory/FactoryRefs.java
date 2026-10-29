@@ -9,8 +9,9 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 /**
@@ -52,29 +53,33 @@ public final class FactoryRefs {
     }
 
     /**
-     * 按短 id 找机器。
+     * 按短 id 找机器身份。
      *
      * @param factory 工厂，可为 {@code null}
      * @param ref     短 id，可为 {@code null}
-     * @return 机器；找不到或前缀有歧义时为空
+     * @return 机器身份；找不到或前缀有歧义时为空
      */
     public static Optional<MachineRef> machine(@Nullable Factory factory, @Nullable String ref) {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        return factory.config().machines().byShortId(ref);
+        return factory.config().machines().byShortId(ref).map(Machine::ref);
     }
 
     /**
-     * 在产线里找一台机器对应的 IO 组。
+     * 在产线里找一台机器对应的 IO 规则。
      *
      * @param factory    工厂
      * @param line       产线
      * @param machineRef 机器短 id
-     * @return IO 组；机器不在产线里时为空
+     * @return IO 规则；机器不在产线里时为空
      */
-    public static Optional<IoGroup> group(Factory factory, PassiveLine line, String machineRef) {
-        return machine(factory, machineRef).flatMap(target -> line.groupByMachine(target.id()));
+    public static Optional<MachineIoGroup> group(Factory factory, PassiveLine line,
+            String machineRef) {
+        return machine(factory, machineRef)
+                .filter(target -> line.containsMachine(target.id()))
+                .flatMap(target -> factory.config().machines().byId(target.id()))
+                .map(Machine::io);
     }
 
     /**
@@ -86,7 +91,7 @@ public final class FactoryRefs {
      */
     public static Optional<PassiveLine> lineOf(Factory factory, UUID machineId) {
         for (PassiveLine line : factory.config().lines().all()) {
-            if (line.groupByMachine(machineId).isPresent()) {
+            if (line.containsMachine(machineId)) {
                 return Optional.of(line);
             }
         }
@@ -94,20 +99,14 @@ public final class FactoryRefs {
     }
 
     /**
-     * 找一台机器对应的 IO 组（一台机器最多属于一条产线）。
+     * 找一台机器的 IO 规则。规则跟着机器走，所以即使没编线也存在。
      *
      * @param factory   工厂
      * @param machineId 机器 id
-     * @return IO 组；没编线时为空
+     * @return IO 规则；机器不在库里时为空
      */
-    public static Optional<IoGroup> groupOf(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.config().lines().all()) {
-            Optional<IoGroup> group = line.groupByMachine(machineId);
-            if (group.isPresent()) {
-                return group;
-            }
-        }
-        return Optional.empty();
+    public static Optional<MachineIoGroup> groupOf(Factory factory, UUID machineId) {
+        return factory.config().machines().byId(machineId).map(Machine::io);
     }
 
     /**
@@ -142,9 +141,7 @@ public final class FactoryRefs {
     public static Set<UUID> assignedMachines(Factory factory) {
         Set<UUID> assigned = new HashSet<>();
         for (PassiveLine line : factory.config().lines().all()) {
-            for (IoGroup group : line.groups()) {
-                assigned.add(group.machineId());
-            }
+            assigned.addAll(line.machineIds());
         }
         return assigned;
     }
@@ -159,7 +156,7 @@ public final class FactoryRefs {
     public static List<String> lineNamesOf(Factory factory, UUID machineId) {
         List<String> names = new ArrayList<>();
         for (PassiveLine line : factory.config().lines().all()) {
-            if (line.groupByMachine(machineId).isPresent()) {
+            if (line.containsMachine(machineId)) {
                 names.add(line.name());
             }
         }
@@ -176,7 +173,7 @@ public final class FactoryRefs {
     public static List<UUID> lineIdsOf(Factory factory, UUID machineId) {
         List<UUID> ids = new ArrayList<>();
         for (PassiveLine line : factory.config().lines().all()) {
-            if (line.groupByMachine(machineId).isPresent()) {
+            if (line.containsMachine(machineId)) {
                 ids.add(line.id());
             }
         }
@@ -184,20 +181,15 @@ public final class FactoryRefs {
     }
 
     /**
-     * 一台机器配了几条规则（输入 + 输出）。
+     * 一台机器配了几条规则（输入 + 输出）。规则在机器上，与是否编线无关。
      *
      * @param factory   工厂
      * @param machineId 机器 id
-     * @return 规则条数；没挂任何产线时为 {@code 0}
+     * @return 规则条数；机器不在库里时为 {@code 0}
      */
     public static int ruleCountOf(Factory factory, UUID machineId) {
-        int count = 0;
-        for (PassiveLine line : factory.config().lines().all()) {
-            Optional<IoGroup> group = line.groupByMachine(machineId);
-            if (group.isPresent()) {
-                count += group.get().inputs().size() + group.get().outputs().size();
-            }
-        }
-        return count;
+        return factory.config().machines().byId(machineId)
+                .map(Machine::ruleCount)
+                .orElse(0);
     }
 }

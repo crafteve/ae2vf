@@ -8,8 +8,8 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
@@ -68,8 +68,8 @@ public final class LineRunner {
         boolean anyAwake = false;
         long earliestWake = Long.MAX_VALUE;
 
-        for (IoGroup group : line.groups()) {
-            RunnerState.GroupState groupState = lineState.group(group.id());
+        for (UUID machineId : line.machineIds()) {
+            RunnerState.GroupState groupState = lineState.group(machineId);
             if (groupState.sleeping) {
                 if (now < groupState.wakeAt) {
                     earliestWake = Math.min(earliestWake, groupState.wakeAt);
@@ -80,11 +80,12 @@ public final class LineRunner {
             }
             anyAwake = true;
 
-            MachineRef target = factory.config().machines().byId(group.machineId()).orElse(null);
-            if (target == null) {
+            Machine machine = factory.config().machines().byId(machineId).orElse(null);
+            if (machine == null) {
                 sleepIfIdle(groupState, now);
                 continue;
             }
+            MachineRef target = machine.ref();
             if (factory.config().machines().isRetired(target.id())) {
                 // 回收站里的机器不参与 IO；restore 时会显式唤醒
                 sleepIfIdle(groupState, now);
@@ -105,7 +106,7 @@ public final class LineRunner {
             long generation = observations == null ? 0L : observations.facesGeneration(target.blockKey());
             ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                     id -> new ItemVariantIndex());
-            GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), group, caps,
+            GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), machine.io(), caps,
                     groupState.routes, generation, factoryVariants, now);
             // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
             // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）

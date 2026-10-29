@@ -14,16 +14,15 @@ import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
 import io.github.crafteve.idlefactory.factory.line.LineService;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -80,7 +79,7 @@ public final class FactoryCommands {
                 String label = FactoryRefs.isReservedName(line.name()) ? line.shortId() : line.name();
                 builder.suggest(label, Component.literal("[" + line.shortId() + "] " + line.name()
                         + " · " + (line.running() ? "运行" : "停止")
-                        + " · " + line.groups().size() + " 台"));
+                        + " · " + line.machineCount() + " 台"));
             }
         }
         return builder.buildFuture();
@@ -408,7 +407,8 @@ public final class FactoryCommands {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
-                for (MachineRef target : factory.config().machines().all()) {
+                for (Machine machine : factory.config().machines().all()) {
+                    MachineRef target = machine.ref();
                     builder.suggest(target.shortId(), machineTooltip(factory, target));
                 }
             }
@@ -422,7 +422,8 @@ public final class FactoryCommands {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
                 Set<UUID> assigned = FactoryRefs.assignedMachines(factory);
-                for (MachineRef target : factory.config().machines().all()) {
+                for (Machine machine : factory.config().machines().all()) {
+                    MachineRef target = machine.ref();
                     if (!assigned.contains(target.id())) {
                         builder.suggest(target.shortId(), machineTooltip(factory, target));
                     }
@@ -438,10 +439,10 @@ public final class FactoryCommands {
             Factory factory = factoryFor(context.getSource());
             PassiveLine line = lineFrom(context, factory);
             if (factory != null && line != null) {
-                for (IoGroup group : line.groups()) {
-                    factory.config().machines().byId(group.machineId())
-                            .ifPresent(target -> builder.suggest(target.shortId(),
-                                    machineTooltip(factory, target)));
+                for (UUID machineId : line.machineIds()) {
+                    factory.config().machines().byId(machineId)
+                            .ifPresent(machine -> builder.suggest(machine.ref().shortId(),
+                                    machineTooltip(factory, machine.ref())));
                 }
             }
             return builder.buildFuture();
@@ -475,13 +476,16 @@ public final class FactoryCommands {
             PassiveLine line = lineFrom(context, factory);
             MachineRef machine = machineFrom(context, factory);
             if (factory != null && line != null && machine != null) {
-                line.groupByMachine(machine.id()).ifPresent(group -> {
-                    for (ResourceSpec spec : input ? group.inputs() : group.outputs()) {
-                        if (spec.key().kind() == kind) {
-                            builder.suggest(spec.key().id().toString());
+                if (line.containsMachine(machine.id())) {
+                    factory.config().machines().byId(machine.id()).ifPresent(entry -> {
+                        var io = entry.io();
+                        for (ResourceSpec spec : input ? io.inputs() : io.outputs()) {
+                            if (spec.key().kind() == kind) {
+                                builder.suggest(spec.key().id().toString());
+                            }
                         }
-                    }
-                });
+                    });
+                }
             }
             return builder.buildFuture();
         };

@@ -6,9 +6,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.probe.Health;
 
 /**
  * 回收站：谓词 + 操作。
@@ -70,15 +70,15 @@ public final class FactoryBin {
     /**
      * 把一台机器从机器库彻底移除，并级联删掉所有产线里指向它的组。
      *
-     * <p>这是唯一会让 {@code IoGroup.machineId} 失去落点的操作，所以必须级联——否则就出现
-     * 「组指向一台不存在的机器」的孤儿态。</p>
+     * <p>这是唯一会让产线引用失去落点的操作，所以必须级联——否则就出现「产线指向一台不存在的
+     * 机器」的孤儿态。</p>
      *
      * @param factory   工厂
      * @param machineId 机器 id
      */
     public static void purge(Factory factory, UUID machineId) {
         for (PassiveLine line : factory.config().lines().all()) {
-            line.removeGroupByMachine(machineId);
+            line.removeMachine(machineId);
         }
         factory.config().machines().remove(machineId);
     }
@@ -123,10 +123,10 @@ public final class FactoryBin {
         if (observations == null) {
             return null;
         }
-        MachineRef ref = factory.config().machines().byId(machineId).orElse(null);
-        if (ref == null) {
+        Machine machine = factory.config().machines().byId(machineId).orElse(null);
+        if (machine == null) {
             return null;
         }
-        return observations.observe(ref.blockKey()).health();
+        return observations.observe(machine.ref().blockKey()).health();
     }
 }

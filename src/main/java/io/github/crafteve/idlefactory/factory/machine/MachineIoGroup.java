@@ -1,8 +1,7 @@
-package io.github.crafteve.idlefactory.factory.line;
+package io.github.crafteve.idlefactory.factory.machine;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,40 +14,19 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * 一个 IO 组：一台机器 + 它的输入清单和输出清单。
+ * 一台机器的 IO 规则：输入清单和输出清单。
  *
- * <p>组只记机器库里的机器 id，不重复存坐标。同一个资源在同一侧只允许一条规则；
- * 输入和输出各自独立。</p>
+ * <p>规则跟着机器走，不跟着产线走；从产线移除机器不会丢规则。组本身没有独立 id，
+ * 机器 id 就是它的身份。</p>
+ *
+ * <p>同一个资源在同一侧只允许一条规则；输入和输出各自独立。</p>
  */
-public final class IoGroup {
-    private static final String TAG_ID = "Id";
-    private static final String TAG_MACHINE = "Machine";
+public final class MachineIoGroup {
     private static final String TAG_INPUTS = "Inputs";
     private static final String TAG_OUTPUTS = "Outputs";
 
-    private final UUID id;
-    private final UUID machineId;
     private final List<ResourceSpec> inputs = new ArrayList<>();
     private final List<ResourceSpec> outputs = new ArrayList<>();
-
-    /**
-     * @param id        组 id
-     * @param machineId 机器库里的机器 id
-     */
-    public IoGroup(UUID id, UUID machineId) {
-        this.id = id;
-        this.machineId = machineId;
-    }
-
-    /** 组 id。 */
-    public UUID id() {
-        return this.id;
-    }
-
-    /** 机器库里的机器 id。 */
-    public UUID machineId() {
-        return this.machineId;
-    }
 
     /** 输入清单（只读）。 */
     public List<ResourceSpec> inputs() {
@@ -58,6 +36,16 @@ public final class IoGroup {
     /** 输出清单（只读）。 */
     public List<ResourceSpec> outputs() {
         return List.copyOf(this.outputs);
+    }
+
+    /** 输入 + 输出规则总数。 */
+    public int ruleCount() {
+        return this.inputs.size() + this.outputs.size();
+    }
+
+    /** 是否有任何规则。 */
+    public boolean isEmpty() {
+        return this.inputs.isEmpty() && this.outputs.isEmpty();
     }
 
     /**
@@ -111,9 +99,6 @@ public final class IoGroup {
     /**
      * 按资源替换一条输入规则。
      *
-     * <p>界面在配置卡上改面或匹配模式时用；规则的身份仍是 key，只换面/模式，
-     * 不改变列表顺序。</p>
-     *
      * @param key         原规则 key
      * @param replacement 新规则；key 必须与原规则一致
      * @return 是否找到并替换
@@ -165,26 +150,20 @@ public final class IoGroup {
      */
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
-        tag.putUUID(TAG_ID, this.id);
-        tag.putUUID(TAG_MACHINE, this.machineId);
         tag.put(TAG_INPUTS, saveSpecs(registries, this.inputs));
         tag.put(TAG_OUTPUTS, saveSpecs(registries, this.outputs));
         return tag;
     }
 
     /**
-     * 从 NBT 读回来。
+     * 从 NBT 读回来；字段缺失时返回空组。
      *
      * @param tag        存档标签
      * @param registries 注册表访问，物品组件解码需要
-     * @return IO 组；字段缺失时返回 {@code null}
+     * @return IO 规则
      */
-    @Nullable
-    public static IoGroup load(CompoundTag tag, HolderLookup.Provider registries) {
-        if (!tag.hasUUID(TAG_ID) || !tag.hasUUID(TAG_MACHINE)) {
-            return null;
-        }
-        IoGroup group = new IoGroup(tag.getUUID(TAG_ID), tag.getUUID(TAG_MACHINE));
+    public static MachineIoGroup load(CompoundTag tag, HolderLookup.Provider registries) {
+        MachineIoGroup group = new MachineIoGroup();
         readSpecs(tag.getList(TAG_INPUTS, Tag.TAG_COMPOUND), registries, group.inputs);
         readSpecs(tag.getList(TAG_OUTPUTS, Tag.TAG_COMPOUND), registries, group.outputs);
         return group;

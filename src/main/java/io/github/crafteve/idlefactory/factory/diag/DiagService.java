@@ -24,6 +24,7 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
@@ -140,7 +141,8 @@ public final class DiagService {
 
         long now = observations.currentTick();
         int shown = 0;
-        for (MachineRef ref : factory.config().machines().all()) {
+        for (Machine machine : factory.config().machines().all()) {
+            MachineRef ref = machine.ref();
             Observation observation = observations.observe(ref.blockKey());
             boolean retired = factory.config().machines().isRetired(ref.id());
             if (observation.health() == Health.PRESENT && !retired) {
@@ -198,7 +200,7 @@ public final class DiagService {
                 .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
                 .append(FactoryMessages.text(line.running() ? "运行" : "停止",
                         line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + line.groups().size() + " 组 · "
+                .append(FactoryMessages.text(" · " + line.machineCount() + " 组 · "
                         + stats.totalRate() + "/s", FactoryMessages.INFO));
         long sleepUntil = runtime.lineRunner().sleepUntil(line.id());
         if (sleepUntil > now) {
@@ -234,13 +236,13 @@ public final class DiagService {
                 .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
                 .append(FactoryMessages.text(line.running() ? "运行" : "停止",
                         line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + line.groups().size() + " 组", FactoryMessages.INFO))
+                .append(FactoryMessages.text(" · " + line.machineCount() + " 组", FactoryMessages.INFO))
                 .append(FactoryMessages.text(sleepUntil > now
                         ? " · 睡眠剩余 " + seconds(sleepUntil - now) + "s"
                         : " · 清醒", FactoryMessages.DIM));
         FactoryMessages.send(player, header);
 
-        if (line.groups().isEmpty()) {
+        if (line.machineIds().isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.info(
                     "还没有机器。用 /idf line " + line.shortId() + " add <机器> 加入"));
             return 1;
@@ -276,7 +278,7 @@ public final class DiagService {
             FactoryMessages.send(player, FactoryMessages.info("用 /idf factory info 查看机器库"));
             return 0;
         }
-        if (line.groupByMachine(machine.get().id()).isEmpty()) {
+        if (!line.containsMachine(machine.get().id())) {
             FactoryMessages.send(player, FactoryMessages.err(
                     "机器 " + machineRef + " 不在产线 " + line.name() + " 里"));
             return 0;

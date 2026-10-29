@@ -10,9 +10,10 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
-import io.github.crafteve.idlefactory.factory.line.IoGroup;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -74,20 +75,21 @@ public final class DiagChecks {
         boolean online = factory.live().storageOnline();
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
-        for (IoGroup group : line.groups()) {
-            Optional<MachineRef> target = factory.config().machines().byId(group.machineId());
+        for (UUID machineId : line.machineIds()) {
+            Optional<Machine> target = factory.config().machines().byId(machineId);
             if (target.isEmpty()) {
-                result.add(simple(group.machineId(), DiagEvent.Level.ERROR, "机器已不在机器库"));
+                result.add(simple(machineId, DiagEvent.Level.ERROR, "机器已不在机器库"));
                 continue;
             }
-            result.add(checkGroup(server, storage, online, target.get(), group, observations,
-                    factory.config().machines().isRetired(target.get().id())));
+            Machine entry = target.get();
+            result.add(checkGroup(server, storage, online, entry.ref(), entry.io(), observations,
+                    factory.config().machines().isRetired(machineId)));
         }
         return result;
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,
-            MachineRef machine, IoGroup group, @Nullable ObservationService observations,
+            MachineRef machine, MachineIoGroup group, @Nullable ObservationService observations,
             boolean retired) {
         ServerLevel level = server.getLevel(machine.dimension());
         if (level == null) {

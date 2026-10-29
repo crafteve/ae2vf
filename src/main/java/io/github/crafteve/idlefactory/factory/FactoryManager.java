@@ -3,13 +3,17 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
+import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 
 /**
  * 工厂档案柜：内存里的索引。
@@ -19,12 +23,12 @@ import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
  */
 public final class FactoryManager {
     private final Map<UUID, Factory> byId = new LinkedHashMap<>();
-    private final Map<UUID, UUID> byOwner = new HashMap<>();
+    private final Map<UUID, Factory> byOwner = new HashMap<>();
 
     /**
      * 从存档记录重建工厂。启动时调一次。
      *
-     * <p>这里只还原配置；仓库解析由 {@link FactoryRuntime} 在全部工厂读完后统一刷新。</p>
+     * <p>机器先建，产线后建；产线引用只保留机器库里存在的 id，且一台机器只能属于一条产线。</p>
      *
      * @param records 存档里的工厂记录
      */
@@ -34,11 +38,24 @@ public final class FactoryManager {
         for (FactoryRecord record : records) {
             FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
                     record.anchor());
-            config.machines().addAll(record.targets());
-            for (UUID retiredId : record.retired()) {
-                config.machines().setRetired(retiredId, true);
+            for (Machine machine : record.machines()) {
+                config.machines().add(machine);
             }
-            config.lines().addAll(record.lines());
+            Set<UUID> assigned = new HashSet<>();
+            for (PassiveLine loaded : record.lines()) {
+                PassiveLine line = new PassiveLine(loaded.id(), loaded.name());
+                line.setRunning(loaded.running());
+                for (UUID machineId : loaded.machineIds()) {
+                    if (config.machines().byId(machineId).isEmpty()) {
+                        continue;
+                    }
+                    if (!assigned.add(machineId)) {
+                        continue;
+                    }
+                    line.addMachine(machineId);
+                }
+                config.lines().add(line);
+            }
             add(new Factory(record.id(), config));
         }
     }
@@ -51,9 +68,8 @@ public final class FactoryManager {
     public List<FactoryRecord> toRecords() {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
-                        factory.config().storageAnchor(), factory.config().machines().all(),
-                        factory.config().lines().all(), factory.config().machines().retiredIds(),
-                        factory.config().storageMode()))
+                        factory.config().storageAnchor(), factory.config().storageMode(),
+                        factory.config().machines().all(), factory.config().lines().all()))
                 .toList();
     }
 
@@ -69,7 +85,7 @@ public final class FactoryManager {
             return false;
         }
         this.byId.put(factory.id(), factory);
-        this.byOwner.put(factory.config().owner(), factory.id());
+        this.byOwner.put(factory.config().owner(), factory);
         return true;
     }
 
@@ -95,8 +111,7 @@ public final class FactoryManager {
 
     /** 按拥有者查；第一版一人一个。 */
     public Optional<Factory> byOwner(UUID ownerId) {
-        UUID id = this.byOwner.get(ownerId);
-        return id == null ? Optional.empty() : byId(id);
+        return Optional.ofNullable(this.byOwner.get(ownerId));
     }
 
     /** 所有工厂（创建顺序）。 */

@@ -290,8 +290,8 @@ public final class FactoryRuntime {
         }
         this.observedKeys.clear();
         for (Factory factory : this.manager.all()) {
-            for (MachineRef ref : factory.config().machines().all()) {
-                this.observedKeys.add(ref.blockKey());
+            for (var machine : factory.config().machines().all()) {
+                this.observedKeys.add(machine.ref().blockKey());
             }
             // 仓库容器和机器共用同一张方块级观测
             if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
@@ -318,11 +318,12 @@ public final class FactoryRuntime {
     private void handleTransition(ObservationService.Transition transition) {
         long now = this.server.overworld().getGameTime();
         for (Factory factory : this.manager.all()) {
-            MachineRef ref = factory.config().machines()
+            var machine = factory.config().machines()
                     .byPosition(transition.key().dimension(), transition.key().pos());
-            if (ref == null) {
+            if (machine == null) {
                 continue;
             }
+            MachineRef ref = machine.ref();
             switch (transition.to()) {
                 case MISSING, NO_DIMENSION -> {
                     factory.live().stats().record(DiagEvent.of(now,
@@ -435,7 +436,7 @@ public final class FactoryRuntime {
 
     private void wakeLines(Factory factory, UUID machineId) {
         for (PassiveLine line : factory.config().lines().all()) {
-            if (line.groupByMachine(machineId).isPresent()) {
+            if (line.containsMachine(machineId)) {
                 this.lineRunner.wake(line.id());
             }
         }

@@ -77,7 +77,8 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
             }
         }
         List<Link> machines = new ArrayList<>();
-        for (MachineRef ref : factory.config().machines().all()) {
+        for (var machine : factory.config().machines().all()) {
+            MachineRef ref = machine.ref();
             if (!factory.config().machines().isRetired(ref.id())) {
                 machines.add(new Link(ref.dimension(), ref.pos()));
             }
