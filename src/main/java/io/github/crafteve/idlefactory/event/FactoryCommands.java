@@ -75,7 +75,7 @@ public final class FactoryCommands {
     private static final SuggestionProvider<CommandSourceStack> LINE_SUGGESTIONS = (context, builder) -> {
         Factory factory = factoryFor(context.getSource());
         if (factory != null) {
-            for (PassiveLine line : factory.lines().all()) {
+            for (PassiveLine line : factory.config().lines().all()) {
                 // 一条产线只建议一次：名字优先，短 id 作兜底
                 String label = FactoryRefs.isReservedName(line.name()) ? line.shortId() : line.name();
                 builder.suggest(label, Component.literal("[" + line.shortId() + "] " + line.name()
@@ -408,7 +408,7 @@ public final class FactoryCommands {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
-                for (MachineRef target : factory.machines().all()) {
+                for (MachineRef target : factory.config().machines().all()) {
                     builder.suggest(target.shortId(), machineTooltip(factory, target));
                 }
             }
@@ -422,7 +422,7 @@ public final class FactoryCommands {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
                 Set<UUID> assigned = FactoryRefs.assignedMachines(factory);
-                for (MachineRef target : factory.machines().all()) {
+                for (MachineRef target : factory.config().machines().all()) {
                     if (!assigned.contains(target.id())) {
                         builder.suggest(target.shortId(), machineTooltip(factory, target));
                     }
@@ -439,7 +439,7 @@ public final class FactoryCommands {
             PassiveLine line = lineFrom(context, factory);
             if (factory != null && line != null) {
                 for (IoGroup group : line.groups()) {
-                    factory.machines().byId(group.machineId())
+                    factory.config().machines().byId(group.machineId())
                             .ifPresent(target -> builder.suggest(target.shortId(),
                                     machineTooltip(factory, target)));
                 }
@@ -491,7 +491,7 @@ public final class FactoryCommands {
     private static SuggestionProvider<CommandSourceStack> containerIds() {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
-            if (factory != null && factory.storageLink().anchor() instanceof ContainerAnchor anchor) {
+            if (factory != null && factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
                 for (ContainerRef ref : anchor.containers()) {
                     builder.suggest(ref.shortId(), Component.literal(
                             ref.dimension().location() + " " + ref.pos().toShortString()
@@ -695,7 +695,7 @@ public final class FactoryCommands {
         if (observations != null) {
             text.append('\n').append(observations.observe(target.blockKey()).health().describe());
         }
-        if (factory.machines().isRetired(target.id())) {
+        if (factory.config().machines().isRetired(target.id())) {
             text.append("\n回收站");
         }
         return Component.literal(text.toString());

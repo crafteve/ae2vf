@@ -70,18 +70,18 @@ public final class DiagChecks {
      */
     public static List<GroupCheck> check(MinecraftServer server, Factory factory, PassiveLine line) {
         List<GroupCheck> result = new ArrayList<>();
-        Storage storage = factory.storage();
-        boolean online = factory.storageLink().online();
+        Storage storage = factory.live().storage();
+        boolean online = factory.live().storageOnline();
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
         for (IoGroup group : line.groups()) {
-            Optional<MachineRef> target = factory.machines().byId(group.machineId());
+            Optional<MachineRef> target = factory.config().machines().byId(group.machineId());
             if (target.isEmpty()) {
                 result.add(simple(group.machineId(), DiagEvent.Level.ERROR, "机器已不在机器库"));
                 continue;
             }
             result.add(checkGroup(server, storage, online, target.get(), group, observations,
-                    factory.machines().isRetired(target.get().id())));
+                    factory.config().machines().isRetired(target.get().id())));
         }
         return result;
     }

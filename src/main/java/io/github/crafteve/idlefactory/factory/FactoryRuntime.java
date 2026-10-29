@@ -22,7 +22,7 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
-import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
@@ -86,6 +86,9 @@ public final class FactoryRuntime {
     private FactoryStore store;
     @Nullable
     private ObservationService observations;
+    /** 仓库解析器：启动时创建，供工厂定时刷新与指令即时刷新共用。 */
+    @Nullable
+    private StorageResolver storageResolver;
     private int tickCounter;
     /** IO 执行间隔（tick），默认每 tick 一轮；可由 /idf diag io 调整。 */
     private int ioInterval = 1;
@@ -117,7 +120,7 @@ public final class FactoryRuntime {
         runtime.save();
         runtime.lineRunner.clear();
         DiagService.clearWatches();
-        StorageLink.setResolver(null);
+        runtime.storageResolver = null;
         runtime.observations = null;
         runtime.observedKeys.clear();
         runtime.missingNotices.clear();
@@ -135,6 +138,12 @@ public final class FactoryRuntime {
     /** 档案柜。 */
     public FactoryManager manager() {
         return this.manager;
+    }
+
+    /** 仓库解析器；启动完成后非 null。 */
+    @Nullable
+    public StorageResolver storageResolver() {
+        return this.storageResolver;
     }
 
     /**
@@ -216,13 +225,13 @@ public final class FactoryRuntime {
         this.store = FactoryStore.get(this.server.overworld());
         // 观测先于仓库解析：容器仓库要借观测做面窄化与可用性判断
         this.observations = new ObservationService(this.server);
-        StorageLink.setResolver(new DispatchingStorageResolver(
+        this.storageResolver = new DispatchingStorageResolver(
                 new Ae2StorageResolver(this.server),
-                new ContainerStorageResolver(this.server, this.observations)));
+                new ContainerStorageResolver(this.server, this.observations));
         this.manager.loadFrom(this.store.records());
         this.links.rebuild(this.manager);
         for (Factory factory : this.manager.all()) {
-            factory.refreshStorage();
+            factory.refreshStorage(this.storageResolver);
         }
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
@@ -240,13 +249,13 @@ public final class FactoryRuntime {
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
             long now = this.server.overworld().getGameTime();
             for (Factory factory : this.manager.all()) {
-                String beforeError = factory.storageLink().lastError();
-                if (factory.refreshStorage()) {
+                String beforeError = factory.live().storageError();
+                if (factory.refreshStorage(this.storageResolver)) {
                     recordStorage(factory, now);
                 }
-                String afterError = factory.storageLink().lastError();
+                String afterError = factory.live().storageError();
                 if (afterError != null && !afterError.equals(beforeError)) {
-                    factory.stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
+                    factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
                             DiagEvent.Category.STOR, null, null, null, "仓库解析异常：" + afterError));
                 }
             }
@@ -281,11 +290,11 @@ public final class FactoryRuntime {
         }
         this.observedKeys.clear();
         for (Factory factory : this.manager.all()) {
-            for (MachineRef ref : factory.machines().all()) {
+            for (MachineRef ref : factory.config().machines().all()) {
                 this.observedKeys.add(ref.blockKey());
             }
             // 仓库容器和机器共用同一张方块级观测
-            if (factory.storageLink().anchor() instanceof ContainerAnchor anchor) {
+            if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
                 for (ContainerRef container : anchor.containers()) {
                     this.observedKeys.add(container.blockKey());
                 }
@@ -309,18 +318,18 @@ public final class FactoryRuntime {
     private void handleTransition(ObservationService.Transition transition) {
         long now = this.server.overworld().getGameTime();
         for (Factory factory : this.manager.all()) {
-            MachineRef ref = factory.machines()
+            MachineRef ref = factory.config().machines()
                     .byPosition(transition.key().dimension(), transition.key().pos());
             if (ref == null) {
                 continue;
             }
             switch (transition.to()) {
                 case MISSING, NO_DIMENSION -> {
-                    factory.stats().record(DiagEvent.of(now,
+                    factory.live().stats().record(DiagEvent.of(now,
                             DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
                             transition.to().describe() + "，已进回收站"));
                     boolean referenced = FactoryBin.referenced(factory).contains(ref.id());
-                    boolean retired = factory.machines().isRetired(ref.id());
+                    boolean retired = factory.config().machines().isRetired(ref.id());
                     if (FactoryBin.purgeable(referenced, retired, transition.to())) {
                         // 没配过规则，直接删——玩家随时可以 connect 回来
                         FactoryBin.purge(factory, ref.id());
@@ -333,7 +342,7 @@ public final class FactoryRuntime {
                 }
                 case PRESENT -> {
                     if (transition.from() != Health.UNKNOWN) {
-                        factory.stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
+                        factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
                         this.wakeLines(factory, ref.id());
                         this.restoredNotices.merge(factory.id(), 1, Integer::sum);
@@ -361,7 +370,7 @@ public final class FactoryRuntime {
             return;
         }
         for (Factory factory : this.manager.all()) {
-            if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+            if (!(factory.config().storageAnchor() instanceof ContainerAnchor anchor)) {
                 continue;
             }
             for (ContainerRef ref : anchor.containers()) {
@@ -369,7 +378,7 @@ public final class FactoryRuntime {
                         || !ref.pos().equals(transition.key().pos())) {
                     continue;
                 }
-                factory.stats().record(DiagEvent.of(now,
+                factory.live().stats().record(DiagEvent.of(now,
                         transition.to() == Health.PRESENT ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
                         DiagEvent.Category.STOR, null, null, null,
                         "容器 [" + ref.shortId() + "] " + transition.to().describe()));
@@ -397,7 +406,7 @@ public final class FactoryRuntime {
                 this.restoredNotices.remove(factoryId);
                 continue;
             }
-            ServerPlayer player = this.server.getPlayerList().getPlayer(factory.owner());
+            ServerPlayer player = this.server.getPlayerList().getPlayer(factory.config().owner());
             if (player == null) {
                 // 拥有者不在线，通知没有意义，计数直接丢
                 this.missingNotices.remove(factoryId);
@@ -425,7 +434,7 @@ public final class FactoryRuntime {
     }
 
     private void wakeLines(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.groupByMachine(machineId).isPresent()) {
                 this.lineRunner.wake(line.id());
             }
@@ -439,8 +448,8 @@ public final class FactoryRuntime {
      * @param now     当前游戏时间
      */
     private static void recordStorage(Factory factory, long now) {
-        boolean online = factory.storageLink().online();
-        factory.stats().record(DiagEvent.of(now,
+        boolean online = factory.live().storageOnline();
+        factory.live().stats().record(DiagEvent.of(now,
                 online ? DiagEvent.Level.OK : DiagEvent.Level.WARN,
                 DiagEvent.Category.STOR, null, null, null,
                 online ? "仓库上线" : "仓库离线"));

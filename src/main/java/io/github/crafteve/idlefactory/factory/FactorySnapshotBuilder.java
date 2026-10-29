@@ -22,7 +22,6 @@ import io.github.crafteve.idlefactory.factory.probe.WorkState;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageLink;
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -59,12 +58,11 @@ public final class FactorySnapshotBuilder {
      * @return 摘要文本
      */
     public static String describe(Factory factory) {
-        StorageLink link = factory.storageLink();
-        StorageAnchor anchor = link.anchor();
+        StorageAnchor anchor = factory.config().storageAnchor();
         String anchorText = anchor == null ? "unbound" : anchor.describe();
         return "工厂 " + factory.id()
-                + " | owner=" + factory.owner()
-                + " | storage=" + (link.online() ? "online" : "offline")
+                + " | owner=" + factory.config().owner()
+                + " | storage=" + (factory.live().storageOnline() ? "online" : "offline")
                 + " | anchor=" + anchorText;
     }
 
@@ -96,8 +94,8 @@ public final class FactorySnapshotBuilder {
      * @return 产线视图
      */
     public static List<LineView> lines(Factory factory, Map<UUID, Long> sleepRemaining) {
-        List<LineView> views = new ArrayList<>(factory.lines().size());
-        for (PassiveLine line : factory.lines().all()) {
+        List<LineView> views = new ArrayList<>(factory.config().lines().size());
+        for (PassiveLine line : factory.config().lines().all()) {
             long remaining = Math.max(0L, sleepRemaining.getOrDefault(line.id(), 0L));
             boolean sleeping = line.running() && remaining > 0L;
             views.add(new LineView(line.id(), line.name(), line.running(),
@@ -288,8 +286,8 @@ public final class FactorySnapshotBuilder {
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
             long now) {
-        List<MachineView> views = new ArrayList<>(factory.machines().size());
-        for (MachineRef ref : factory.machines().all()) {
+        List<MachineView> views = new ArrayList<>(factory.config().machines().size());
+        for (MachineRef ref : factory.config().machines().all()) {
             Observation observation = observations == null
                     ? Observation.UNKNOWN : observations.observe(ref.blockKey());
             Optional<IoGroup> group = FactoryRefs.groupOf(factory, ref.id());
@@ -297,7 +295,7 @@ public final class FactorySnapshotBuilder {
             List<ResourceSpec> outputs = group.map(IoGroup::outputs).orElse(List.of());
 
             DiagStats.GroupStats stats = FactoryRefs.lineOf(factory, ref.id())
-                    .map(line -> factory.stats().line(line.id()).groupOrNull(ref.id()))
+                    .map(line -> factory.live().stats().line(line.id()).groupOrNull(ref.id()))
                     .orElse(null);
             List<Long> inputRates = new ArrayList<>(inputs.size());
             for (ResourceSpec spec : inputs) {
@@ -333,7 +331,7 @@ public final class FactorySnapshotBuilder {
                     ? IoResult.Reason.OK : stats.outputReason();
 
             views.add(new MachineView(ref,
-                    factory.machines().isRetired(ref.id()),
+                    factory.config().machines().isRetired(ref.id()),
                     observation.health(),
                     observation.blockId(),
                     observation.presence(),
@@ -419,13 +417,13 @@ public final class FactorySnapshotBuilder {
             }
         }
         int running = 0;
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.running()) {
                 running++;
             }
         }
-        return new FactoryHealth(factory.machines().size(), active, unloaded, missing,
-                retired, bin, factory.lines().size(), running);
+        return new FactoryHealth(factory.config().machines().size(), active, unloaded, missing,
+                retired, bin, factory.config().lines().size(), running);
     }
 
     /**

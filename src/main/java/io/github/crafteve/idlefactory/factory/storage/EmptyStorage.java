@@ -8,7 +8,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 /**
  * 空仓库：什么都没装，也什么都收不下。
  *
- * <p>它是 {@link StorageLink} 在「没绑地址」或「仓库暂时连不上」时的降级实现。
+ * <p>它是工厂运行时在「没绑地址」或「仓库暂时连不上」时的降级实现。
  * 工厂拿到它不会以为出了错——它只会看到「没料」和「没地方放」，然后按正常业务逻辑罢工。</p>
  */
 public final class EmptyStorage implements Storage {

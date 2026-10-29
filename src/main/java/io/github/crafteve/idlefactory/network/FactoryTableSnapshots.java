@@ -50,7 +50,7 @@ public final class FactoryTableSnapshots {
         FactorySnapshotBuilder.FactoryHealth health =
                 FactorySnapshotBuilder.health(owner, machines);
         Map<UUID, Long> sleepRemaining = new HashMap<>();
-        for (PassiveLine line : owner.lines().all()) {
+        for (PassiveLine line : owner.config().lines().all()) {
             long until = runtime.lineRunner().sleepUntil(line.id());
             if (until > now) {
                 sleepRemaining.put(line.id(), until - now);
@@ -59,7 +59,7 @@ public final class FactoryTableSnapshots {
         List<FactorySnapshotBuilder.LineView> lines =
                 FactorySnapshotBuilder.lines(owner, sleepRemaining);
         PacketDistributor.sendToPlayer(player, new FactoryTableS2C(
-                containerId, true, owner.storageLink().online(),
+                containerId, true, owner.live().storageOnline(),
                 health.lines(), health.runningLines(), lines, machines));
     }
 }

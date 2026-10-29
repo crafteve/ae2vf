@@ -27,7 +27,7 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageLink;
+import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
@@ -113,7 +113,8 @@ public final class FactoryService {
             return;
         }
         UUID id = nextId(runtime, player.getUUID());
-        Factory factory = new Factory(id, player.getUUID());
+        Factory factory = new Factory(id,
+                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
         if (!runtime.manager().add(factory)) {
             IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
             return;
@@ -145,7 +146,8 @@ public final class FactoryService {
         }
 
         UUID id = nextId(runtime, player.getUUID());
-        Factory factory = new Factory(id, player.getUUID());
+        Factory factory = new Factory(id,
+                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
         if (!runtime.manager().add(factory)) {
             err(player, "工厂创建失败：id 或拥有者冲突");
             return 0;
@@ -193,7 +195,7 @@ public final class FactoryService {
             return 0;
         }
         // 即时刷新一次，别让 online 停在 tick 定时器上一秒的状态
-        factory.refreshStorage();
+        factory.refreshStorage(storageResolver());
         info(player, FactorySnapshotBuilder.describe(factory));
 
         ObservationService observations = observations();
@@ -294,21 +296,21 @@ public final class FactoryService {
             err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
             return 0;
         }
-        Optional<MachineRef> existing = factory.machines().byId(target.id());
+        Optional<MachineRef> existing = factory.config().machines().byId(target.id());
         if (existing.isPresent()) {
             MachineRef ref = existing.get();
-            if (!factory.machines().isRetired(ref.id())) {
+            if (!factory.config().machines().isRetired(ref.id())) {
                 err(player, "这台机器已经接入过了：" + ref.shortId());
                 return 0;
             }
-            factory.machines().setRetired(ref.id(), false);
+            factory.config().machines().setRetired(ref.id(), false);
             refreshObservation(ref);
             wakeLines(factory, ref.id());
             markDirty();
             ok(player, "已从回收站取回：" + ref.shortId() + " · 规则已恢复");
             return 1;
         }
-        if (!factory.machines().add(target)) {
+        if (!factory.config().machines().add(target)) {
             err(player, "这台机器已经接入过了：" + target.shortId());
             return 0;
         }
@@ -339,7 +341,7 @@ public final class FactoryService {
             return 0;
         }
         ServerLevel level = player.serverLevel();
-        MachineRef target = factory.machines().byPosition(level.dimension(), pos);
+        MachineRef target = factory.config().machines().byPosition(level.dimension(), pos);
         if (target == null) {
             err(player, "这个位置没有接入的机器");
             return 0;
@@ -359,7 +361,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.machines().byShortId(shortId);
+        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
@@ -401,7 +403,7 @@ public final class FactoryService {
      * @return 处理结果
      */
     private static DetachResult detachOrPurgeSilent(Factory factory, MachineRef target) {
-        if (factory.machines().isRetired(target.id())) {
+        if (factory.config().machines().isRetired(target.id())) {
             return DetachResult.ALREADY;
         }
         Set<UUID> referenced = FactoryBin.referenced(factory);
@@ -409,7 +411,7 @@ public final class FactoryService {
             FactoryBin.purge(factory, target.id());
             return DetachResult.PURGED;
         }
-        factory.machines().setRetired(target.id(), true);
+        factory.config().machines().setRetired(target.id(), true);
         return DetachResult.BINNED;
     }
 
@@ -522,13 +524,13 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (factory.storageLink().anchor() == null) {
+        if (factory.config().storageAnchor() == null) {
             barErr(player, "当前没有仓库链接");
             return 0;
         }
-        factory.bindAnchor(null);
+        factory.bindStorage(null, storageResolver());
         markDirty();
-        barOk(player, "已清空仓库链接（当前 " + modeLabel(factory.storageMode()) + " 模式）");
+        barOk(player, "已清空仓库链接（当前 " + modeLabel(factory.config().storageMode()) + " 模式）");
         return 1;
     }
 
@@ -543,13 +545,13 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (factory.storageLink().anchor() != null) {
+        if (factory.config().storageAnchor() != null) {
             barErr(player, "先清空当前链接再切换模式");
             return 0;
         }
-        StorageMode next = factory.storageMode() == StorageMode.ME
+        StorageMode next = factory.config().storageMode() == StorageMode.ME
                 ? StorageMode.CONTAINER : StorageMode.ME;
-        factory.setStorageMode(next);
+        factory.config().setStorageMode(next);
         markDirty();
         barOk(player, "已切换为 " + modeLabel(next) + " 模式");
         return 1;
@@ -617,8 +619,8 @@ public final class FactoryService {
         }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
-            MachineRef ref = factory.machines().byPosition(level.dimension(), targetPos);
-            if (ref == null || factory.machines().isRetired(ref.id())) {
+            MachineRef ref = factory.config().machines().byPosition(level.dimension(), targetPos);
+            if (ref == null || factory.config().machines().isRetired(ref.id())) {
                 allConnected = false;
                 break;
             }
@@ -637,10 +639,10 @@ public final class FactoryService {
         int restored = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
-            MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
+            MachineRef target = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (target != null) {
-                if (factory.machines().isRetired(target.id())) {
-                    factory.machines().setRetired(target.id(), false);
+                if (factory.config().machines().isRetired(target.id())) {
+                    factory.config().machines().setRetired(target.id(), false);
                     refreshObservation(target);
                     wakeLines(factory, target.id());
                     restored++;
@@ -650,7 +652,7 @@ public final class FactoryService {
                 continue;
             }
             MachineRef ref = MachineRef.of(level.dimension(), targetPos);
-            if (factory.machines().add(ref)) {
+            if (factory.config().machines().add(ref)) {
                 refreshObservation(ref);
                 added++;
             } else {
@@ -700,7 +702,7 @@ public final class FactoryService {
         int already = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
-            MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
+            MachineRef target = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (target == null) {
                 skipped++;
                 continue;
@@ -766,9 +768,9 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        StorageAnchor anchor = factory.storageLink().anchor();
+        StorageAnchor anchor = factory.config().storageAnchor();
         ServerLevel level = player.serverLevel();
-        if (factory.storageMode() == StorageMode.ME) {
+        if (factory.config().storageMode() == StorageMode.ME) {
             return toggleMeStorage(player, factory, level, anchor, pos);
         }
         return toggleContainerStorage(player, factory, level, anchor, pos, chain);
@@ -787,7 +789,7 @@ public final class FactoryService {
         boolean same = anchor instanceof MeAnchor me
                 && me.dimension().equals(level.dimension()) && me.pos().equals(pos);
         if (same) {
-            factory.bindAnchor(null);
+            factory.bindStorage(null, storageResolver());
             markDirty();
             barOk(player, "已取消 ME 仓库链接");
             return 1;
@@ -804,8 +806,8 @@ public final class FactoryService {
             barErr(player, "该方块没有接入 ME 网络");
             return 0;
         }
-        factory.bindAnchor(new MeAnchor(level.dimension(), pos));
-        factory.setStorageMode(StorageMode.ME);
+        factory.bindStorage(new MeAnchor(level.dimension(), pos), storageResolver());
+        factory.config().setStorageMode(StorageMode.ME);
         markDirty();
         barOk(player, "已绑定 ME 仓库 " + blockLabel(level, pos));
         return 1;
@@ -900,8 +902,8 @@ public final class FactoryService {
             }
             return 0;
         }
-        factory.bindAnchor(next);
-        factory.setStorageMode(StorageMode.CONTAINER);
+        factory.bindStorage(next, storageResolver());
+        factory.config().setStorageMode(StorageMode.CONTAINER);
         markDirty();
         if (!chain) {
             barOk(player, "已绑定容器 " + blockLabel(level, origin));
@@ -936,8 +938,8 @@ public final class FactoryService {
             barErr(player, "该位置没有绑定容器");
             return 0;
         }
-        factory.bindAnchor(next.isEmpty() ? null : next);
-        factory.setStorageMode(StorageMode.CONTAINER);
+        factory.bindStorage(next.isEmpty() ? null : next, storageResolver());
+        factory.config().setStorageMode(StorageMode.CONTAINER);
         markDirty();
         if (!chain) {
             String label = blockLabel(level, targets.getFirst());
@@ -967,7 +969,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (factory.storageLink().anchor() == null) {
+        if (factory.config().storageAnchor() == null) {
             barErr(player, "当前没有仓库链接");
             return 0;
         }
@@ -1102,17 +1104,17 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.machines().byShortId(shortId);
+        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
             return 0;
         }
         MachineRef ref = target.get();
-        if (!factory.machines().isRetired(ref.id())) {
+        if (!factory.config().machines().isRetired(ref.id())) {
             err(player, "这台机器不在回收站（它只是失联了；方块回来会自动恢复）");
             return 0;
         }
-        factory.machines().setRetired(ref.id(), false);
+        factory.config().machines().setRetired(ref.id(), false);
         Observation observation = refreshObservation(ref);
         wakeLines(factory, ref.id());
         markDirty();
@@ -1170,14 +1172,14 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = factory.machines().byShortId(shortId);
+        Optional<MachineRef> target = factory.config().machines().byShortId(shortId);
         if (target.isEmpty()) {
             err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
             return 0;
         }
         MachineRef ref = target.get();
         Health health = FactoryBin.healthOf(factory, observations(), ref.id());
-        if (!FactoryBin.binned(factory.machines().isRetired(ref.id()),
+        if (!FactoryBin.binned(factory.config().machines().isRetired(ref.id()),
                 health == null ? Health.UNKNOWN : health)) {
             err(player, "这台机器不在回收站");
             return 0;
@@ -1237,7 +1239,7 @@ public final class FactoryService {
         }
 
         ContainerRef ref = ContainerRef.of(level.dimension(), pos);
-        StorageAnchor current = factory.storageLink().anchor();
+        StorageAnchor current = factory.config().storageAnchor();
         ContainerAnchor anchor;
         if (current == null) {
             anchor = new ContainerAnchor(List.of(ref));
@@ -1256,8 +1258,8 @@ public final class FactoryService {
             return 0;
         }
 
-        factory.bindAnchor(anchor);
-        factory.setStorageMode(StorageMode.CONTAINER);
+        factory.bindStorage(anchor, storageResolver());
+        factory.config().setStorageMode(StorageMode.CONTAINER);
         markDirty();
         ok(player, "已加入仓库容器 [" + ref.shortId() + "] " + level.dimension().location()
                 + " " + pos.toShortString() + "（共 " + anchor.containers().size() + " 个）");
@@ -1275,11 +1277,11 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (factory.storageLink().anchor() == null) {
+        if (factory.config().storageAnchor() == null) {
             err(player, "还没有绑定仓库");
             return 0;
         }
-        factory.bindAnchor(null);
+        factory.bindStorage(null, storageResolver());
         markDirty();
         ok(player, "已解绑仓库");
         return 1;
@@ -1297,7 +1299,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+        if (!(factory.config().storageAnchor() instanceof ContainerAnchor anchor)) {
             err(player, "当前没有容器仓库");
             return 0;
         }
@@ -1307,7 +1309,7 @@ public final class FactoryService {
             return 0;
         }
         ContainerAnchor next = anchor.without(ref.get().id());
-        factory.bindAnchor(next.isEmpty() ? null : next);
+        factory.bindStorage(next.isEmpty() ? null : next, storageResolver());
         markDirty();
         ok(player, "已移除容器 [" + ref.get().shortId() + "]");
         return 1;
@@ -1326,7 +1328,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+        if (!(factory.config().storageAnchor() instanceof ContainerAnchor anchor)) {
             err(player, "当前没有容器仓库");
             return 0;
         }
@@ -1335,7 +1337,7 @@ public final class FactoryService {
             err(player, "找不到容器 " + shortId);
             return 0;
         }
-        factory.bindAnchor(anchor.withPriority(ref.get().id(), priority));
+        factory.bindStorage(anchor.withPriority(ref.get().id(), priority), storageResolver());
         markDirty();
         ok(player, "容器 [" + ref.get().shortId() + "] 优先级 → " + priority);
         return 1;
@@ -1354,7 +1356,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        if (!(factory.storageLink().anchor() instanceof ContainerAnchor anchor)) {
+        if (!(factory.config().storageAnchor() instanceof ContainerAnchor anchor)) {
             err(player, "当前没有容器仓库（AE2 仓库不需要清理）");
             return 0;
         }
@@ -1376,7 +1378,7 @@ public final class FactoryService {
             info(player, "没有已缺失的容器（未加载的不算）");
             return 1;
         }
-        factory.bindAnchor(keep.isEmpty() ? null : new ContainerAnchor(keep));
+        factory.bindStorage(keep.isEmpty() ? null : new ContainerAnchor(keep), storageResolver());
         markDirty();
         ok(player, "已清理 " + removed + " 个已缺失的容器"
                 + (keep.isEmpty() ? " · 仓库已解绑" : " · 剩 " + keep.size() + " 个"));
@@ -1432,15 +1434,15 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        factory.refreshStorage();
-        StorageLink link = factory.storageLink();
-        StorageAnchor anchor = link.anchor();
+        factory.refreshStorage(storageResolver());
+        StorageAnchor anchor = factory.config().storageAnchor();
         if (anchor == null) {
             err(player, "还没有绑定仓库");
             info(player, "容器：准星对准箱子执行 /idf storage bind；ME：用存储链接杖右键 ME 网络方块");
             return 0;
         }
-        info(player, "仓库：" + anchor.describe() + " · " + (link.online() ? "在线" : "离线"));
+        info(player, "仓库：" + anchor.describe() + " · "
+                + (factory.live().storageOnline() ? "在线" : "离线"));
 
         ObservationService observations = observations();
         if (anchor instanceof ContainerAnchor containerAnchor) {
@@ -1473,12 +1475,12 @@ public final class FactoryService {
                     + (missing > 0 ? " · /idf storage prune 清理已缺失" : ""));
         }
 
-        if (!link.online()) {
+        if (!factory.live().storageOnline()) {
             warn(player, "仓库当前离线，产线不会搬运");
             return 1;
         }
 
-        Storage storage = factory.storage();
+        Storage storage = factory.live().storage();
         Map<ResourceKey, Long> snapshot = storage.snapshot();
         if (snapshot.isEmpty()) {
             info(player, "仓库是空的");
@@ -1617,16 +1619,16 @@ public final class FactoryService {
      */
     @Nullable
     private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
-        factory.refreshStorage();
-        if (factory.storageLink().anchor() == null) {
+        factory.refreshStorage(storageResolver());
+        if (factory.config().storageAnchor() == null) {
             err(player, "你还没有绑定仓库：用存储链接杖右键 ME 网络方块，或对准箱子执行 /idf storage bind");
             return null;
         }
-        if (!factory.storageLink().online()) {
+        if (!factory.live().storageOnline()) {
             err(player, "仓库未连接（网络没电、频道不足，或 ME 接入点区块未加载）");
             return null;
         }
-        return factory.storage();
+        return factory.live().storage();
     }
 
     /**
@@ -1656,6 +1658,19 @@ public final class FactoryService {
     }
 
     /**
+     * 取仓库解析器；运行时未就绪时为 {@code null}。
+     *
+     * <p>绑定与指令刷新都要立即解析，所以直接从运行时借同一个解析器，不另建。</p>
+     *
+     * @return 仓库解析器
+     */
+    @Nullable
+    private static StorageResolver storageResolver() {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        return runtime == null ? null : runtime.storageResolver();
+    }
+
+    /**
      * 立刻刷新一台机器的观测（接入、取回之后调，别让 {@code info} 看到 UNKNOWN）。
      *
      * @param target 机器
@@ -1678,7 +1693,7 @@ public final class FactoryService {
         if (runtime == null) {
             return;
         }
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.groupByMachine(machineId).isPresent()) {
                 runtime.lineRunner().wake(line.id());
             }

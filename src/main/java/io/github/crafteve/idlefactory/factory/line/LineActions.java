@@ -90,11 +90,11 @@ public final class LineActions {
         if (error != null) {
             return Result.err(error);
         }
-        if (factory.lines().size() >= MAX_LINES) {
+        if (factory.config().lines().size() >= MAX_LINES) {
             return Result.err("产线数量已达上限 " + MAX_LINES + " 条");
         }
         PassiveLine line = new PassiveLine(UUID.randomUUID(), name);
-        factory.lines().add(line);
+        factory.config().lines().add(line);
         markDirty();
         return Result.ok("已创建产线 [" + line.shortId() + "] " + name, line.id());
     }
@@ -108,7 +108,7 @@ public final class LineActions {
      * @return 结果
      */
     public static Result rename(Factory factory, UUID lineId, String rawName) {
-        Optional<PassiveLine> found = factory.lines().byId(lineId);
+        Optional<PassiveLine> found = factory.config().lines().byId(lineId);
         if (found.isEmpty()) {
             return Result.err("找不到产线");
         }
@@ -134,7 +134,7 @@ public final class LineActions {
      * @return 结果
      */
     public static Result delete(Factory factory, UUID lineId) {
-        Optional<PassiveLine> found = factory.lines().byId(lineId);
+        Optional<PassiveLine> found = factory.config().lines().byId(lineId);
         if (found.isEmpty()) {
             return Result.err("找不到产线");
         }
@@ -144,7 +144,7 @@ public final class LineActions {
         for (IoGroup group : line.groups()) {
             machineIds.add(group.machineId());
         }
-        factory.lines().remove(lineId);
+        factory.config().lines().remove(lineId);
         forgetLine(lineId);
         int purged = 0;
         for (UUID machineId : machineIds) {
@@ -166,7 +166,7 @@ public final class LineActions {
      * @return 结果
      */
     public static Result setRunning(Factory factory, UUID lineId, boolean running) {
-        Optional<PassiveLine> found = factory.lines().byId(lineId);
+        Optional<PassiveLine> found = factory.config().lines().byId(lineId);
         if (found.isEmpty()) {
             return Result.err("找不到产线");
         }
@@ -193,11 +193,11 @@ public final class LineActions {
      * @return 结果
      */
     public static Result addMachine(Factory factory, UUID lineId, UUID machineId) {
-        Optional<PassiveLine> targetFound = factory.lines().byId(lineId);
+        Optional<PassiveLine> targetFound = factory.config().lines().byId(lineId);
         if (targetFound.isEmpty()) {
             return Result.err("找不到产线");
         }
-        Optional<MachineRef> machineFound = factory.machines().byId(machineId);
+        Optional<MachineRef> machineFound = factory.config().machines().byId(machineId);
         if (machineFound.isEmpty()) {
             return Result.err("找不到机器");
         }
@@ -229,11 +229,11 @@ public final class LineActions {
      * @return 结果
      */
     public static Result placeMachine(Factory factory, UUID lineId, UUID machineId) {
-        Optional<PassiveLine> targetFound = factory.lines().byId(lineId);
+        Optional<PassiveLine> targetFound = factory.config().lines().byId(lineId);
         if (targetFound.isEmpty()) {
             return Result.err("找不到产线");
         }
-        Optional<MachineRef> machineFound = factory.machines().byId(machineId);
+        Optional<MachineRef> machineFound = factory.config().machines().byId(machineId);
         if (machineFound.isEmpty()) {
             return Result.err("找不到机器");
         }
@@ -285,12 +285,12 @@ public final class LineActions {
      * @return 结果
      */
     public static Result removeMachine(Factory factory, UUID lineId, UUID machineId) {
-        Optional<PassiveLine> found = factory.lines().byId(lineId);
+        Optional<PassiveLine> found = factory.config().lines().byId(lineId);
         if (found.isEmpty()) {
             return Result.err("找不到产线");
         }
         PassiveLine line = found.get();
-        Optional<MachineRef> machineFound = factory.machines().byId(machineId);
+        Optional<MachineRef> machineFound = factory.config().machines().byId(machineId);
         if (machineFound.isEmpty()) {
             return Result.err("找不到机器");
         }
@@ -440,7 +440,7 @@ public final class LineActions {
         if (FactoryRefs.isReservedName(name)) {
             return "「" + name + "」是保留字（" + FactoryRefs.describeReservedNames() + "），换个名字";
         }
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (!line.id().equals(exclude) && line.name().equals(name)) {
                 return "已有同名产线：" + name;
             }
@@ -463,7 +463,7 @@ public final class LineActions {
     }
 
     private static Optional<IoGroup> requireGroup(Factory factory, UUID lineId, UUID machineId) {
-        Optional<PassiveLine> line = factory.lines().byId(lineId);
+        Optional<PassiveLine> line = factory.config().lines().byId(lineId);
         if (line.isEmpty()) {
             return Optional.empty();
         }

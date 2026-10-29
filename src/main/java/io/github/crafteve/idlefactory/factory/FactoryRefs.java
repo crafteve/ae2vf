@@ -47,8 +47,8 @@ public final class FactoryRefs {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        Optional<PassiveLine> byShortId = factory.lines().byShortId(ref);
-        return byShortId.isPresent() ? byShortId : factory.lines().byName(ref);
+        Optional<PassiveLine> byShortId = factory.config().lines().byShortId(ref);
+        return byShortId.isPresent() ? byShortId : factory.config().lines().byName(ref);
     }
 
     /**
@@ -62,7 +62,7 @@ public final class FactoryRefs {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        return factory.machines().byShortId(ref);
+        return factory.config().machines().byShortId(ref);
     }
 
     /**
@@ -85,7 +85,7 @@ public final class FactoryRefs {
      * @return 产线；没编线时为空
      */
     public static Optional<PassiveLine> lineOf(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.groupByMachine(machineId).isPresent()) {
                 return Optional.of(line);
             }
@@ -101,7 +101,7 @@ public final class FactoryRefs {
      * @return IO 组；没编线时为空
      */
     public static Optional<IoGroup> groupOf(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             Optional<IoGroup> group = line.groupByMachine(machineId);
             if (group.isPresent()) {
                 return group;
@@ -141,7 +141,7 @@ public final class FactoryRefs {
      */
     public static Set<UUID> assignedMachines(Factory factory) {
         Set<UUID> assigned = new HashSet<>();
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             for (IoGroup group : line.groups()) {
                 assigned.add(group.machineId());
             }
@@ -158,7 +158,7 @@ public final class FactoryRefs {
      */
     public static List<String> lineNamesOf(Factory factory, UUID machineId) {
         List<String> names = new ArrayList<>();
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.groupByMachine(machineId).isPresent()) {
                 names.add(line.name());
             }
@@ -175,7 +175,7 @@ public final class FactoryRefs {
      */
     public static List<UUID> lineIdsOf(Factory factory, UUID machineId) {
         List<UUID> ids = new ArrayList<>();
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             if (line.groupByMachine(machineId).isPresent()) {
                 ids.add(line.id());
             }
@@ -192,7 +192,7 @@ public final class FactoryRefs {
      */
     public static int ruleCountOf(Factory factory, UUID machineId) {
         int count = 0;
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             Optional<IoGroup> group = line.groupByMachine(machineId);
             if (group.isPresent()) {
                 count += group.get().inputs().size() + group.get().outputs().size();

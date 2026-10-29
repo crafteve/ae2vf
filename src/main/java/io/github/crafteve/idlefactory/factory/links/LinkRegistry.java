@@ -80,10 +80,10 @@ public final class LinkRegistry {
         this.byChunk.clear();
         List<Conflict> conflicts = new ArrayList<>();
         for (Factory factory : manager.all()) {
-            for (MachineRef ref : factory.machines().all()) {
+            for (MachineRef ref : factory.config().machines().all()) {
                 put(factory.id(), LinkRole.MACHINE, ref.dimension(), ref.pos(), conflicts);
             }
-            StorageAnchor anchor = factory.storageLink().anchor();
+            StorageAnchor anchor = factory.config().storageAnchor();
             if (anchor instanceof MeAnchor me) {
                 put(factory.id(), LinkRole.STORAGE, me.dimension(), me.pos(), conflicts);
             } else if (anchor instanceof ContainerAnchor containers) {

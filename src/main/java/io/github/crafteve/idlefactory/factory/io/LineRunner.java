@@ -45,11 +45,11 @@ public final class LineRunner {
             @Nullable ObservationService observations) {
         long now = server.overworld().getGameTime();
         for (Factory factory : manager.all()) {
-            if (!factory.storageLink().online()) {
+            if (!factory.live().storageOnline()) {
                 continue;
             }
-            Storage storage = factory.storage();
-            for (PassiveLine line : factory.lines().all()) {
+            Storage storage = factory.live().storage();
+            for (PassiveLine line : factory.config().lines().all()) {
                 if (!line.running()) {
                     continue;
                 }
@@ -80,12 +80,12 @@ public final class LineRunner {
             }
             anyAwake = true;
 
-            MachineRef target = factory.machines().byId(group.machineId()).orElse(null);
+            MachineRef target = factory.config().machines().byId(group.machineId()).orElse(null);
             if (target == null) {
                 sleepIfIdle(groupState, now);
                 continue;
             }
-            if (factory.machines().isRetired(target.id())) {
+            if (factory.config().machines().isRetired(target.id())) {
                 // 回收站里的机器不参与 IO；restore 时会显式唤醒
                 sleepIfIdle(groupState, now);
                 continue;
@@ -119,7 +119,7 @@ public final class LineRunner {
                     observations.noteSuccess(key);
                 }
             }
-            DiagStats.LineStats stats = factory.stats().line(line.id());
+            DiagStats.LineStats stats = factory.live().stats().line(line.id());
             // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
             stats.group(target.id()).setRuleReasons(result.inputReasons(), result.outputReasons());
             if (result.movedAnything()) {

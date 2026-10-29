@@ -55,7 +55,7 @@ public final class LineService {
         if (factory == null) {
             return 0;
         }
-        List<PassiveLine> lines = factory.lines().all();
+        List<PassiveLine> lines = factory.config().lines().all();
         if (lines.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.info("还没有产线。先执行 /idf line create <名字>"));
             return 1;
@@ -186,7 +186,7 @@ public final class LineService {
         FactoryMessages.send(player, head);
 
         for (IoGroup group : line.groups()) {
-            Optional<MachineRef> target = factory.machines().byId(group.machineId());
+            Optional<MachineRef> target = factory.config().machines().byId(group.machineId());
             if (target.isEmpty()) {
                 FactoryMessages.send(player, FactoryMessages.err(
                         "  机器 " + group.machineId() + " 已不在机器库"));
@@ -536,7 +536,7 @@ public final class LineService {
         if (line.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到产线 " + ref));
             FactoryMessages.send(player, FactoryMessages.info(
-                    "现有 " + factory.lines().size() + " 条，用 /idf line 查看（短 id 或名字都能填）"));
+                    "现有 " + factory.config().lines().size() + " 条，用 /idf line 查看（短 id 或名字都能填）"));
             return null;
         }
         return line.get();

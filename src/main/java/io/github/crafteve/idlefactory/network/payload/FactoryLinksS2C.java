@@ -68,7 +68,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
      */
     public static FactoryLinksS2C of(Factory factory) {
         List<Link> storage = new ArrayList<>();
-        StorageAnchor anchor = factory.storageLink().anchor();
+        StorageAnchor anchor = factory.config().storageAnchor();
         if (anchor instanceof MeAnchor me) {
             storage.add(new Link(me.dimension(), me.pos()));
         } else if (anchor instanceof ContainerAnchor containers) {
@@ -77,12 +77,12 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
             }
         }
         List<Link> machines = new ArrayList<>();
-        for (MachineRef ref : factory.machines().all()) {
-            if (!factory.machines().isRetired(ref.id())) {
+        for (MachineRef ref : factory.config().machines().all()) {
+            if (!factory.config().machines().isRetired(ref.id())) {
                 machines.add(new Link(ref.dimension(), ref.pos()));
             }
         }
-        return new FactoryLinksS2C(factory.storageMode(), storage, machines);
+        return new FactoryLinksS2C(factory.config().storageMode(), storage, machines);
     }
 
     /** 空状态：没有工厂或还没绑定。 */

@@ -160,7 +160,7 @@ public final class DiagRender {
      */
     public static Component watchSummary(Factory factory, PassiveLine line, long now,
             long sleepUntil, long sleepSince) {
-        DiagStats.LineStats stats = factory.stats().line(line.id());
+        DiagStats.LineStats stats = factory.live().stats().line(line.id());
         List<Map.Entry<ResourceKey, Long>> rates = topRates(stats, 2);
 
         MutableComponent row = Component.empty()
@@ -208,7 +208,7 @@ public final class DiagRender {
     public static List<Component> watchDetail(MinecraftServer server, Factory factory, PassiveLine line,
             long now, long sleepUntil, long sleepSince) {
         List<Component> rows = new ArrayList<>();
-        DiagStats.LineStats stats = factory.stats().line(line.id());
+        DiagStats.LineStats stats = factory.live().stats().line(line.id());
 
         rows.add(Component.empty()
                 .append(FactoryMessages.text("[watch] ", FactoryMessages.DIM))
@@ -244,7 +244,7 @@ public final class DiagRender {
 
     private static Component machineRow(Factory factory, IoGroup group, DiagStats.LineStats stats,
             Map<UUID, String> reasons, long now) {
-        MachineRef machine = factory.machines().byId(group.machineId()).orElse(null);
+        MachineRef machine = factory.config().machines().byId(group.machineId()).orElse(null);
         String id = machine == null ? shortId(group.machineId()) : machine.shortId();
         DiagStats.GroupStats groupStats = stats.group(group.machineId());
 

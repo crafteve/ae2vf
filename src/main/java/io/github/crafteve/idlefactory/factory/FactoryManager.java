@@ -24,21 +24,22 @@ public final class FactoryManager {
     /**
      * 从存档记录重建工厂。启动时调一次。
      *
+     * <p>这里只还原配置；仓库解析由 {@link FactoryRuntime} 在全部工厂读完后统一刷新。</p>
+     *
      * @param records 存档里的工厂记录
      */
     public void loadFrom(List<FactoryRecord> records) {
         this.byId.clear();
         this.byOwner.clear();
         for (FactoryRecord record : records) {
-            Factory factory = new Factory(record.id(), record.owner());
-            factory.bindAnchor(record.anchor());
-            factory.setStorageMode(record.storageMode());
-            factory.machines().addAll(record.targets());
+            FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
+                    record.anchor());
+            config.machines().addAll(record.targets());
             for (UUID retiredId : record.retired()) {
-                factory.machines().setRetired(retiredId, true);
+                config.machines().setRetired(retiredId, true);
             }
-            factory.lines().addAll(record.lines());
-            add(factory);
+            config.lines().addAll(record.lines());
+            add(new Factory(record.id(), config));
         }
     }
 
@@ -49,10 +50,10 @@ public final class FactoryManager {
      */
     public List<FactoryRecord> toRecords() {
         return this.byId.values().stream()
-                .map(factory -> new FactoryRecord(factory.id(), factory.owner(),
-                        factory.storageLink().anchor(), factory.machines().all(),
-                        factory.lines().all(), factory.machines().retiredIds(),
-                        factory.storageMode()))
+                .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
+                        factory.config().storageAnchor(), factory.config().machines().all(),
+                        factory.config().lines().all(), factory.config().machines().retiredIds(),
+                        factory.config().storageMode()))
                 .toList();
     }
 
@@ -63,11 +64,12 @@ public final class FactoryManager {
      * @return 是否真的加入了
      */
     public boolean add(Factory factory) {
-        if (this.byId.containsKey(factory.id()) || this.byOwner.containsKey(factory.owner())) {
+        if (this.byId.containsKey(factory.id())
+                || this.byOwner.containsKey(factory.config().owner())) {
             return false;
         }
         this.byId.put(factory.id(), factory);
-        this.byOwner.put(factory.owner(), factory.id());
+        this.byOwner.put(factory.config().owner(), factory.id());
         return true;
     }
 
@@ -82,7 +84,7 @@ public final class FactoryManager {
         if (removed == null) {
             return false;
         }
-        this.byOwner.remove(removed.owner());
+        this.byOwner.remove(removed.config().owner());
         return true;
     }
 

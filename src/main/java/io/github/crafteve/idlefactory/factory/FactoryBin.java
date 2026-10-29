@@ -77,10 +77,10 @@ public final class FactoryBin {
      * @param machineId 机器 id
      */
     public static void purge(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             line.removeGroupByMachine(machineId);
         }
-        factory.machines().remove(machineId);
+        factory.config().machines().remove(machineId);
     }
 
     /**
@@ -100,7 +100,7 @@ public final class FactoryBin {
         if (health == null) {
             return false;
         }
-        boolean retired = factory.machines().isRetired(machineId);
+        boolean retired = factory.config().machines().isRetired(machineId);
         boolean referenced = referenced(factory).contains(machineId);
         if (!purgeable(referenced, retired, health)) {
             return false;
@@ -123,7 +123,7 @@ public final class FactoryBin {
         if (observations == null) {
             return null;
         }
-        MachineRef ref = factory.machines().byId(machineId).orElse(null);
+        MachineRef ref = factory.config().machines().byId(machineId).orElse(null);
         if (ref == null) {
             return null;
         }

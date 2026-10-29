@@ -81,10 +81,10 @@ public final class DiagService {
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        List<PassiveLine> lines = factory.lines().all();
+        List<PassiveLine> lines = factory.config().lines().all();
 
         FactoryMessages.send(player, FactoryMessages.info("── 工厂 " + DiagRender.shortId(factory.id())
-                + " · 仓库" + (factory.storageLink().online() ? "在线" : "离线")));
+                + " · 仓库" + (factory.live().storageOnline() ? "在线" : "离线")));
         FactoryMessages.send(player, FactoryMessages.info(
                 FactorySnapshotBuilder.health(factory, runtime.observations()).describe()
                         + " · 产线 " + lines.size()));
@@ -98,7 +98,7 @@ public final class DiagService {
                     "… 还有 " + (lines.size() - shown) + " 条，用 /idf line 查看"));
         }
 
-        List<DiagEvent> recent = factory.stats().recent(1);
+        List<DiagEvent> recent = factory.live().stats().recent(1);
         if (!recent.isEmpty()) {
             FactoryMessages.send(player, DiagRender.event(recent.get(0), now));
         }
@@ -133,16 +133,16 @@ public final class DiagService {
                         + " · 待消化 " + stats.dirtyPending()
                         + " · 面表冻结 " + observations.frozenFacesCount()));
         int routes = 0;
-        for (PassiveLine line : factory.lines().all()) {
+        for (PassiveLine line : factory.config().lines().all()) {
             routes += runtime.lineRunner().routeCount(line.id());
         }
         FactoryMessages.send(player, FactoryMessages.info("面路由 " + routes + " 条（搬通过的面）"));
 
         long now = observations.currentTick();
         int shown = 0;
-        for (MachineRef ref : factory.machines().all()) {
+        for (MachineRef ref : factory.config().machines().all()) {
             Observation observation = observations.observe(ref.blockKey());
-            boolean retired = factory.machines().isRetired(ref.id());
+            boolean retired = factory.config().machines().isRetired(ref.id());
             if (observation.health() == Health.PRESENT && !retired) {
                 continue;
             }
@@ -189,7 +189,7 @@ public final class DiagService {
 
     private static Component statusRow(Factory factory, PassiveLine line, long now,
             FactoryRuntime runtime) {
-        DiagStats.LineStats stats = factory.stats().line(line.id());
+        DiagStats.LineStats stats = factory.live().stats().line(line.id());
         MutableComponent row = Component.empty()
                 .append(DiagRender.levelTag(line.running()
                         ? DiagEvent.Level.OK : DiagEvent.Level.IDLE))
@@ -373,13 +373,13 @@ public final class DiagService {
         }
         int wanted = Math.min(Math.max(count, 1), TAIL_MAX);
         long now = now(FactoryRuntime.get().server());
-        List<DiagEvent> events = factory.stats().recent(wanted);
+        List<DiagEvent> events = factory.live().stats().recent(wanted);
         if (events.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.info("还没有事件"));
             return 1;
         }
         FactoryMessages.send(player, FactoryMessages.info("── 最近 " + events.size()
-                + " 条 / 共 " + factory.stats().size() + " ──"));
+                + " 条 / 共 " + factory.live().stats().size() + " ──"));
         for (DiagEvent event : events) {
             FactoryMessages.send(player, DiagRender.event(event, now));
         }
@@ -442,8 +442,8 @@ public final class DiagService {
         Path file = directory.resolve("diag-" + LocalDateTime.now().format(STAMP) + ".log");
         List<String> lines = new ArrayList<>();
         lines.add("# Idle Factory DiagStats");
-        lines.add("# factory=" + factory.id() + " owner=" + factory.owner());
-        for (DiagEvent event : factory.stats().recent(200)) {
+        lines.add("# factory=" + factory.id() + " owner=" + factory.config().owner());
+        for (DiagEvent event : factory.live().stats().recent(200)) {
             lines.add(DiagRender.plain(event, now));
         }
         try {
@@ -522,7 +522,7 @@ public final class DiagService {
         }
         long now = now(runtime.server());
         String text = player.getGameProfile().getName() + " " + action + (success ? "" : " 失败");
-        factory.get().stats().record(DiagEvent.of(now,
+        factory.get().live().stats().record(DiagEvent.of(now,
                 success ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
                 DiagEvent.Category.CMD, null, null, null, text));
     }
@@ -538,7 +538,7 @@ public final class DiagService {
             return;
         }
         for (Factory factory : runtime.manager().all()) {
-            factory.stats().sample();
+            factory.live().stats().sample();
         }
         if (WATCHES.isEmpty()) {
             return;
@@ -558,7 +558,7 @@ public final class DiagService {
                 iterator.remove();
                 continue;
             }
-            Optional<PassiveLine> line = factory.get().lines().byId(watch.lineId);
+            Optional<PassiveLine> line = factory.get().config().lines().byId(watch.lineId);
             if (line.isEmpty()) {
                 iterator.remove();
                 continue;

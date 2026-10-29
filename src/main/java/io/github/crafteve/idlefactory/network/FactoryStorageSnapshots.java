@@ -46,7 +46,7 @@ public final class FactoryStorageSnapshots {
     public static void send(ServerPlayer player, Factory factory, int containerId) {
         Map<ResourceKey, Long> snapshot;
         try {
-            snapshot = factory.storage().snapshot();
+            snapshot = factory.live().storage().snapshot();
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("IdleFactory storage snapshot failed: factory={}",
                     factory.id(), e);

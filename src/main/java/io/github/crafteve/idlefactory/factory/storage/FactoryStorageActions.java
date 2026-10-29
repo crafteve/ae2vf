@@ -42,12 +42,12 @@ public final class FactoryStorageActions {
         if (factory == null) {
             return;
         }
-        factory.refreshStorage();
-        if (factory.storageLink().anchor() == null) {
+        factory.refreshStorage(FactoryRuntime.get().storageResolver());
+        if (factory.config().storageAnchor() == null) {
             message(player, "还没有绑定仓库");
             return;
         }
-        if (!factory.storageLink().online()) {
+        if (!factory.live().storageOnline()) {
             message(player, "仓库未连接");
             return;
         }
@@ -55,7 +55,7 @@ public final class FactoryStorageActions {
             message(player, "当前仅物品支持直接存取");
             return;
         }
-        Storage storage = factory.storage();
+        Storage storage = factory.live().storage();
         boolean changed = switch (gesture) {
             case LEFT -> menu.getCarried().isEmpty()
                     ? takeToCarried(menu, storage, key, Integer.MAX_VALUE)
@@ -95,11 +95,11 @@ public final class FactoryStorageActions {
         if (factory == null) {
             return false;
         }
-        factory.refreshStorage();
-        if (!factory.storageLink().online()) {
+        factory.refreshStorage(FactoryRuntime.get().storageResolver());
+        if (!factory.live().storageOnline()) {
             return false;
         }
-        Storage storage = factory.storage();
+        Storage storage = factory.live().storage();
         ResourceKey key = ResourceKey.item(stack);
         long accepted = storage.insert(key, stack.getCount(), true);
         if (accepted <= 0L) {

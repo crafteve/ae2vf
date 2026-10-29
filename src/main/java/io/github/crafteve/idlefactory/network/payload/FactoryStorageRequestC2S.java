@@ -62,7 +62,7 @@ public record FactoryStorageRequestC2S(int containerId) implements CustomPacketP
                 return;
             }
             Optional<Factory> optional = runtime.manager().byOwner(player.getUUID());
-            if (optional.isEmpty() || !optional.get().storageLink().online()) {
+            if (optional.isEmpty() || !optional.get().live().storageOnline()) {
                 PacketDistributor.sendToPlayer(player,
                         FactoryStorageS2C.empty(payload.containerId()));
                 return;
