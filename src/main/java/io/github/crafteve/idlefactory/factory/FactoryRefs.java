@@ -11,7 +11,6 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 /**
@@ -67,22 +66,6 @@ public final class FactoryRefs {
     }
 
     /**
-     * 在产线里找一台机器对应的 IO 规则。
-     *
-     * @param factory    工厂
-     * @param line       产线
-     * @param machineRef 机器短 id
-     * @return IO 规则；机器不在产线里时为空
-     */
-    public static Optional<MachineIoGroup> group(Factory factory, PassiveLine line,
-            String machineRef) {
-        return machine(factory, machineRef)
-                .filter(target -> line.containsMachine(target.id()))
-                .flatMap(target -> factory.config().machines().byId(target.id()))
-                .map(Machine::io);
-    }
-
-    /**
      * 找一台机器所属的产线（一台机器最多属于一条产线）。
      *
      * @param factory   工厂
@@ -96,17 +79,6 @@ public final class FactoryRefs {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * 找一台机器的 IO 规则。规则跟着机器走，所以即使没编线也存在。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     * @return IO 规则；机器不在库里时为空
-     */
-    public static Optional<MachineIoGroup> groupOf(Factory factory, UUID machineId) {
-        return factory.config().machines().byId(machineId).map(Machine::io);
     }
 
     /**
@@ -178,18 +150,5 @@ public final class FactoryRefs {
             }
         }
         return ids;
-    }
-
-    /**
-     * 一台机器配了几条规则（输入 + 输出）。规则在机器上，与是否编线无关。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     * @return 规则条数；机器不在库里时为 {@code 0}
-     */
-    public static int ruleCountOf(Factory factory, UUID machineId) {
-        return factory.config().machines().byId(machineId)
-                .map(Machine::ruleCount)
-                .orElse(0);
     }
 }

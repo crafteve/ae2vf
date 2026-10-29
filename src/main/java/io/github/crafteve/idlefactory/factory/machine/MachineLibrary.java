@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.factory.machine;
 
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,17 +51,6 @@ public final class MachineLibrary {
     }
 
     /**
-     * 批量加，忽略重复。
-     *
-     * @param machines 机器集合
-     */
-    public void addAll(Collection<Machine> machines) {
-        for (Machine machine : machines) {
-            add(machine);
-        }
-    }
-
-    /**
      * 按 id 移除。
      *
      * @param id 机器 id
@@ -70,18 +58,6 @@ public final class MachineLibrary {
      */
     public boolean remove(UUID id) {
         return this.byId.remove(id) != null;
-    }
-
-    /**
-     * 按坐标移除。
-     *
-     * @param dimension 维度
-     * @param pos       坐标
-     * @return 是否真的移除了
-     */
-    public boolean remove(ResourceKey<Level> dimension, BlockPos pos) {
-        Machine found = byPosition(dimension, pos);
-        return found != null && remove(found.id());
     }
 
     /**
