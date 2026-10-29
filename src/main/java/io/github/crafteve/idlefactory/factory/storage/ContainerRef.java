@@ -1,11 +1,11 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.observation.Located;
+import io.github.crafteve.idlefactory.factory.registry.LinkIds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -37,14 +37,15 @@ public record ContainerRef(UUID id, ResourceKey<Level> dimension, BlockPos pos, 
     /**
      * 按坐标生成容器引用。
      *
+     * <p>id 和机器用同一套派生（维度 + 坐标，不带角色前缀），所以同一个方块当机器还是
+     * 当容器是同一个 id——门禁的前提。</p>
+     *
      * @param dimension 维度
      * @param pos       坐标
      * @return 新引用，优先级 0
      */
     public static ContainerRef of(ResourceKey<Level> dimension, BlockPos pos) {
-        String key = "container:" + dimension.location() + ":" + pos.asLong();
-        UUID id = UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
-        return new ContainerRef(id, dimension, pos, 0);
+        return new ContainerRef(LinkIds.of(dimension, pos), dimension, pos, 0);
     }
 
     /**

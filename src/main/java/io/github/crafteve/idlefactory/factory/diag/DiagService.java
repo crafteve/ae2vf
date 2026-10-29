@@ -23,6 +23,8 @@ import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.registry.LinkRegistry;
+import io.github.crafteve.idlefactory.factory.registry.LinkRole;
 import io.github.crafteve.idlefactory.factory.observation.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -285,6 +287,72 @@ public final class DiagService {
             }
         }
         return 0;
+    }
+
+    /**
+     * 占用对账：现建一张占用表，报告总数、各家持有数和冲突。
+     *
+     * <p>只读，不改任何状态——表是现拼的，看完就扔。冲突只报告，绝不自动解决。</p>
+     *
+     * @param player 玩家
+     * @return 命令结果
+     */
+    public static int links(ServerPlayer player) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            FactoryMessages.send(player, FactoryMessages.err("Idle Factory 尚未启动（服务端未就绪）"));
+            return 0;
+        }
+        LinkRegistry registry = new LinkRegistry();
+        List<LinkRegistry.Conflict> conflicts = registry.rebuild(runtime.manager());
+        FactoryMessages.send(player, FactoryMessages.info("── 占用 " + registry.size()
+                + " 条 · 工厂 " + runtime.manager().all().size() + " 家 ──"));
+        int shown = 0;
+        for (Factory factory : runtime.manager().all()) {
+            if (shown >= STATUS_LINES) {
+                FactoryMessages.send(player, FactoryMessages.info("… 还有 "
+                        + (runtime.manager().all().size() - shown) + " 家"));
+                break;
+            }
+            int machines = 0;
+            int storage = 0;
+            for (UUID id : registry.byFactory(factory.id())) {
+                LinkRegistry.Claim claim = registry.get(id).orElse(null);
+                if (claim != null && claim.role() == LinkRole.MACHINE) {
+                    machines++;
+                } else {
+                    storage++;
+                }
+            }
+            FactoryMessages.send(player, FactoryMessages.info("["
+                    + DiagRender.shortId(factory.id()) + "] 机器 " + machines
+                    + " · 仓库 " + storage));
+            shown++;
+        }
+        if (conflicts.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.ok("无冲突"));
+            return 1;
+        }
+        FactoryMessages.send(player, FactoryMessages.warn("冲突 " + conflicts.size() + " 处："));
+        int count = Math.min(conflicts.size(), OBSERVE_LIMIT);
+        for (int i = 0; i < count; i++) {
+            LinkRegistry.Conflict conflict = conflicts.get(i);
+            FactoryMessages.send(player, FactoryMessages.warn("["
+                    + conflict.pos().toShortString() + "] "
+                    + DiagRender.shortId(conflict.first().factoryId()) + "·"
+                    + roleName(conflict.first().role()) + " × "
+                    + DiagRender.shortId(conflict.second().factoryId()) + "·"
+                    + roleName(conflict.second().role())));
+        }
+        if (conflicts.size() > count) {
+            FactoryMessages.send(player, FactoryMessages.info("… 还有 "
+                    + (conflicts.size() - count) + " 处"));
+        }
+        return 1;
+    }
+
+    private static String roleName(LinkRole role) {
+        return role == LinkRole.MACHINE ? "机器" : "仓库";
     }
 
     /**

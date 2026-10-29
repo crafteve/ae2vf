@@ -365,6 +365,8 @@ public final class FactoryCommands {
                         .executes(context -> DiagService.status(player(context))))
                 .then(Commands.literal("observe")
                         .executes(context -> DiagService.observe(player(context))))
+                .then(Commands.literal("links")
+                        .executes(context -> DiagService.links(player(context))))
                 .then(Commands.literal("why")
                         .then(Commands.argument("line", StringArgumentType.word())
                                 .suggests(LINE_SUGGESTIONS)
