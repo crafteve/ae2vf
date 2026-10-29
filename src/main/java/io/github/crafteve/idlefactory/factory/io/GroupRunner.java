@@ -293,6 +293,8 @@ public final class GroupRunner {
 
     private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,
             RuleResolver.Resolved resolved, long generation) {
+        // 物品规则不记路由：无向句柄可能只读（Mekanism），模糊变体也可能落在不同面；
+        // 每次按当前物品重新探面，避免把某一条变体或某一侧钉死。
         if (routes == null || spec.face() != null || spec.key().kind() == ResourceKind.ITEM) {
             return;
         }

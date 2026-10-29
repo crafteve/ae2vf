@@ -27,15 +27,19 @@ import net.neoforged.neoforge.items.IItemHandler;
  * <ol>
  *   <li><b>玩家配了面</b>：直接用，不查路由、不扫面（配置优先）；</li>
  *   <li><b>路由表里有记录</b>：直接按上次搬通的面取 handler，一次查表；</li>
- *   <li><b>都没有</b>：扫面。流体/能量逐面「模拟搬一点」，物品按无向语义。</li>
+ *   <li><b>都没有</b>：扫面。物品先试无向 handler，再逐面找能接收/抽出该物品的面；
+ *       流体/能量逐面「模拟搬一点」。</li>
  * </ol>
  *
- * <p>物品保持无向语义：{@code getCapability(..., null)} 才是「整个库存」，符合仓库对容器的
- * 直觉；流体和能量才需要尊重机器的面配置。</p>
+ * <p>物品规则本身仍然是无向配置（{@code face} 恒为 {@code null}）：无向 handler 能服务时
+ * 优先用它，保持「整个库存」的旧语义；像 Mekanism 那样无向查询只返回只读代理、真正 handler
+ * 按面注册的机器，才退到六面探测。流体和能量一直尊重机器的面配置。</p>
  */
 public final class RuleResolver {
     /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
     private static final int ENERGY_PROBE = 1000;
+    /** 物品面探测的模拟量：1 个就足以判断这个面收不收 / 抽不抽得出来。 */
+    private static final int ITEM_PROBE = 1;
 
     /**
      * 解析出来的搬运通道。
@@ -121,11 +125,97 @@ public final class RuleResolver {
             return build(level, pos, spec, caps, configured);
         }
         return switch (spec.key().kind()) {
-            case ITEM -> build(level, pos, spec, caps, null);
+            case ITEM -> sweepItem(level, pos, spec, input, caps);
             case FLUID -> sweepFluid(level, pos, spec, input, caps);
             case ENERGY -> sweepEnergy(level, pos, spec, input, caps);
             case CHEMICAL -> null;
         };
+    }
+
+    /**
+     * 物品：先无向、再逐面。
+     *
+     * <p>物品规则是无向配置，但「无向查询」不等于「可写」：Mekanism 的 {@code side == null}
+     * 返回只读代理，insert/extract 都返回空。因此无向 handler 不存在或当前方向用不了时，必须
+     * 逐个面找真正可用的 handler。找不到可用的面时仍回退无向 / 第一个面 handler，让下游报
+     * 「满了 / 没料」而不是「没有 handler」。</p>
+     */
+    @Nullable
+    private static Resolved sweepItem(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+            @Nullable LevelCapabilityCache caps) {
+        ItemStack sample = spec.key().toStack();
+        if (sample.isEmpty()) {
+            return null;
+        }
+        IItemHandler unsided = item(level, pos, caps, null);
+        if (unsided != null && itemAccessible(unsided, sample, spec.fuzzy(), input)) {
+            return new Resolved(new ItemAdapter(unsided, sample), null);
+        }
+        IItemHandler firstSide = null;
+        Direction firstFace = null;
+        for (Direction side : Direction.values()) {
+            IItemHandler handler = item(level, pos, caps, side);
+            if (handler == null) {
+                continue;
+            }
+            if (firstSide == null) {
+                firstSide = handler;
+                firstFace = side;
+            }
+            if (itemAccessible(handler, sample, spec.fuzzy(), input)) {
+                return new Resolved(new ItemAdapter(handler, sample), side);
+            }
+        }
+        if (unsided != null) {
+            return new Resolved(new ItemAdapter(unsided, sample), null);
+        }
+        return firstSide == null
+                ? null
+                : new Resolved(new ItemAdapter(firstSide, sample), firstFace);
+    }
+
+    /**
+     * 这个 handler 此刻能不能按规则方向服务该物品。
+     *
+     * <p>精确规则按完整组件比较；模糊规则按注册名，先试默认组件栈、再试规则自带的样本，
+     * 最后扫机器里已有的变体（上限 {@link ItemAdapter#MAX_SCAN_SLOTS}），避免只探默认栈
+     * 就否掉一个只认带组件变体的面。</p>
+     */
+    private static boolean itemAccessible(IItemHandler handler, ItemStack sample, boolean fuzzy,
+            boolean input) {
+        if (!fuzzy) {
+            return probeItem(handler, sample, input);
+        }
+        ItemStack plain = new ItemStack(sample.getItem());
+        if (probeItem(handler, plain, input)) {
+            return true;
+        }
+        if (!ItemStack.isSameItemSameComponents(plain, sample)
+                && probeItem(handler, sample, input)) {
+            return true;
+        }
+        int slots = Math.min(handler.getSlots(), ItemAdapter.MAX_SCAN_SLOTS);
+        for (int slot = 0; slot < slots; slot++) {
+            ItemStack inSlot = handler.getStackInSlot(slot);
+            if (!inSlot.isEmpty() && inSlot.getItem() == sample.getItem()
+                    && probeItem(handler, inSlot.copyWithCount(1), input)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 用 1 个物品模拟一次「收 / 抽」。
+     *
+     * <p>复用 {@link ItemAdapter} 的槽位遍历，保证探测与实际搬运用的是同一套
+     * insert/extract 语义。</p>
+     */
+    private static boolean probeItem(IItemHandler handler, ItemStack sample, boolean input) {
+        ItemAdapter adapter = new ItemAdapter(handler, sample);
+        return input
+                ? adapter.insert(ITEM_PROBE, true) > 0L
+                : adapter.extract(ITEM_PROBE, true) > 0L;
     }
 
     @Nullable
