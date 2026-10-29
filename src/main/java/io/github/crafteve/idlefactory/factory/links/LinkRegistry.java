@@ -109,6 +109,17 @@ public final class LinkRegistry {
     }
 
     /**
+     * 只读的 id → 认领表。
+     *
+     * <p>给门禁现算一次操作视图用；调用方拿到的是只读视图，不能改内部索引。</p>
+     *
+     * @return 只读映射
+     */
+    public Map<UUID, Claim> claims() {
+        return Collections.unmodifiableMap(this.byId);
+    }
+
+    /**
      * 某工厂名下所有占用 id。
      *
      * @param factoryId 工厂 id
