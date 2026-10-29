@@ -34,7 +34,7 @@
 - **观测层**：全局方块观测（机器与容器共用一张表），预算 8 次/tick、指数退避、能力失效事件标脏；读路径不探世界
 - **被动产线**：create / delete / add / remove / start / end / info / manage
 - **IO 规则**：资源类型 + 注册名 + 绝对六向面，输入输出各自独立
-- **IO 执行**：每 tick 一轮（`/idf diag io` 可调 1–20），`feed` / `pull` 事务，组 / 线两级睡眠
+- **IO 执行**：每 tick 一轮（`/idf diag io` 可调 1–20），`feed` / `pull` 事务，机器 / 线两级睡眠
 - **面路由**：记住每条规则上次搬通的面（玩家配了面就用配置，没配才查路由/扫面）；`REJECTED` 时重扫
 - **诊断**：事件流（命令 / 产线 / 机器 / 仓库）+ 每条产线的搬运计数，`/idf diag` 查
 - **界面 P0**：`/idf gui` 打开工作台骨架（底图 + 假数据），用于定尺寸与配方查看器留白
@@ -144,13 +144,17 @@ factory/                        工厂主体（服务端权威）
 ├── FactoryRefs / FactoryMessages / FactorySnapshotBuilder
 ├── resource/                   资源模型
 │   └── ResourceKind / ResourceKey / ResourceSpec
+├── location/                   方块位置键
+│   └── BlockKey
 ├── observation/                世界观测层（L1）
-│   └── Observation / ObservationKey / ObservationService
-│   └── BlockProbe / FaceTable / Health / Located
-│   └── LevelCapabilityCache    能力句柄缓存（失效事件驱动）
+│   └── Observation / ObservationService / WorldEventBridge
+├── capability/                 能力缓存
+│   └── FaceTable / FaceCache / LevelCapabilityCache
+├── probe/                      方块探测
+│   └── BlockProbe / Health / WorkState
 ├── storage/                    仓库抽象与地址
-│   └── Storage / StorageLink / StorageAnchor（AE2 / 容器）
-│   └── Ae2Storage / ContainerStorage / DispatchingStorageResolver
+│   └── Storage / StorageAnchor / MeAnchor / ContainerAnchor（AE2 / 容器）
+│   └── ContainerStorage / DispatchingStorageResolver
 ├── machine/                    机器库
 │   └── MachineLibrary / Machine / MachineIoGroup / MachineRef
 ├── line/                       被动产线（只存机器引用）
@@ -182,7 +186,7 @@ client/
 - IO 只有一条写路径 `IoTransfer`：搬不进去的东西，永远不离开来源
 - 仓库离线 = 空仓库，工厂表现为「没料」，不是「网络断线」
 - **三层事实**：配置（写档）→ 观测（可重建）→ 路由/执行（瞬态）。读路径只读观测，不探世界
-- **`observation` 包零工厂依赖**：它只认 `Located`（位置），机器和容器都是它的消费者
+- **`observation` 包零工厂依赖**：它只认 `BlockKey`（位置），机器和容器都是它的消费者
 - **未加载 ≠ 不存在**：存在性判断必须先过 `isLoaded`；失联只标记，不删配置
 - **界面的静态外观来自贴图**：Java 只 blit 九宫格，不画边框与斜边
 

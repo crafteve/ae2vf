@@ -13,7 +13,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 服务端权威：IO 全在服务端；GUI 只是监视器，只渲染 + 发意图；menu 是登录壳。
 - 工厂不是数据库：仓库在 AE2 网络或方块容器组；仓库离线 = 没料，不是断网。
 - 被动产线：玩家配置输入输出，当前形态。主动产线：AE2 pattern / CPU 下单，未实现。
-- 四个基础概念：机器库、产线、IO 组、回收站。
+- 基础概念：机器库（每台机器带自己的 IO 规则）、产线（只存机器引用）；失联是运行时状态，不写档。
 - 资源统一为 `(kind, id, components)`：物品带数据组件快照，流体 / FE 只按注册名；化学品只有枚举位，配了不执行。
 - IO 规则分精确 / 模糊：模糊忽略物品组件，旧规则默认按模糊读入。
 - 观测层是第二事实层：方块在不在、哪个面有什么能力、是否在干活。界面与指令只读观测。
@@ -42,11 +42,11 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 |---|---|---|
 | `resource` | 资源键、规格、类型 | 存储、执行 |
 | `observation` | 方块级观测、能力缓存、工作状态 | 配置、搬运 |
-| `machine` | 机器引用、机器库 | 世界探测 |
-| `line` | 产线、IO 组、规则的配置 | 执行 |
+| `machine` | 机器、机器库、机器 IO 规则 | 世界探测、搬运 |
+| `line` | 产线、机器引用 | IO 规则、执行 |
 | `storage` | 仓库抽象与后端（AE2 / 容器） | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
-| `factory` | 工厂实例与编排（Runtime / Service / Store / Bin） | 存储实现、搬运实现 |
+| `factory` | 工厂实例与编排（Runtime / Service / Store / Actions） | 存储实现、搬运实现 |
 | `diag` | 事件、统计、体检、渲染文本 | 改写配置 |
 | `event` / `registry` | 指令注册；MenuType 注册 | 业务逻辑 |
 | `menu` | 菜单与玩家槽位 | 工厂数据 |
@@ -61,7 +61,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 硬条款：
 
 1. 包名只用单数领域名词。禁止 `util`、`common`、`misc`、`helper`。
-2. 一个概念只建模一处：资源 = `ResourceKey`，观测键 = `ObservationKey`，IO 规则 = `ResourceSpec`。
+2. 一个概念只建模一处：资源 = `ResourceKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`。
 3. 依赖单向。现存例外只有 4 个：`storage → menu`、`storage → network`、`factory → integration.ae2`、`network.payload → client.network`。禁止新增跨层环。
 4. 发包只从 `network`。`FactoryStorageActions` 发包是历史例外，新代码不许学。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
@@ -71,15 +71,15 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.2 三层信息：配置 / 观测 / io
 
-- 配置（最高信息，写档）：`line` 的产线与 IO 组规则、`factory` 的机器库与仓库地址。只描述搬什么，不执行。
+- 配置（最高信息，写档）：`machine` 的机器与 IO 规则、`line` 的产线引用、`factory` 的机器库与仓库地址。只描述搬什么，不执行。
 - 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面、指令、执行门禁都只读它，读路径不探世界。
 - 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `LineRunner → GroupRunner → IoTransfer`；结果只留在本轮与诊断里，不回写配置。
 
 各包职责：
 
-- `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口；`FactoryBin` 管回收站；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `line`：配置层。`PassiveLine` 是产线开关，`IoGroup` 是一台机器的输入输出规则组，`LineService` 做管理动作。
-- `io`：执行层。`LineRunner` 遍历线与组、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`RuleResolver` 负责取面与 handler；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
+- `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口，`MachineActions` 管机器规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
+- `line`：配置层。`PassiveLine` 只存 `machineIds`；`LineService` 做产线管理动作；规则写操作不在本包。
+- `io`：执行层。`LineRunner` 遍历线与机器、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`RuleResolver` 负责取面与 handler；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
 
 调用链：`ServerTick → FactoryRuntime → LineRunner → GroupRunner → IoTransfer → Storage / ResourceAdapter`。
 
@@ -107,7 +107,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 目标体量：上百台机器、多产线、16 个容器。
 
-- 睡眠：组、线两级，100 tick 未搬动才睡；观测按状态退避。
+- 睡眠：机器、线两级，100 tick 未搬动才睡；观测按状态退避。
 - 预算：观测 8 次/tick，标脏 32 次/tick，工作状态 16 次/tick。
 - 复探：PRESENT 100 tick，UNLOADED 40 tick，MISSING 100 → 1200 tick，工作状态 10 tick。
 - IO：默认每 tick 一轮，`/idf diag io` 可调 1–20。
@@ -115,7 +115,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 读路径不探世界：展示、指令、界面只读观测缓存。
 - 索引 O(1)：`byId`、`byPosition`；不每 tick 新建集合、不重复分配。
 - 所有遍历有上限护栏；失联通知按工厂聚合、10 秒节流；心跳走 trace。
-- 模糊物品变体：索引 TTL 20 tick、单 id 64 个、单规则 8 个 / 单组 16 个变体每 tick；仓库快照按 512 KiB 分片。
+- 模糊物品变体：索引 TTL 20 tick、单 id 64 个、单规则 8 个 / 单机器 16 个变体每 tick；仓库快照按 512 KiB 分片。
 - 卡顿先降频，再考虑加预算。
 
 ### 3.2 界面
@@ -147,7 +147,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 4.1 命名
 
-Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Line、IoGroup、Machine、Observation、Storage、Anchor、Ref、Runner，不用 `Target`。
+Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Line、Machine、MachineIoGroup、IO 规则、Observation、Storage、Anchor、Ref、Runner，不用 `Target`。
 
 ### 4.2 注释
 
@@ -223,7 +223,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `LineSelectorMenu.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `Machine.java` · `MachineLibrary.java` · `MachineIoGroup.java` · `MachineActions.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `LineSelectorMenu.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -242,10 +242,9 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 新增浮层必须在 `GuiLayer` 里加枚举项再引用，调用点禁止写 z 魔法数字；浮层被物品/数量盖住、或反过来盖住 tooltip，基本都是层级散落导致的。
 15. 排序键 / 方向 / 范围偏好写入客户端 CLIENT 配置（`config/idlefactory-client.toml`），关闭界面与重启客户端都保留；不写存档、不参与服务端。
+16. 机器失联只进 `FactoryLive.machineMissing`，不写档；产线只存 `machineIds`；只有显式删除机器才删规则。
+17. 左表产线机器行的叉号是“移出产线”，右侧机器库卡片的叉号是“删除机器”；两者语义不能混。
 
 ### 6.3 文档偏差
 
-- `docs/ui/P0.md` 写默认留白 48，代码是 96。
-- `factory/io/package-info.java` 仍称"本包暂时为空"。
-
-改到相关处顺手修，不为这两条单独开重构。
+- 无已知偏差；发现时顺手修，不单独开重构。
