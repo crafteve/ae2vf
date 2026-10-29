@@ -142,15 +142,15 @@ public final class DiagService {
         int shown = 0;
         for (MachineRef ref : factory.machines().all()) {
             Observation observation = observations.observe(ref.blockKey());
-            boolean detached = factory.machines().isDetached(ref.id());
-            if (observation.health() == Health.PRESENT && !detached) {
+            boolean retired = factory.machines().isRetired(ref.id());
+            if (observation.health() == Health.PRESENT && !retired) {
                 continue;
             }
             if (shown >= OBSERVE_LIMIT) {
                 FactoryMessages.send(player, FactoryMessages.info("… 还有更多，用 /idf factory bin 查看"));
                 break;
             }
-            FactoryMessages.send(player, observationRow(ref, observation, detached, now));
+            FactoryMessages.send(player, observationRow(ref, observation, retired, now));
             shown++;
         }
         if (shown == 0) {
@@ -160,16 +160,16 @@ public final class DiagService {
     }
 
     private static Component observationRow(MachineRef ref, Observation observation,
-            boolean detached, long now) {
+            boolean retired, long now) {
         String where = ref.dimension().location() + " " + ref.pos().toShortString();
         DiagEvent.Level level = switch (observation.health()) {
-            case PRESENT -> detached ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
+            case PRESENT -> retired ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
             case UNLOADED -> DiagEvent.Level.WARN;
             case UNKNOWN -> DiagEvent.Level.IDLE;
             default -> DiagEvent.Level.ERROR;
         };
         StringBuilder tail = new StringBuilder(observation.health().describe());
-        if (detached) {
+        if (retired) {
             tail.append(" · 已断开");
         }
         long missingSince = observation.missingSince();

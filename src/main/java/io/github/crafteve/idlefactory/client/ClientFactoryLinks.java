@@ -51,7 +51,7 @@ public final class ClientFactoryLinks {
         return storage;
     }
 
-    /** 未断开的已连接机器。 */
+    /** 未退役的已连接机器。 */
     public static List<FactoryLinksS2C.Link> machines() {
         return machines;
     }

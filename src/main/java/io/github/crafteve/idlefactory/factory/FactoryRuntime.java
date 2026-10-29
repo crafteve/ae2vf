@@ -320,13 +320,13 @@ public final class FactoryRuntime {
                             DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(), null,
                             transition.to().describe() + "，已进回收站"));
                     boolean referenced = FactoryBin.referenced(factory).contains(ref.id());
-                    boolean detached = factory.machines().isDetached(ref.id());
-                    if (FactoryBin.purgeable(referenced, detached, transition.to())) {
+                    boolean retired = factory.machines().isRetired(ref.id());
+                    if (FactoryBin.purgeable(referenced, retired, transition.to())) {
                         // 没配过规则，直接删——玩家随时可以 connect 回来
                         FactoryBin.purge(factory, ref.id());
                         // 档案变了就得同步索引：只 save 会让占用表留下幽灵认领。
                         this.markDirty();
-                    } else if (!detached) {
+                    } else if (!retired) {
                         // 玩家自己断开的机器不再提醒：他已经说过不要了
                         this.missingNotices.merge(factory.id(), 1, Integer::sum);
                     }

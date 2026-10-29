@@ -297,11 +297,11 @@ public final class FactoryService {
         Optional<MachineRef> existing = factory.machines().byId(target.id());
         if (existing.isPresent()) {
             MachineRef ref = existing.get();
-            if (!factory.machines().isDetached(ref.id())) {
+            if (!factory.machines().isRetired(ref.id())) {
                 err(player, "这台机器已经接入过了：" + ref.shortId());
                 return 0;
             }
-            factory.machines().setDetached(ref.id(), false);
+            factory.machines().setRetired(ref.id(), false);
             refreshObservation(ref);
             wakeLines(factory, ref.id());
             markDirty();
@@ -401,7 +401,7 @@ public final class FactoryService {
      * @return 处理结果
      */
     private static DetachResult detachOrPurgeSilent(Factory factory, MachineRef target) {
-        if (factory.machines().isDetached(target.id())) {
+        if (factory.machines().isRetired(target.id())) {
             return DetachResult.ALREADY;
         }
         Set<UUID> referenced = FactoryBin.referenced(factory);
@@ -409,7 +409,7 @@ public final class FactoryService {
             FactoryBin.purge(factory, target.id());
             return DetachResult.PURGED;
         }
-        factory.machines().setDetached(target.id(), true);
+        factory.machines().setRetired(target.id(), true);
         return DetachResult.BINNED;
     }
 
@@ -618,7 +618,7 @@ public final class FactoryService {
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
             MachineRef ref = factory.machines().byPosition(level.dimension(), targetPos);
-            if (ref == null || factory.machines().isDetached(ref.id())) {
+            if (ref == null || factory.machines().isRetired(ref.id())) {
                 allConnected = false;
                 break;
             }
@@ -639,8 +639,8 @@ public final class FactoryService {
         for (BlockPos targetPos : targets) {
             MachineRef target = factory.machines().byPosition(level.dimension(), targetPos);
             if (target != null) {
-                if (factory.machines().isDetached(target.id())) {
-                    factory.machines().setDetached(target.id(), false);
+                if (factory.machines().isRetired(target.id())) {
+                    factory.machines().setRetired(target.id(), false);
                     refreshObservation(target);
                     wakeLines(factory, target.id());
                     restored++;
@@ -1069,7 +1069,7 @@ public final class FactoryService {
         for (FactorySnapshotBuilder.MachineView view : bin) {
             MachineRef ref = view.ref();
             String where = ref.dimension().location() + " " + ref.pos().toShortString();
-            String reason = view.detached() ? "你断开的" : view.health().describe();
+            String reason = view.retired() ? "你放进回收站的" : view.health().describe();
             String rules = view.lineNames().isEmpty()
                     ? "没挂产线"
                     : String.join(" / ", view.lineNames()) + " · " + view.ruleCount() + " 条规则";
@@ -1091,7 +1091,7 @@ public final class FactoryService {
     }
 
     /**
-     * 把一台机器从回收站取回（只对「玩家断开」的条目有效）。
+     * 把一台机器从回收站取回（只对「已退役」的条目有效）。
      *
      * @param player  发起请求的玩家
      * @param shortId 机器短 id
@@ -1108,11 +1108,11 @@ public final class FactoryService {
             return 0;
         }
         MachineRef ref = target.get();
-        if (!factory.machines().isDetached(ref.id())) {
+        if (!factory.machines().isRetired(ref.id())) {
             err(player, "这台机器不在回收站（它只是失联了；方块回来会自动恢复）");
             return 0;
         }
-        factory.machines().setDetached(ref.id(), false);
+        factory.machines().setRetired(ref.id(), false);
         Observation observation = refreshObservation(ref);
         wakeLines(factory, ref.id());
         markDirty();
@@ -1177,7 +1177,7 @@ public final class FactoryService {
         }
         MachineRef ref = target.get();
         Health health = FactoryBin.healthOf(factory, observations(), ref.id());
-        if (!FactoryBin.binned(factory.machines().isDetached(ref.id()),
+        if (!FactoryBin.binned(factory.machines().isRetired(ref.id()),
                 health == null ? Health.UNKNOWN : health)) {
             err(player, "这台机器不在回收站");
             return 0;

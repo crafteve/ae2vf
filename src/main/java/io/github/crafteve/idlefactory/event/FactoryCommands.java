@@ -695,7 +695,7 @@ public final class FactoryCommands {
         if (observations != null) {
             text.append('\n').append(observations.observe(target.blockKey()).health().describe());
         }
-        if (factory.machines().isDetached(target.id())) {
+        if (factory.machines().isRetired(target.id())) {
             text.append("\n回收站");
         }
         return Component.literal(text.toString());

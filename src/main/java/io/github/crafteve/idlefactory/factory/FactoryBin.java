@@ -16,14 +16,14 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationService;
  * <p>核心只有一条布尔表达式：</p>
  *
  * <pre>
- *   回收站（显示） = detached || health.gone()
- *   真正删除      = !referenced &amp;&amp; (detached || health.gone())
+ *   回收站（显示） = retired || health.gone()
+ *   真正删除      = !referenced &amp;&amp; (retired || health.gone())
  * </pre>
  *
  * <p>三个输入分别来自三处，职责不混：</p>
  * <ul>
  *   <li>{@code referenced} —— 配置层现算（{@link FactoryRefs#assignedMachines}）；</li>
- *   <li>{@code detached} —— 配置层存的玩家意图（{@code MachineLibrary}）；</li>
+ *   <li>{@code retired} —— 配置层存的玩家意图（{@code MachineLibrary}）；</li>
  *   <li>{@code health} —— 观测层的事实（{@code ObservationService}）。</li>
  * </ul>
  *
@@ -37,24 +37,24 @@ public final class FactoryBin {
     /**
      * 这台机器算不算在回收站里。
      *
-     * @param detached 玩家是否已断开
-     * @param health   观测结论
-     * @return 断开或确实不在了时为 {@code true}
+     * @param retired 玩家是否已把机器退役（放进回收站）
+     * @param health  观测结论
+     * @return 已退役或确实不在了时为 {@code true}
      */
-    public static boolean binned(boolean detached, Health health) {
-        return detached || health.gone();
+    public static boolean binned(boolean retired, Health health) {
+        return retired || health.gone();
     }
 
     /**
      * 该不该把它从机器库彻底删掉。
      *
      * @param referenced 是否还有 IO 组引用它
-     * @param detached   玩家是否已断开
+     * @param retired    玩家是否已把机器退役
      * @param health     观测结论
      * @return 无引用、且在回收站里时为 {@code true}
      */
-    public static boolean purgeable(boolean referenced, boolean detached, Health health) {
-        return !referenced && binned(detached, health);
+    public static boolean purgeable(boolean referenced, boolean retired, Health health) {
+        return !referenced && binned(retired, health);
     }
 
     /**
@@ -100,9 +100,9 @@ public final class FactoryBin {
         if (health == null) {
             return false;
         }
-        boolean detached = factory.machines().isDetached(machineId);
+        boolean retired = factory.machines().isRetired(machineId);
         boolean referenced = referenced(factory).contains(machineId);
-        if (!purgeable(referenced, detached, health)) {
+        if (!purgeable(referenced, retired, health)) {
             return false;
         }
         purge(factory, machineId);

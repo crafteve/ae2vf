@@ -163,7 +163,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeUUID(ref.id());
         ResourceLocation.STREAM_CODEC.encode(buf, ref.dimension().location());
         buf.writeLong(ref.pos().asLong());
-        buf.writeBoolean(machine.detached());
+        buf.writeBoolean(machine.retired());
         buf.writeByte(machine.health().ordinal());
         writeNullableResourceLocation(buf, machine.blockId());
         buf.writeByte(kindMask(machine.presence()));
@@ -195,7 +195,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         UUID id = buf.readUUID();
         ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
         long packedPos = buf.readLong();
-        boolean detached = buf.readBoolean();
+        boolean retired = buf.readBoolean();
         Health health = readEnum(buf, Health.values(), "health");
         ResourceLocation blockId = readNullableResourceLocation(buf);
         Set<ResourceKind> presence = readKinds(buf.readUnsignedByte());
@@ -226,7 +226,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         MachineRef ref = new MachineRef(id,
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
-        return new FactorySnapshotBuilder.MachineView(ref, detached, health, blockId,
+        return new FactorySnapshotBuilder.MachineView(ref, retired, health, blockId,
                 presence, lineNames, lineIds, ruleCount, inputs, outputs, inputRates, outputRates,
                 sinceMoveTicks, blockedTicks, workState, inputFull, sinceInputMoveTicks,
                 inputReason, outputReason, inputReasons, outputReasons);

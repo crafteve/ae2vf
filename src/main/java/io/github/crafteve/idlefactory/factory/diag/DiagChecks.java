@@ -81,14 +81,14 @@ public final class DiagChecks {
                 continue;
             }
             result.add(checkGroup(server, storage, online, target.get(), group, observations,
-                    factory.machines().isDetached(target.get().id())));
+                    factory.machines().isRetired(target.get().id())));
         }
         return result;
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,
             MachineRef machine, IoGroup group, @Nullable ObservationService observations,
-            boolean detached) {
+            boolean retired) {
         ServerLevel level = server.getLevel(machine.dimension());
         if (level == null) {
             return simple(machine.id(), DiagEvent.Level.ERROR, "维度不存在");
@@ -105,7 +105,7 @@ public final class DiagChecks {
         } else if (!level.isLoaded(machine.pos())) {
             return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
         }
-        if (detached) {
+        if (retired) {
             return simple(machine.id(), DiagEvent.Level.WARN, "已被移出机器库（回收站）");
         }
 

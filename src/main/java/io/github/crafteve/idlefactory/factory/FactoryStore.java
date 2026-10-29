@@ -40,7 +40,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_STORAGE_MODE = "StorageMode";
     private static final String TAG_TARGETS = "Targets";
     private static final String TAG_LINES = "Lines";
-    private static final String TAG_DETACHED = "Detached";
+    private static final String TAG_RETIRED = "Retired";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -116,9 +116,9 @@ public final class FactoryStore extends SavedData {
                 }
                 entry.put(TAG_LINES, lines);
             }
-            if (!record.detached().isEmpty()) {
+            if (!record.retired().isEmpty()) {
                 // 只在非空时写，保持文件干净；旧存档没有这个字段 → 全部活跃
-                entry.putIntArray(TAG_DETACHED, encodeUuids(record.detached()));
+                entry.putIntArray(TAG_RETIRED, encodeUuids(record.retired()));
             }
             list.add(entry);
         }
@@ -157,7 +157,7 @@ public final class FactoryStore extends SavedData {
                 }
             }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    targets, lines, decodeUuids(entry.getIntArray(TAG_DETACHED)), storageMode));
+                    targets, lines, decodeUuids(entry.getIntArray(TAG_RETIRED)), storageMode));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -186,16 +186,16 @@ public final class FactoryStore extends SavedData {
     /**
      * 一条存档记录：工厂的身份、仓库地址、机器库、被动产线库与回收站。
      *
-     * @param id       工厂 id
-     * @param owner    拥有者玩家 uuid
-     * @param anchor   仓库地址；未绑定为 {@code null}
-     * @param targets  机器库里的目标
-     * @param lines    被动产线
-     * @param detached 玩家已断开、仍留在库里的机器 id（意图，必须写档）
+     * @param id          工厂 id
+     * @param owner       拥有者玩家 uuid
+     * @param anchor      仓库地址；未绑定为 {@code null}
+     * @param targets     机器库里的目标
+     * @param lines       被动产线
+     * @param retired     玩家已退役、仍留在库里的机器 id（意图，必须写档）
      * @param storageMode 仓库接入模式（ME / 容器）
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            List<MachineRef> targets, List<PassiveLine> lines, Set<UUID> detached,
+            List<MachineRef> targets, List<PassiveLine> lines, Set<UUID> retired,
             StorageMode storageMode) {
     }
 

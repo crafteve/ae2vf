@@ -163,11 +163,11 @@ public final class Observation {
     /**
      * 这个位置算不算「在回收站里」。
      *
-     * @param detached 玩家是否已经断开它（配置层的意图）
-     * @return 断开或确实不在了时为 {@code true}
+     * @param retired 玩家是否已把机器退役（配置层的意图）
+     * @return 已退役或确实不在了时为 {@code true}
      */
-    public boolean binned(boolean detached) {
-        return detached || this.health.gone();
+    public boolean binned(boolean retired) {
+        return retired || this.health.gone();
     }
 
     /**

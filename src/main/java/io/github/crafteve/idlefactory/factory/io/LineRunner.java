@@ -85,7 +85,7 @@ public final class LineRunner {
                 sleepIfIdle(groupState, now);
                 continue;
             }
-            if (factory.machines().isDetached(target.id())) {
+            if (factory.machines().isRetired(target.id())) {
                 // 回收站里的机器不参与 IO；restore 时会显式唤醒
                 sleepIfIdle(groupState, now);
                 continue;

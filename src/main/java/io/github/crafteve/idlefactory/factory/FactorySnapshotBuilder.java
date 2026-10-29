@@ -110,7 +110,7 @@ public final class FactorySnapshotBuilder {
      * 一台机器在界面上的样子。
      *
      * @param ref       机器引用（坐标 + id）
-     * @param detached  玩家是否已断开（回收站）
+     * @param retired   玩家是否已把机器退役（回收站）
      * @param health    观测结论
      * @param blockId   观测到的方块 id；未知时 {@code null}
      * @param presence  无向能力
@@ -131,7 +131,7 @@ public final class FactorySnapshotBuilder {
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
-    public record MachineView(MachineRef ref, boolean detached, Health health,
+    public record MachineView(MachineRef ref, boolean retired, Health health,
             @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
             List<String> lineNames, List<UUID> lineIds, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
@@ -166,9 +166,9 @@ public final class FactorySnapshotBuilder {
             return List.copyOf(aligned);
         }
 
-        /** 是否在回收站里（断开 或 确实不在了）。 */
+        /** 是否在回收站里（已退役 或 确实不在了）。 */
         public boolean binned() {
-            return FactoryBin.binned(this.detached, this.health);
+            return FactoryBin.binned(this.retired, this.health);
         }
 
         /** 输入侧总速率。 */
@@ -246,16 +246,16 @@ public final class FactorySnapshotBuilder {
      * 工厂健康度汇总。
      *
      * @param total        机器总数（含回收站）
-     * @param active       参与 IO 的数量（在、且没被断开）
+     * @param active       参与 IO 的数量（在、且没被退役）
      * @param unloaded     未加载
      * @param missing      失联（含维度不存在）
-     * @param detached     玩家断开的数量
-     * @param bin          回收站总量（断开 + 失联，去重）
+     * @param retired      已退役的数量
+     * @param bin          回收站总量（已退役 + 失联，去重）
      * @param lines        产线数
      * @param runningLines 运行中的产线数
      */
     public record FactoryHealth(int total, int active, int unloaded, int missing,
-            int detached, int bin, int lines, int runningLines) {
+            int retired, int bin, int lines, int runningLines) {
 
         /**
          * 一行摘要，给 {@code info} / {@code diag} 的头部用。
@@ -333,7 +333,7 @@ public final class FactorySnapshotBuilder {
                     ? IoResult.Reason.OK : stats.outputReason();
 
             views.add(new MachineView(ref,
-                    factory.machines().isDetached(ref.id()),
+                    factory.machines().isRetired(ref.id()),
                     observation.health(),
                     observation.blockId(),
                     observation.presence(),
@@ -361,7 +361,7 @@ public final class FactorySnapshotBuilder {
     }
 
     /**
-     * 回收站视图（断开 或 失联）。
+     * 回收站视图（已退役 或 失联）。
      *
      * @param factory      工厂
      * @param observations 观测服务
@@ -399,11 +399,11 @@ public final class FactorySnapshotBuilder {
         int active = 0;
         int unloaded = 0;
         int missing = 0;
-        int detached = 0;
+        int retired = 0;
         int bin = 0;
         for (MachineView view : views) {
-            if (view.detached()) {
-                detached++;
+            if (view.retired()) {
+                retired++;
             } else {
                 switch (view.health()) {
                     case PRESENT -> active++;
@@ -425,7 +425,7 @@ public final class FactorySnapshotBuilder {
             }
         }
         return new FactoryHealth(factory.machines().size(), active, unloaded, missing,
-                detached, bin, factory.lines().size(), running);
+                retired, bin, factory.lines().size(), running);
     }
 
     /**
@@ -435,7 +435,7 @@ public final class FactorySnapshotBuilder {
      * @return 状态文本
      */
     public static String describe(MachineView view) {
-        if (!view.detached()) {
+        if (!view.retired()) {
             return view.health().describe();
         }
         return view.health() == Health.PRESENT ? "已断开" : "已断开 · " + view.health().describe();

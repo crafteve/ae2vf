@@ -1670,7 +1670,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private Status offlineStatus(FactorySnapshotBuilder.MachineView machine) {
-        if (machine.detached()) {
+        if (machine.retired()) {
             return new Status("回收站", this.theme.statusIdle(),
                     GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
         }

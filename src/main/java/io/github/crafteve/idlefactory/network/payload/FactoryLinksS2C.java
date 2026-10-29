@@ -26,13 +26,13 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 服务端 → 客户端：当前仓库模式和所有已绑定坐标。
  *
- * <p>客户端只用它画绿/蓝框，不拿它做业务判断。机器只发未断开（回收站里的不发）；仓库地址
+ * <p>客户端只用它画绿/蓝框，不拿它做业务判断。机器只发未退役（回收站里的不发）；仓库地址
  * 按类型展开成坐标列表：ME 一个、容器最多
  * {@link ContainerAnchor#MAX_CONTAINERS} 个。</p>
  *
  * @param mode     当前仓库模式
  * @param storage  仓库坐标（ME / 容器）
- * @param machines 未断开的已连接机器
+ * @param machines 未退役的已连接机器
  */
 public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> machines)
         implements CustomPacketPayload {
@@ -78,7 +78,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
         }
         List<Link> machines = new ArrayList<>();
         for (MachineRef ref : factory.machines().all()) {
-            if (!factory.machines().isDetached(ref.id())) {
+            if (!factory.machines().isRetired(ref.id())) {
                 machines.add(new Link(ref.dimension(), ref.pos()));
             }
         }
