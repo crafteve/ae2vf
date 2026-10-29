@@ -807,7 +807,6 @@ public final class FactoryService {
             return 0;
         }
         factory.bindStorage(new MeAnchor(level.dimension(), pos), storageResolver());
-        factory.config().setStorageMode(StorageMode.ME);
         markDirty();
         barOk(player, "已绑定 ME 仓库 " + blockLabel(level, pos));
         return 1;
@@ -903,7 +902,6 @@ public final class FactoryService {
             return 0;
         }
         factory.bindStorage(next, storageResolver());
-        factory.config().setStorageMode(StorageMode.CONTAINER);
         markDirty();
         if (!chain) {
             barOk(player, "已绑定容器 " + blockLabel(level, origin));
@@ -1259,7 +1257,6 @@ public final class FactoryService {
         }
 
         factory.bindStorage(anchor, storageResolver());
-        factory.config().setStorageMode(StorageMode.CONTAINER);
         markDirty();
         ok(player, "已加入仓库容器 [" + ref.shortId() + "] " + level.dimension().location()
                 + " " + pos.toShortString() + "（共 " + anchor.containers().size() + " 个）");
