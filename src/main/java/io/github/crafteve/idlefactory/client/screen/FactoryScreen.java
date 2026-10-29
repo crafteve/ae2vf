@@ -2230,7 +2230,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawMachineLibrary(GuiGraphics graphics) {
         FactoryLayout l = this.layout;
         int width = FactoryLayout.GRID_COLS * FactoryLayout.CELL;
-        int height = l.gridRows * FactoryLayout.CELL;
         int rows = machineRowsVisible();
         for (int i = 0; i < rows; i++) {
             int index = this.machineFirstRow + i;
@@ -2242,12 +2241,23 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             drawMachineCard(graphics, machine, l.gridX, y, width);
         }
         if (this.machines.isEmpty()) {
-            graphics.drawString(this.font, "没有机器", l.gridX,
-                    l.gridY + height / 2 - 4, this.theme.textDim(), false);
+            drawMachineLibraryEmpty(graphics, "没有机器");
         } else if (this.filteredMachines.isEmpty()) {
-            graphics.drawString(this.font, "没有匹配", l.gridX,
-                    l.gridY + height / 2 - 4, this.theme.textDim(), false);
+            drawMachineLibraryEmpty(graphics, "没有匹配");
         }
+    }
+
+    /**
+     * 机器库空提示：水平居中于右区。
+     *
+     * <p>机器卡片列本身已经按右区居中，这里直接用整个右区计算文字位置，保证两种空状态
+     * 都落在机器库中间，而不是贴着左边缘；垂直位置仍取卡片区域的中点。</p>
+     */
+    private void drawMachineLibraryEmpty(GuiGraphics graphics, String text) {
+        FactoryLayout l = this.layout;
+        int x = l.rightX + (l.rightW - this.font.width(text)) / 2;
+        int y = l.gridY + l.gridRows * FactoryLayout.CELL / 2 - 4;
+        graphics.drawString(this.font, text, x, y, this.theme.textDim(), false);
     }
 
     /**
