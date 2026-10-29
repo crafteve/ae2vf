@@ -79,11 +79,11 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口，`MachineActions` 管机器规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
 - `line`：配置层。`PassiveLine` 只存 `machineIds`；`LineService` 做产线管理动作；规则写操作不在本包。
-- `io`：执行层。`LineRunner` 遍历线与机器、做两级睡眠、读观测门禁；`GroupRunner` 三层取面并调搬运；`RuleResolver` 负责取面与 handler；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 记住搬通的面。
+- `io`：执行层。`LineRunner` 遍历线与机器、做两级睡眠、读观测门禁；`GroupRunner` 按规则调搬运；`RuleResolver` 负责取面与 handler：玩家配的面 > 路由表 > 扫面；物品先试无向 handler，无向不可用（缺失或只读）时逐面探测，命令里显式配了 `face` 的物品规则仍优先用配置面；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 只记流体 / 能量搬通的面。
 
 调用链：`ServerTick → FactoryRuntime → LineRunner → GroupRunner → IoTransfer → Storage / ResourceAdapter`。
 
-失败原因沿链上抛：`OK`、`NO_ITEM`、`NO_SPACE`、`NO_HANDLER`、`REJECTED`。`REJECTED`（有容量却不收）说明面不对，要踢路由；`NO_SPACE`（满了）是正常状态，保住路由。
+失败原因沿链上抛：`OK`、`NO_ITEM`、`NO_SPACE`、`NO_HANDLER`、`REJECTED`。`REJECTED`（有容量却不收）说明面不对，要踢路由（物品规则没有路由条目，下一轮重新探面）；`NO_SPACE`（满了）是正常状态，保住路由。
 
 ### 2.3 数据层
 
@@ -141,7 +141,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 指令以产线为主语：`/idf line <线> <动作>`；Tab 按上下文过滤。
 - `diag why` 固定六问，`diag watch` 汇总 / 详情，单条回执 60 字内。
 - 表格可展开规则、可搜索；搜索沿用 AE2 语法并接 jecharacters 拼音兼容层。
-- JEI R/U 必须覆盖机器列表、IO 列、仓库、背包。
+- JEI R/U 必须覆盖机器列表、IO 列、仓库、背包；FE 使用独立配料（`idlefactory:fe`）与信息页，R/U / 收藏不得落到红石粉。
 
 ## 四、编码规范
 
@@ -232,7 +232,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 3. 能力监听器必须强引用（NeoForge 存 WeakReference）；监听器里只标脏，不查世界；负结果要缓存。
 4. `NO_SPACE` 与 `REJECTED` 不能混：前者是满，后者是面不对。
 5. `UNLOADED` 不进事件流，只在 `diag observe` 看。
-6. 物品规则无向（`null` face），流体 / FE 才按面，这是刻意语义。
+6. 物品规则默认无向（GUI 不提供面；旧档与常规规则 `face == null`），但执行时不能只查无向 handler：Mekanism 的 `side == null` 物品句柄是只读代理，必须先试无向、不可用再逐面找可接收 / 可抽出的面；命令里显式配了 `face` 的物品规则仍优先用配置面。物品规则不写路由表（模糊变体可能落在不同面）；流体 / FE 一直按面。
 7. FE 探面用 1000 FE，Mekanism 的 FE↔J 换算会截断小数值。
 8. 容器优先级：高的先填、低的先抽；同优先级组内两阶段，组间不合并。
 9. 仓库离线 = 空仓库，表现为没料，不是报错。
@@ -244,6 +244,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 15. 排序键 / 方向 / 范围偏好写入客户端 CLIENT 配置（`config/idlefactory-client.toml`），关闭界面与重启客户端都保留；不写存档、不参与服务端。
 16. 机器失联只进 `FactoryLive.machineMissing`，不写档；产线只存 `machineIds`；只有显式删除机器才删规则。
 17. 左表产线机器行的叉号是“移出产线”，右侧机器库卡片的叉号是“删除机器”；两者语义不能混。
+18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `ResourceIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 
 ### 6.3 文档偏差
 
