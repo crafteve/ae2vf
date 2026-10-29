@@ -21,9 +21,9 @@ import net.neoforged.neoforge.fluids.FluidStack;
  *
  * <p>物品走原版 {@code renderItem} + 装饰层；流体按 AE2 终端的做法取 still 贴图并染色；
  * FE 优先用 Applied Flux 的 {@code EnergyType.FE} 图标，未装附属时退回「水贴图染绿」，
- * 保证任何环境都有可辨认的图标。</p>
+ * 保证任何环境都有可辨认的图标。JEI 的 FE 配料也复用这份绘制，避免两处图标不一致。</p>
  */
-final class ResourceIconRenderer {
+public final class ResourceIconRenderer {
     /** FE 没有 Applied Flux 时的备用染色：绿色。 */
     private static final int FE_FALLBACK_TINT = 0xFF55FF55;
     /** 缺省染色（不做染色）。 */
@@ -42,7 +42,7 @@ final class ResourceIconRenderer {
      * @param x        左上角 x
      * @param y        左上角 y
      */
-    static void draw(GuiGraphics graphics, Font font, ResourceKey key, int x, int y) {
+    public static void draw(GuiGraphics graphics, Font font, ResourceKey key, int x, int y) {
         switch (key.kind()) {
             case ITEM -> drawItem(graphics, font, key, x, y);
             case FLUID -> {

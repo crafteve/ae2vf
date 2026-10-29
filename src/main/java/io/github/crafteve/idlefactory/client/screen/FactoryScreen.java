@@ -2798,20 +2798,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
-     * JEI R/U 查询目标：一个物品和它在屏幕上的格子区域。
+     * JEI R/U 查询目标：资源类型、物品图标和它在屏幕上的格子区域。
      *
-     * @param stack 物品
+     * @param kind  资源类型；{@code ENERGY} 走 JEI 的 FE 配料，其余按物品/桶处理
+     * @param stack 物品图标；能量没有物品形态，固定为空
      * @param area  可点击区域
      */
-    public record JeiTarget(ItemStack stack, Rect2i area) {
+    public record JeiTarget(ResourceKind kind, ItemStack stack, Rect2i area) {
     }
 
     /**
      * 当前鼠标下的 JEI 查询目标。
      *
      * <p>覆盖左表机器/输入/输出、仓库格、机器库卡片和玩家背包槽位。只返回界面
-     * 上真实画出来的物品；流体按桶图标、能量按红石图标处理，和绘制使用同一份
-     * {@link #iconStack}。JEI 插件拿到这个目标后会自己创建 clickable ingredient。</p>
+     * 上真实画出来的物品；流体按桶图标处理，能量交给独立的 FE 配料（不再退回红石粉）。
+     * JEI 插件拿到这个目标后会自己创建 clickable ingredient。</p>
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
@@ -2830,7 +2831,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         for (Slot slot : this.menu.slots) {
             if (slot.hasItem()
                     && isHovering(slot.x, slot.y, 16, 16, mouseX, mouseY)) {
-                return new JeiTarget(slot.getItem(),
+                return new JeiTarget(ResourceKind.ITEM, slot.getItem(),
                         new Rect2i(this.leftPos + slot.x - 1,
                                 this.topPos + slot.y - 1, FactoryLayout.CELL,
                                 FactoryLayout.CELL));
@@ -2844,15 +2845,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             FactoryStorageS2C.Entry entry = storageEntryAt(mouseX, mouseY);
             if (entry != null) {
-                ItemStack stack = iconStack(entry.key());
-                if (!stack.isEmpty()) {
-                    int col = (int) ((mouseX - l.gridX) / FactoryLayout.CELL);
-                    int row = (int) ((mouseY - l.gridY) / FactoryLayout.CELL);
-                    return new JeiTarget(stack,
-                            new Rect2i(l.gridX + col * FactoryLayout.CELL,
-                                    l.gridY + row * FactoryLayout.CELL,
-                                    FactoryLayout.CELL, FactoryLayout.CELL));
-                }
+                int col = (int) ((mouseX - l.gridX) / FactoryLayout.CELL);
+                int row = (int) ((mouseY - l.gridY) / FactoryLayout.CELL);
+                return resourceTarget(entry.key(),
+                        new Rect2i(l.gridX + col * FactoryLayout.CELL,
+                                l.gridY + row * FactoryLayout.CELL,
+                                FactoryLayout.CELL, FactoryLayout.CELL));
             }
         }
 
@@ -2874,8 +2872,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                             this.filteredMachines.get(index);
                     ItemStack stack = FactoryLabels.blockStack(machine.blockId());
                     if (!stack.isEmpty()) {
-                        return new JeiTarget(stack, new Rect2i(iconX, iconY,
-                                FactoryLayout.CELL, FactoryLayout.CELL));
+                        return new JeiTarget(ResourceKind.ITEM, stack,
+                                new Rect2i(iconX, iconY,
+                                        FactoryLayout.CELL, FactoryLayout.CELL));
                     }
                 }
             }
@@ -2902,12 +2901,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                         List<ResourceSpec> rules = card.input()
                                 ? machine.inputs() : machine.outputs();
                         if (card.ruleIndex() < rules.size()) {
-                            ItemStack stack = iconStack(rules.get(card.ruleIndex()).key());
-                            if (!stack.isEmpty()) {
-                                return new JeiTarget(stack, new Rect2i(
-                                        card.x() + 4, card.y() + 4,
-                                        FactoryLayout.CELL, FactoryLayout.CELL));
-                            }
+                            return resourceTarget(rules.get(card.ruleIndex()).key(),
+                                    new Rect2i(card.x() + 4, card.y() + 4,
+                                            FactoryLayout.CELL, FactoryLayout.CELL));
                         }
                     }
                     return null;
@@ -2923,8 +2919,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
                     ItemStack stack = FactoryLabels.blockStack(machine.blockId());
                     if (!stack.isEmpty()) {
-                        return new JeiTarget(stack, new Rect2i(iconX, y + 4,
-                                FactoryLayout.CELL, FactoryLayout.CELL));
+                        return new JeiTarget(ResourceKind.ITEM, stack,
+                                new Rect2i(iconX, y + 4,
+                                        FactoryLayout.CELL, FactoryLayout.CELL));
                     }
                 }
                 if (l.hasColumn(FactoryLayout.COL_INPUT)) {
@@ -2951,6 +2948,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
+     * 把资源转成 JEI 目标。
+     *
+     * <p>能量在 JEI 里没有物品形态：{@code stack} 留空，由插件换成独立的 FE 配料；
+     * 物品/流体仍用 {@link #iconStack} 的图标，保持原来的 R/U 行为。</p>
+     */
+    private JeiTarget resourceTarget(ResourceKey key, Rect2i area) {
+        ResourceKind kind = key.kind();
+        return new JeiTarget(kind,
+                kind == ResourceKind.ENERGY ? ItemStack.EMPTY : iconStack(key), area);
+    }
+
+    /**
      * 在输入/输出列里找当前鼠标命中的规则图标。
      *
      * <p>位置计算必须和 {@link #drawRuleIcons} 完全一致：每条包含 18px 图标和
@@ -2974,12 +2983,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
             if (inside(mouseX, mouseY, cursor, y,
                     FactoryLayout.CELL, FactoryLayout.CELL)) {
-                ResourceKey key = rules.get(shown).key();
-                ItemStack stack = iconStack(key);
-                if (!stack.isEmpty()) {
-                    return new JeiTarget(stack, new Rect2i(cursor, y,
-                            FactoryLayout.CELL, FactoryLayout.CELL));
-                }
+                return resourceTarget(rules.get(shown).key(),
+                        new Rect2i(cursor, y, FactoryLayout.CELL, FactoryLayout.CELL));
             }
             cursor += entryWidth;
             shown++;
