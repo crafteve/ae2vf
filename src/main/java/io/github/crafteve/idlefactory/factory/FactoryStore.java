@@ -40,6 +40,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_STORAGE_MODE = "StorageMode";
     private static final String TAG_TARGETS = "Targets";
     private static final String TAG_LINES = "Lines";
+    /** 回收站标记：玩家主动退役、仍留在机器库里的机器 id。 */
     private static final String TAG_RETIRED = "Retired";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 

@@ -65,14 +65,4 @@ public final class Factory {
     public boolean refreshStorage(@Nullable StorageResolver resolver) {
         return this.live.refresh(this.config.storageAnchor(), resolver);
     }
-
-    /**
-     * 是否由这个玩家拥有。
-     *
-     * @param playerId 玩家 uuid
-     * @return 是拥有者时为 {@code true}
-     */
-    public boolean isOwnedBy(UUID playerId) {
-        return this.config.owner().equals(playerId);
-    }
 }

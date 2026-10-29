@@ -28,6 +28,11 @@ public final class FactoryLive {
     /** 诊断数据：事件环 + 搬运计数。 */
     private final DiagStats stats = new DiagStats();
 
+    /** 由 {@link Factory} 创建；初始为空仓库、离线。 */
+    FactoryLive() {
+        // 初始状态：空仓库、离线、无错误
+    }
+
     /** 当前仓库，永远非 null。 */
     public Storage storage() {
         return this.storage;
