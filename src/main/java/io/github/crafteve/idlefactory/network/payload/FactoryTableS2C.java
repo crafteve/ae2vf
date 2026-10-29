@@ -11,7 +11,6 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.FactoryState;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -41,14 +40,13 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param containerId     菜单容器 id
  * @param hasFactory      玩家是否已有工厂
- * @param state           工厂状态
  * @param storageOnline   仓库是否在线
  * @param lineCount       产线数
  * @param runningLineCount 运行中的产线数
  * @param lines           产线列表（界面菜单/筛选）
  * @param machines        机器库视图（含回收站）
  */
-public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState state,
+public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline, int lineCount, int runningLineCount,
         List<FactorySnapshotBuilder.LineView> lines,
         List<FactorySnapshotBuilder.MachineView> machines) implements CustomPacketPayload {
@@ -74,7 +72,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
 
     /** 没有工厂时的空表。 */
     public static FactoryTableS2C empty(int containerId) {
-        return new FactoryTableS2C(containerId, false, FactoryState.CREATED, false, 0, 0,
+        return new FactoryTableS2C(containerId, false, false, 0, 0,
                 List.of(), List.of());
     }
 
@@ -96,7 +94,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
     private static void write(RegistryFriendlyByteBuf buf, FactoryTableS2C payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeBoolean(payload.hasFactory());
-        buf.writeByte(payload.state().ordinal());
         buf.writeBoolean(payload.storageOnline());
         buf.writeVarInt(payload.lineCount());
         buf.writeVarInt(payload.runningLineCount());
@@ -110,7 +107,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
     private static FactoryTableS2C read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
-        FactoryState state = readEnum(buf, FactoryState.values(), "factory state");
         boolean storageOnline = buf.readBoolean();
         int lineCount = buf.readVarInt();
         int runningLineCount = buf.readVarInt();
@@ -120,7 +116,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory, FactoryState 
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
-        return new FactoryTableS2C(containerId, hasFactory, state, storageOnline,
+        return new FactoryTableS2C(containerId, hasFactory, storageOnline,
                 lineCount, runningLineCount, lines, machines);
     }
 

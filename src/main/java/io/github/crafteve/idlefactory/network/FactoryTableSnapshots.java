@@ -59,7 +59,7 @@ public final class FactoryTableSnapshots {
         List<FactorySnapshotBuilder.LineView> lines =
                 FactorySnapshotBuilder.lines(owner, sleepRemaining);
         PacketDistributor.sendToPlayer(player, new FactoryTableS2C(
-                containerId, true, owner.state(), owner.storageLink().online(),
+                containerId, true, owner.storageLink().online(),
                 health.lines(), health.runningLines(), lines, machines));
     }
 }

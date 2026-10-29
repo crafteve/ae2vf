@@ -19,7 +19,6 @@ import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.FactoryState;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.line.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
@@ -100,8 +99,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private List<FactorySnapshotBuilder.LineView> lines = List.of();
     /** 服务端是否已经有工厂实例；没有时界面显示创建引导。 */
     private boolean hasFactory;
-    /** 工厂整体运行状态，只用于顶栏摘要。 */
-    private FactoryState factoryState = FactoryState.CREATED;
     /** 仓库链接是否在线；表格中的数量仍以仓库包为准。 */
     private boolean storageOnline;
     /** 工厂产线总数。 */
@@ -254,7 +251,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     public void acceptTable(FactoryTableS2C payload) {
         this.hasFactory = payload.hasFactory();
-        this.factoryState = payload.state();
         this.storageOnline = payload.storageOnline();
         this.lineCount = payload.lineCount();
         this.runningLineCount = payload.runningLineCount();
@@ -867,7 +863,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         } else {
             // 顶栏状态描述的是当前产线，不是工厂整体。没有选线时没有可报的
-            // 运行状态，不能拿 factoryState 冒充，否则会出现无主的「运行中」。
+            // 运行状态，直接显示「未选产线」，不借用别的状态。
             status = "未选产线";
             statusColor = this.theme.statusIdle();
         }

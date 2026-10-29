@@ -64,33 +64,8 @@ public final class FactorySnapshotBuilder {
         String anchorText = anchor == null ? "unbound" : anchor.describe();
         return "工厂 " + factory.id()
                 + " | owner=" + factory.owner()
-                + " | state=" + factory.state()
                 + " | storage=" + (link.online() ? "online" : "offline")
                 + " | anchor=" + anchorText;
-    }
-
-    /**
-     * 工厂摘要的结构化版本，留给以后的 S2C 包。
-     *
-     * @param id            工厂 id
-     * @param owner         拥有者
-     * @param state         状态
-     * @param storageOnline 仓库是否在线
-     * @param anchor        仓库地址
-     */
-    public record Summary(UUID id, UUID owner, FactoryState state,
-            boolean storageOnline, @Nullable StorageAnchor anchor) {
-    }
-
-    /**
-     * 生成结构化摘要。
-     *
-     * @param factory 工厂
-     * @return 摘要
-     */
-    public static Summary build(Factory factory) {
-        return new Summary(factory.id(), factory.owner(), factory.state(),
-                factory.storageLink().online(), factory.storageLink().anchor());
     }
 
     /**

@@ -16,7 +16,7 @@ import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 /**
  * 一个工厂实例。
  *
- * <p>它是服务端对象，拥有自己的仓库插头、状态和（后续）产线图。它不知道终端的存在：
+ * <p>它是服务端对象，拥有自己的仓库插头、机器库和产线库。它不知道终端的存在：
  * 终端打开与否、玩家在不在线，都不影响它的生命周期。</p>
  *
  * <p>工厂<b>拥有</b>一个仓库，但<b>不实现</b>仓库。物品永远现读现写
@@ -35,8 +35,6 @@ public final class Factory {
     private final MachineLibrary machines = new MachineLibrary();
     /** 被动产线库。 */
     private final LineLibrary lines = new LineLibrary();
-    /** 运行状态，只由工厂主体和仓库解析结果改变。 */
-    private FactoryState state = FactoryState.CREATED;
     /** 诊断数据：事件环 + 搬运计数。纯运行时，不写存档。 */
     private final DiagStats stats = new DiagStats();
 
@@ -84,16 +82,6 @@ public final class Factory {
         return this.storageLink.storage();
     }
 
-    /** 当前状态。 */
-    public FactoryState state() {
-        return this.state;
-    }
-
-    /** 改状态；只允许工厂主体调用。 */
-    public void setState(FactoryState newState) {
-        this.state = newState;
-    }
-
     /** 当前仓库接入模式。 */
     public StorageMode storageMode() {
         return this.storageMode;
@@ -123,28 +111,17 @@ public final class Factory {
         } else if (anchor != null) {
             this.storageMode = StorageMode.ME;
         }
-        updateStateFromStorage();
     }
 
     /**
-     * 重新解析仓库地址并同步状态。服务器启动、界面刷新、定时重试时调。
+     * 重新解析仓库地址。服务器启动、界面刷新、定时重试时调。
      *
      * @return 在线状态是否发生了变化
      */
     public boolean refreshStorage() {
         boolean before = this.storageLink.online();
         this.storageLink.refresh();
-        boolean after = this.storageLink.online();
-        updateStateFromStorage();
-        return before != after;
-    }
-
-    private void updateStateFromStorage() {
-        if (this.storageLink.anchor() == null) {
-            this.state = FactoryState.CREATED;
-        } else {
-            this.state = this.storageLink.online() ? FactoryState.RUNNING : FactoryState.PAUSED;
-        }
+        return before != this.storageLink.online();
     }
 
     /**
