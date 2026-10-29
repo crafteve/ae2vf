@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.line.LineActions;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
@@ -209,10 +210,10 @@ public final class FactoryService {
         }
         info(player, FactorySnapshotBuilder.health(factory, machines).describe());
 
-        int binCount = 0;
+        int missingCount = 0;
         for (FactorySnapshotBuilder.MachineView view : machines) {
-            if (view.binned()) {
-                binCount++;
+            if (view.machineMissing()) {
+                missingCount++;
             }
         }
         int shown = 0;
@@ -224,8 +225,8 @@ public final class FactoryService {
             sendMachineRow(player, view);
             shown++;
         }
-        if (binCount > 0) {
-            info(player, "回收站 " + binCount + " 台 · /idf factory bin 查看");
+        if (missingCount > 0) {
+            info(player, "失联 " + missingCount + " 台 · 放回方块会自动恢复；删除请用机器库界面");
         }
         return 1;
     }
@@ -248,7 +249,7 @@ public final class FactoryService {
 
     // ------------------------------------------------------------------
     // ---- 03. 机器库：准星接入与断开（connectMachine / disconnectMachine） ----
-    // 负责准星选中机器的接入、断开与回收站分流；由 /idf factory connect 与 /idf factory disconnect 调用。
+    // 负责准星选中机器的接入、删除与确认；由 /idf factory connect 与 /idf factory disconnect 调用。
     // ------------------------------------------------------------------
 
     /**
@@ -282,7 +283,7 @@ public final class FactoryService {
             return 0;
         }
         // 指令路径也是绑定入口，必须和绑定杖走同一套占用规则；自占同角色交给下面的
-        // byId 判断（可能是回收站取回，也可能是数据修复）。
+        // byId 判断（可能是数据修复，也可能是重复 connect）。
         LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
         LinkGate.ClaimCheck claim =
                 gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
@@ -299,17 +300,8 @@ public final class FactoryService {
         }
         Optional<Machine> existing = factory.config().machines().byId(target.id());
         if (existing.isPresent()) {
-            MachineRef ref = existing.get().ref();
-            if (!factory.config().machines().isRetired(ref.id())) {
-                err(player, "这台机器已经接入过了：" + ref.shortId());
-                return 0;
-            }
-            factory.config().machines().setRetired(ref.id(), false);
-            refreshObservation(ref);
-            wakeLines(factory, ref.id());
-            markDirty();
-            ok(player, "已从回收站取回：" + ref.shortId() + " · 规则已恢复");
-            return 1;
+            err(player, "这台机器已经接入过了：" + existing.get().ref().shortId());
+            return 0;
         }
         if (!factory.config().machines().add(target)) {
             err(player, "这台机器已经接入过了：" + target.shortId());
@@ -323,15 +315,48 @@ public final class FactoryService {
     }
 
     /**
-     * 把准星选中的机器断开。
-     *
-     * <p>规则只有一条：<b>没配过规则就直接删，配过规则就移入回收站</b>。前者零损失（玩家随时可以
-     * 重新 connect），后者保住规则（误拆不用重设）。</p>
+     * 删除准星选中的机器；有 IO 规则时先要求确认。
      *
      * @param player 发起请求的玩家
      * @return 命令结果
      */
     public static int disconnectMachine(ServerPlayer player) {
+        return deleteMachine(player, false);
+    }
+
+    /**
+     * 确认删除准星选中的机器。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int confirmDisconnectMachine(ServerPlayer player) {
+        return deleteMachine(player, true);
+    }
+
+    /**
+     * 按短 id 删除机器；有 IO 规则时先要求确认。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 短 id（前 8 位）
+     * @return 命令结果
+     */
+    public static int disconnectMachine(ServerPlayer player, String shortId) {
+        return deleteMachine(player, shortId, false);
+    }
+
+    /**
+     * 按短 id 确认删除机器。
+     *
+     * @param player  发起请求的玩家
+     * @param shortId 短 id（前 8 位）
+     * @return 命令结果
+     */
+    public static int confirmDisconnectMachine(ServerPlayer player, String shortId) {
+        return deleteMachine(player, shortId, true);
+    }
+
+    private static int deleteMachine(ServerPlayer player, boolean confirmed) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return 0;
@@ -342,22 +367,16 @@ public final class FactoryService {
             return 0;
         }
         ServerLevel level = player.serverLevel();
-        Machine targetMachine = factory.config().machines().byPosition(level.dimension(), pos);
-        if (targetMachine == null) {
+        Machine target = factory.config().machines().byPosition(level.dimension(), pos);
+        if (target == null) {
             err(player, "这个位置没有接入的机器");
             return 0;
         }
-        return detachOrPurge(player, factory, targetMachine.ref());
+        return reportDelete(player, factory, target, confirmed,
+                "/idf factory disconnect confirm");
     }
 
-    /**
-     * 按短 id 远程断开机器。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 短 id（前 8 位）
-     * @return 命令结果
-     */
-    public static int disconnectMachine(ServerPlayer player, String shortId) {
+    private static int deleteMachine(ServerPlayer player, String shortId, boolean confirmed) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return 0;
@@ -367,63 +386,67 @@ public final class FactoryService {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        return detachOrPurge(player, factory, target.get().ref());
+        return reportDelete(player, factory, target.get(), confirmed,
+                "/idf factory disconnect " + shortId + " confirm");
     }
 
     /**
-     * 断开的唯一出口。
+     * 删除一台机器的唯一出口。
      *
-     * @param player  发起请求的玩家
-     * @param factory 工厂
-     * @param target  机器
+     * <p>有规则时必须确认；没有规则直接删。删除会同时删掉产线引用和失联标记，规则随机器一起消失。</p>
+     *
+     * @param player         玩家
+     * @param factory        工厂
+     * @param target         机器
+     * @param confirmed      是否已经确认
+     * @param confirmCommand 给玩家的确认指令
      * @return 命令结果
      */
-    private static int detachOrPurge(ServerPlayer player, Factory factory, MachineRef target) {
-        DetachResult result = detachOrPurgeSilent(factory, target);
-        if (result == DetachResult.ALREADY) {
-            info(player, "这台机器已经在回收站里了（/idf factory bin 查看）");
-            return 1;
+    private static int reportDelete(ServerPlayer player, Factory factory, Machine target,
+            boolean confirmed, String confirmCommand) {
+        int rules = target.ruleCount();
+        if (rules > 0 && !confirmed) {
+            String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, target.id()));
+            warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + rules + " 条 IO 配置"
+                    + (lines.isEmpty() ? "" : "（" + lines + "）")
+                    + "，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
+            return 0;
         }
-        markDirty();
-        if (result == DetachResult.PURGED) {
-            ok(player, "已删除机器 [" + target.shortId() + "]（这台机器没有配过规则，随时可以 connect 回来）");
-            return 1;
+        LineActions.Result result = deleteMachineById(factory, target.id(), true);
+        if (!result.ok()) {
+            err(player, result.message());
+            return 0;
         }
-        String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, target.id()));
-        int rules = FactoryRefs.ruleCountOf(factory, target.id());
-        ok(player, "已移入回收站 [" + target.shortId() + "] · 规则保留（" + lines
-                + " · " + rules + " 条）· /idf factory connect 可恢复");
+        ok(player, result.message());
         return 1;
     }
 
     /**
-     * 断开一台机器，不发送聊天回执；供连锁断开汇总用。
+     * 按机器 id 删除；界面确认后走这个入口。
      *
-     * @param factory 工厂
-     * @param target  机器
-     * @return 处理结果
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @param confirmed 是否已经确认（有规则时必须为 {@code true}）
+     * @return 动作结果
      */
-    private static DetachResult detachOrPurgeSilent(Factory factory, MachineRef target) {
-        if (factory.config().machines().isRetired(target.id())) {
-            return DetachResult.ALREADY;
+    public static LineActions.Result deleteMachineById(Factory factory, UUID machineId,
+            boolean confirmed) {
+        Machine target = factory.config().machines().byId(machineId).orElse(null);
+        if (target == null) {
+            return LineActions.Result.err("找不到机器");
         }
-        Set<UUID> referenced = FactoryBin.referenced(factory);
-        if (!referenced.contains(target.id())) {
-            FactoryBin.purge(factory, target.id());
-            return DetachResult.PURGED;
+        int rules = target.ruleCount();
+        if (rules > 0 && !confirmed) {
+            return LineActions.Result.err("这台机器还有 " + rules + " 条 IO 配置，需要确认");
         }
-        factory.config().machines().setRetired(target.id(), true);
-        return DetachResult.BINNED;
-    }
-
-    /** 单台断开的三种结果。 */
-    private enum DetachResult {
-        /** 没配过规则，已从机器库删除。 */
-        PURGED,
-        /** 配过规则，已移入回收站。 */
-        BINNED,
-        /** 本来就在回收站。 */
-        ALREADY
+        for (PassiveLine line : factory.config().lines().all()) {
+            line.removeMachine(machineId);
+        }
+        factory.live().clearMachineMissing(machineId);
+        factory.config().machines().remove(machineId);
+        markDirty();
+        return LineActions.Result.ok("已删除机器 [" + target.ref().shortId() + "]"
+                + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""), null);
     }
 
     // ------------------------------------------------------------------
@@ -566,7 +589,7 @@ public final class FactoryService {
     /**
      * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
      *
-     * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连或还在回收站，
+     * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连，
      * 就补齐/取回整组。这样 Ctrl 连点两次不会出现一半连、一半断。</p>
      *
      * @param player 发起请求的玩家
@@ -620,9 +643,7 @@ public final class FactoryService {
         }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
-            Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
-            MachineRef ref = machine == null ? null : machine.ref();
-            if (ref == null || factory.config().machines().isRetired(ref.id())) {
+            if (factory.config().machines().byPosition(level.dimension(), targetPos) == null) {
                 allConnected = false;
                 break;
             }
@@ -638,52 +659,38 @@ public final class FactoryService {
             ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
             int blockedRole) {
         int added = 0;
-        int restored = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
             Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
-            MachineRef target = existing == null ? null : existing.ref();
-            if (target != null) {
-                if (factory.config().machines().isRetired(target.id())) {
-                    factory.config().machines().setRetired(target.id(), false);
-                    refreshObservation(target);
-                    wakeLines(factory, target.id());
-                    restored++;
-                } else {
-                    skipped++;
-                }
+            if (existing != null) {
+                skipped++;
                 continue;
             }
-            MachineRef ref = MachineRef.of(level.dimension(), targetPos);
-            if (factory.config().machines().add(ref)) {
-                refreshObservation(ref);
+            MachineRef target = MachineRef.of(level.dimension(), targetPos);
+            if (factory.config().machines().add(target)) {
+                refreshObservation(target);
                 added++;
             } else {
                 skipped++;
             }
         }
-        if (added + restored > 0) {
+        if (added > 0) {
             markDirty();
         }
         if (!chain) {
             String label = machineLabel(level, targets.getFirst());
             if (added > 0) {
                 barOk(player, "已连接机器 " + label);
-            } else if (restored > 0) {
-                barOk(player, "已恢复机器 " + label);
             } else {
                 barErr(player, "该机器已被连接 " + label);
             }
-            return added + restored;
+            return added;
         }
-        if (added + restored == 0) {
-            barErr(player, "没有新增机器（已连接或已在回收站）");
+        if (added == 0) {
+            barErr(player, "没有新增机器（都已连接）");
             return 0;
         }
-        String text = "已连接 " + (added + restored) + " 台";
-        if (restored > 0) {
-            text += "（取回 " + restored + " 台）";
-        }
+        String text = "已连接 " + added + " 台";
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
         }
@@ -694,52 +701,58 @@ public final class FactoryService {
             text += "，角色冲突 " + blockedRole + " 台";
         }
         barOk(player, text);
-        return added + restored;
+        return added;
     }
 
     private static int disconnectMachineTargets(ServerPlayer player, Factory factory,
             ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
             int blockedRole) {
-        int purged = 0;
-        int binned = 0;
-        int already = 0;
+        int deleted = 0;
+        int skippedRules = 0;
         int skipped = 0;
         for (BlockPos targetPos : targets) {
-            Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
-            MachineRef target = existing == null ? null : existing.ref();
-            if (target == null) {
+            Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
+            if (machine == null) {
                 skipped++;
                 continue;
             }
-            switch (detachOrPurgeSilent(factory, target)) {
-                case PURGED -> purged++;
-                case BINNED -> binned++;
-                case ALREADY -> already++;
+            if (machine.ruleCount() > 0) {
+                // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
+                skippedRules++;
+                continue;
             }
+            for (PassiveLine line : factory.config().lines().all()) {
+                line.removeMachine(machine.id());
+            }
+            factory.live().clearMachineMissing(machine.id());
+            factory.config().machines().remove(machine.id());
+            deleted++;
         }
-        if (purged + binned > 0) {
+        if (deleted > 0) {
             markDirty();
         }
         if (!chain) {
             String label = machineLabel(level, targets.getFirst());
-            if (purged > 0) {
+            if (deleted > 0) {
                 barOk(player, "已删除链接 " + label);
-            } else if (binned > 0) {
-                barErr(player, "该机器仍有 IO 配置，已移入回收站 " + label);
-            } else if (already > 0) {
-                barErr(player, "该机器已经在回收站 " + label);
+            } else if (skippedRules > 0) {
+                barErr(player, "该机器仍有 IO 配置，请在机器库界面删除 " + label);
             } else {
                 barErr(player, "没有可删除的链接");
             }
-            return purged + binned;
+            return deleted;
         }
-        if (purged + binned == 0) {
-            barErr(player, "没有可删除的链接");
+        if (deleted == 0) {
+            if (skippedRules > 0) {
+                barErr(player, "跳过了 " + skippedRules + " 台有 IO 配置的机器，请在机器库界面删除");
+            } else {
+                barErr(player, "没有可删除的链接");
+            }
             return 0;
         }
-        String text = "已删除 " + (purged + binned) + " 台";
-        if (binned > 0) {
-            text += "（回收站 " + binned + " 台）";
+        String text = "已删除 " + deleted + " 台";
+        if (skippedRules > 0) {
+            text += "，跳过 " + skippedRules + " 台有 IO 配置的机器（请在机器库界面删除）";
         }
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
@@ -751,7 +764,7 @@ public final class FactoryService {
             text += "，角色冲突 " + blockedRole + " 台";
         }
         barOk(player, text);
-        return purged + binned;
+        return deleted;
     }
 
     // ------------------------------------------------------------------
@@ -1042,159 +1055,6 @@ public final class FactoryService {
 
     private static String modeLabel(StorageMode mode) {
         return mode == StorageMode.ME ? "ME" : "容器";
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 10. 回收站（binInfo / binRestore / binPurge） ----
-    // 负责回收站条目的列出、取回与清理；由 /idf factory bin 的 info、restore 与 purge 调用。
-    // ------------------------------------------------------------------
-
-    /**
-     * 列出回收站。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int binInfo(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        ObservationService observations = observations();
-        List<FactorySnapshotBuilder.MachineView> bin =
-                FactorySnapshotBuilder.bin(factory, observations);
-        if (bin.isEmpty()) {
-            info(player, "回收站是空的");
-            return 1;
-        }
-        info(player, "回收站 " + bin.size() + " 台（规则都保留着）：");
-        Set<UUID> referenced = FactoryBin.referenced(factory);
-        int orphaned = 0;
-        for (FactorySnapshotBuilder.MachineView view : bin) {
-            MachineRef ref = view.ref();
-            String where = ref.dimension().location() + " " + ref.pos().toShortString();
-            String reason = view.retired() ? "你放进回收站的" : view.health().describe();
-            String rules = view.lineNames().isEmpty()
-                    ? "没挂产线"
-                    : String.join(" / ", view.lineNames()) + " · " + view.ruleCount() + " 条规则";
-            if (!referenced.contains(ref.id())) {
-                orphaned++;
-            }
-            Component row = Component.empty()
-                    .append(FactoryMessages.text("  ", FactoryMessages.INFO))
-                    .append(FactoryMessages.link(ref.shortId(),
-                            "/idf factory bin restore " + ref.shortId(), "取回这台机器"))
-                    .append(FactoryMessages.text(" " + where + " · " + reason + " · " + rules,
-                            FactoryMessages.INFO));
-            FactoryMessages.send(player, row);
-        }
-        if (orphaned > 0) {
-            info(player, "其中 " + orphaned + " 台已无引用 · /idf factory bin purge 可清理");
-        }
-        return 1;
-    }
-
-    /**
-     * 把一台机器从回收站取回（只对「已退役」的条目有效）。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 机器短 id
-     * @return 命令结果
-     */
-    public static int binRestore(ServerPlayer player, String shortId) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        Optional<Machine> target = factory.config().machines().byShortId(shortId);
-        if (target.isEmpty()) {
-            err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
-            return 0;
-        }
-        MachineRef ref = target.get().ref();
-        if (!factory.config().machines().isRetired(ref.id())) {
-            err(player, "这台机器不在回收站（它只是失联了；方块回来会自动恢复）");
-            return 0;
-        }
-        factory.config().machines().setRetired(ref.id(), false);
-        Observation observation = refreshObservation(ref);
-        wakeLines(factory, ref.id());
-        markDirty();
-        if (observation != null && !observation.health().alive()) {
-            warn(player, "已恢复 [" + ref.shortId() + "]，但方块现在不在（"
-                    + observation.health().describe() + "）；放回机器后会自动恢复");
-        } else {
-            ok(player, "已从回收站取回 [" + ref.shortId() + "] · 规则已恢复");
-        }
-        return 1;
-    }
-
-    /**
-     * 清理回收站里所有「已无引用」的条目。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int binPurge(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        ObservationService observations = observations();
-        List<FactorySnapshotBuilder.MachineView> bin =
-                FactorySnapshotBuilder.bin(factory, observations);
-        Set<UUID> referenced = FactoryBin.referenced(factory);
-        int purged = 0;
-        int skipped = 0;
-        for (FactorySnapshotBuilder.MachineView view : bin) {
-            if (referenced.contains(view.ref().id())) {
-                skipped++;
-                continue;
-            }
-            FactoryBin.purge(factory, view.ref().id());
-            purged++;
-        }
-        if (purged > 0) {
-            markDirty();
-        }
-        ok(player, "已清理 " + purged + " 条"
-                + (skipped > 0 ? " · " + skipped + " 条仍有引用（先 line <线> remove <机器>）" : ""));
-        return 1;
-    }
-
-    /**
-     * 清理回收站里的一条。仍有引用时拒绝——删规则是 {@code line remove} 的工作。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 机器短 id
-     * @return 命令结果
-     */
-    public static int binPurge(ServerPlayer player, String shortId) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        Optional<Machine> target = factory.config().machines().byShortId(shortId);
-        if (target.isEmpty()) {
-            err(player, "找不到机器 " + shortId + "（或前缀有歧义）");
-            return 0;
-        }
-        MachineRef ref = target.get().ref();
-        Health health = FactoryBin.healthOf(factory, observations(), ref.id());
-        if (!FactoryBin.binned(factory.config().machines().isRetired(ref.id()),
-                health == null ? Health.UNKNOWN : health)) {
-            err(player, "这台机器不在回收站");
-            return 0;
-        }
-        if (FactoryBin.referenced(factory).contains(ref.id())) {
-            String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, ref.id()));
-            err(player, "这台机器还配在 " + lines + " 上；先 /idf line <线> remove " + ref.shortId());
-            return 0;
-        }
-        FactoryBin.purge(factory, ref.id());
-        markDirty();
-        ok(player, "已清理回收站条目 [" + ref.shortId() + "]");
-        return 1;
     }
 
     // ------------------------------------------------------------------
@@ -1681,24 +1541,6 @@ public final class FactoryService {
     private static Observation refreshObservation(MachineRef target) {
         ObservationService observations = observations();
         return observations == null ? null : observations.refresh(target.blockKey());
-    }
-
-    /**
-     * 唤醒一台机器所在的所有产线（取回、恢复之后调）。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     */
-    private static void wakeLines(Factory factory, UUID machineId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return;
-        }
-        for (PassiveLine line : factory.config().lines().all()) {
-            if (line.containsMachine(machineId)) {
-                runtime.lineRunner().wake(line.id());
-            }
-        }
     }
 
     /**

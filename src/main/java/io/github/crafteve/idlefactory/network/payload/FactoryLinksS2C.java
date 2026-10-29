@@ -26,7 +26,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 服务端 → 客户端：当前仓库模式和所有已绑定坐标。
  *
- * <p>客户端只用它画绿/蓝框，不拿它做业务判断。机器只发未退役（回收站里的不发）；仓库地址
+ * <p>客户端只用它画绿/蓝框，不拿它做业务判断。机器只发未失联的；仓库地址
  * 按类型展开成坐标列表：ME 一个、容器最多
  * {@link ContainerAnchor#MAX_CONTAINERS} 个。</p>
  *
@@ -79,8 +79,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
         List<Link> machines = new ArrayList<>();
         for (var machine : factory.config().machines().all()) {
             MachineRef ref = machine.ref();
-            if (!factory.config().machines().isRetired(ref.id())
-                    && !factory.live().isMachineMissing(ref.id())) {
+            if (!factory.live().isMachineMissing(ref.id())) {
                 machines.add(new Link(ref.dimension(), ref.pos()));
             }
         }

@@ -308,7 +308,7 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 消费一次状态迁移：记事件、按回收站规则清理、必要时唤醒产线。
+     * 消费一次状态迁移：记事件、维护 machineMissing、必要时唤醒产线。
      *
      * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
      * 未加载只在 {@code diag observe} 里看得到。</p>
@@ -355,7 +355,7 @@ public final class FactoryRuntime {
     /**
      * 容器迁移：记一条仓库事件。
      *
-     * <p>容器和机器共用观测表，但它们的消费方式不同：机器进回收站，容器只能被
+     * <p>容器和机器共用观测表，但它们的消费方式不同：机器标记失联，容器只能被
      * {@code storage prune} 清理。所以这里只负责让「箱子没了」在事件流里看得见。</p>
      *
      * @param transition 迁移

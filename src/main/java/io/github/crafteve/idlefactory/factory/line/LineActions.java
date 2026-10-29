@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.factory.line;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -8,12 +7,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryBin;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
@@ -127,10 +124,7 @@ public final class LineActions {
     }
 
     /**
-     * 删除一条产线，并按引用情况清理回收站里的机器。
-     *
-     * <p>产线只删自己的引用；机器和规则留在机器库。回收站清理是过渡逻辑，等删除语义落地后
-     * 会去掉。</p>
+     * 删除一条产线。只删产线自己的引用，机器和规则留在机器库。
      *
      * @param factory 工厂
      * @param lineId  产线 id
@@ -143,18 +137,10 @@ public final class LineActions {
         }
         PassiveLine line = found.get();
         String label = "[" + line.shortId() + "] " + line.name();
-        List<UUID> machineIds = new ArrayList<>(line.machineIds());
         factory.config().lines().remove(lineId);
         forgetLine(lineId);
-        int purged = 0;
-        for (UUID machineId : machineIds) {
-            if (FactoryBin.purgeIfOrphaned(factory, observations(), machineId)) {
-                purged++;
-            }
-        }
         markDirty();
-        return Result.ok("已删除产线 " + label
-                + (purged > 0 ? " · 顺带清理了 " + purged + " 台回收站里的机器" : ""), lineId);
+        return Result.ok("已删除产线 " + label + " · 机器和规则留在机器库", lineId);
     }
 
     /**
@@ -268,7 +254,7 @@ public final class LineActions {
     }
 
     /**
-     * 把机器从产线移出；机器和规则留在机器库，够条件时顺手清理回收站条目。
+     * 把机器从产线移出；机器和规则留在机器库。
      *
      * @param factory   工厂
      * @param lineId    产线 id
@@ -289,11 +275,9 @@ public final class LineActions {
             return Result.err("机器不在产线 " + line.name() + " 里");
         }
         wakeLine(line.id());
-        boolean purged = FactoryBin.purgeIfOrphaned(factory, observations(), machineId);
         markDirty();
         return Result.ok("已把机器 [" + machineFound.get().ref().shortId() + "] 移出产线 "
-                + line.name()
-                + (purged ? " · 它在回收站且已无引用，已从机器库删除" : ""), lineId);
+                + line.name() + " · 机器和规则留在机器库", lineId);
     }
 
     // ------------------------------------------------------------------
@@ -490,12 +474,6 @@ public final class LineActions {
         if (runtime != null) {
             runtime.markDirty();
         }
-    }
-
-    @Nullable
-    private static ObservationService observations() {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        return runtime == null ? null : runtime.observations();
     }
 
     private static void wakeLine(UUID lineId) {

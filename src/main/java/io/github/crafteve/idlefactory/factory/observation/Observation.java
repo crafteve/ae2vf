@@ -161,16 +161,6 @@ public final class Observation {
     }
 
     /**
-     * 这个位置算不算「在回收站里」。
-     *
-     * @param retired 玩家是否已把机器退役（配置层的意图）
-     * @return 已退役或确实不在了时为 {@code true}
-     */
-    public boolean binned(boolean retired) {
-        return retired || this.health.gone();
-    }
-
-    /**
      * 距离上次观测过去了多少 tick。
      *
      * @param now 当前 tick

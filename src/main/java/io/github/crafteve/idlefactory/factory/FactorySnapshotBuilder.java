@@ -108,7 +108,6 @@ public final class FactorySnapshotBuilder {
      * 一台机器在界面上的样子。
      *
      * @param ref       机器引用（坐标 + id）
-     * @param retired   玩家是否已把机器退役（回收站）
      * @param machineMissing 方块是否已经消失（观测事实）
      * @param health    观测结论
      * @param blockId   观测到的方块 id；未知时 {@code null}
@@ -130,7 +129,7 @@ public final class FactorySnapshotBuilder {
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
-    public record MachineView(MachineRef ref, boolean retired, boolean machineMissing, Health health,
+    public record MachineView(MachineRef ref, boolean machineMissing, Health health,
             @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
             List<String> lineNames, List<UUID> lineIds, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
@@ -163,11 +162,6 @@ public final class FactorySnapshotBuilder {
                 aligned.add(i < reasons.size() ? reasons.get(i) : IoResult.Reason.NO_ITEM);
             }
             return List.copyOf(aligned);
-        }
-
-        /** 是否在回收站里（已退役 或 确实不在了）。 */
-        public boolean binned() {
-            return FactoryBin.binned(this.retired, this.health);
         }
 
         /** 输入侧总速率。 */
@@ -211,7 +205,7 @@ public final class FactorySnapshotBuilder {
          * @return 总状态
          */
         public TotalState totalState() {
-            if (binned() || this.machineMissing || this.health != Health.PRESENT) {
+            if (this.machineMissing || this.health != Health.PRESENT) {
                 return TotalState.OFFLINE;
             }
             if (this.lineNames.isEmpty() || this.ruleCount == 0) {
@@ -244,17 +238,15 @@ public final class FactorySnapshotBuilder {
     /**
      * 工厂健康度汇总。
      *
-     * @param total        机器总数（含回收站）
-     * @param active       参与 IO 的数量（在、且没被退役）
+     * @param total        机器总数
+     * @param active       参与 IO 的数量（方块在、未失联）
      * @param unloaded     未加载
      * @param missing      失联（含维度不存在）
-     * @param retired      已退役的数量
-     * @param bin          回收站总量（已退役 + 失联，去重）
      * @param lines        产线数
      * @param runningLines 运行中的产线数
      */
     public record FactoryHealth(int total, int active, int unloaded, int missing,
-            int retired, int bin, int lines, int runningLines) {
+            int lines, int runningLines) {
 
         /**
          * 一行摘要，给 {@code info} / {@code diag} 的头部用。
@@ -270,15 +262,12 @@ public final class FactorySnapshotBuilder {
             if (this.missing > 0) {
                 builder.append(" · 失联 ").append(this.missing);
             }
-            if (this.bin > 0) {
-                builder.append(" · 回收站 ").append(this.bin);
-            }
             return builder.toString();
         }
     }
 
     /**
-     * 机器库视图（含回收站）。
+     * 机器库视图。
      *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
@@ -333,7 +322,6 @@ public final class FactorySnapshotBuilder {
                     ? IoResult.Reason.OK : stats.outputReason();
 
             views.add(new MachineView(ref,
-                    factory.config().machines().isRetired(ref.id()),
                     factory.live().isMachineMissing(ref.id()),
                     observation.health(),
                     observation.blockId(),
@@ -362,23 +350,6 @@ public final class FactorySnapshotBuilder {
     }
 
     /**
-     * 回收站视图（已退役 或 失联）。
-     *
-     * @param factory      工厂
-     * @param observations 观测服务
-     * @return 视图列表
-     */
-    public static List<MachineView> bin(Factory factory, @Nullable ObservationService observations) {
-        List<MachineView> entries = new ArrayList<>();
-        for (MachineView view : machines(factory, observations)) {
-            if (view.binned()) {
-                entries.add(view);
-            }
-        }
-        return entries;
-    }
-
-    /**
      * 汇总健康度。
      *
      * @param factory      工厂
@@ -400,23 +371,20 @@ public final class FactorySnapshotBuilder {
         int active = 0;
         int unloaded = 0;
         int missing = 0;
-        int retired = 0;
-        int bin = 0;
         for (MachineView view : views) {
-            if (view.retired()) {
-                retired++;
-            } else {
-                switch (view.health()) {
-                    case PRESENT -> active++;
-                    case UNLOADED -> unloaded++;
-                    case MISSING, NO_DIMENSION -> missing++;
-                    default -> {
-                        // UNKNOWN 不计入任何一档
+            switch (view.health()) {
+                case PRESENT -> {
+                    if (view.machineMissing()) {
+                        missing++;
+                    } else {
+                        active++;
                     }
                 }
-            }
-            if (view.binned()) {
-                bin++;
+                case UNLOADED -> unloaded++;
+                case MISSING, NO_DIMENSION -> missing++;
+                default -> {
+                    // UNKNOWN 不计入任何一档
+                }
             }
         }
         int running = 0;
@@ -426,7 +394,7 @@ public final class FactorySnapshotBuilder {
             }
         }
         return new FactoryHealth(factory.config().machines().size(), active, unloaded, missing,
-                retired, bin, factory.config().lines().size(), running);
+                factory.config().lines().size(), running);
     }
 
     /**
@@ -436,9 +404,6 @@ public final class FactorySnapshotBuilder {
      * @return 状态文本
      */
     public static String describe(MachineView view) {
-        if (!view.retired()) {
-            return view.health().describe();
-        }
-        return view.health() == Health.PRESENT ? "已断开" : "已断开 · " + view.health().describe();
+        return view.health().describe();
     }
 }

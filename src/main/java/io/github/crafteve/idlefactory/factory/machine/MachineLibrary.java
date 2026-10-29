@@ -1,12 +1,10 @@
 package io.github.crafteve.idlefactory.factory.machine;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import net.minecraft.core.BlockPos;
@@ -19,12 +17,11 @@ import net.minecraft.world.level.Level;
  * <p>每台机器是 {@link Machine}（身份 + 坐标 + IO 规则）。增删按 id 去重；按坐标查用于准星操作，
  * 按短 id 查用于远程操作。</p>
  *
- * <p>{@code retired} 是回收站过渡期字段，W4 会删除；目前仍供旧的断开/回收站逻辑使用。</p>
+ * <p>方块没了不会把机器移出机器库，只由运行时 {@code machineMissing} 标记；只有玩家显式删除
+ * 才会真正移除。</p>
  */
 public final class MachineLibrary {
     private final Map<UUID, Machine> byId = new LinkedHashMap<>();
-    /** 玩家已退役、仍留在库里的机器 id（回收站过渡期使用）。 */
-    private final Set<UUID> retired = new HashSet<>();
 
     /**
      * 按坐标加一台没有规则的新机器。
@@ -66,13 +63,12 @@ public final class MachineLibrary {
     }
 
     /**
-     * 按 id 移除。会同时清掉它的退役标记。
+     * 按 id 移除。
      *
      * @param id 机器 id
      * @return 是否真的移除了
      */
     public boolean remove(UUID id) {
-        this.retired.remove(id);
         return this.byId.remove(id) != null;
     }
 
@@ -129,55 +125,14 @@ public final class MachineLibrary {
         return Optional.ofNullable(this.byId.get(id));
     }
 
-    /**
-     * 这台机器是不是已被玩家退役（回收站）。
-     *
-     * @param id 机器 id
-     * @return 已退役时为 {@code true}
-     */
-    public boolean isRetired(UUID id) {
-        return this.retired.contains(id);
-    }
-
-    /**
-     * 设置退役标记。只会作用于库里已有的机器。
-     *
-     * @param id    机器 id
-     * @param value {@code true} 表示移入回收站
-     */
-    public void setRetired(UUID id, boolean value) {
-        if (!this.byId.containsKey(id)) {
-            return;
-        }
-        if (value) {
-            this.retired.add(id);
-        } else {
-            this.retired.remove(id);
-        }
-    }
-
-    /**
-     * 所有退役标记（存档过渡用）。
-     *
-     * @return 只读集合
-     */
-    public Set<UUID> retiredIds() {
-        return Set.copyOf(this.retired);
-    }
-
     /** 所有机器（登记顺序）。 */
     public List<Machine> all() {
         return List.copyOf(this.byId.values());
     }
 
-    /** 机器数量（含回收站）。 */
+    /** 机器数量。 */
     public int size() {
         return this.byId.size();
-    }
-
-    /** 还在参与 IO 的数量（不含回收站）。 */
-    public int activeCount() {
-        return this.byId.size() - this.retired.size();
     }
 
     /** 是否为空。 */

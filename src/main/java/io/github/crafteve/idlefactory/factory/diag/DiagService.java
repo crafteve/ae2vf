@@ -144,15 +144,15 @@ public final class DiagService {
         for (Machine machine : factory.config().machines().all()) {
             MachineRef ref = machine.ref();
             Observation observation = observations.observe(ref.blockKey());
-            boolean retired = factory.config().machines().isRetired(ref.id());
-            if (observation.health() == Health.PRESENT && !retired) {
+            boolean missing = factory.live().isMachineMissing(ref.id());
+            if (observation.health() == Health.PRESENT && !missing) {
                 continue;
             }
             if (shown >= OBSERVE_LIMIT) {
-                FactoryMessages.send(player, FactoryMessages.info("… 还有更多，用 /idf factory bin 查看"));
+                FactoryMessages.send(player, FactoryMessages.info("… 还有更多，用 /idf factory info 查看"));
                 break;
             }
-            FactoryMessages.send(player, observationRow(ref, observation, retired, now));
+            FactoryMessages.send(player, observationRow(ref, observation, missing, now));
             shown++;
         }
         if (shown == 0) {
@@ -162,17 +162,17 @@ public final class DiagService {
     }
 
     private static Component observationRow(MachineRef ref, Observation observation,
-            boolean retired, long now) {
+            boolean missing, long now) {
         String where = ref.dimension().location() + " " + ref.pos().toShortString();
         DiagEvent.Level level = switch (observation.health()) {
-            case PRESENT -> retired ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
+            case PRESENT -> missing ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
             case UNLOADED -> DiagEvent.Level.WARN;
             case UNKNOWN -> DiagEvent.Level.IDLE;
             default -> DiagEvent.Level.ERROR;
         };
         StringBuilder tail = new StringBuilder(observation.health().describe());
-        if (retired) {
-            tail.append(" · 已断开");
+        if (missing) {
+            tail.append(" · 机器失联");
         }
         long missingSince = observation.missingSince();
         if (missingSince >= 0L) {

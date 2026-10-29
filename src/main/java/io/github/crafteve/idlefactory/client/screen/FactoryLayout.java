@@ -44,7 +44,7 @@ public final class FactoryLayout {
     public static final int GRID_COLS = 9;
     /** tab 条高度。 */
     public static final int TAB_H = 16;
-    /** tab 数量（仓库 / 机器）。回收站是机器的属性，不占一个 tab。 */
+    /** tab 数量（仓库 / 机器）。失联是机器的属性，不占一个 tab。 */
     public static final int TAB_COUNT = 2;
     /** 搜索框高度。 */
     public static final int SEARCH_H = 14;

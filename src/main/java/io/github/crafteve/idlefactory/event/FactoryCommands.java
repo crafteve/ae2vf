@@ -12,7 +12,6 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.line.LineService;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
@@ -160,33 +159,22 @@ public final class FactoryCommands {
                 .then(Commands.literal("disconnect")
                         .executes(audit("factory.disconnect",
                                 context -> FactoryService.disconnectMachine(player(context))))
+                        .then(Commands.literal("confirm")
+                                .executes(audit("factory.disconnect.confirm",
+                                        context -> FactoryService.confirmDisconnectMachine(
+                                                player(context)))))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .suggests(allMachines())
                                 .executes(audit("factory.disconnect",
                                         context -> FactoryService.disconnectMachine(
-                                                player(context), StringArgumentType.getString(context, "id"))))))
+                                                player(context), StringArgumentType.getString(context, "id"))))
+                                .then(Commands.literal("confirm")
+                                        .executes(audit("factory.disconnect.confirm",
+                                                context -> FactoryService.confirmDisconnectMachine(
+                                                        player(context),
+                                                        StringArgumentType.getString(context, "id")))))))
                 .then(Commands.literal("info")
-                        .executes(context -> FactoryService.info(player(context))))
-                .then(bin());
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> bin() {
-        return Commands.literal("bin")
-                .executes(context -> FactoryService.binInfo(player(context)))
-                .then(Commands.literal("restore")
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(binIds())
-                                .executes(audit("factory.bin.restore",
-                                        context -> FactoryService.binRestore(player(context),
-                                                StringArgumentType.getString(context, "id"))))))
-                .then(Commands.literal("purge")
-                        .executes(audit("factory.bin.purge",
-                                context -> FactoryService.binPurge(player(context))))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .suggests(binIds())
-                                .executes(audit("factory.bin.purge",
-                                        context -> FactoryService.binPurge(player(context),
-                                                StringArgumentType.getString(context, "id"))))));
+                        .executes(context -> FactoryService.info(player(context))));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> line(RegisterCommandsEvent event) {
@@ -449,26 +437,6 @@ public final class FactoryCommands {
         };
     }
 
-    /** 回收站里的机器（{@code bin restore/purge} 用）。 */
-    private static SuggestionProvider<CommandSourceStack> binIds() {
-        return (context, builder) -> {
-            Factory factory = factoryFor(context.getSource());
-            if (factory == null) {
-                return builder.buildFuture();
-            }
-            FactoryRuntime runtime = FactoryRuntime.get();
-            ObservationService observations = runtime == null ? null : runtime.observations();
-            for (FactorySnapshotBuilder.MachineView view
-                    : FactorySnapshotBuilder.bin(factory, observations)) {
-                MachineRef ref = view.ref();
-                builder.suggest(ref.shortId(), Component.literal(
-                        ref.dimension().location() + " " + ref.pos().toShortString()
-                                + " · " + FactorySnapshotBuilder.describe(view)));
-            }
-            return builder.buildFuture();
-        };
-    }
-
     /** 这台机器已经配过的同类资源（{@code remove} 用）。 */
     private static SuggestionProvider<CommandSourceStack> configuredItems(boolean input, ResourceKind kind) {
         return (context, builder) -> {
@@ -698,9 +666,6 @@ public final class FactoryCommands {
                 .append(' ').append(target.pos().toShortString());
         if (observations != null) {
             text.append('\n').append(observations.observe(target.blockKey()).health().describe());
-        }
-        if (factory.config().machines().isRetired(target.id())) {
-            text.append("\n回收站");
         }
         return Component.literal(text.toString());
     }

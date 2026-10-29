@@ -44,7 +44,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param lineCount       产线数
  * @param runningLineCount 运行中的产线数
  * @param lines           产线列表（界面菜单/筛选）
- * @param machines        机器库视图（含回收站）
+ * @param machines        机器库视图
  */
 public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline, int lineCount, int runningLineCount,
@@ -163,7 +163,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeUUID(ref.id());
         ResourceLocation.STREAM_CODEC.encode(buf, ref.dimension().location());
         buf.writeLong(ref.pos().asLong());
-        buf.writeBoolean(machine.retired());
         buf.writeBoolean(machine.machineMissing());
         buf.writeByte(machine.health().ordinal());
         writeNullableResourceLocation(buf, machine.blockId());
@@ -196,7 +195,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         UUID id = buf.readUUID();
         ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
         long packedPos = buf.readLong();
-        boolean retired = buf.readBoolean();
         boolean machineMissing = buf.readBoolean();
         Health health = readEnum(buf, Health.values(), "health");
         ResourceLocation blockId = readNullableResourceLocation(buf);
@@ -228,7 +226,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         MachineRef ref = new MachineRef(id,
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
-        return new FactorySnapshotBuilder.MachineView(ref, retired, machineMissing, health, blockId,
+        return new FactorySnapshotBuilder.MachineView(ref, machineMissing, health, blockId,
                 presence, lineNames, lineIds, ruleCount, inputs, outputs, inputRates, outputRates,
                 sinceMoveTicks, blockedTicks, workState, inputFull, sinceInputMoveTicks,
                 inputReason, outputReason, inputReasons, outputReasons);

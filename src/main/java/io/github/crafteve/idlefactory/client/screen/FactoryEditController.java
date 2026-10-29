@@ -711,12 +711,31 @@ public final class FactoryEditController {
         }
     }
 
+    /**
+     * 打开删除机器的确认框；有规则时由调用方显示规则数。
+     *
+     * @param machine 机器
+     */
+    public void confirmDeleteMachine(FactorySnapshotBuilder.MachineView machine) {
+        if (this.layout == null) {
+            return;
+        }
+        String message = machine.ruleCount() > 0
+                ? "机器 [" + machine.ref().shortId() + "] 还有 " + machine.ruleCount()
+                        + " 条 IO 配置。\n删除后规则无法恢复。"
+                : "删除机器 [" + machine.ref().shortId() + "]？";
+        this.confirmDialog.open("删除机器", message, "删除",
+                () -> sendLineAction(FactoryLineActionC2S.Action.DELETE_MACHINE, null,
+                        machine.ref().id(), null),
+                this.layout);
+    }
+
     private void confirmDelete(FactorySnapshotBuilder.LineView line) {
         if (this.layout == null) {
             return;
         }
         this.confirmDialog.open("删除产线",
-                "删除产线 [" + line.name() + "]？\n机器会失去引用，规则会一起移除。",
+                "删除产线 [" + line.name() + "]？\n机器会回到机器库，规则保留。",
                 "删除",
                 () -> {
                     this.pendingAction = FactoryLineActionC2S.Action.DELETE_LINE;

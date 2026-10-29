@@ -974,10 +974,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int ready = 0;
         int unloaded = 0;
         int missing = 0;
-        int binned = 0;
         for (FactorySnapshotBuilder.MachineView machine : table) {
-            if (machine.binned()) {
-                binned++;
+            if (machine.machineMissing()) {
+                missing++;
             } else {
                 switch (machine.health()) {
                     case PRESENT -> ready++;
@@ -1002,9 +1001,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         footer.add(new TextPart(" · ", this.theme.textPrimary()));
         footer.add(new TextPart("失联 ", this.theme.error()));
         footer.add(new TextPart(Integer.toString(missing), this.theme.error()));
-        footer.add(new TextPart(" · ", this.theme.textPrimary()));
-        footer.add(new TextPart("回收站 ", this.theme.statusIdle()));
-        footer.add(new TextPart(Integer.toString(binned), this.theme.statusIdle()));
         if (this.maxFirstRow() > 0) {
             footer.add(new TextPart(" · ", this.theme.textPrimary()));
             footer.add(new TextPart(Integer.toString(this.firstRow + 1), this.theme.textValue()));
@@ -1046,11 +1042,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
         NineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
                 FactoryLayout.CELL);
-        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
+        ItemStack icon = machine.machineMissing()
+                ? new ItemStack(Items.BARRIER)
+                : FactoryLabels.blockStack(machine.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
 
-        String name = FactoryLabels.blockName(machine.blockId());
+        String name = machine.machineMissing() ? "已失联" : FactoryLabels.blockName(machine.blockId());
         int nameWidth = l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 10;
         graphics.drawString(this.font,
                 this.font.plainSubstrByWidth(name, nameWidth),
@@ -1098,6 +1096,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     idleLabel != null);
         }
         drawExpandButton(graphics, y, isOpen(machine));
+        int deleteX = l.leftX + l.leftW - 14;
+        boolean deleteHovered = this.renderMouseX >= deleteX && this.renderMouseX < deleteX + 12
+                && this.renderMouseY >= y + 4 && this.renderMouseY < y + FactoryLayout.ROW_H - 4;
+        graphics.drawString(this.font, "×", deleteX, y + (FactoryLayout.ROW_H - 8) / 2,
+                deleteHovered ? this.theme.error() : this.theme.textDim(), false);
         if (detailHeight > 0) {
             IoDetailLayout.Detail detail = IoDetailLayout.layout(l, machine,
                     y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
@@ -1217,6 +1220,27 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return null;
         }
         return this.filteredMachines.get(index);
+    }
+
+    /**
+     * 鼠标下的删除按钮（机器行最右侧的叉号）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 机器视图；没命中为 {@code null}
+     */
+    @Nullable
+    FactorySnapshotBuilder.MachineView deleteButtonAt(double mouseX, double mouseY) {
+        if (this.activeTab != TAB_MACHINES) {
+            return null;
+        }
+        TableHit hit = tableHitAt(mouseY);
+        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            return null;
+        }
+        int x = this.layout.leftX + this.layout.leftW - 14;
+        return inside(mouseX, mouseY, x, hit.y() + 2, 12, FactoryLayout.ROW_H - 4)
+                ? hit.machine() : null;
     }
 
     /**
@@ -1670,9 +1694,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     private Status offlineStatus(FactorySnapshotBuilder.MachineView machine) {
-        if (machine.retired()) {
-            return new Status("回收站", this.theme.statusIdle(),
-                    GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
+        if (machine.machineMissing()) {
+            return new Status("失联", this.theme.error(),
+                    GuiTextures.STATUS_STRIP_ERROR, GuiTextures.STATUS_LAMP_ERROR);
         }
         return switch (machine.health()) {
             case MISSING, NO_DIMENSION -> new Status("失联", this.theme.error(),
@@ -2226,7 +2250,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int iconSlotY = cardY + 2;
         NineSlice.slot(graphics, iconSlotX, iconSlotY,
                 FactoryLayout.CELL, FactoryLayout.CELL);
-        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
+        ItemStack icon = machine.machineMissing()
+                ? new ItemStack(Items.BARRIER)
+                : FactoryLabels.blockStack(machine.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconSlotX + 1, iconSlotY + 1);
 
@@ -2243,8 +2269,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 GuiTextures.STATUS_LAMP_SIZE);
 
         int nameWidth = Math.max(18, lampX - textX - 4);
+        String cardName = machine.machineMissing()
+                ? "已失联" : FactoryLabels.blockName(machine.blockId());
         graphics.drawString(this.font,
-                this.font.plainSubstrByWidth(FactoryLabels.blockName(machine.blockId()), nameWidth),
+                this.font.plainSubstrByWidth(cardName, nameWidth),
                 textX, nameY, CARD_NAME, false);
         graphics.drawString(this.font, statusText, statusX, nameY, status.color(), false);
 
@@ -2410,6 +2438,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             this.searchBox.setValue("");
             this.searchBox.setFocused(true);
             return true;
+        }
+        if (button == 0 && this.editController != null) {
+            FactorySnapshotBuilder.MachineView deleteTarget =
+                    deleteButtonAt(mouseX, mouseY);
+            if (deleteTarget != null) {
+                this.editController.confirmDeleteMachine(deleteTarget);
+                return true;
+            }
         }
         if (clickMachineExpand(mouseX, mouseY)) {
             return true;

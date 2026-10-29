@@ -23,7 +23,7 @@ public enum Health {
         return this == PRESENT;
     }
 
-    /** 是否「确实不在了」。用于回收站与清理判定；{@link #UNLOADED} 不算。 */
+    /** 是否「确实不在了」。用于失联标记与清理判定；{@link #UNLOADED} 不算。 */
     public boolean gone() {
         return this == MISSING || this == NO_DIMENSION;
     }

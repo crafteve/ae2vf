@@ -27,7 +27,7 @@ import net.minecraft.server.level.ServerLevel;
  * 不参与每轮遍历。{@code start} / {@code end} / 配置变更会手动唤醒。</p>
  *
  * <p><b>门禁读观测，不读世界</b>：一个组只有「没被玩家断开」且「观测结论是 PRESENT」才会进
- * {@link GroupRunner}。回收站里的、失联的、未加载的组一律直接睡，零世界查询。</p>
+ * {@link GroupRunner}。失联的、未加载的组一律直接睡，零世界查询。</p>
  */
 public final class LineRunner {
     private final RunnerState state = new RunnerState();
@@ -86,11 +86,6 @@ public final class LineRunner {
                 continue;
             }
             MachineRef target = machine.ref();
-            if (factory.config().machines().isRetired(target.id())) {
-                // 回收站里的机器不参与 IO；restore 时会显式唤醒
-                sleepIfIdle(groupState, now);
-                continue;
-            }
             if (factory.live().isMachineMissing(target.id())) {
                 // 方块没了，机器仍在库；等方块回来时再唤醒
                 sleepIfIdle(groupState, now);

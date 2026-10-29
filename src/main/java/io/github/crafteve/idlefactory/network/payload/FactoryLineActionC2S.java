@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.line.LineActions;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
@@ -23,7 +24,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 客户端对产线做出的管理动作：新建 / 重命名 / 删除 / 启动 / 暂停 / 放机器 / 移出机器。
+ * 客户端对产线做出的管理动作：新建 / 重命名 / 删除 / 启动 / 暂停 / 放机器 / 移出机器 / 删除机器。
  *
  * <p>只传 id 和名字，不传产线内容；所有校验由 {@link LineActions} 在服务端重新做。名字只在
  * 新建/重命名时有意义，其它动作忽略。</p>
@@ -31,7 +32,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param containerId 菜单容器 id
  * @param action      动作
  * @param lineId      目标产线 id；新建时为 {@code null}
- * @param machineId   机器 id；仅放机器/移出机器使用
+ * @param machineId   机器 id；放机器/移出机器/删除机器使用
  * @param name        新产线名；仅新建/重命名使用
  */
 public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUID lineId,
@@ -97,6 +98,8 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
                     payload.machineId());
             case REMOVE_MACHINE -> LineActions.removeMachine(factory, payload.lineId(),
                     payload.machineId());
+            case DELETE_MACHINE -> FactoryService.deleteMachineById(factory, payload.machineId(),
+                    true);
         };
     }
 
@@ -154,6 +157,11 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
                     throw new DecoderException("machine action requires line and machine ids");
                 }
             }
+            case DELETE_MACHINE -> {
+                if (machineId == null) {
+                    throw new DecoderException("delete machine requires a machine id");
+                }
+            }
         }
     }
 
@@ -184,6 +192,8 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
         /** 放入机器；机器在别的产线时为移动。 */
         PLACE_MACHINE,
         /** 把机器移出产线。 */
-        REMOVE_MACHINE
+        REMOVE_MACHINE,
+        /** 删除机器（界面确认后）。 */
+        DELETE_MACHINE
     }
 }
