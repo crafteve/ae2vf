@@ -324,7 +324,8 @@ public final class FactoryRuntime {
                     if (FactoryBin.purgeable(referenced, detached, transition.to())) {
                         // 没配过规则，直接删——玩家随时可以 connect 回来
                         FactoryBin.purge(factory, ref.id());
-                        this.save();
+                        // 档案变了就得同步索引：只 save 会让占用表留下幽灵认领。
+                        this.markDirty();
                     } else if (!detached) {
                         // 玩家自己断开的机器不再提醒：他已经说过不要了
                         this.missingNotices.merge(factory.id(), 1, Integer::sum);
