@@ -5,8 +5,6 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
@@ -103,7 +101,7 @@ final class RuleStrip {
      * @param dragging 是否正在拖资源（用于空槽高亮）
      * @param inactive 产线是否暂停/睡眠；此时速率用中性色
      */
-    static void draw(GuiGraphics graphics, Font font, GuiTheme theme, Layout layout,
+    static void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, Layout layout,
             List<ResourceSpec> rules, List<Long> rates, List<IoResult.Reason> reasons,
             int mouseX, int mouseY, boolean dragging, boolean inactive) {
         for (Entry entry : layout.entries()) {
@@ -119,7 +117,7 @@ final class RuleStrip {
             int rateColor = inactive ? theme.statusIdle()
                     : FactoryLabels.rateColorUi(rate, effective, theme);
             String rateText = FactoryLabels.rateText(rate, spec.key().kind());
-            NineSlice.slot(graphics, entry.x(), entry.y(),
+            FactoryNineSlice.slot(graphics, entry.x(), entry.y(),
                     FactoryLayout.CELL, FactoryLayout.CELL);
             ResourceIconRenderer.draw(graphics, font, spec.key(), entry.x() + 1, entry.y() + 1);
             graphics.drawString(font, rateText, entry.x() + FactoryLayout.CELL + 2,
@@ -139,7 +137,7 @@ final class RuleStrip {
         }
         boolean hovered = inside(mouseX, mouseY, add.x(), add.y(),
                 FactoryLayout.CELL, FactoryLayout.CELL);
-        NineSlice.slot(graphics, add.x(), add.y(), FactoryLayout.CELL, FactoryLayout.CELL);
+        FactoryNineSlice.slot(graphics, add.x(), add.y(), FactoryLayout.CELL, FactoryLayout.CELL);
         String plus = "+";
         graphics.drawString(font, plus,
                 add.x() + (FactoryLayout.CELL - font.width(plus)) / 2, add.y() + 5,

@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory;
 
 import io.github.crafteve.idlefactory.client.ModKeyMappings;
-import io.github.crafteve.idlefactory.client.UiConfig;
+import io.github.crafteve.idlefactory.client.screen.FactoryUiConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
@@ -26,7 +26,7 @@ public class IdleFactoryClient {
     public IdleFactoryClient(ModContainer container) {
         // 排序偏好是纯客户端视图状态，写进 config/idlefactory-client.toml；
         // 服务端不加载这份配置。
-        container.registerConfig(ModConfig.Type.CLIENT, UiConfig.SPEC);
+        container.registerConfig(ModConfig.Type.CLIENT, FactoryUiConfig.SPEC);
         // Allows NeoForge to create a config screen for this mod's configs.
         // The config screen is accessed by going to the Mods screen > clicking on your mod > clicking on config.
         // Do not forget to add translations for your config options to the en_us.json file.

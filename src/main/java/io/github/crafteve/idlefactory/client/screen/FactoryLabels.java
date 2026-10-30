@@ -4,8 +4,6 @@ import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
@@ -321,10 +319,10 @@ final class FactoryLabels {
      */
     static ResourceLocation reasonStrip(IoResult.Reason reason) {
         return switch (reason) {
-            case OK -> GuiTextures.STATUS_STRIP_RUN;
-            case NO_ITEM -> GuiTextures.STATUS_STRIP_IDLE;
-            case NO_SPACE -> GuiTextures.STATUS_STRIP_WARN;
-            case NO_HANDLER, REJECTED -> GuiTextures.STATUS_STRIP_ERROR;
+            case OK -> FactoryGuiTextures.STATUS_STRIP_RUN;
+            case NO_ITEM -> FactoryGuiTextures.STATUS_STRIP_IDLE;
+            case NO_SPACE -> FactoryGuiTextures.STATUS_STRIP_WARN;
+            case NO_HANDLER, REJECTED -> FactoryGuiTextures.STATUS_STRIP_ERROR;
         };
     }
 
@@ -335,7 +333,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int reasonColor(IoResult.Reason reason, GuiTheme theme) {
+    static int reasonColor(IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case OK -> theme.statusRun();
             case NO_ITEM -> theme.statusIdle();
@@ -351,7 +349,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int tooltipReasonColor(IoResult.Reason reason, GuiTheme theme) {
+    static int tooltipReasonColor(IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case OK -> theme.tooltip().ok();
             case NO_ITEM -> theme.tooltip().idle();
@@ -400,7 +398,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int rateColorTooltip(long rate, IoResult.Reason reason, GuiTheme theme) {
+    static int rateColorTooltip(long rate, IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case NO_HANDLER, REJECTED -> theme.tooltip().error();
             case NO_SPACE -> theme.tooltip().warn();
@@ -416,7 +414,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int rateColorUi(long rate, IoResult.Reason reason, GuiTheme theme) {
+    static int rateColorUi(long rate, IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case NO_HANDLER, REJECTED -> theme.error();
             case NO_SPACE -> theme.statusWarn();
@@ -446,7 +444,7 @@ final class FactoryLabels {
      * @param theme 主题
      * @return 文本组件
      */
-    static Component labelValue(String label, String value, GuiTheme theme) {
+    static Component labelValue(String label, String value, FactoryGuiTheme theme) {
         return Component.empty()
                 .append(colored(label, theme.tooltip().label()))
                 .append(coloredBold(value, theme.tooltip().value()));
@@ -461,7 +459,7 @@ final class FactoryLabels {
      * @param theme 主题
      * @return 文本组件
      */
-    static Component faceLine(String label, String face, String faceEn, GuiTheme theme) {
+    static Component faceLine(String label, String face, String faceEn, FactoryGuiTheme theme) {
         return Component.empty()
                 .append(colored(label, theme.tooltip().label()))
                 .append(coloredBold(face + "（" + faceEn + "）", theme.tooltip().face()));
@@ -477,7 +475,7 @@ final class FactoryLabels {
      * @return 文本组件
      */
     static Component rate(long rate, ResourceKind kind, IoResult.Reason reason,
-            GuiTheme theme) {
+            FactoryGuiTheme theme) {
         int color = rateColorTooltip(rate, reason, theme);
         return coloredBold(rateText(rate, kind), color);
     }
@@ -490,7 +488,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return 文本组件
      */
-    static Component state(IoResult.Reason reason, boolean input, GuiTheme theme) {
+    static Component state(IoResult.Reason reason, boolean input, FactoryGuiTheme theme) {
         return Component.empty()
                 .append(colored("状态：", theme.tooltip().label()))
                 .append(coloredBold(reason(reason, input), tooltipReasonColor(reason, theme)));

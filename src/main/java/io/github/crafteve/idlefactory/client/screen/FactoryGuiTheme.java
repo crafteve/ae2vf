@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.theme;
+package io.github.crafteve.idlefactory.client.screen;
 
 /**
  * GUI 主题色板。
@@ -14,7 +14,7 @@ package io.github.crafteve.idlefactory.client.theme;
  * <p>改色必须两边一起改：这里的常量 + 生成脚本里的调色板。否则贴图和文字会脱节，而且这种脱节
  * 在截图里看不出来。</p>
  */
-public record GuiTheme(
+public record FactoryGuiTheme(
         /** 面板底色。 */
         int panelBg,
         /** 面板最外圈深色。 */
@@ -83,7 +83,7 @@ public record GuiTheme(
      * {@code accent} 与 {@code textPrimary} 刻意同色——AE2 浅色主题里「强调」就是最深的那个靛色，
      * 不要再自创蓝色。</p>
      */
-    public static final GuiTheme AE2 = new GuiTheme(
+    public static final FactoryGuiTheme AE2 = new FactoryGuiTheme(
             0xFFCBCCD4, // panelBg
             0xFF413F54, // panelBorder
             0xFFF2F2F2, // panelBorderLight
@@ -108,7 +108,7 @@ public record GuiTheme(
     );
 
     /** 深色主题（保留，暂不作为默认；贴图目前只生成了浅色一套）。 */
-    public static final GuiTheme DARK = new GuiTheme(
+    public static final FactoryGuiTheme DARK = new FactoryGuiTheme(
             0xFF1A1A1C,
             0xFF2A2A2E,
             0xFF2E2E33,
@@ -133,14 +133,14 @@ public record GuiTheme(
     );
 
     /** 当前主题；默认 {@link #AE2}。 */
-    private static volatile GuiTheme current = AE2;
+    private static volatile FactoryGuiTheme current = AE2;
 
     /**
      * 当前主题。
      *
      * @return 当前主题，默认 {@link #AE2}
      */
-    public static GuiTheme current() {
+    public static FactoryGuiTheme current() {
         return current;
     }
 
@@ -149,7 +149,7 @@ public record GuiTheme(
      *
      * @param theme 新主题；传 {@code null} 会恢复 {@link #AE2}
      */
-    public static void setCurrent(GuiTheme theme) {
+    public static void setCurrent(FactoryGuiTheme theme) {
         current = theme != null ? theme : AE2;
     }
 }

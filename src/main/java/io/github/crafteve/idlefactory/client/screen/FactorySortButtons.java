@@ -3,8 +3,6 @@ package io.github.crafteve.idlefactory.client.screen;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.UiConfig;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.resources.ResourceLocation;
@@ -143,15 +141,15 @@ final class FactorySortButtons {
      */
     ResourceLocation icon(int index, boolean storageTab) {
         return switch (index) {
-            case KEY -> GuiTextures.SORT_KEY;
+            case KEY -> FactoryGuiTextures.SORT_KEY;
             case DIRECTION -> (storageTab ? storageDescending : machineDescending)
-                    ? GuiTextures.SORT_DESC : GuiTextures.SORT_ASC;
+                    ? FactoryGuiTextures.SORT_DESC : FactoryGuiTextures.SORT_ASC;
             case SCOPE -> switch (storageScope) {
-                case ALL -> GuiTextures.SCOPE_ALL;
-                case ITEMS -> GuiTextures.SCOPE_ITEMS;
-                case FLUIDS -> GuiTextures.SCOPE_FLUIDS;
+                case ALL -> FactoryGuiTextures.SCOPE_ALL;
+                case ITEMS -> FactoryGuiTextures.SCOPE_ITEMS;
+                case FLUIDS -> FactoryGuiTextures.SCOPE_FLUIDS;
             };
-            default -> GuiTextures.SORT_KEY;
+            default -> FactoryGuiTextures.SORT_KEY;
         };
     }
 
@@ -243,12 +241,12 @@ final class FactorySortButtons {
     private static void loadFromConfig() {
         try {
             storageKey = parseEnum(FactorySort.StorageKey.class,
-                    UiConfig.STORAGE_KEY.get(), FactorySort.StorageKey.DEFAULT);
-            storageDescending = UiConfig.STORAGE_DESCENDING.get();
-            storageScope = parseEnum(Scope.class, UiConfig.STORAGE_SCOPE.get(), Scope.ALL);
+                    FactoryUiConfig.STORAGE_KEY.get(), FactorySort.StorageKey.DEFAULT);
+            storageDescending = FactoryUiConfig.STORAGE_DESCENDING.get();
+            storageScope = parseEnum(Scope.class, FactoryUiConfig.STORAGE_SCOPE.get(), Scope.ALL);
             machineKey = parseEnum(FactorySort.MachineKey.class,
-                    UiConfig.MACHINE_KEY.get(), FactorySort.MachineKey.DEFAULT);
-            machineDescending = UiConfig.MACHINE_DESCENDING.get();
+                    FactoryUiConfig.MACHINE_KEY.get(), FactorySort.MachineKey.DEFAULT);
+            machineDescending = FactoryUiConfig.MACHINE_DESCENDING.get();
         } catch (RuntimeException exception) {
             IdleFactory.LOGGER.warn("读取排序偏好失败，使用默认值", exception);
         }
@@ -262,12 +260,12 @@ final class FactorySortButtons {
      */
     private static void persist() {
         try {
-            UiConfig.STORAGE_KEY.set(storageKey.name());
-            UiConfig.STORAGE_DESCENDING.set(storageDescending);
-            UiConfig.STORAGE_SCOPE.set(storageScope.name());
-            UiConfig.MACHINE_KEY.set(machineKey.name());
-            UiConfig.MACHINE_DESCENDING.set(machineDescending);
-            UiConfig.SPEC.save();
+            FactoryUiConfig.STORAGE_KEY.set(storageKey.name());
+            FactoryUiConfig.STORAGE_DESCENDING.set(storageDescending);
+            FactoryUiConfig.STORAGE_SCOPE.set(storageScope.name());
+            FactoryUiConfig.MACHINE_KEY.set(machineKey.name());
+            FactoryUiConfig.MACHINE_DESCENDING.set(machineDescending);
+            FactoryUiConfig.SPEC.save();
         } catch (RuntimeException exception) {
             IdleFactory.LOGGER.warn("保存排序偏好失败", exception);
         }

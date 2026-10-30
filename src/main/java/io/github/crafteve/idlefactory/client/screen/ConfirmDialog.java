@@ -2,9 +2,6 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,7 +14,7 @@ import net.minecraft.client.gui.GuiGraphics;
  */
 public final class ConfirmDialog {
     private final Font font;
-    private final GuiTheme theme;
+    private final FactoryGuiTheme theme;
 
     private boolean open;
     private String title = "";
@@ -32,7 +29,7 @@ public final class ConfirmDialog {
      * @param font  字体
      * @param theme 主题
      */
-    public ConfirmDialog(Font font, GuiTheme theme) {
+    public ConfirmDialog(Font font, FactoryGuiTheme theme) {
         this.font = font;
         this.theme = theme;
     }
@@ -94,8 +91,8 @@ public final class ConfirmDialog {
         int h = FactoryLayout.CONFIRM_H;
         graphics.fill(l.panelX, l.panelY, l.panelX + l.panelW, l.panelY + l.panelH,
                 0x90000000);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x + 3, y + 3, w, h);
-        NineSlice.panel(graphics, x, y, w, h);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + 3, y + 3, w, h);
+        FactoryNineSlice.panel(graphics, x, y, w, h);
         graphics.drawString(this.font, this.title, x + 12, y + 10,
                 this.theme.textPrimary(), false);
 
@@ -120,9 +117,9 @@ public final class ConfirmDialog {
             boolean danger, int mouseX, int mouseY) {
         boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 18;
         if (hovered) {
-            NineSlice.buttonHover(graphics, x, y, w, 18);
+            FactoryNineSlice.buttonHover(graphics, x, y, w, 18);
         } else {
-            NineSlice.button(graphics, x, y, w, 18);
+            FactoryNineSlice.button(graphics, x, y, w, 18);
         }
         int color = danger ? this.theme.error() : this.theme.textPrimary();
         graphics.drawString(this.font, label,

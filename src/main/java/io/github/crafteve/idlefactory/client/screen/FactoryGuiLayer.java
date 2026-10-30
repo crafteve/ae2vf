@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.widget;
+package io.github.crafteve.idlefactory.client.screen;
 
 /**
  * 界面绘制层级（z）。
@@ -9,7 +9,7 @@ package io.github.crafteve.idlefactory.client.widget;
  *
  * <p>新加图层先在这里加一项再引用，禁止在调用点写魔法数。</p>
  */
-public enum GuiLayer {
+public enum FactoryGuiLayer {
     /** 面板、文字、槽位、按钮等基础 2D 层。 */
     BASE(0.0F),
     /** 原版物品图标（{@code GuiGraphics.renderItem} 自带 150 偏移）。 */
@@ -27,7 +27,7 @@ public enum GuiLayer {
 
     private final float z;
 
-    GuiLayer(float z) {
+    FactoryGuiLayer(float z) {
         this.z = z;
     }
 

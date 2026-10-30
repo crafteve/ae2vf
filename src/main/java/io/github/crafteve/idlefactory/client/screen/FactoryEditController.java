@@ -5,10 +5,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiLayer;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.line.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
@@ -43,7 +39,7 @@ public final class FactoryEditController {
 
     private final FactoryScreen screen;
     private final Font font;
-    private final GuiTheme theme;
+    private final FactoryGuiTheme theme;
     private final LineSelectorMenu lineMenu;
     private final LineNameDialog nameDialog;
     private final ConfirmDialog confirmDialog;
@@ -95,7 +91,7 @@ public final class FactoryEditController {
      * @param font   字体
      * @param theme  主题
      */
-    public FactoryEditController(FactoryScreen screen, Font font, GuiTheme theme) {
+    public FactoryEditController(FactoryScreen screen, Font font, FactoryGuiTheme theme) {
         this.screen = screen;
         this.font = font;
         this.theme = theme;
@@ -614,9 +610,9 @@ public final class FactoryEditController {
         }
         drawFeedback(graphics);
         // 物品图标在 150、原版数量装饰在 200、仓库自定义数量在 300；浮层必须高于这些内容层。
-        // 层级统一走 GuiLayer，tooltip 由原版画在 400，浮层打开时 tooltip 已被抑制。
+        // 层级统一走 FactoryGuiLayer，tooltip 由原版画在 400，浮层打开时 tooltip 已被抑制。
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, GuiLayer.OVERLAY.z());
+        graphics.pose().translate(0.0F, 0.0F, FactoryGuiLayer.OVERLAY.z());
         this.lineMenu.draw(graphics, this.font, this.theme, mouseX, mouseY);
         this.nameDialog.draw(graphics, mouseX, mouseY, partialTick);
         this.confirmDialog.draw(graphics, mouseX, mouseY);
@@ -635,7 +631,7 @@ public final class FactoryEditController {
             }
             // renderItem 自带 150 偏移，这里再补差值，让幽灵净层级落在 DRAG。
             graphics.pose().pushPose();
-            graphics.pose().translate(0.0F, 0.0F, GuiLayer.DRAG.z() - GuiLayer.ITEM.z());
+            graphics.pose().translate(0.0F, 0.0F, FactoryGuiLayer.DRAG.z() - FactoryGuiLayer.ITEM.z());
             graphics.renderItem(icon, (int) this.dragMouseX - 8, (int) this.dragMouseY - 8);
             graphics.pose().popPose();
         }
@@ -773,7 +769,7 @@ public final class FactoryEditController {
             return;
         }
         FactoryLayout l = this.layout;
-        NineSlice.fill(graphics, GuiTextures.HEADER_BG, l.tableX, l.footerY, l.tableW,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.HEADER_BG, l.tableX, l.footerY, l.tableW,
                 FactoryLayout.FOOTER_H);
         String text = this.font.plainSubstrByWidth(this.feedbackText, l.tableW - 4);
         graphics.drawString(this.font, text, l.tableX + 2, l.footerY + 3,

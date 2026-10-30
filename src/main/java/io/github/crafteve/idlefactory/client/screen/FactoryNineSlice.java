@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.widget;
+package io.github.crafteve.idlefactory.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
@@ -17,86 +17,86 @@ import net.minecraft.resources.ResourceLocation;
  * <p><b>注意</b>：{@code GuiGraphics.blit} 的源尺寸和目标尺寸是两组独立参数，不能混用——
  * 用「目标尺寸」当源尺寸去拉伸 1×1 贴图会采样越界，画出来是花屏。所有调用都显式给源矩形。</p>
  */
-public final class NineSlice {
-    private NineSlice() {
+public final class FactoryNineSlice {
+    private FactoryNineSlice() {
         // 纯静态工具类
     }
 
     // ------------------------------------------------------------------
-    // 具名快捷方法：边框宽度写在这里，和 GuiTextures 里的常量对应
+    // 具名快捷方法：边框宽度写在这里，和 FactoryGuiTextures 里的常量对应
     // ------------------------------------------------------------------
 
     /** 画面板底。 */
     public static void panel(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.PANEL, GuiTextures.PANEL_SIZE, GuiTextures.PANEL_BORDER,
+        slice(graphics, FactoryGuiTextures.PANEL, FactoryGuiTextures.PANEL_SIZE, FactoryGuiTextures.PANEL_BORDER,
                 x, y, width, height);
     }
 
     /** 画凹槽格子。 */
     public static void slot(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.SLOT, GuiTextures.SLOT_SIZE, 1, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.SLOT, FactoryGuiTextures.SLOT_SIZE, 1, x, y, width, height);
     }
 
     /** 画凸起按钮。 */
     public static void button(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.BUTTON, GuiTextures.BUTTON_SIZE, 1, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.BUTTON, FactoryGuiTextures.BUTTON_SIZE, 1, x, y, width, height);
     }
 
     /** 画输入框。 */
     public static void field(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.FIELD, GuiTextures.FIELD_SIZE, 1, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.FIELD, FactoryGuiTextures.FIELD_SIZE, 1, x, y, width, height);
     }
 
     /** 画凸起表头。 */
     public static void header(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.TABLE_HEADER, GuiTextures.TABLE_FRAME_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.TABLE_HEADER, FactoryGuiTextures.TABLE_FRAME_SIZE, 1,
                 x, y, width, height);
     }
 
     /** 画行卡片。 */
     public static void card(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.ROW_CARD, GuiTextures.TABLE_FRAME_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.ROW_CARD, FactoryGuiTextures.TABLE_FRAME_SIZE, 1,
                 x, y, width, height);
     }
 
     /** 画机器库卡片。 */
     public static void machineCard(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.MACHINE_CARD, GuiTextures.MACHINE_CARD_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.MACHINE_CARD, FactoryGuiTextures.MACHINE_CARD_SIZE, 1,
                 x, y, width, height);
     }
 
     /** 画 IO 展开详情底板。 */
     public static void ioPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.IO_PANEL, GuiTextures.IO_PANEL_SIZE,
-                GuiTextures.IO_PANEL_BORDER, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.IO_PANEL, FactoryGuiTextures.IO_PANEL_SIZE,
+                FactoryGuiTextures.IO_PANEL_BORDER, x, y, width, height);
     }
 
     /** 画 IO 规则单元格。 */
     public static void ioCell(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.IO_CELL, GuiTextures.IO_CELL_SIZE, 1, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.IO_CELL, FactoryGuiTextures.IO_CELL_SIZE, 1, x, y, width, height);
     }
 
     /** 画 IO 规则单元格悬停底。 */
     public static void ioCellHover(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.IO_CELL_HOVER, GuiTextures.IO_CELL_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.IO_CELL_HOVER, FactoryGuiTextures.IO_CELL_SIZE, 1,
                 x, y, width, height);
     }
 
     /** 画 IO 段头：深色卡片，下/右 2px 深阴影。 */
     public static void ioHeader(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.IO_HEADER, GuiTextures.IO_HEADER_SIZE,
-                GuiTextures.IO_HEADER_BORDER, x, y, width, height);
+        slice(graphics, FactoryGuiTextures.IO_HEADER, FactoryGuiTextures.IO_HEADER_SIZE,
+                FactoryGuiTextures.IO_HEADER_BORDER, x, y, width, height);
     }
 
     /** 画按钮悬停底。 */
     public static void buttonHover(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.BUTTON_HOVER, GuiTextures.IO_CELL_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.BUTTON_HOVER, FactoryGuiTextures.IO_CELL_SIZE, 1,
                 x, y, width, height);
     }
 
     /** 画蓝灰排序按钮底。 */
     public static void sortButton(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, GuiTextures.SORT_BUTTON, GuiTextures.SORT_BUTTON_SIZE, 1,
+        slice(graphics, FactoryGuiTextures.SORT_BUTTON, FactoryGuiTextures.SORT_BUTTON_SIZE, 1,
                 x, y, width, height);
     }
 

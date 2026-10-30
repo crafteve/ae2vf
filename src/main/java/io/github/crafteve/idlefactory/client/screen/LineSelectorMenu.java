@@ -6,9 +6,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 
 import net.minecraft.client.gui.Font;
@@ -171,7 +168,7 @@ public final class LineSelectorMenu {
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
-    public void draw(GuiGraphics graphics, Font font, GuiTheme theme, int mouseX, int mouseY) {
+    public void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, int mouseX, int mouseY) {
         if (!this.open || this.layout == null) {
             return;
         }
@@ -181,23 +178,23 @@ public final class LineSelectorMenu {
                         - FactoryLayout.PAD - this.width));
         relayout();
 
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
                 this.width, this.height);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, this.width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y + this.height - 1,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y, this.width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y + this.height - 1,
                 this.width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, 1, this.height);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + this.width - 1, this.y,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y, 1, this.height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x + this.width - 1, this.y,
                 1, this.height);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
                 this.width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
                 1, this.height - 2);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + this.height - 2,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1, this.y + this.height - 2,
                 this.width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + this.width - 2, this.y + 1,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + this.width - 2, this.y + 1,
                 1, this.height - 2);
-        NineSlice.fill(graphics, GuiTextures.HEADER_BG, this.x + 2, this.y + 2,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.HEADER_BG, this.x + 2, this.y + 2,
                 this.width - 4, this.height - 4);
 
         int rowX = this.x + FactoryLayout.LINE_MENU_PAD;
@@ -221,11 +218,11 @@ public final class LineSelectorMenu {
         if (this.hasFactory) {
             int addY = this.y + this.height - FactoryLayout.LINE_ADD_ROW_H
                     - FactoryLayout.LINE_MENU_PAD;
-            NineSlice.button(graphics, rowX, addY, rowW, FactoryLayout.LINE_ADD_ROW_H - 3);
+            FactoryNineSlice.button(graphics, rowX, addY, rowW, FactoryLayout.LINE_ADD_ROW_H - 3);
             boolean hovered = mouseX >= rowX && mouseX < rowX + rowW
                     && mouseY >= addY && mouseY < addY + FactoryLayout.LINE_ADD_ROW_H - 3;
             if (hovered) {
-                NineSlice.fill(graphics, GuiTextures.ROW_ALT, rowX + 1, addY + 1,
+                FactoryNineSlice.fill(graphics, FactoryGuiTextures.ROW_ALT, rowX + 1, addY + 1,
                         rowW - 2, FactoryLayout.LINE_ADD_ROW_H - 5);
             }
             graphics.drawString(font, "+ 新建产线", rowX + 5, addY + 3,
@@ -244,25 +241,25 @@ public final class LineSelectorMenu {
     private static net.minecraft.resources.ResourceLocation statusLamp(
             FactorySnapshotBuilder.LineView line) {
         if (!line.running()) {
-            return GuiTextures.STATUS_LAMP_ERROR;
+            return FactoryGuiTextures.STATUS_LAMP_ERROR;
         }
-        return line.sleeping() ? GuiTextures.STATUS_LAMP_IDLE : GuiTextures.STATUS_LAMP_RUN;
+        return line.sleeping() ? FactoryGuiTextures.STATUS_LAMP_IDLE : FactoryGuiTextures.STATUS_LAMP_RUN;
     }
 
-    private void drawLineRow(GuiGraphics graphics, Font font, GuiTheme theme,
+    private void drawLineRow(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
             int mouseX, int mouseY, FactorySnapshotBuilder.LineView line, int rowX, int rowY,
             int rowW) {
-        NineSlice.button(graphics, rowX, rowY, rowW, FactoryLayout.LINE_ROW_H - 2);
+        FactoryNineSlice.button(graphics, rowX, rowY, rowW, FactoryLayout.LINE_ROW_H - 2);
         boolean selectedRow = line.id().equals(this.selected);
         boolean hovered = mouseX >= rowX && mouseX < rowX + rowW
                 && mouseY >= rowY && mouseY < rowY + FactoryLayout.LINE_ROW_H - 2;
         if (selectedRow || hovered) {
-            NineSlice.fill(graphics, GuiTextures.ROW_ALT, rowX + 1, rowY + 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.ROW_ALT, rowX + 1, rowY + 1,
                     rowW - 2, FactoryLayout.LINE_ROW_H - 4);
         }
-        NineSlice.icon(graphics,
+        FactoryNineSlice.icon(graphics,
                 statusLamp(line),
-                rowX + 5, rowY + 6, GuiTextures.STATUS_LAMP_SIZE);
+                rowX + 5, rowY + 6, FactoryGuiTextures.STATUS_LAMP_SIZE);
 
         boolean scrollable = this.lines.size() > this.visibleRows;
         int caretX = rowX + rowW - 5 - FactoryLayout.LINE_CARET_W
@@ -275,8 +272,8 @@ public final class LineSelectorMenu {
                 nameX, rowY + 4,
                 selectedRow ? theme.textValue() : theme.textPrimary(), false);
         graphics.drawString(font, count, countX, rowY + 4, theme.textDim(), false);
-        NineSlice.icon(graphics, GuiTextures.CHEVRON_RIGHT, caretX, rowY + 5,
-                GuiTextures.CHEVRON_SIZE);
+        FactoryNineSlice.icon(graphics, FactoryGuiTextures.CHEVRON_RIGHT, caretX, rowY + 5,
+                FactoryGuiTextures.CHEVRON_SIZE);
     }
 
     /** 列表内容超过可视行数时，在右缘画一条 2px 滚动条。 */
@@ -549,40 +546,40 @@ public final class LineSelectorMenu {
             return item.kind().clickable() ? item.id() : null;
         }
 
-        void draw(GuiGraphics graphics, Font font, GuiTheme theme, int mouseX, int mouseY) {
+        void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, int mouseX, int mouseY) {
             if (!this.open) {
                 return;
             }
             int height = height();
-            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x + 2, this.y + 2,
                     this.width, height);
-            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, this.width, 1);
-            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y + height - 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y, this.width, 1);
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y + height - 1,
                     this.width, 1);
-            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x, this.y, 1, height);
-            NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, this.x + this.width - 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x, this.y, 1, height);
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, this.x + this.width - 1,
                     this.y, 1, height);
-            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
                     this.width - 2, 1);
-            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1, this.y + 1,
                     1, height - 2);
-            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, this.x + 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, this.x + 1,
                     this.y + height - 2, this.width - 2, 1);
-            NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT,
                     this.x + this.width - 2, this.y + 1, 1, height - 2);
-            NineSlice.fill(graphics, GuiTextures.HEADER_BG, this.x + 2, this.y + 2,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.HEADER_BG, this.x + 2, this.y + 2,
                     this.width - 4, height - 4);
 
             for (int i = 0; i < this.items.size(); i++) {
                 Item item = this.items.get(i);
                 int rowY = this.y + PAD + i * this.rowHeight;
-                NineSlice.button(graphics, this.x + PAD, rowY,
+                FactoryNineSlice.button(graphics, this.x + PAD, rowY,
                         this.width - PAD * 2, this.rowHeight - 2);
                 boolean hovered = mouseX >= this.x + PAD
                         && mouseX < this.x + this.width - PAD
                         && mouseY >= rowY && mouseY < rowY + this.rowHeight - 2;
                 if (hovered && item.kind().clickable()) {
-                    NineSlice.fill(graphics, GuiTextures.ROW_ALT, this.x + PAD + 1,
+                    FactoryNineSlice.fill(graphics, FactoryGuiTextures.ROW_ALT, this.x + PAD + 1,
                             rowY + 1, this.width - PAD * 2 - 2, this.rowHeight - 4);
                 }
                 int color;

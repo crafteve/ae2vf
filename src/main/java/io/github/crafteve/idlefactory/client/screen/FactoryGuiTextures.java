@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.widget;
+package io.github.crafteve.idlefactory.client.screen;
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -10,10 +10,10 @@ import io.github.crafteve.idlefactory.IdleFactory;
  * <p>全部由 {@code tools/gui/gen_textures.py} 离线生成，落在
  * {@code assets/idlefactory/textures/gui/}。Java 侧只引用，不拼路径字符串。</p>
  *
- * <p>新增贴图时三处一起改：生成脚本的 {@code SPECS}、这里的常量、以及 {@link NineSlice} 里
+ * <p>新增贴图时三处一起改：生成脚本的 {@code SPECS}、这里的常量、以及 {@link FactoryNineSlice} 里
  * 对应的方法（因为边框宽度要跟着走）。</p>
  */
-public final class GuiTextures {
+public final class FactoryGuiTextures {
     /** 面板底：九宫格，边框 3。 */
     public static final ResourceLocation PANEL = id("panel");
     /** 凹槽格子：九宫格，边框 1。 */
@@ -142,7 +142,7 @@ public final class GuiTextures {
     /** 排序图标边长。 */
     public static final int SORT_ICON_SIZE = 12;
 
-    private GuiTextures() {
+    private FactoryGuiTextures() {
         // 纯常量持有类
     }
 

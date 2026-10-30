@@ -4,10 +4,6 @@ import java.util.function.BiConsumer;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
-import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.line.LineActions;
 
 import net.minecraft.client.gui.Font;
@@ -33,9 +29,9 @@ public final class LineNameDialog {
     }
 
     private final Font font;
-    private final GuiTheme theme;
+    private final FactoryGuiTheme theme;
     private final BiConsumer<Mode, String> onConfirm;
-    private final SearchEditBox field;
+    private final FactorySearchEditBox field;
 
     private boolean open;
     private boolean pending;
@@ -50,11 +46,11 @@ public final class LineNameDialog {
      * @param theme     主题
      * @param onConfirm 确认回调；参数是模式和已 trim 的名字
      */
-    public LineNameDialog(Font font, GuiTheme theme, BiConsumer<Mode, String> onConfirm) {
+    public LineNameDialog(Font font, FactoryGuiTheme theme, BiConsumer<Mode, String> onConfirm) {
         this.font = font;
         this.theme = theme;
         this.onConfirm = onConfirm;
-        this.field = new SearchEditBox(font, 0, 0, 120, 10, theme,
+        this.field = new FactorySearchEditBox(font, 0, 0, 120, 10, theme,
                 Component.literal("产线名"));
         this.field.setMaxLength(LineActions.MAX_NAME_LENGTH);
         this.field.setFilter(value -> value.chars().noneMatch(ch ->
@@ -143,8 +139,8 @@ public final class LineNameDialog {
         // 蒙住整个面板，让浮层成为唯一可操作的区域。
         graphics.fill(l.panelX, l.panelY, l.panelX + l.panelW, l.panelY + l.panelH,
                 0x90000000);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x + 3, y + 3, w, h);
-        NineSlice.panel(graphics, x, y, w, h);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + 3, y + 3, w, h);
+        FactoryNineSlice.panel(graphics, x, y, w, h);
 
         String title = this.mode == Mode.CREATE ? "新建产线" : "重命名产线";
         graphics.drawString(this.font, title, x + 12, y + 10, this.theme.textPrimary(), false);
@@ -155,7 +151,7 @@ public final class LineNameDialog {
         int fieldX = x + 12;
         int fieldY = y + 30;
         int fieldW = w - 24;
-        NineSlice.field(graphics, fieldX, fieldY, fieldW, 18);
+        FactoryNineSlice.field(graphics, fieldX, fieldY, fieldW, 18);
         this.field.render(graphics, mouseX, mouseY, partialTick);
 
         if (this.error != null) {
@@ -181,9 +177,9 @@ public final class LineNameDialog {
         boolean hovered = enabled && mouseX >= x && mouseX < x + w
                 && mouseY >= y && mouseY < y + 18;
         if (hovered) {
-            NineSlice.buttonHover(graphics, x, y, w, 18);
+            FactoryNineSlice.buttonHover(graphics, x, y, w, 18);
         } else {
-            NineSlice.button(graphics, x, y, w, 18);
+            FactoryNineSlice.button(graphics, x, y, w, 18);
         }
         graphics.drawString(this.font, label,
                 x + (w - this.font.width(label)) / 2, y + 5,

@@ -12,12 +12,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.storage.FactoryStorageRepo;
-import io.github.crafteve.idlefactory.client.theme.GuiTheme;
-import io.github.crafteve.idlefactory.client.widget.GuiLayer;
-import io.github.crafteve.idlefactory.client.widget.GuiTextures;
-import io.github.crafteve.idlefactory.client.widget.NineSlice;
-import io.github.crafteve.idlefactory.client.widget.SearchEditBox;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.line.IoSide;
@@ -67,7 +61,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 仓库格点击只发送 {@code FactoryStorageActionC2S} 手势，实际数量、背包扣减和
  * carried 同步全部由服务端决定；这样 AE2 的大数量物品和容器仓库都能走同一条路。</p>
  *
- * <p>机器库使用深色卡片、独立图标槽和状态色条；所有静态外观来自 {@link NineSlice}
+ * <p>机器库使用深色卡片、独立图标槽和状态色条；所有静态外观来自 {@link FactoryNineSlice}
  * 贴图，本类只负责坐标与绘制顺序。几何值集中在 {@link FactoryLayout}，调布局尺寸
  * 不应改这里。</p>
  *
@@ -105,11 +99,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private static final int TAB_MACHINES = 1;
 
     /** 界面唯色源；客户端主题配置取一次，避免每帧重复查。 */
-    private final GuiTheme theme = GuiTheme.current();
+    private final FactoryGuiTheme theme = FactoryGuiTheme.current();
     /** 当前屏幕尺寸下的几何；init 重建，绘制与命中只读它。 */
     private FactoryLayout layout;
     /** 搜索输入框；init 重建，关闭时把内容记进 rememberedSearch。 */
-    private SearchEditBox searchBox;
+    private FactorySearchEditBox searchBox;
     /** 服务端最近一次给的全量机器视图；左表和机器库都从这份数据派生。 */
     private List<FactorySnapshotBuilder.MachineView> machines = List.of();
     /** 服务端最近一次给的产线列表；产线下拉从这里取。 */
@@ -228,7 +222,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 : this.searchBox.getValue();
         int searchX = this.layout.rightX + 4;
         int searchW = this.layout.searchWidth();
-        this.searchBox = new SearchEditBox(this.font, searchX + 18,
+        this.searchBox = new FactorySearchEditBox(this.font, searchX + 18,
                 this.layout.searchY + 3, searchW - 32, 10,
                 this.theme, Component.literal("搜索…"));
         this.searchBox.setResponder(value -> {
@@ -951,23 +945,23 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     protected void renderBg(GuiGraphics graphics, float partialTick, int mouseX, int mouseY) {
         FactoryLayout l = this.layout;
 
-        NineSlice.panel(graphics, this.leftPos, this.topPos, this.imageWidth, this.imageHeight);
+        FactoryNineSlice.panel(graphics, this.leftPos, this.topPos, this.imageWidth, this.imageHeight);
 
         // 顶栏下沿只画到右区左边缘，右侧 tab 条自己带走自己的边线。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
                 l.headerX, l.headerY + FactoryLayout.HEADER_H, l.rightX - l.headerX, 1);
 
         // 左右两区之间的竖向分隔线；宽度固定 1px，避免不同 GUI 缩放下变粗。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER,
                 l.rightX - FactoryLayout.GAP / 2, l.bodyY, 1, l.bodyH);
 
         // 表头整体向内缩 2px，和外层深色/白色双层表框留出层次；
         // 表框本身在 drawTable 的最后绘制，保证白色内圈不会被行卡片盖住。
-        NineSlice.header(graphics, l.leftX + 2, l.tableHeaderY + 2,
+        FactoryNineSlice.header(graphics, l.leftX + 2, l.tableHeaderY + 2,
                 l.leftW - 4, FactoryLayout.TABLE_HEADER_H - 2);
 
         // 表格底部统计行上方的细分隔线。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER, l.tableX, l.footerY, l.tableW, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER, l.tableX, l.footerY, l.tableW, 1);
 
         drawRightChrome(graphics);
     }
@@ -989,21 +983,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         for (int i = 0; i < FactoryLayout.TAB_COUNT; i++) {
             int x = l.rightX + i * tabWidth;
             int w = i == FactoryLayout.TAB_COUNT - 1 ? l.rightW - i * tabWidth : tabWidth;
-            NineSlice.button(graphics, x, l.tabY, w, FactoryLayout.HEADER_H);
+            FactoryNineSlice.button(graphics, x, l.tabY, w, FactoryLayout.HEADER_H);
         }
         // 选中 tab 用一条 2px 深色上沿强调；宽度跟随当前 tab 的实际宽度。
         int activeWidth = this.activeTab == FactoryLayout.TAB_COUNT - 1
                 ? l.rightW - this.activeTab * tabWidth
                 : tabWidth;
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
                 l.rightX + this.activeTab * tabWidth, l.tabY, activeWidth, 2);
 
         drawSearchField(graphics);
-        NineSlice.icon(graphics, GuiTextures.SEARCH, l.rightX + 9, l.searchY + 2,
-                GuiTextures.SEARCH_SIZE);
+        FactoryNineSlice.icon(graphics, FactoryGuiTextures.SEARCH, l.rightX + 9, l.searchY + 2,
+                FactoryGuiTextures.SEARCH_SIZE);
         if (this.searchBox != null && !this.searchBox.getValue().isEmpty()) {
-            NineSlice.icon(graphics, GuiTextures.SEARCH_CLEAR,
-                    clearButtonX(), l.searchY + 4, GuiTextures.SEARCH_CLEAR_SIZE);
+            FactoryNineSlice.icon(graphics, FactoryGuiTextures.SEARCH_CLEAR,
+                    clearButtonX(), l.searchY + 4, FactoryGuiTextures.SEARCH_CLEAR_SIZE);
         }
         drawSortButtons(graphics);
         if (this.activeTab == TAB_STORAGE) {
@@ -1017,11 +1011,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         // 3×3 与结果格之间的箭头：一条细横线和右侧结果凹槽。
         int arrowY = l.resultY + FactoryLayout.CRAFT_RESULT / 2;
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
                 l.craftX + FactoryLayout.CRAFT * FactoryLayout.CRAFT_CELL + 4, arrowY,
                 FactoryLayout.CRAFT_ARROW - 8, 1);
 
-        NineSlice.slot(graphics, l.resultX, l.resultY,
+        FactoryNineSlice.slot(graphics, l.resultX, l.resultY,
                 FactoryLayout.CRAFT_RESULT, FactoryLayout.CRAFT_RESULT);
     }
 
@@ -1038,15 +1032,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param height   外框高
      */
     private void drawTableFrame(GuiGraphics graphics, int x, int y, int width, int height) {
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y, width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y + height - 1, width, 1);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x, y, 1, height);
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK, x + width - 1, y, 1, height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y + height - 1, width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, 1, height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + width - 1, y, 1, height);
 
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + 1, width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + 1, 1, height - 2);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + 1, y + height - 2, width - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.TABLE_LIGHT, x + width - 2, y + 1, 1, height - 2);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1, width - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1, 1, height - 2);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + height - 2, width - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 2, y + 1, 1, height - 2);
     }
 
     /**
@@ -1065,7 +1059,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawGrid(GuiGraphics graphics, int x, int y, int columns, int rows, int cell) {
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < columns; col++) {
-                NineSlice.slot(graphics, x + col * cell, y + row * cell, cell, cell);
+                FactoryNineSlice.slot(graphics, x + col * cell, y + row * cell, cell, cell);
             }
         }
     }
@@ -1095,7 +1089,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         String line = lineButtonText();
         int buttonW = lineButtonW();
-        NineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
+        FactoryNineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
         String lineLabel = this.font.plainSubstrByWidth(line, buttonW - 8);
         graphics.drawString(this.font, lineLabel,
                 x + (buttonW - this.font.width(lineLabel)) / 2, textY,
@@ -1147,7 +1141,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             drawParts(graphics, stats, statsX, textY);
         }
 
-        NineSlice.button(graphics, closeX, l.headerY + 4, CLOSE_SIZE, CLOSE_SIZE);
+        FactoryNineSlice.button(graphics, closeX, l.headerY + 4, CLOSE_SIZE, CLOSE_SIZE);
         graphics.drawString(this.font, "x",
                 closeX + (CLOSE_SIZE - this.font.width("x")) / 2, textY,
                 this.theme.textPrimary(), false);
@@ -1311,14 +1305,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         Status status = statusOf(machine);
         String idleLabel = lineIdleLabel();
 
-        NineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
+        FactoryNineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
                 FactoryLayout.ROW_H - 1);
         // 1px 状态条：从卡片顶部内缘一直贯穿到底部内缘，颜色跟随总状态。
-        NineSlice.fill(graphics, status.strip(), l.leftX + 3, y + 1, 1,
+        FactoryNineSlice.fill(graphics, status.strip(), l.leftX + 3, y + 1, 1,
                 FactoryLayout.ROW_H - 2);
 
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
-        NineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
+        FactoryNineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
                 FactoryLayout.CELL);
         ItemStack icon = machine.machineMissing()
                 ? new ItemStack(Items.BARRIER)
@@ -1342,8 +1336,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                         ? this.theme.textDim() : this.theme.textValue(), false);
 
         int stateX = l.columnX(FactoryLayout.COL_STATE) + 4;
-        NineSlice.icon(graphics, status.lamp(), stateX, textY + 2,
-                GuiTextures.STATUS_LAMP_SIZE);
+        FactoryNineSlice.icon(graphics, status.lamp(), stateX, textY + 2,
+                FactoryGuiTextures.STATUS_LAMP_SIZE);
         String statusLabel = status.text();
         int statusWidth = l.columnW(FactoryLayout.COL_STATE) - 14;
         graphics.drawString(this.font,
@@ -1399,18 +1393,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         int cardX = l.leftX + 2;
         int cardW = l.leftW - 4;
-        NineSlice.card(graphics, cardX, y, cardW, FactoryLayout.ROW_H - 1);
+        FactoryNineSlice.card(graphics, cardX, y, cardW, FactoryLayout.ROW_H - 1);
 
         boolean dragging = this.editController != null
                 && this.editController.isDraggingMachine();
         boolean hover = dragging && addMachineRowContains(this.renderMouseX, this.renderMouseY);
         if (hover) {
-            NineSlice.fill(graphics, GuiTextures.ROW_ALT, cardX + 1, y + 1,
+            FactoryNineSlice.fill(graphics, FactoryGuiTextures.ROW_ALT, cardX + 1, y + 1,
                     cardW - 2, FactoryLayout.ROW_H - 3);
         }
 
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
-        NineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL, FactoryLayout.CELL);
+        FactoryNineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL, FactoryLayout.CELL);
         String plus = "+";
         graphics.drawString(this.font, plus,
                 iconX + (FactoryLayout.CELL - this.font.width(plus)) / 2, y + 8,
@@ -1866,16 +1860,16 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         boolean hovered = inside(this.renderMouseX, this.renderMouseY, x, buttonY,
                 FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
         if (hovered) {
-            NineSlice.buttonHover(graphics, x, buttonY,
+            FactoryNineSlice.buttonHover(graphics, x, buttonY,
                     FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
         } else {
-            NineSlice.button(graphics, x, buttonY,
+            FactoryNineSlice.button(graphics, x, buttonY,
                     FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
         }
-        int offset = (FactoryLayout.EXPAND_BUTTON - GuiTextures.CHEVRON_SIZE) / 2;
-        NineSlice.icon(graphics,
-                open ? GuiTextures.CHEVRON_DOWN : GuiTextures.CHEVRON_RIGHT,
-                x + offset, buttonY + offset, GuiTextures.CHEVRON_SIZE);
+        int offset = (FactoryLayout.EXPAND_BUTTON - FactoryGuiTextures.CHEVRON_SIZE) / 2;
+        FactoryNineSlice.icon(graphics,
+                open ? FactoryGuiTextures.CHEVRON_DOWN : FactoryGuiTextures.CHEVRON_RIGHT,
+                x + offset, buttonY + offset, FactoryGuiTextures.CHEVRON_SIZE);
     }
 
     /**
@@ -2063,21 +2057,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return switch (machine.totalState()) {
             case OFFLINE -> offlineStatus(machine);
             case UNCONFIGURED -> new Status(machine.lineNames().isEmpty() ? "未编线" : "无规则",
-                    this.theme.statusIdle(), GuiTextures.STATUS_STRIP_IDLE,
-                    GuiTextures.STATUS_LAMP_IDLE);
+                    this.theme.statusIdle(), FactoryGuiTextures.STATUS_STRIP_IDLE,
+                    FactoryGuiTextures.STATUS_LAMP_IDLE);
             case RUNNING -> new Status("运行", this.theme.statusRun(),
-                    GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
+                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
             case IDLE -> new Status("空闲", this.theme.statusIdle(),
-                    GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
+                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
             case WAITING_MATERIAL -> new Status("仓库缺料", this.theme.statusWarn(),
-                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
             case INPUT_OK -> new Status("可输入", this.theme.statusRun(),
-                    GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
+                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
             case INPUT_BLOCKED -> new Status("输入堵塞",
-                    this.theme.statusWarn(), GuiTextures.STATUS_STRIP_WARN,
-                    GuiTextures.STATUS_LAMP_WARN);
+                    this.theme.statusWarn(), FactoryGuiTextures.STATUS_STRIP_WARN,
+                    FactoryGuiTextures.STATUS_LAMP_WARN);
             default -> new Status("未知", this.theme.statusIdle(),
-                    GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
+                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
         };
     }
 
@@ -2093,15 +2087,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private Status offlineStatus(FactorySnapshotBuilder.MachineView machine) {
         if (machine.machineMissing()) {
             return new Status("失联", this.theme.error(),
-                    GuiTextures.STATUS_STRIP_ERROR, GuiTextures.STATUS_LAMP_ERROR);
+                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
         }
         return switch (machine.health()) {
             case MISSING, NO_DIMENSION -> new Status("失联", this.theme.error(),
-                    GuiTextures.STATUS_STRIP_ERROR, GuiTextures.STATUS_LAMP_ERROR);
+                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
             case UNLOADED -> new Status("未载", this.theme.statusWarn(),
-                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
             default -> new Status("未探测", this.theme.statusWarn(),
-                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
         };
     }
 
@@ -2183,7 +2177,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         float height = this.font.lineHeight * scale;
         graphics.pose().pushPose();
         graphics.pose().translate(right - width - 1.0F, bottom - height,
-                GuiLayer.GRID_COUNT.z());
+                FactoryGuiLayer.GRID_COUNT.z());
         graphics.pose().scale(scale, scale, 1.0F);
         graphics.drawString(this.font, text, 0, 0, 0xFFFFFFFF, true);
         graphics.pose().popPose();
@@ -2268,10 +2262,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         int col = (mouseX - l.gridX) / FactoryLayout.CELL;
         int row = (mouseY - l.gridY) / FactoryLayout.CELL;
-        NineSlice.icon(graphics, GuiTextures.SLOT_HOVER,
+        FactoryNineSlice.icon(graphics, FactoryGuiTextures.SLOT_HOVER,
                 l.gridX + col * FactoryLayout.CELL,
                 l.gridY + row * FactoryLayout.CELL,
-                GuiTextures.SLOT_HOVER_SIZE);
+                FactoryGuiTextures.SLOT_HOVER_SIZE);
     }
 
     /**
@@ -2492,7 +2486,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 一行提示
      */
     private Component searchHint(String key, String description) {
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
         return Component.empty()
                 .append(FactoryLabels.coloredBold(key, tt.value()))
                 .append(FactoryLabels.colored(" " + description, tt.label()));
@@ -2540,7 +2534,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawExpandTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new ArrayList<>();
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(FactoryLabels.colored(
                 isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情", tt.title()));
         lines.add(Component.empty()
@@ -2567,7 +2561,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
             int mouseX, int mouseY) {
         List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
         List<Component> lines = new ArrayList<>();
         if (card.empty()) {
             lines.add(FactoryLabels.colored(card.input() ? "输入空卡" : "输出空卡", tt.title()));
@@ -2675,7 +2669,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return;
         }
         List<Component> lines = new java.util.ArrayList<>();
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(FactoryLabels.colored(title, tt.title()));
         int shown = Math.min(rules.size(), 10);
         for (int i = 0; i < shown; i++) {
@@ -2716,7 +2710,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawMachineTooltip(GuiGraphics graphics,
             FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
         List<Component> lines = new java.util.ArrayList<>();
-        GuiTheme.Tooltip tt = this.theme.tooltip();
+        FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
         lines.add(FactoryLabels.colored(FactoryLabels.blockName(machine.blockId()), tt.title()));
         lines.add(FactoryLabels.coloredBold(statusText(machine), statusColor(machine)));
         lines.add(FactoryLabels.colored(machine.ref().dimension().location()
@@ -2803,17 +2797,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int cardH = FactoryLayout.ROW_H - 3;
 
         // 右下阴影 + 深钢灰卡片，做出卡片浮在面板上的层次。
-        NineSlice.fill(graphics, GuiTextures.DIVIDER_DARK,
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
                 cardX + 2, cardY + 2, cardW, cardH);
-        NineSlice.machineCard(graphics, cardX, cardY, cardW, cardH);
+        FactoryNineSlice.machineCard(graphics, cardX, cardY, cardW, cardH);
 
         Status status = statusOf(machine);
-        NineSlice.fill(graphics, status.strip(), cardX + 1, cardY + 2,
+        FactoryNineSlice.fill(graphics, status.strip(), cardX + 1, cardY + 2,
                 2, cardH - 4);
 
         int iconSlotX = cardX + 4;
         int iconSlotY = cardY + 2;
-        NineSlice.slot(graphics, iconSlotX, iconSlotY,
+        FactoryNineSlice.slot(graphics, iconSlotX, iconSlotY,
                 FactoryLayout.CELL, FactoryLayout.CELL);
         ItemStack icon = machine.machineMissing()
                 ? new ItemStack(Items.BARRIER)
@@ -2830,8 +2824,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int statusWidth = this.font.width(statusText);
         int statusX = right - statusWidth;
         int lampX = Math.max(textX, statusX - 7);
-        NineSlice.icon(graphics, status.lamp(), lampX, nameY + 2,
-                GuiTextures.STATUS_LAMP_SIZE);
+        FactoryNineSlice.icon(graphics, status.lamp(), lampX, nameY + 2,
+                FactoryGuiTextures.STATUS_LAMP_SIZE);
 
         int nameWidth = Math.max(18, lampX - textX - 4);
         String cardName = machine.machineMissing()
@@ -2884,10 +2878,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     protected void renderSlot(GuiGraphics graphics, Slot slot) {
         if (isHovering(slot.x, slot.y, 16, 16, this.renderMouseX, this.renderMouseY)) {
-            NineSlice.icon(graphics, GuiTextures.SLOT_HOVER, slot.x - 1, slot.y - 1,
-                    GuiTextures.SLOT_HOVER_SIZE);
+            FactoryNineSlice.icon(graphics, FactoryGuiTextures.SLOT_HOVER, slot.x - 1, slot.y - 1,
+                    FactoryGuiTextures.SLOT_HOVER_SIZE);
         } else {
-            NineSlice.slot(graphics, slot.x - 1, slot.y - 1,
+            FactoryNineSlice.slot(graphics, slot.x - 1, slot.y - 1,
                     FactoryLayout.CELL, FactoryLayout.CELL);
         }
         super.renderSlot(graphics, slot);
@@ -3049,7 +3043,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (button == 0 && this.searchBox != null
                 && !this.searchBox.getValue().isEmpty()
                 && mouseX >= clearButtonX() - 1
-                && mouseX < clearButtonX() + GuiTextures.SEARCH_CLEAR_SIZE + 1
+                && mouseX < clearButtonX() + FactoryGuiTextures.SEARCH_CLEAR_SIZE + 1
                 && mouseY >= l.searchY && mouseY < l.searchY + FactoryLayout.SEARCH_H) {
             this.searchBox.setValue("");
             this.searchBox.setFocused(true);
@@ -3153,7 +3147,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /**
      * 搜索框底板：纯色填充 + 1px 外框 + 1px 内凹阴影。
      *
-     * <p>这里不用 NineSlice.field：4px 高的框会把 6×6 贴图的内斜边拉成不规则色块。
+     * <p>这里不用 FactoryNineSlice.field：4px 高的框会把 6×6 贴图的内斜边拉成不规则色块。
      * 所有边都用 1×1 纯色贴图拉伸，保证任何 GUI 缩放下边框始终是 1px。</p>
      *
      * @param graphics 画布
@@ -3165,19 +3159,19 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int w = l.searchWidth();
         int h = FactoryLayout.SEARCH_H;
 
-        NineSlice.fill(graphics, GuiTextures.SEARCH_BG, x + 2, y + 2, w - 4, h - 4);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BG, x + 2, y + 2, w - 4, h - 4);
 
         // 外框
-        NineSlice.fill(graphics, GuiTextures.SEARCH_BORDER, x, y, w, 1);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_BORDER, x, y + h - 1, w, 1);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_BORDER, x, y, 1, h);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_BORDER, x + w - 1, y, 1, h);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y, w, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y + h - 1, w, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y, 1, h);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x + w - 1, y, 1, h);
 
         // 内凹：上/左用阴影，下/右用高光，形成凹进面板的搜索框。
-        NineSlice.fill(graphics, GuiTextures.SEARCH_SHADOW, x + 1, y + 1, w - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_SHADOW, x + 1, y + 1, 1, h - 2);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_HIGHLIGHT, x + 1, y + h - 2, w - 2, 1);
-        NineSlice.fill(graphics, GuiTextures.SEARCH_HIGHLIGHT, x + w - 2, y + 1, 1, h - 2);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_SHADOW, x + 1, y + 1, w - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_SHADOW, x + 1, y + 1, 1, h - 2);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_HIGHLIGHT, x + 1, y + h - 2, w - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_HIGHLIGHT, x + w - 2, y + 1, 1, h - 2);
     }
 
     /**
@@ -3200,9 +3194,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             int x = l.sortButtonX(index);
             int y = l.searchY;
             int size = FactoryLayout.SORT_BTN_SIZE;
-            NineSlice.sortButton(graphics, x, y, size, size);
-            NineSlice.icon(graphics, buttons.icon(index, storageTab), x + 1, y + 1,
-                    GuiTextures.SORT_ICON_SIZE);
+            FactoryNineSlice.sortButton(graphics, x, y, size, size);
+            FactoryNineSlice.icon(graphics, buttons.icon(index, storageTab), x + 1, y + 1,
+                    FactoryGuiTextures.SORT_ICON_SIZE);
             if (hovered == index) {
                 graphics.fill(x, y, x + size, y + size, 0x22FFFFFF);
             }

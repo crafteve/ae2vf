@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.storage;
+package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
  * 过滤结果和滚动位置不会因为服务端重排而乱跳。</p>
  *
  * <p>{@link #all()} 始终是「稳定身份顺序」；过滤与排序只作用于 {@link #view()}。排序规则由
- * 调用方以 {@link Comparator} 传入，本类不认识任何排序键，避免 storage 包反过来依赖界面。</p>
+ * 调用方以 {@link Comparator} 传入，本类不认识任何排序键，避免仓库视图反过来依赖界面排序键。</p>
  *
  * <p>不直接复用 AE2 的 {@code Repo}：它绑死 {@code GridInventoryEntry}、{@code AEKey} 和
  * {@code MEStorageMenu}，而本项目的仓库后端可能是容器组。</p>

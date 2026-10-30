@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client;
+package io.github.crafteve.idlefactory.client.screen;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -10,7 +10,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  *
  * <p>配置项只在客户端读取；服务端不会注册这份配置。</p>
  */
-public final class UiConfig {
+public final class FactoryUiConfig {
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     static {
@@ -46,7 +46,7 @@ public final class UiConfig {
         SPEC = BUILDER.build();
     }
 
-    private UiConfig() {
+    private FactoryUiConfig() {
         // 纯常量持有类
     }
 }
