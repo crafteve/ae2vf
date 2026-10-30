@@ -34,6 +34,56 @@ final class FactoryScreenGeometry {
     }
 
     /**
+     * 顶栏产线按钮的 x。
+     *
+     * @return 按钮左边缘
+     */
+    int lineButtonX() {
+        return this.screen.layout.headerX + 6
+                + this.screen.state.font.width("放置工厂")
+                + FactoryChromeRender.TITLE_GAP;
+    }
+
+    /**
+     * 顶栏产线按钮的宽度。
+     *
+     * @return 按钮宽度
+     */
+    int lineButtonW() {
+        return Math.max(24, Math.min(140,
+                this.screen.state.font.width(this.screen.state.lineButtonText()) + 14));
+    }
+
+    /**
+     * 搜索框清空按钮的 x。
+     *
+     * @return 清空按钮左边缘
+     */
+    int clearButtonX() {
+        return this.screen.layout.rightX + 4 + this.screen.layout.searchWidth() - 14;
+    }
+
+    /**
+     * 鼠标落在第几个排序按钮上。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 0 排序键、1 方向、2 范围；不在按钮内返回 -1
+     */
+    int sortButtonAt(double mouseX, double mouseY) {
+        FactoryLayout l = this.screen.layout;
+        for (int index = 0; index < FactoryLayout.SORT_BTN_COUNT; index++) {
+            int x = l.sortButtonX(index);
+            if (mouseX >= x && mouseX < x + FactoryLayout.SORT_BTN_SIZE
+                    && mouseY >= l.searchY
+                    && mouseY < l.searchY + FactoryLayout.SORT_BTN_SIZE) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * 左表中一次命中。
      *
      * @param machine      机器视图

@@ -74,7 +74,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>下面的分节只用于导航，不代表这个类已经拆分；真正的拆分另开计划，不在注释整理里
  * 移动方法归属。分节头按现有代码顺序放置，不改变字段或方法的声明顺序。</p>
  */
-public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
+public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
+        implements FactoryScreenContext {
     // ------------------------------------------------------------------
     // ---- 01. 字段与生命周期 ----
     // 这里放常量、状态字段、构造、init 与 tick；只描述壳的生命周期，业务派生在 03/04。
@@ -104,6 +105,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     final FactoryScreenState state = new FactoryScreenState(this.theme);
     /** 几何/命中；绘制、输入、JEI 共用。 */
     private final FactoryScreenGeometry geometry = new FactoryScreenGeometry(this);
+    /** 顶栏/右区静态底板。 */
+    private final FactoryChromeRender chromeRender = new FactoryChromeRender(this);
+    /** 左表渲染。 */
+    private final FactoryTableRender tableRender = new FactoryTableRender(this);
+    /** 右区动态内容。 */
+    private final FactoryRightContentRender rightContentRender =
+            new FactoryRightContentRender(this);
     /** 当前屏幕尺寸下的几何；init 重建，绘制与命中只读它。 */
     FactoryLayout layout;
     /** 搜索输入框；init 重建，关闭时把内容记进 rememberedSearch。 */
@@ -717,47 +725,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param graphics 画布
      */
     private void drawRightChrome(GuiGraphics graphics) {
-        FactoryLayout l = this.layout;
-
-        // tab 条占据顶栏右端的完整宽度；最后一个 tab 吸收除不尽的多余像素。
-        int tabWidth = l.rightW / FactoryLayout.TAB_COUNT;
-        for (int i = 0; i < FactoryLayout.TAB_COUNT; i++) {
-            int x = l.rightX + i * tabWidth;
-            int w = i == FactoryLayout.TAB_COUNT - 1 ? l.rightW - i * tabWidth : tabWidth;
-            FactoryNineSlice.button(graphics, x, l.tabY, w, FactoryLayout.HEADER_H);
-        }
-        // 选中 tab 用一条 2px 深色上沿强调；宽度跟随当前 tab 的实际宽度。
-        int activeWidth = this.state.activeTab == FactoryLayout.TAB_COUNT - 1
-                ? l.rightW - this.state.activeTab * tabWidth
-                : tabWidth;
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
-                l.rightX + this.state.activeTab * tabWidth, l.tabY, activeWidth, 2);
-
-        drawSearchField(graphics);
-        FactoryNineSlice.icon(graphics, FactoryGuiTextures.SEARCH, l.rightX + 9, l.searchY + 2,
-                FactoryGuiTextures.SEARCH_SIZE);
-        if (this.searchBox != null && !this.searchBox.getValue().isEmpty()) {
-            FactoryNineSlice.icon(graphics, FactoryGuiTextures.SEARCH_CLEAR,
-                    clearButtonX(), l.searchY + 4, FactoryGuiTextures.SEARCH_CLEAR_SIZE);
-        }
-        drawSortButtons(graphics);
-        if (this.state.activeTab == TAB_STORAGE) {
-            drawGrid(graphics, l.gridX, l.gridY, FactoryLayout.GRID_COLS, l.gridRows,
-                    FactoryLayout.CELL);
-        }
-
-        // 合成占位目前还是 P0 视觉：两个 tab 都保留，避免切 tab 时布局跳动。
-        drawGrid(graphics, l.craftX, l.craftY, FactoryLayout.CRAFT, FactoryLayout.CRAFT,
-                FactoryLayout.CRAFT_CELL);
-
-        // 3×3 与结果格之间的箭头：一条细横线和右侧结果凹槽。
-        int arrowY = l.resultY + FactoryLayout.CRAFT_RESULT / 2;
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
-                l.craftX + FactoryLayout.CRAFT * FactoryLayout.CRAFT_CELL + 4, arrowY,
-                FactoryLayout.CRAFT_ARROW - 8, 1);
-
-        FactoryNineSlice.slot(graphics, l.resultX, l.resultY,
-                FactoryLayout.CRAFT_RESULT, FactoryLayout.CRAFT_RESULT);
+        this.chromeRender.drawRightChrome(graphics);
     }
 
     /**
@@ -3149,15 +3117,57 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         return FactoryScreenGeometry.inside(mouseX, mouseY, x, y, width, height);
     }
 
-    /**
-     * 当前布局。
-     *
-     * <p>保留给调试、测试和后续阶段读取；正常绘制不应从外部修改布局字段。</p>
-     *
-     * @return 当前布局；尚未 init 时为 {@code null}
-     */
+    @Override
+    public FactoryScreenState state() {
+        return this.state;
+    }
+
+    @Override
+    public FactoryScreenGeometry geometry() {
+        return this.geometry;
+    }
+
+    @Override
     public FactoryLayout layout() {
         return this.layout;
+    }
+
+    @Override
+    public FactoryGuiTheme theme() {
+        return this.theme;
+    }
+
+    @Override
+    public net.minecraft.client.gui.Font font() {
+        return this.font;
+    }
+
+    @Override
+    @Nullable
+    public FactoryScreenInteraction interaction() {
+        return this.editController;
+    }
+
+    @Override
+    @Nullable
+    public FactorySearchEditBox searchBox() {
+        return this.searchBox;
+    }
+
+    @Override
+    @Nullable
+    public FactorySortButtons sortButtons() {
+        return this.sortButtons;
+    }
+
+    @Override
+    public int mouseX() {
+        return this.renderMouseX;
+    }
+
+    @Override
+    public int mouseY() {
+        return this.renderMouseY;
     }
 }
 
