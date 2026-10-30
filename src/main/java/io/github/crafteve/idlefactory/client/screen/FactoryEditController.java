@@ -744,6 +744,20 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     }
 
     /**
+     * 把一组机器的台数改到目标值；滚轮停止后由界面层调用一次。
+     *
+     * @param anchorId 组锚点
+     * @param target   目标台数；服务端会再夹紧
+     */
+    public void resizeStack(UUID anchorId, int target) {
+        UUID lineId = this.screen.selectedLineId();
+        if (lineId == null) {
+            return;
+        }
+        sendLineAction(FactoryLineActionC2S.Action.RESIZE_STACK, lineId, anchorId, null, target);
+    }
+
+    /**
      * 把整组机器移出当前产线；机器和规则回到机器库。
      *
      * @param stack 机器组

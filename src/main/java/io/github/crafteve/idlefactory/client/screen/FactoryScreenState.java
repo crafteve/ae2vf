@@ -79,6 +79,23 @@ final class FactoryScreenState {
     /** 已展开的机器；同一时间最多一台，快照刷新后仍能保持展开。 */
     /** 展开的组，按锚点机器 id 存；签名变化不影响展开状态。 */
     final Set<UUID> expandedStacks = new HashSet<>();
+
+    /** 滚轮改台数的合并窗口（毫秒）；滚轮一格在 Windows 上常一次发多个事件。 */
+    static final long STACK_SCROLL_MERGE_MS = 150L;
+    /** 发出改数量请求后，本地乐观显示最多保留多久（毫秒），等快照回来。 */
+    static final long STACK_SCROLL_ECHO_MS = 500L;
+    /** 一组最多多少台；和服务端 LineActions.MAX_STACK 一致。 */
+    static final int MAX_STACK_COUNT = 512;
+
+    /** 正在用滚轮改的组锚点；{@code null} 表示没有待发请求。 */
+    @Nullable
+    UUID pendingStackAnchorId;
+    /** 目标台数，本地乐观显示用。 */
+    int pendingStackTarget;
+    /** 最后一次滚轮时间。 */
+    long pendingStackChangedAt;
+    /** 请求发出的时间；{@code 0} 表示还没发。 */
+    long pendingStackSentAt;
     /** 展开 IO 面板的像素滚动。 */
     int ioScroll;
 
@@ -253,6 +270,77 @@ final class FactoryScreenState {
     void setSearchQuery(FactorySearchQuery query) {
         this.searchQuery = query;
         rebuildFiltered();
+    }
+
+    /**
+     * 滚轮改某组台数：先从当前台数起算，同一组的连续滚动会累加。
+     *
+     * @param stack 机器组
+     * @param delta 增量；正数加、负数减
+     */
+    void scrollStackCount(FactoryMachineStack stack, int delta) {
+        long now = System.currentTimeMillis();
+        if (!stack.anchorId().equals(this.pendingStackAnchorId)) {
+            this.pendingStackAnchorId = stack.anchorId();
+            this.pendingStackTarget = stack.count();
+            this.pendingStackSentAt = 0L;
+        } else if (this.pendingStackSentAt > 0L) {
+            // 上一个请求已经发出，又在它回来之前继续滚：以当前目标为基准接着加。
+            this.pendingStackSentAt = 0L;
+        }
+        this.pendingStackTarget = Math.max(1,
+                Math.min(MAX_STACK_COUNT, this.pendingStackTarget + delta));
+        this.pendingStackChangedAt = now;
+    }
+
+    /**
+     * 该组的显示台数：有未发出的滚轮请求时用目标值，其余用真实台数。
+     *
+     * @param stack 机器组
+     * @return 显示用台数
+     */
+    int displayCount(FactoryMachineStack stack) {
+        long now = System.currentTimeMillis();
+        if (stack.anchorId().equals(this.pendingStackAnchorId)) {
+            if (this.pendingStackSentAt == 0L
+                    || now - this.pendingStackSentAt <= STACK_SCROLL_ECHO_MS) {
+                return this.pendingStackTarget;
+            }
+        }
+        return stack.count();
+    }
+
+    /**
+     * 是否该把滚轮累计的台数发给服务端。
+     *
+     * @param now 当前毫秒
+     * @return 停手超过合并窗口且还没发过时为 {@code true}
+     */
+    boolean pendingStackDue(long now) {
+        return this.pendingStackAnchorId != null && this.pendingStackSentAt == 0L
+                && now - this.pendingStackChangedAt >= STACK_SCROLL_MERGE_MS;
+    }
+
+    /** 标记请求已发出，本地乐观显示开始倒计时。 */
+    void markPendingStackSent(long now) {
+        this.pendingStackSentAt = now;
+    }
+
+    /**
+     * 乐观显示是否过期；过期后回到服务端快照的真实台数。
+     *
+     * @param now 当前毫秒
+     * @return 过期为 {@code true}
+     */
+    boolean pendingStackExpired(long now) {
+        return this.pendingStackAnchorId != null && this.pendingStackSentAt > 0L
+                && now - this.pendingStackSentAt > STACK_SCROLL_ECHO_MS;
+    }
+
+    /** 放弃未发出的滚轮请求。 */
+    void clearPendingStack() {
+        this.pendingStackAnchorId = null;
+        this.pendingStackSentAt = 0L;
     }
 
     /**

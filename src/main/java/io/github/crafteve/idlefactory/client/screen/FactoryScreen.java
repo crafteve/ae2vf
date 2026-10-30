@@ -431,6 +431,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderMouseX = mouseX;
         this.renderMouseY = mouseY;
+        flushPendingStack();
         super.render(graphics, mouseX, mouseY, partialTick);
         this.chromeRender.drawHeader(graphics);
         this.tableRender.drawTable(graphics);
@@ -438,6 +439,32 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
         this.tooltipRender.draw(graphics, mouseX, mouseY);
         if (this.editController != null) {
             this.editController.draw(graphics, mouseX, mouseY, partialTick);
+        }
+    }
+
+    /**
+     * 把滚轮累计的台数发给服务端。
+     *
+     * <p>滚轮一格在 Windows 上常一次发多个事件，所以这里按「停手 150ms 合并一次」发送。
+     * 发出后本地乐观显示最多保留 500ms，等快照回来再校正；过期没等到就回到快照值，
+     * 不会一直显示一个服务端没接受的数字。</p>
+     */
+    private void flushPendingStack() {
+        FactoryEditController controller = this.editController;
+        if (controller == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (this.state.pendingStackDue(now)) {
+            int target = this.state.pendingStackTarget;
+            UUID anchorId = this.state.pendingStackAnchorId;
+            if (anchorId == null) {
+                return;
+            }
+            this.state.markPendingStackSent(now);
+            controller.resizeStack(anchorId, target);
+        } else if (this.state.pendingStackExpired(now)) {
+            this.state.clearPendingStack();
         }
     }
 

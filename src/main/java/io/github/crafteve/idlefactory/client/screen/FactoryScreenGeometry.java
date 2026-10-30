@@ -323,6 +323,40 @@ final class FactoryScreenGeometry {
     }
 
     /**
+     * 鼠标下的左表图标槽位（18×18），只在基础行有效。
+     *
+     * <p>滚轮改台数只认这块区域，行体其余位置仍然翻行；这是为了避免「想翻行却改了数量」。</p>
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中的组；没命中为 {@code null}
+     */
+    @Nullable
+    FactoryMachineStack stackIconAt(double mouseX, double mouseY) {
+        StackHit hit = tableHitAt(mouseY);
+        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
+            return null;
+        }
+        int x = this.screen.layout.columnX(FactoryLayout.COL_NAME) + 4;
+        int y = hit.y() + 4;
+        return inside(mouseX, mouseY, x, y, FactoryLayout.CELL, FactoryLayout.CELL)
+                ? hit.stack() : null;
+    }
+
+    /**
+     * 鼠标是否落在左表行体上（改台数的滚轮区域之外）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 在左表内为 {@code true}
+     */
+    boolean inTableBody(double mouseX, double mouseY) {
+        FactoryLayout l = this.screen.layout;
+        return mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
+                && mouseY >= l.rowTop && mouseY < l.footerY;
+    }
+
+    /**
      * 该组在当前行位置上的展开高度。
      *
      * @param stack 机器组

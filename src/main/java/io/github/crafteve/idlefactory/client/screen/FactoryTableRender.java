@@ -53,6 +53,9 @@ final class FactoryTableRender {
         }
 
         List<FactoryMachineStack> table = state.tableStacks;
+        // 悬停的图标槽位只认一次，避免每行都重算一遍命中。
+        FactoryMachineStack hoveredIcon = this.context.geometry()
+                .stackIconAt(this.context.mouseX(), this.context.mouseY());
         int total = 0;
         int shown = 0;
         int y = l.rowTop;
@@ -64,7 +67,7 @@ final class FactoryTableRender {
             if (i < table.size()) {
                 FactoryMachineStack stack = table.get(i);
                 int detailHeight = this.context.geometry().detailHeight(stack, y);
-                drawRow(graphics, stack, y, detailHeight);
+                drawRow(graphics, stack, y, detailHeight, stack.equals(hoveredIcon));
                 y += FactoryLayout.ROW_H + detailHeight;
             } else {
                 drawAddMachineRow(graphics, y);
@@ -132,9 +135,10 @@ final class FactoryTableRender {
      * @param stack        机器组
      * @param y            行顶部
      * @param detailHeight 展开区高度；0 表示未展开
+     * @param iconHovered  鼠标是否停在图标槽位上（滚轮改数量的入口）
      */
     private void drawRow(GuiGraphics graphics, FactoryMachineStack stack, int y,
-            int detailHeight) {
+            int detailHeight, boolean iconHovered) {
         FactoryLayout l = this.context.layout();
         FactoryScreenState state = this.context.state();
         FactoryScreenInteraction interaction = this.context.interaction();
@@ -158,6 +162,9 @@ final class FactoryTableRender {
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
         drawCountBadge(graphics, stack, iconX, y + 5);
+        if (iconHovered) {
+            drawIconHoverOutline(graphics, iconX, y + 5);
+        }
 
         String name = anchor.machineMissing()
                 ? "已失联" : FactoryLabels.blockName(anchor.blockId());
@@ -218,6 +225,24 @@ final class FactoryTableRender {
     }
 
     /**
+     * 图标槽位的 1px 悬停描边，提示「这里滚轮可以改台数」。
+     *
+     * @param graphics 画布
+     * @param iconX    图标左边缘
+     * @param iconY    图标上边缘
+     */
+    private void drawIconHoverOutline(GuiGraphics graphics, int iconX, int iconY) {
+        int color = this.context.theme().hoverOutline();
+        int x = iconX - 1;
+        int y = iconY - 1;
+        int size = FactoryLayout.CELL + 2;
+        graphics.fill(x, y, x + size, y + 1, color);
+        graphics.fill(x, y + size - 1, x + size, y + size, color);
+        graphics.fill(x, y, x + 1, y + size, color);
+        graphics.fill(x + size - 1, y, x + size, y + size, color);
+    }
+
+    /**
      * 在图标右下角画整组台数，样式跟原版物品数量一致：白字、带阴影、右下对齐。
      *
      * @param graphics 画布
@@ -227,10 +252,11 @@ final class FactoryTableRender {
      */
     private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int iconX,
             int iconY) {
-        if (!stack.stacked()) {
+        int count = this.context.state().displayCount(stack);
+        if (count <= 1) {
             return;
         }
-        String label = "×" + stack.count();
+        String label = "×" + count;
         int textWidth = this.context.font().width(label);
         graphics.drawString(this.context.font(), label,
                 iconX + FactoryLayout.CELL - 2 - textWidth, iconY + FactoryLayout.CELL - 8,

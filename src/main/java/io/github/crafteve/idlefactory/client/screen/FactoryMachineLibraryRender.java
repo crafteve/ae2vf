@@ -168,10 +168,11 @@ final class FactoryMachineLibraryRender {
      */
     private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int iconX,
             int iconY) {
-        if (!stack.stacked()) {
+        int count = this.context.state().displayCount(stack);
+        if (count <= 1) {
             return;
         }
-        String label = "×" + stack.count();
+        String label = "×" + count;
         int textWidth = this.context.font().width(label);
         graphics.drawString(this.context.font(), label,
                 iconX + FactoryLayout.CELL - 2 - textWidth, iconY + FactoryLayout.CELL - 8,

@@ -516,6 +516,16 @@ final class FactoryScreenInput {
         if (ioScrollAt(mouseX, mouseY, scrollY)) {
             return true;
         }
+        // 左表图标槽位上滚轮改台数；其余区域仍翻行。
+        FactoryMachineStack scrollStack = this.screen.geometry().stackIconAt(mouseX, mouseY);
+        if (scrollStack != null && this.screen.selectedLineId() != null) {
+            int step = scrollY > 0 ? 1 : -1;
+            if (Screen.hasShiftDown()) {
+                step *= 10;
+            }
+            this.screen.state.scrollStackCount(scrollStack, step);
+            return true;
+        }
         FactoryLayout l = this.screen.layout;
         FactoryScreenState state = this.screen.state;
         if (state.activeTab == FactoryScreen.TAB_STORAGE

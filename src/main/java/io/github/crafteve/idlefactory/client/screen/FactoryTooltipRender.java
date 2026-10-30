@@ -197,7 +197,8 @@ final class FactoryTooltipRender {
     private void drawRemoveTooltip(GuiGraphics graphics, FactoryMachineStack stack, int mouseX,
             int mouseY) {
         FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
-        String title = stack.stacked() ? "移出整组 " + stack.count() + " 台" : "移出产线";
+        int count = this.context.state().displayCount(stack);
+        String title = count > 1 ? "移出整组 " + count + " 台" : "移出产线";
         graphics.renderComponentTooltip(this.context.font(), List.of(
                 FactoryLabels.colored(title, tt.title()),
                 FactoryLabels.colored("只移除产线引用，机器与 IO 规则保留", tt.label())),
@@ -229,7 +230,9 @@ final class FactoryTooltipRender {
                 .append(FactoryLabels.colored(" 条", tt.label())));
         if (stack.stacked()) {
             lines.add(FactoryLabels.colored(
-                    "这一行是 " + stack.count() + " 台，改动会同步到整组", tt.label()));
+                    "这一行是 " + this.context.state().displayCount(stack)
+                            + " 台，改动会同步到整组", tt.label()));
+            lines.add(FactoryLabels.colored("图标上滚轮改台数，Shift 一次 ±10", tt.label()));
         }
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }
