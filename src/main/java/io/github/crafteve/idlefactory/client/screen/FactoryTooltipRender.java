@@ -102,16 +102,11 @@ final class FactoryTooltipRender {
             }
         }
 
-        if (state.activeTab == FactoryScreen.TAB_MACHINES
-                && mouseX >= l.gridX
-                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
-                && mouseY >= l.gridY
-                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
-            int row = (mouseY - l.gridY) / FactoryLayout.ROW_H;
-            int index = state.machineFirstRow + row;
-            if (row < state.machineRowsVisible()
-                    && index >= 0 && index < state.libraryStacks.size()) {
-                FactoryMachineStack stack = state.libraryStacks.get(index);
+        if (state.activeTab == FactoryScreen.TAB_MACHINES) {
+            // 和点击/拖拽共用同一份命中：卡片矩形之外的缝隙、边缘空白都不弹提示。
+            FactoryMachineStack stack = this.context.geometry()
+                    .libraryStackAt(mouseX, mouseY);
+            if (stack != null) {
                 drawStackTooltip(graphics, stack, mouseX, mouseY);
                 return;
             }

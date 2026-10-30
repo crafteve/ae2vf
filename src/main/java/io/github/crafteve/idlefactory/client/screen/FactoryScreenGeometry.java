@@ -138,6 +138,9 @@ final class FactoryScreenGeometry {
     /**
      * 鼠标下的机器库组行（机器 tab）。
      *
+     * <p>命中的是卡片实际矩形，不是整行 26px：卡片在行内上下各留 1px、左右各留 2px，
+     * 缝隙和边缘空白不该触发点击、拖拽或 tooltip。</p>
+     *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
      * @return 机器组；没命中为 {@code null}
@@ -158,6 +161,16 @@ final class FactoryScreenGeometry {
         int index = this.screen.state.machineFirstRow + row;
         if (row >= this.screen.state.machineRowsVisible()
                 || index < 0 || index >= this.screen.state.libraryStacks.size()) {
+            return null;
+        }
+        // 和 FactoryMachineLibraryRender 的卡片矩形保持一致：cardX = gridX + 2、cardY = 行顶 + 1、
+        // cardW = 宽 - 4、cardH = ROW_H - 3。命中缝隙时返回 null，避免空白处也弹 tooltip。
+        int cardX = l.gridX + 2;
+        int cardW = gridW - 4;
+        int cardY = l.gridY + row * FactoryLayout.ROW_H + 1;
+        int cardH = FactoryLayout.ROW_H - 3;
+        if (mouseX < cardX || mouseX >= cardX + cardW
+                || mouseY < cardY || mouseY >= cardY + cardH) {
             return null;
         }
         return this.screen.state.libraryStacks.get(index);
