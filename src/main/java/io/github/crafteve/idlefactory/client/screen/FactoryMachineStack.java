@@ -98,10 +98,13 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
     /**
      * 从规则列表算签名。
      *
+     * <p>包内可见：状态层算「这一组最多还能扩到几台」时要拿别的机器视图比签名，
+     * 不能再写一份构造逻辑。</p>
+     *
      * @param view 机器视图
      * @return 签名
      */
-    private static MachineIoGroup.Signature signatureOf(FactorySnapshotBuilder.MachineView view) {
+    static MachineIoGroup.Signature signatureOf(FactorySnapshotBuilder.MachineView view) {
         return new MachineIoGroup.Signature(Set.copyOf(view.inputs()), Set.copyOf(view.outputs()));
     }
 

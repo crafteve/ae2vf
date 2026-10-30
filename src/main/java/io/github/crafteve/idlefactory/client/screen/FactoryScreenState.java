@@ -273,6 +273,35 @@ final class FactoryScreenState {
     }
 
     /**
+     * 这一组最多能扩到几台：当前台数 + 空闲同类机器数。
+     *
+     * <p>规则和服务端的池子一致：同方块、同方块实体、不在任何产线，并且「没有规则」或者
+     * 「规则和本组完全一样」。客户端先夹一次，避免本地乐观值滚到 7、服务端再打回 3 的闪烁；
+     * 服务端仍然会重新夹紧，这里只是让显示别先骗人。</p>
+     *
+     * @param stack 机器组
+     * @return 上限；至少等于当前台数
+     */
+    int maxStackCount(FactoryMachineStack stack) {
+        int pool = 0;
+        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
+            if (!machine.lineIds().isEmpty()) {
+                continue;
+            }
+            if (!Objects.equals(machine.groupBlockId(), stack.blockId())
+                    || !Objects.equals(machine.beTypeId(), stack.beTypeId())) {
+                continue;
+            }
+            boolean empty = machine.inputs().isEmpty() && machine.outputs().isEmpty();
+            if (!empty && !FactoryMachineStack.signatureOf(machine).equals(stack.signature())) {
+                continue;
+            }
+            pool++;
+        }
+        return Math.min(MAX_STACK_COUNT, stack.count() + pool);
+    }
+
+    /**
      * 滚轮改某组台数：先从当前台数起算，同一组的连续滚动会累加。
      *
      * @param stack 机器组
@@ -288,8 +317,9 @@ final class FactoryScreenState {
             // 上一个请求已经发出，又在它回来之前继续滚：以当前目标为基准接着加。
             this.pendingStackSentAt = 0L;
         }
+        int max = maxStackCount(stack);
         this.pendingStackTarget = Math.max(1,
-                Math.min(MAX_STACK_COUNT, this.pendingStackTarget + delta));
+                Math.min(max, this.pendingStackTarget + delta));
         this.pendingStackChangedAt = now;
     }
 
