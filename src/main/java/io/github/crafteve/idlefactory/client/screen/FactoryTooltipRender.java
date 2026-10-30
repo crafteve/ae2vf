@@ -110,9 +110,9 @@ final class FactoryTooltipRender {
             int row = (mouseY - l.gridY) / FactoryLayout.ROW_H;
             int index = state.machineFirstRow + row;
             if (row < state.machineRowsVisible()
-                    && index >= 0 && index < state.filteredMachines.size()) {
-                FactorySnapshotBuilder.MachineView machine = state.filteredMachines.get(index);
-                drawMachineTooltip(graphics, machine, mouseX, mouseY);
+                    && index >= 0 && index < state.libraryStacks.size()) {
+                FactoryMachineStack stack = state.libraryStacks.get(index);
+                drawStackTooltip(graphics, stack, mouseX, mouseY);
                 return;
             }
         }
@@ -377,32 +377,55 @@ final class FactoryTooltipRender {
     }
 
     /**
-     * 机器库卡片的 tooltip。
+     * 机器库组卡片的 tooltip。
+     *
+     * <p>单台时就是一台机器的信息；多台时标题带台数，坐标按成员逐台列出（最多 3 台，其余写
+     * 「还有 N 台」）。「未编线」只出现一次：它既是产线信息也是状态，重复会让人以为有两条。</p>
      *
      * @param graphics 画布
-     * @param machine  机器视图
+     * @param stack    机器组
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
-    private void drawMachineTooltip(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
+    private void drawStackTooltip(GuiGraphics graphics, FactoryMachineStack stack, int mouseX,
+            int mouseY) {
         List<Component> lines = new ArrayList<>();
         FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
-        lines.add(FactoryLabels.colored(FactoryLabels.blockName(machine.blockId()), tt.title()));
-        lines.add(FactoryLabels.coloredBold(
-                FactoryStatus.text(machine, this.context.theme()),
-                FactoryStatus.of(machine, this.context.theme()).color()));
-        lines.add(FactoryLabels.colored(machine.ref().dimension().location()
-                + " " + machine.ref().pos().toShortString(), tt.label()));
-        lines.add(machine.lineNames().isEmpty()
-                ? FactoryLabels.colored("未编线", tt.idle())
-                : FactoryLabels.labelValue("产线 ",
-                        String.join("/", machine.lineNames()), this.context.theme()));
+        FactorySnapshotBuilder.MachineView anchor = stack.anchor();
+        int count = this.context.state().displayCount(stack);
+
+        String name = FactoryLabels.blockName(stack.blockId());
+        lines.add(FactoryLabels.colored(count > 1 ? name + " ×" + count : name, tt.title()));
+        lines.add(FactoryLabels.coloredBold(stack.statusText(this.context.theme()),
+                stack.status(this.context.theme()).color()));
+
+        if (anchor.lineNames().isEmpty()) {
+            lines.add(FactoryLabels.colored("未编线", tt.idle()));
+        } else {
+            lines.add(FactoryLabels.labelValue("产线 ",
+                    String.join("/", anchor.lineNames()), this.context.theme()));
+        }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("规则 ", tt.label()))
                 .append(FactoryLabels.coloredBold(
-                        Integer.toString(machine.ruleCount()), tt.value()))
+                        Integer.toString(anchor.ruleCount()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));
+
+        if (count > 1) {
+            int shown = Math.min(3, stack.members().size());
+            for (int i = 0; i < shown; i++) {
+                FactorySnapshotBuilder.MachineView member = stack.members().get(i);
+                lines.add(FactoryLabels.colored("  " + member.ref().dimension().location()
+                        + " " + member.ref().pos().toShortString(), tt.label()));
+            }
+            if (stack.members().size() > shown) {
+                lines.add(FactoryLabels.colored(
+                        "  还有 " + (stack.members().size() - shown) + " 台", tt.label()));
+            }
+        } else {
+            lines.add(FactoryLabels.colored(anchor.ref().dimension().location()
+                    + " " + anchor.ref().pos().toShortString(), tt.label()));
+        }
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }
 }

@@ -174,8 +174,11 @@ final class FactoryMachineLibraryRender {
         }
         String label = "×" + count;
         int textWidth = this.context.font().width(label);
-        graphics.drawString(this.context.font(), label,
-                iconX + FactoryLayout.CELL - 2 - textWidth, iconY + FactoryLayout.CELL - 8,
-                0xFFFFFFFF, true);
+        // 图标画在 ITEM(150) 层，这里必须抬到 GRID_COUNT(300)，否则数量会被图标盖住。
+        graphics.pose().pushPose();
+        graphics.pose().translate(iconX + FactoryLayout.CELL - 2 - textWidth,
+                iconY + FactoryLayout.CELL - 8, FactoryGuiLayer.GRID_COUNT.z());
+        graphics.drawString(this.context.font(), label, 0, 0, 0xFFFFFFFF, true);
+        graphics.pose().popPose();
     }
 }
