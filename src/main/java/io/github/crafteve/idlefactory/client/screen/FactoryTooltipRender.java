@@ -418,6 +418,7 @@ final class FactoryTooltipRender {
                 lines.add(FactoryLabels.colored(
                         "  还有 " + (stack.members().size() - shown) + " 台", tt.label()));
             }
+            lines.add(FactoryLabels.colored("单击卡片展开成员", tt.label()));
         } else {
             lines.add(FactoryLabels.colored(anchor.ref().dimension().location()
                     + " " + anchor.ref().pos().toShortString(), tt.label()));

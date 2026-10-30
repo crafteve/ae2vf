@@ -351,6 +351,9 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         if (this.dragStack != null && button == 0) {
             if (this.dragActive) {
                 finishMachineDrag(mouseX, mouseY);
+            } else if (this.dragFromLibrary) {
+                // 单击库卡片（没拖动）：展开/收起成员列表。
+                this.screen.state.toggleLibraryExpanded(this.dragStack);
             }
             cancelDrag();
             return true;

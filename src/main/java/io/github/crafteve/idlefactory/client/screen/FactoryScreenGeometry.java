@@ -157,23 +157,53 @@ final class FactoryScreenGeometry {
                 || mouseY < l.gridY || mouseY >= l.gridY + gridH) {
             return null;
         }
-        int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
-        int index = this.screen.state.machineFirstRow + row;
-        if (row >= this.screen.state.machineRowsVisible()
-                || index < 0 || index >= this.screen.state.libraryStacks.size()) {
-            return null;
-        }
-        // 和 FactoryMachineLibraryRender 的卡片矩形保持一致：cardX = gridX + 2、cardY = 行顶 + 1、
-        // cardW = 宽 - 4、cardH = ROW_H - 3。命中缝隙时返回 null，避免空白处也弹 tooltip。
         int cardX = l.gridX + 2;
         int cardW = gridW - 4;
-        int cardY = l.gridY + row * FactoryLayout.ROW_H + 1;
-        int cardH = FactoryLayout.ROW_H - 3;
-        if (mouseX < cardX || mouseX >= cardX + cardW
-                || mouseY < cardY || mouseY >= cardY + cardH) {
-            return null;
+        int y = l.gridY;
+        for (int index = this.screen.state.machineFirstRow;
+                index < this.screen.state.libraryStacks.size(); index++) {
+            if (y >= l.gridY + gridH) {
+                break;
+            }
+            FactoryMachineStack stack = this.screen.state.libraryStacks.get(index);
+            int detailHeight = this.screen.state.libraryDetailHeight(stack);
+            if (mouseY >= y && mouseY < y + FactoryLayout.ROW_H + detailHeight) {
+                // 基础行才认卡片矩形；展开区整块都属于这一行。
+                if (mouseY < y + FactoryLayout.ROW_H) {
+                    if (mouseX < cardX || mouseX >= cardX + cardW
+                            || mouseY < y + 1 || mouseY >= y + FactoryLayout.ROW_H - 2) {
+                        return null;
+                    }
+                }
+                return stack;
+            }
+            y += FactoryLayout.ROW_H + detailHeight;
         }
-        return this.screen.state.libraryStacks.get(index);
+        return null;
+    }
+
+    /**
+     * 某组在机器库里的行顶 y；不在可见范围时为 {@code -1}。
+     *
+     * @param target 机器组
+     * @return 行顶 y
+     */
+    int libraryRowY(FactoryMachineStack target) {
+        FactoryLayout l = this.screen.layout;
+        int y = l.gridY;
+        int bottom = l.gridY + l.gridRows * FactoryLayout.CELL;
+        for (int index = this.screen.state.machineFirstRow;
+                index < this.screen.state.libraryStacks.size(); index++) {
+            if (y >= bottom) {
+                break;
+            }
+            FactoryMachineStack stack = this.screen.state.libraryStacks.get(index);
+            if (stack == target) {
+                return y;
+            }
+            y += FactoryLayout.ROW_H + this.screen.state.libraryDetailHeight(stack);
+        }
+        return -1;
     }
 
     /**
@@ -220,13 +250,16 @@ final class FactoryScreenGeometry {
         if (stack == null) {
             return null;
         }
-        int row = (int) ((mouseY - this.screen.layout.gridY) / FactoryLayout.ROW_H);
+        int y = libraryRowY(stack);
+        if (y < 0) {
+            return null;
+        }
         int cardX = this.screen.layout.gridX + 2;
         int cardW = FactoryLayout.GRID_COLS * FactoryLayout.CELL - 4;
-        int cardY = this.screen.layout.gridY + row * FactoryLayout.ROW_H + 1;
+        int cardY = y + 1;
         int x = cardX + cardW - 12;
-        int y = cardY + 13 - 1;
-        return inside(mouseX, mouseY, x, y, 10, 10) ? stack : null;
+        int buttonY = cardY + 13 - 1;
+        return inside(mouseX, mouseY, x, buttonY, 10, 10) ? stack : null;
     }
 
     /**

@@ -77,24 +77,18 @@ final class FactoryJeiTargets {
             }
         }
 
-        if (state.activeTab == FactoryScreen.TAB_MACHINES
-                && mouseX >= l.gridX
-                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
-                && mouseY >= l.gridY
-                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
-            int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
-            int index = state.machineFirstRow + row;
-            if (row < state.machineRowsVisible()
-                    && index >= 0 && index < state.filteredMachines.size()) {
-                int cardY = l.gridY + row * FactoryLayout.ROW_H;
+        if (state.activeTab == FactoryScreen.TAB_MACHINES) {
+            FactoryMachineStack stack = this.context.geometry()
+                    .libraryStackAt(mouseX, mouseY);
+            if (stack != null) {
+                int cardY = this.context.geometry().libraryRowY(stack);
                 int iconX = l.gridX + 6;
                 int iconY = cardY + 3;
-                if (FactoryScreenGeometry.inside(mouseX, mouseY, iconX, iconY,
+                if (cardY >= 0 && FactoryScreenGeometry.inside(mouseX, mouseY, iconX, iconY,
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
-                    FactorySnapshotBuilder.MachineView machine = state.filteredMachines.get(index);
-                    ItemStack stack = FactoryLabels.blockStack(machine.blockId());
-                    if (!stack.isEmpty()) {
-                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, stack,
+                    ItemStack icon = FactoryLabels.blockStack(stack.blockId());
+                    if (!icon.isEmpty()) {
+                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, icon,
                                 new Rect2i(iconX, iconY, FactoryLayout.CELL,
                                         FactoryLayout.CELL));
                     }

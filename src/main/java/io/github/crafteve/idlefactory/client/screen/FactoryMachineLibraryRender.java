@@ -36,20 +36,66 @@ final class FactoryMachineLibraryRender {
         FactoryScreenState state = this.context.state();
         FactoryLayout l = this.context.layout();
         int width = FactoryLayout.GRID_COLS * FactoryLayout.CELL;
-        int rows = state.machineRowsVisible();
-        for (int i = 0; i < rows; i++) {
-            int index = state.machineFirstRow + i;
-            if (index >= state.libraryStacks.size()) {
+        int bottom = l.gridY + l.gridRows * FactoryLayout.CELL;
+        int y = l.gridY;
+        for (int index = state.machineFirstRow; index < state.libraryStacks.size(); index++) {
+            if (y >= bottom) {
                 break;
             }
             FactoryMachineStack stack = state.libraryStacks.get(index);
-            int y = l.gridY + i * FactoryLayout.ROW_H;
             drawMachineCard(graphics, stack, l.gridX, y, width);
+            y += FactoryLayout.ROW_H;
+            int detailHeight = state.libraryDetailHeight(stack);
+            if (detailHeight > 0) {
+                drawMembers(graphics, stack, l.gridX, y, width, detailHeight);
+                y += detailHeight;
+            }
         }
         if (state.machines.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有机器");
         } else if (state.libraryStacks.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有匹配");
+        }
+    }
+
+    /**
+     * 展开区：逐台列出成员坐标与单台状态。
+     *
+     * <p>机器库是只读视图，这里只显示「这一行到底是哪几台、各自什么状态」，不做编辑。
+     * 最多列 {@link FactoryScreenState#LIBRARY_MEMBER_ROWS} 台，其余折叠成一行提示。</p>
+     *
+     * @param graphics 画布
+     * @param stack    机器组
+     * @param x        卡片行左边缘
+     * @param y        展开区顶部
+     * @param width    卡片行总宽
+     * @param height   展开区高度
+     */
+    private void drawMembers(GuiGraphics graphics, FactoryMachineStack stack, int x, int y,
+            int width, int height) {
+        int cardX = x + 2;
+        int cardW = width - 4;
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
+                cardX + 2, y + 2, cardW, height - 2);
+        FactoryNineSlice.machineCard(graphics, cardX, y, cardW, height - 2);
+
+        int shown = Math.min(stack.count(), FactoryScreenState.LIBRARY_MEMBER_ROWS);
+        for (int i = 0; i < shown; i++) {
+            FactorySnapshotBuilder.MachineView member = stack.members().get(i);
+            int rowY = y + 2 + i * FactoryScreenState.LIBRARY_MEMBER_H;
+            FactoryStatus status = FactoryStatus.of(member, this.context.theme());
+            FactoryNineSlice.icon(graphics, status.lamp(), cardX + 6, rowY + 4,
+                    FactoryGuiTextures.STATUS_LAMP_SIZE);
+            graphics.drawString(this.context.font(), member.ref().pos().toShortString(),
+                    cardX + 18, rowY + 4, this.context.theme().textValue(), false);
+            graphics.drawString(this.context.font(), status.text(), cardX + 78, rowY + 4,
+                    status.color(), false);
+        }
+        if (stack.count() > shown) {
+            int rowY = y + 2 + shown * FactoryScreenState.LIBRARY_MEMBER_H;
+            graphics.drawString(this.context.font(),
+                    "还有 " + (stack.count() - shown) + " 台",
+                    cardX + 6, rowY + 2, this.context.theme().textDim(), false);
         }
     }
 

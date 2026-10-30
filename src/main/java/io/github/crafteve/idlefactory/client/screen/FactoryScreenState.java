@@ -80,6 +80,15 @@ final class FactoryScreenState {
     /** 展开的组，按锚点机器 id 存；签名变化不影响展开状态。 */
     final Set<UUID> expandedStacks = new HashSet<>();
 
+    /** 机器库展开的组，按锚点 id 记；一次只展开一张卡。 */
+    @Nullable
+    UUID expandedLibraryAnchor;
+
+    /** 机器库展开区里最多列几台成员。 */
+    static final int LIBRARY_MEMBER_ROWS = 8;
+    /** 机器库成员行高。 */
+    static final int LIBRARY_MEMBER_H = 16;
+
     /** 滚轮改台数的合并窗口（毫秒）；滚轮一格在 Windows 上常一次发多个事件。 */
     static final long STACK_SCROLL_MERGE_MS = 150L;
     /** 发出改数量请求后，本地乐观显示最多保留多久（毫秒），等快照回来。 */
@@ -157,6 +166,11 @@ final class FactoryScreenState {
             currentIds.add(machine.ref().id());
         }
         this.expandedStacks.retainAll(currentIds);
+        if (this.expandedLibraryAnchor != null
+                && !currentIds.contains(this.expandedLibraryAnchor)) {
+            // 展开的那台被删了：收起，避免下一次同名锚点出现时意外展开。
+            this.expandedLibraryAnchor = null;
+        }
         if (this.selectedLineId != null && findLine(this.selectedLineId) == null) {
             this.selectedLineId = null;
         }
@@ -311,6 +325,34 @@ final class FactoryScreenState {
      */
     int maxStackCount(FactoryMachineStack stack) {
         return Math.min(MAX_STACK_COUNT, stack.count() + stackPool(stack).size());
+    }
+
+    /**
+     * 机器库卡片的展开高度；没展开或不是这一组时为 0。
+     *
+     * <p>最多列 {@link #LIBRARY_MEMBER_ROWS} 台，再多就写「还有 N 台」，避免一张卡撑满整页。</p>
+     *
+     * @param stack 机器组
+     * @return 像素高度
+     */
+    int libraryDetailHeight(FactoryMachineStack stack) {
+        if (this.expandedLibraryAnchor == null
+                || !this.expandedLibraryAnchor.equals(stack.anchorId())) {
+            return 0;
+        }
+        int shown = Math.min(stack.count(), LIBRARY_MEMBER_ROWS);
+        int extra = stack.count() > shown ? 14 : 0;
+        return shown * LIBRARY_MEMBER_H + extra + 4;
+    }
+
+    /**
+     * 切换机器库某张卡的展开状态；一次只展开一张。
+     *
+     * @param stack 机器组
+     */
+    void toggleLibraryExpanded(FactoryMachineStack stack) {
+        UUID anchorId = stack.anchorId();
+        this.expandedLibraryAnchor = anchorId.equals(this.expandedLibraryAnchor) ? null : anchorId;
     }
 
     /**
@@ -602,7 +644,7 @@ final class FactoryScreenState {
     }
 
     /**
-     * 机器库一屏能放几行卡片。
+     * 机器库一屏能放几行卡片；按展开后的实际高度算。
      *
      * @return 可见行数
      */
@@ -610,15 +652,24 @@ final class FactoryScreenState {
         if (this.layout == null) {
             return 1;
         }
-        return Math.max(1, this.layout.gridRows * FactoryLayout.CELL / FactoryLayout.ROW_H);
+        int bottom = this.layout.gridY + this.layout.gridRows * FactoryLayout.CELL;
+        int y = this.layout.gridY;
+        int count = 0;
+        for (int i = this.machineFirstRow; i < this.libraryStacks.size() && y < bottom; i++) {
+            y += FactoryLayout.ROW_H + libraryDetailHeight(this.libraryStacks.get(i));
+            count++;
+        }
+        return Math.max(1, count);
     }
 
     /**
      * 机器库最多能滚到第几行。
      *
-     * @return 最大首行下标；不足一屏为 0
+     * <p>展开会让可见行数变化，这里只保证能滚到最后一张卡，不追求精确的「最后满屏」。</p>
+     *
+     * @return 最大首行下标
      */
     int maxMachineFirstRow() {
-        return Math.max(0, this.libraryStacks.size() - machineRowsVisible());
+        return Math.max(0, this.libraryStacks.size() - 1);
     }
 }
