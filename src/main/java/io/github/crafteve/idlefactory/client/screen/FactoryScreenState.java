@@ -87,6 +87,12 @@ final class FactoryScreenState {
     List<FactoryStorageS2C.Entry> filteredStorageEntries = List.of();
     /** 机器库搜索 + 排序后的可见视图；左表还会再按当前产线过滤。 */
     List<FactorySnapshotBuilder.MachineView> filteredMachines = List.of();
+
+    /** 机器库按组聚合后的行；与 {@link #filteredMachines} 一起重算。 */
+    List<FactoryMachineStack> libraryStacks = List.of();
+
+    /** 当前产线按组聚合后的行；左表只画这些。 */
+    List<FactoryMachineStack> tableStacks = List.of();
     /** 资源 → 搜索字段缓存；tooltip/tag 读取较重，避免每次过滤重复解析。 */
     final Map<ResourceKey, FactorySearchQuery.Fields> storageSearchFields = new HashMap<>();
 
@@ -137,7 +143,6 @@ final class FactoryScreenState {
             this.selectedLineId = null;
         }
         rememberedLineId = this.selectedLineId;
-        this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         if (!this.hasFactory) {
             this.storageRepo.clear();
             this.storageSearchFields.clear();
@@ -211,10 +216,23 @@ final class FactoryScreenState {
                 : FactorySort.machines(visible, buttons.machineKey(), buttons.machineDescending());
 
         this.filteredStorageEntries = this.storageRepo.view();
+        rebuildStacks();
+        this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
         this.storageFirstRow = Math.max(0,
                 Math.min(this.storageFirstRow, maxStorageFirstRow()));
         this.machineFirstRow = Math.max(0,
                 Math.min(this.machineFirstRow, maxMachineFirstRow()));
+    }
+
+    /**
+     * 重算左表和机器库的组行。
+     *
+     * <p>分组是纯视图操作，不缓存跨快照状态：每次可见视图变化都从头算，512 台上限下开销可以忽略。
+     * 先算机器库是因为它用 {@code filteredMachines}（已搜索、已排序），左表则按机器库登记顺序。</p>
+     */
+    private void rebuildStacks() {
+        this.libraryStacks = FactoryMachineStack.library(this.filteredMachines);
+        this.tableStacks = FactoryMachineStack.table(tableMachines());
     }
 
     /**
@@ -284,7 +302,7 @@ final class FactoryScreenState {
         if (this.selectedLineId == null) {
             return 0;
         }
-        return Math.max(0, tableMachines().size());
+        return Math.max(0, this.tableStacks.size());
     }
 
     /**
@@ -316,15 +334,15 @@ final class FactoryScreenState {
         int state = 64;
         int input = 72;
         int output = 72;
-        for (FactorySnapshotBuilder.MachineView machine : tableMachines()) {
+        for (FactoryMachineStack stack : this.tableStacks) {
             name = Math.max(name,
-                    this.font.width(FactoryLabels.blockName(machine.blockId()))
+                    this.font.width(FactoryLabels.blockName(stack.blockId()))
                             + FactoryLayout.CELL + 12);
-            input = Math.max(input, ruleWidth(machine.inputs(), machine.inputRates()));
-            output = Math.max(output, ruleWidth(machine.outputs(), machine.outputRates()));
+            input = Math.max(input, ruleWidth(stack.inputs(), stack.inputRates()));
+            output = Math.max(output, ruleWidth(stack.outputs(), stack.outputRates()));
         }
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            state = Math.max(state, this.font.width(FactoryStatus.text(machine, this.theme)) + 17);
+        for (FactoryMachineStack stack : this.libraryStacks) {
+            state = Math.max(state, this.font.width(stack.statusText(this.theme)) + 17);
         }
         this.layout.relayoutColumns(new int[] { name, state, input, output });
     }
@@ -413,6 +431,7 @@ final class FactoryScreenState {
         this.selectedLineId = lineId;
         rememberedLineId = lineId;
         this.firstRow = 0;
+        rebuildStacks();
         updateColumnWidths();
     }
 
@@ -448,6 +467,6 @@ final class FactoryScreenState {
      * @return 最大首行下标；不足一屏为 0
      */
     int maxMachineFirstRow() {
-        return Math.max(0, this.filteredMachines.size() - machineRowsVisible());
+        return Math.max(0, this.libraryStacks.size() - machineRowsVisible());
     }
 }
