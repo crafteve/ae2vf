@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
  * <p>保留字、重名、长度上限都由服务端判定；这里只拦“非空”和“无空白/控制字符”，错误由
  * {@link #setError(String)} 写进来。</p>
  */
-public final class LineNameDialog {
+public final class FactoryLineNameDialog {
     /** 浮层模式。 */
     public enum Mode {
         /** 新建产线。 */
@@ -46,7 +46,7 @@ public final class LineNameDialog {
      * @param theme     主题
      * @param onConfirm 确认回调；参数是模式和已 trim 的名字
      */
-    public LineNameDialog(Font font, FactoryGuiTheme theme, BiConsumer<Mode, String> onConfirm) {
+    public FactoryLineNameDialog(Font font, FactoryGuiTheme theme, BiConsumer<Mode, String> onConfirm) {
         this.font = font;
         this.theme = theme;
         this.onConfirm = onConfirm;

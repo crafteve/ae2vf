@@ -14,11 +14,11 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 展开 IO 面板的绘制层：段头、配置卡、空卡、滚动条。
  *
- * <p>只读 {@link IoDetailLayout.Detail} 的绝对坐标；不自己算布局。卡片控件（面、匹配）的
- * 矩形来自 {@link IoCardControls}，和点击命中共用一份。卡片保持 26px：第一行槽位 + 名称 +
+ * <p>只读 {@link FactoryIoDetailLayout.Detail} 的绝对坐标；不自己算布局。卡片控件（面、匹配）的
+ * 矩形来自 {@link FactoryIoCardControls}，和点击命中共用一份。卡片保持 26px：第一行槽位 + 名称 +
  * 右对齐速率，第二行面按钮 + 匹配按钮 + 状态文字。</p>
  */
-final class IoDetailRender {
+final class FactoryIoDetailRender {
     /** 深色段头上的冷白。 */
     private static final int HEADER_TEXT = 0xFFE8ECF5;
     /** 深色段头上的亮青数值。 */
@@ -26,7 +26,7 @@ final class IoDetailRender {
     /** 黄色匹配按钮上的深棕文字。 */
     private static final int MATCH_TEXT = 0xFF4A3200;
 
-    private IoDetailRender() {
+    private FactoryIoDetailRender() {
         // 纯静态工具类
     }
 
@@ -45,7 +45,7 @@ final class IoDetailRender {
      * @param idleLabel        产线暂停/睡眠时的中性文案；运行中传 {@code null}
      */
     static void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, FactoryLayout layout,
-            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Detail detail,
+            FactorySnapshotBuilder.MachineView machine, FactoryIoDetailLayout.Detail detail,
             int mouseX, int mouseY, boolean draggingResource, @Nullable String idleLabel) {
         if (detail.panelH() <= 0 || detail.panelW() <= 0) {
             return;
@@ -56,10 +56,10 @@ final class IoDetailRender {
         graphics.enableScissor(detail.panelX() + 1, detail.panelY() + 1,
                 detail.panelX() + detail.panelW() - 1,
                 detail.panelY() + detail.panelH() - 1);
-        for (IoDetailLayout.Section section : detail.sections()) {
+        for (FactoryIoDetailLayout.Section section : detail.sections()) {
             drawSection(graphics, font, theme, layout, detail, section, idleLabel);
         }
-        for (IoDetailLayout.Card card : detail.cards()) {
+        for (FactoryIoDetailLayout.Card card : detail.cards()) {
             if (card.y() + FactoryLayout.IO_CELL_H < detail.panelY()
                     || card.y() > detail.panelY() + detail.panelH()) {
                 continue;
@@ -75,7 +75,7 @@ final class IoDetailRender {
     }
 
     private static void drawSection(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
-            FactoryLayout layout, IoDetailLayout.Detail detail, IoDetailLayout.Section section,
+            FactoryLayout layout, FactoryIoDetailLayout.Detail detail, FactoryIoDetailLayout.Section section,
             @Nullable String idleLabel) {
         int contentX = detail.panelX() + FactoryLayout.IO_PANEL_PAD;
         int innerW = layout.ioInnerWidth();
@@ -110,7 +110,7 @@ final class IoDetailRender {
      * @param draggingResource 是否正在拖资源
      */
     private static void drawEmptyCard(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
-            IoDetailLayout.Card card, int mouseX, int mouseY, boolean draggingResource) {
+            FactoryIoDetailLayout.Card card, int mouseX, int mouseY, boolean draggingResource) {
         boolean hovered = inside(mouseX, mouseY, card.x(), card.y(),
                 card.width(), FactoryLayout.IO_CELL_H);
         if (hovered) {
@@ -135,7 +135,7 @@ final class IoDetailRender {
     }
 
     private static void drawRuleCard(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
-            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
+            FactorySnapshotBuilder.MachineView machine, FactoryIoDetailLayout.Card card,
             int mouseX, int mouseY, @Nullable String idleLabel) {
         List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
         if (card.ruleIndex() >= rules.size()) {
@@ -168,7 +168,7 @@ final class IoDetailRender {
         int slotX = card.x() + FactoryLayout.IO_CARD_PAD;
         int slotY = card.y() + FactoryLayout.IO_CARD_SLOT_Y;
         FactoryNineSlice.slot(graphics, slotX, slotY, FactoryLayout.CELL, FactoryLayout.CELL);
-        ResourceIconRenderer.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
+        FactoryResourceIconRender.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
         int textX = card.x() + FactoryLayout.IO_CARD_TEXT_X;
         String rateText = FactoryLabels.rateText(rate, spec.key().kind());
@@ -184,7 +184,7 @@ final class IoDetailRender {
         drawFaceButton(graphics, font, theme, card, spec, mouseX, mouseY);
         drawMatchButton(graphics, font, theme, card, spec, mouseX, mouseY);
 
-        int statusX = IoCardControls.reasonX(card.x(), spec);
+        int statusX = FactoryIoCardControls.reasonX(card.x(), spec);
         int statusWidth = Math.max(0, card.x() + card.width() - 4 - statusX);
         String statusText = idleLabel != null ? idleLabel
                 : FactoryLabels.reason(effective, card.input());
@@ -195,26 +195,26 @@ final class IoDetailRender {
     }
 
     private static void drawFaceButton(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
-            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
-        IoCardControls.Rect rect = IoCardControls.faceRect(card.x(), card.y());
+            FactoryIoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
+        FactoryIoCardControls.Rect rect = FactoryIoCardControls.faceRect(card.x(), card.y());
         boolean hovered = inside(mouseX, mouseY, rect);
         if (hovered) {
             FactoryNineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
         } else {
             FactoryNineSlice.button(graphics, rect.x(), rect.y(), rect.width(), rect.height());
         }
-        String label = IoCardControls.faceLabel(spec);
+        String label = FactoryIoCardControls.faceLabel(spec);
         graphics.drawString(font, label,
                 rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
                 theme.textFace(), false);
     }
 
     private static void drawMatchButton(GuiGraphics graphics, Font font, FactoryGuiTheme theme,
-            IoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
-        if (!IoCardControls.matchVisible(spec)) {
+            FactoryIoDetailLayout.Card card, ResourceSpec spec, int mouseX, int mouseY) {
+        if (!FactoryIoCardControls.matchVisible(spec)) {
             return;
         }
-        IoCardControls.Rect rect = IoCardControls.matchRect(card.x(), card.y());
+        FactoryIoCardControls.Rect rect = FactoryIoCardControls.matchRect(card.x(), card.y());
         boolean hovered = inside(mouseX, mouseY, rect);
         if (hovered) {
             FactoryNineSlice.buttonHover(graphics, rect.x(), rect.y(), rect.width(), rect.height());
@@ -222,13 +222,13 @@ final class IoDetailRender {
             FactoryNineSlice.slice(graphics, FactoryGuiTextures.BUTTON_MATCH, FactoryGuiTextures.BUTTON_SIZE, 1,
                     rect.x(), rect.y(), rect.width(), rect.height());
         }
-        String label = IoCardControls.matchLabel(spec);
+        String label = FactoryIoCardControls.matchLabel(spec);
         graphics.drawString(font, label,
                 rect.x() + (rect.width() - font.width(label)) / 2, rect.y() + 2,
                 MATCH_TEXT, false);
     }
 
-    private static void drawScrollbar(GuiGraphics graphics, IoDetailLayout.Detail detail) {
+    private static void drawScrollbar(GuiGraphics graphics, FactoryIoDetailLayout.Detail detail) {
         if (detail.maxScroll() <= 0) {
             return;
         }
@@ -243,7 +243,7 @@ final class IoDetailRender {
         graphics.fill(trackX, thumbY, trackX + 2, thumbY + thumbH, 0xFF4D6A8A);
     }
 
-    private static boolean inside(double mouseX, double mouseY, IoCardControls.Rect rect) {
+    private static boolean inside(double mouseX, double mouseY, FactoryIoCardControls.Rect rect) {
         return inside(mouseX, mouseY, rect.x(), rect.y(), rect.width(), rect.height());
     }
 

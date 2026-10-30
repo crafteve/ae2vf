@@ -17,7 +17,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>每列最多显示 3 条规则摘要，并在末尾为“空槽”预留 18px；空槽是资源拖拽的放置目标。
  * 绘制、点击、JEI 都用同一份 {@link Layout}，避免坐标各算各的。</p>
  */
-final class RuleStrip {
+final class FactoryRuleStrip {
     /** 最多显示几条规则摘要。 */
     private static final int MAX_RULES = 3;
 
@@ -46,7 +46,7 @@ final class RuleStrip {
         }
     }
 
-    private RuleStrip() {
+    private FactoryRuleStrip() {
         // 纯静态工具类
     }
 
@@ -119,7 +119,7 @@ final class RuleStrip {
             String rateText = FactoryLabels.rateText(rate, spec.key().kind());
             FactoryNineSlice.slot(graphics, entry.x(), entry.y(),
                     FactoryLayout.CELL, FactoryLayout.CELL);
-            ResourceIconRenderer.draw(graphics, font, spec.key(), entry.x() + 1, entry.y() + 1);
+            FactoryResourceIconRender.draw(graphics, font, spec.key(), entry.x() + 1, entry.y() + 1);
             graphics.drawString(font, rateText, entry.x() + FactoryLayout.CELL + 2,
                     entry.y() + 5, rateColor, false);
         }

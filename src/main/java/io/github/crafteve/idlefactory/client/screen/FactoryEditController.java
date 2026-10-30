@@ -40,9 +40,9 @@ public final class FactoryEditController {
     private final FactoryScreen screen;
     private final Font font;
     private final FactoryGuiTheme theme;
-    private final LineSelectorMenu lineMenu;
-    private final LineNameDialog nameDialog;
-    private final ConfirmDialog confirmDialog;
+    private final FactoryLineMenu lineMenu;
+    private final FactoryLineNameDialog nameDialog;
+    private final FactoryConfirmDialog confirmDialog;
 
     @Nullable
     private FactoryLayout layout;
@@ -95,7 +95,7 @@ public final class FactoryEditController {
         this.screen = screen;
         this.font = font;
         this.theme = theme;
-        this.lineMenu = new LineSelectorMenu(new LineSelectorMenu.Callbacks() {
+        this.lineMenu = new FactoryLineMenu(new FactoryLineMenu.Callbacks() {
             @Override
             public void select(@Nullable UUID lineId) {
                 screen.selectLine(lineId);
@@ -103,12 +103,12 @@ public final class FactoryEditController {
 
             @Override
             public void create() {
-                openNameDialog(LineNameDialog.Mode.CREATE, null, null);
+                openNameDialog(FactoryLineNameDialog.Mode.CREATE, null, null);
             }
 
             @Override
             public void rename(FactorySnapshotBuilder.LineView line) {
-                openNameDialog(LineNameDialog.Mode.RENAME, line.name(), line.id());
+                openNameDialog(FactoryLineNameDialog.Mode.RENAME, line.name(), line.id());
             }
 
             @Override
@@ -122,8 +122,8 @@ public final class FactoryEditController {
                         : FactoryLineActionC2S.Action.PAUSE_LINE, line.id(), null, null);
             }
         });
-        this.nameDialog = new LineNameDialog(font, theme, this::confirmName);
-        this.confirmDialog = new ConfirmDialog(font, theme);
+        this.nameDialog = new FactoryLineNameDialog(font, theme, this::confirmName);
+        this.confirmDialog = new FactoryConfirmDialog(font, theme);
     }
 
     /**
@@ -679,7 +679,7 @@ public final class FactoryEditController {
         this.feedbackTicks = FEEDBACK_TICKS;
     }
 
-    private void openNameDialog(LineNameDialog.Mode mode, @Nullable String initial,
+    private void openNameDialog(FactoryLineNameDialog.Mode mode, @Nullable String initial,
             @Nullable UUID lineId) {
         if (this.layout == null) {
             return;
@@ -688,8 +688,8 @@ public final class FactoryEditController {
         this.nameDialog.open(mode, initial, this.layout);
     }
 
-    private void confirmName(LineNameDialog.Mode mode, String name) {
-        if (mode == LineNameDialog.Mode.CREATE) {
+    private void confirmName(FactoryLineNameDialog.Mode mode, String name) {
+        if (mode == FactoryLineNameDialog.Mode.CREATE) {
             this.pendingAction = FactoryLineActionC2S.Action.CREATE_LINE;
             this.pendingLineId = null;
             this.awaitingName = true;

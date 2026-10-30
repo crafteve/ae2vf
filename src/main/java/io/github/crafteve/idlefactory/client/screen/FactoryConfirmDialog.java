@@ -12,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>不带输入框；确认后立即关闭并执行回调，结果由服务端反馈显示在底部状态条。Esc / 取消关闭，
  * 回车确认。浮层外点击一律吞掉，避免误触背后的表格。</p>
  */
-public final class ConfirmDialog {
+public final class FactoryConfirmDialog {
     private final Font font;
     private final FactoryGuiTheme theme;
 
@@ -29,7 +29,7 @@ public final class ConfirmDialog {
      * @param font  字体
      * @param theme 主题
      */
-    public ConfirmDialog(Font font, FactoryGuiTheme theme) {
+    public FactoryConfirmDialog(Font font, FactoryGuiTheme theme) {
         this.font = font;
         this.theme = theme;
     }

@@ -19,7 +19,7 @@ import net.minecraft.client.gui.GuiGraphics;
  *
  * <p>几何常量在 {@link FactoryLayout}；这里只按文本算宽度，并夹在面板内。</p>
  */
-public final class LineSelectorMenu {
+public final class FactoryLineMenu {
     /** 下拉对外的动作。 */
     public interface Callbacks {
         /** 选中一条产线；{@code null} 表示清空。 */
@@ -68,7 +68,7 @@ public final class LineSelectorMenu {
     /**
      * @param callbacks 动作回调
      */
-    public LineSelectorMenu(Callbacks callbacks) {
+    public FactoryLineMenu(Callbacks callbacks) {
         this.callbacks = callbacks;
     }
 

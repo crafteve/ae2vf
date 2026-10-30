@@ -17,10 +17,10 @@ import net.minecraft.client.gui.Font;
  * 按 {@link Detail#scroll()} 平移，命中测试用同一份绝对坐标并拒绝面板外的位置。空卡永远
  * 在每段末尾，作为“拖资源进来新增规则”的放置目标。</p>
  *
- * <p>本类只算几何，不绘制；绘制在 {@link IoDetailRender}，控件命中在
- * {@link IoCardControls}。</p>
+ * <p>本类只算几何，不绘制；绘制在 {@link FactoryIoDetailRender}，控件命中在
+ * {@link FactoryIoCardControls}。</p>
  */
-final class IoDetailLayout {
+final class FactoryIoDetailLayout {
     /** 卡片之间的间距。 */
     static final int GAP = FactoryLayout.IO_GAP;
 
@@ -81,7 +81,7 @@ final class IoDetailLayout {
     private record Placement(int x, int rowY, int width, int ruleIndex, boolean empty) {
     }
 
-    private IoDetailLayout() {
+    private FactoryIoDetailLayout() {
         // 纯静态工具类
     }
 

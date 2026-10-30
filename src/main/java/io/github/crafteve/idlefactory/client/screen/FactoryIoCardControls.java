@@ -14,7 +14,7 @@ import net.minecraft.core.Direction;
  * 匹配按钮与状态文字。面按钮左键切到下一个面、右键切回上一个面；匹配按钮点击在精确 /
  * 模糊之间切换。绘制、命中、tooltip 都从这里取矩形，避免三处各算一份。</p>
  */
-final class IoCardControls {
+final class FactoryIoCardControls {
     /** 面顺序：任意 + 六向。 */
     static final Direction[] FACES = {
             null, Direction.UP, Direction.DOWN, Direction.NORTH,
@@ -45,7 +45,7 @@ final class IoCardControls {
     record Hit(Kind kind) {
     }
 
-    private IoCardControls() {
+    private FactoryIoCardControls() {
         // 纯静态工具类
     }
 

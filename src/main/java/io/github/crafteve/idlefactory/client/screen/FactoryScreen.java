@@ -1291,7 +1291,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      *
      * <p>基础行固定高 {@link FactoryLayout#ROW_H}，包含状态条、机器图标、名称、
      * 产线、状态和输入/输出摘要；行尾按钮决定是否继续画展开区。展开内容不在这
-     * 一行里，而是由 {@link IoDetailRender} 接到行底部。</p>
+     * 一行里，而是由 {@link FactoryIoDetailRender} 接到行底部。</p>
      *
      * @param graphics     画布
      * @param machine      机器视图
@@ -1346,10 +1346,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (l.hasColumn(FactoryLayout.COL_INPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_INPUT) + 2;
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.inputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.inputs(),
                     machine.inputRates(), stripX, y + 4,
                     l.columnW(FactoryLayout.COL_INPUT) - 4, true);
-            RuleStrip.draw(graphics, this.font, this.theme, strip, machine.inputs(),
+            FactoryRuleStrip.draw(graphics, this.font, this.theme, strip, machine.inputs(),
                     machine.inputRates(), machine.inputReasons(), this.renderMouseX,
                     this.renderMouseY, this.editController != null
                             && this.editController.isDraggingResource(),
@@ -1357,11 +1357,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.outputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.outputs(),
                     machine.outputRates(), stripX, y + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4
                             - FactoryLayout.EXPAND_BUTTON - 2, true);
-            RuleStrip.draw(graphics, this.font, this.theme, strip, machine.outputs(),
+            FactoryRuleStrip.draw(graphics, this.font, this.theme, strip, machine.outputs(),
                     machine.outputRates(), machine.outputReasons(), this.renderMouseX,
                     this.renderMouseY, this.editController != null
                             && this.editController.isDraggingResource(),
@@ -1374,9 +1374,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         graphics.drawString(this.font, "×", removeX, y + (FactoryLayout.ROW_H - 8) / 2,
                 removeHovered ? this.theme.error() : this.theme.textDim(), false);
         if (detailHeight > 0) {
-            IoDetailLayout.Detail detail = IoDetailLayout.layout(l, machine,
+            FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, machine,
                     y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
-            IoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
+            FactoryIoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
                     this.renderMouseX, this.renderMouseY,
                     this.editController != null && this.editController.isDraggingResource(),
                     idleLabel);
@@ -1619,7 +1619,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         FactorySnapshotBuilder.MachineView machine = hit.machine();
         if (hit.detailHeight() > 0 && mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+            FactoryIoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
             if (card != null && card.empty()) {
                 return new IoDropTarget(machine, card.input() ? IoSide.INPUT : IoSide.OUTPUT);
             }
@@ -1631,21 +1631,21 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         if (l.hasColumn(FactoryLayout.COL_INPUT)
                 && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.inputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.inputs(),
                     machine.inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
                     hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
-            if (RuleStrip.hitAdd(strip, mouseX, mouseY)) {
+            if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
                 return new IoDropTarget(machine, IoSide.INPUT);
             }
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                 && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, machine.outputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.outputs(),
                     machine.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
                     hit.y() + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4
                             - FactoryLayout.EXPAND_BUTTON - 2, true);
-            if (RuleStrip.hitAdd(strip, mouseX, mouseY)) {
+            if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
                 return new IoDropTarget(machine, IoSide.OUTPUT);
             }
         }
@@ -1688,7 +1688,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 || mouseX >= this.layout.leftX + this.layout.leftW) {
             return false;
         }
-        IoDetailLayout.Detail detail = IoDetailLayout.layout(this.layout, hit.machine(),
+        FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(this.layout, hit.machine(),
                 hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
         if (detail.maxScroll() <= 0) {
             return true;
@@ -1709,7 +1709,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 是否消费
      */
     boolean handleIoCardMouse(FactorySnapshotBuilder.MachineView machine,
-            IoDetailLayout.Card card, double mouseX, double mouseY, int button) {
+            FactoryIoDetailLayout.Card card, double mouseX, double mouseY, int button) {
         IoSide side = card.input() ? IoSide.INPUT : IoSide.OUTPUT;
         if (card.empty() || this.editController == null) {
             return true;
@@ -1719,13 +1719,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return true;
         }
         ResourceSpec spec = rules.get(card.ruleIndex());
-        IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
+        FactoryIoCardControls.Hit hit = FactoryIoCardControls.hit(card.x(), card.y(), card.width(),
                 false, spec, mouseX, mouseY);
         switch (hit.kind()) {
             case FACE -> {
                 // 左键下一个面、右键上一个面；面按钮本身就是当前面的显示。
                 if (button == 0 || button == 1) {
-                    Direction next = IoCardControls.nextFace(spec.face(),
+                    Direction next = FactoryIoCardControls.nextFace(spec.face(),
                             button == 0 ? 1 : -1);
                     this.editController.updateRule(machine, side, spec, next, spec.mode());
                 }
@@ -1757,7 +1757,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param button 鼠标键
      * @return 是否消费
      */
-    boolean handleRuleStripMouse(double mouseX, double mouseY, int button) {
+    boolean handleFactoryRuleStripMouse(double mouseX, double mouseY, int button) {
         if (button != 0 || this.editController == null) {
             return false;
         }
@@ -1768,31 +1768,31 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         FactoryLayout l = this.layout;
         if (l.hasColumn(FactoryLayout.COL_INPUT)
                 && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, hit.machine().inputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, hit.machine().inputs(),
                     hit.machine().inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
                     hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
-            RuleStrip.Entry entry = RuleStrip.hitRule(strip, mouseX, mouseY);
+            FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
             if (entry != null && entry.ruleIndex() < hit.machine().inputs().size()) {
                 this.editController.beginRuleDrag(hit.machine(), IoSide.INPUT,
                         hit.machine().inputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
-            return RuleStrip.hitAdd(strip, mouseX, mouseY);
+            return FactoryRuleStrip.hitAdd(strip, mouseX, mouseY);
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                 && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
-            RuleStrip.Layout strip = RuleStrip.layout(this.font, hit.machine().outputs(),
+            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, hit.machine().outputs(),
                     hit.machine().outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
                     hit.y() + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4
                             - FactoryLayout.EXPAND_BUTTON - 2, true);
-            RuleStrip.Entry entry = RuleStrip.hitRule(strip, mouseX, mouseY);
+            FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
             if (entry != null && entry.ruleIndex() < hit.machine().outputs().size()) {
                 this.editController.beginRuleDrag(hit.machine(), IoSide.OUTPUT,
                         hit.machine().outputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
-            return RuleStrip.hitAdd(strip, mouseX, mouseY);
+            return FactoryRuleStrip.hitAdd(strip, mouseX, mouseY);
         }
         return false;
     }
@@ -1816,7 +1816,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (!this.expandedMachines.contains(machine.ref())) {
             return 0;
         }
-        int required = IoDetailLayout.requiredHeight(this.layout, machine, this.font);
+        int required = FactoryIoDetailLayout.requiredHeight(this.layout, machine, this.font);
         int available = Math.max(0, this.layout.footerY - rowY - FactoryLayout.ROW_H);
         // 展开区最多占到 footer 上沿；剩余空间不足时宁可截断，也不能把后续行推出表格。
         return Math.min(required, available);
@@ -1981,7 +1981,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return;
             }
         }
-        int required = IoDetailLayout.requiredHeight(this.layout, table.get(index), this.font);
+        int required = FactoryIoDetailLayout.requiredHeight(this.layout, table.get(index), this.font);
         int available = Math.max(0, this.layout.footerY - y - FactoryLayout.ROW_H);
         if (required > available) {
             this.firstRow = index;
@@ -2127,7 +2127,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /**
      * 画一个资源图标。
      *
-     * <p>物品/流体/FE 的图标差异全部收在 {@link ResourceIconRenderer}，这里只转发，
+     * <p>物品/流体/FE 的图标差异全部收在 {@link FactoryResourceIconRender}，这里只转发，
      * 保证仓库格、IO 列和 JEI 用的是同一份贴图逻辑。</p>
      *
      * @param graphics 画布
@@ -2136,7 +2136,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param y        左上角 y
      */
     private void drawResourceIcon(GuiGraphics graphics, ResourceKey key, int x, int y) {
-        ResourceIconRenderer.draw(graphics, this.font, key, x, y);
+        FactoryResourceIconRender.draw(graphics, this.font, key, x, y);
     }
 
     /**
@@ -2452,7 +2452,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 drawExpandTooltip(graphics, machine, mouseX, mouseY);
                 return;
             }
-            IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+            FactoryIoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
             if (card != null) {
                 drawCardTooltip(graphics, machine, card, mouseX, mouseY);
                 return;
@@ -2514,13 +2514,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 卡片；没展开或没命中为 {@code null}
      */
     @Nullable
-    private IoDetailLayout.Card detailCardAt(TableHit hit, double mouseX, double mouseY) {
+    private FactoryIoDetailLayout.Card detailCardAt(TableHit hit, double mouseX, double mouseY) {
         if (hit.detailHeight() <= 0) {
             return null;
         }
-        IoDetailLayout.Detail detail = IoDetailLayout.layout(this.layout, hit.machine(),
+        FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(this.layout, hit.machine(),
                 hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
-        return IoDetailLayout.cardAt(detail, mouseX, mouseY);
+        return FactoryIoDetailLayout.cardAt(detail, mouseX, mouseY);
     }
 
     /**
@@ -2558,7 +2558,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param mouseY   鼠标 y
      */
     private void drawCardTooltip(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, IoDetailLayout.Card card,
+            FactorySnapshotBuilder.MachineView machine, FactoryIoDetailLayout.Card card,
             int mouseX, int mouseY) {
         List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
         FactoryGuiTheme.Tooltip tt = this.theme.tooltip();
@@ -2574,7 +2574,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         ResourceSpec spec = rules.get(card.ruleIndex());
         String idleLabel = lineIdleLabel();
-        IoCardControls.Hit hit = IoCardControls.hit(card.x(), card.y(), card.width(),
+        FactoryIoCardControls.Hit hit = FactoryIoCardControls.hit(card.x(), card.y(), card.width(),
                 false, spec, mouseX, mouseY);
         switch (hit.kind()) {
             case FACE -> {
@@ -3060,13 +3060,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (clickMachineExpand(mouseX, mouseY)) {
             return true;
         }
-        if (handleRuleStripMouse(mouseX, mouseY, button)) {
+        if (handleFactoryRuleStripMouse(mouseX, mouseY, button)) {
             return true;
         }
         TableHit ioHit = tableHitAt(mouseY);
         if (ioHit != null && ioHit.detailHeight() > 0
                 && mouseY >= ioHit.y() + FactoryLayout.ROW_H) {
-            IoDetailLayout.Card card = detailCardAt(ioHit, mouseX, mouseY);
+            FactoryIoDetailLayout.Card card = detailCardAt(ioHit, mouseX, mouseY);
             if (card != null) {
                 handleIoCardMouse(ioHit.machine(), card, mouseX, mouseY, button);
                 return true;
@@ -3492,7 +3492,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 }
 
                 // 展开区配置卡：只有左上角资源槽是 JEI 目标；面/匹配/删除按钮不返回。
-                IoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
+                FactoryIoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
                 if (card != null) {
                     if (!card.empty()
                             && inside(mouseX, mouseY, card.x() + 3, card.y() + 3,
@@ -3565,7 +3565,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /**
      * 在输入/输出列里找当前鼠标命中的规则图标。
      *
-     * <p>位置计算必须和 {@link RuleStrip} 的绘制完全一致：每条包含 18px 图标和
+     * <p>位置计算必须和 {@link FactoryRuleStrip} 的绘制完全一致：每条包含 18px 图标和
      * 速率文字，最多 3 条；绘制时如果第二条会超出 maxWidth 就停止，这里同样停止。</p>
      *
      * @param rules    规则
