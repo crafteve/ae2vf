@@ -215,9 +215,7 @@ final class FactoryScreenGeometry {
      */
     @Nullable
     FactoryMachineStack lineRemoveButtonAt(double mouseX, double mouseY) {
-        if (this.screen.state.activeTab != FactoryScreen.TAB_MACHINES) {
-            return null;
-        }
+        // 不限制右侧 tab：左表的 × 是产线自己的动作，和右边显示仓库还是机器库无关。
         StackHit hit = tableHitAt(mouseY);
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
