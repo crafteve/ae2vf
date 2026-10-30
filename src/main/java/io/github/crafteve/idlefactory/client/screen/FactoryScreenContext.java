@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.menu.FactoryMenu;
+
 import net.minecraft.client.gui.Font;
 
 /**
@@ -25,6 +27,27 @@ interface FactoryScreenContext {
      * @return 几何
      */
     FactoryScreenGeometry geometry();
+
+    /**
+     * 菜单（含玩家槽位）。
+     *
+     * @return 菜单
+     */
+    FactoryMenu menu();
+
+    /**
+     * 面板左上角屏幕 x。
+     *
+     * @return leftPos
+     */
+    int leftPos();
+
+    /**
+     * 面板左上角屏幕 y。
+     *
+     * @return topPos
+     */
+    int topPos();
 
     /**
      * 当前布局。

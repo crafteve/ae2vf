@@ -171,15 +171,28 @@ integration/ae2/                AE2 适配（物品 / 流体）
 integration/appflux/            Applied Flux 的 FE key（可选依赖）
 menu/                           FactoryMenu（只持有 36 个玩家槽位）
 client/
-├── screen/FactoryScreen        工作台绘制（P0：骨架 + 假数据）
-├── screen/FactoryLayout        全部几何，一处算完
-├── widget/NineSlice            九宫格 blit
-├── widget/GuiTextures          贴图 id 与边框宽度
-└── theme/GuiTheme              文字色与状态色（静态外观在贴图里）
+├── ClientFactoryLinks / ClientWandInput / FactoryLinkRenderer / ModKeyMappings
+└── screen/                     工厂工作台唯一复杂屏幕包（类名统一 Factory 前缀）
+    ├── FactoryScreen           壳：生命周期、网络转发、槽位、渲染/输入编排
+    ├── FactoryScreenState      状态与派生视图（快照、过滤、排序、滚动、展开）
+    ├── FactoryScreenGeometry   几何与命中（行高、卡片、仓库格、规则列）
+    ├── FactoryScreenInput      鼠标/键盘/滚轮、IO 卡片、仓库手势
+    ├── FactoryScreenContext    渲染/几何共用的只读视图
+    ├── FactoryChromeRender     顶栏 + 右区静态底板
+    ├── FactoryTableRender      左表
+    ├── FactoryStorageRender    仓库格
+    ├── FactoryMachineLibraryRender 机器库
+    ├── FactoryTooltipRender    全部 tooltip
+    ├── FactoryEditController / FactoryLineMenu / FactoryLineNameDialog / FactoryConfirmDialog
+    ├── FactoryRuleStrip / FactoryIoCardControls / FactoryIoDetailLayout / FactoryIoDetailRender
+    ├── FactorySearchQuery / FactorySort / FactorySortButtons
+    ├── FactoryLabels / FactoryLayout / FactoryStatus / FactoryUiText
+    ├── FactoryGuiTheme / FactoryGuiLayer / FactoryGuiTextures / FactoryNineSlice
+    └── FactorySearchEditBox / FactoryStorageRepo / FactoryUiConfig / FactoryResourceIconRender
 ```
 
 界面贴图不在手画：由 `tools/gui/gen_textures.py` 离线生成到
-`assets/idlefactory/textures/gui/`，色值与 `GuiTheme` 一一对应。
+`assets/idlefactory/textures/gui/`，色值与 `FactoryGuiTheme` 一一对应。
 
 核心约束：
 

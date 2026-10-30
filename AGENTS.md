@@ -51,7 +51,8 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `event` / `registry` | 指令注册；MenuType 注册 | 业务逻辑 |
 | `menu` | 菜单与玩家槽位 | 工厂数据 |
 | `network` | 协议与负载 | 业务判断 |
-| `client` | 界面、主题、控件、客户端缓存 | 服务端状态 |
+| `client` | 客户端入口、世界链接、绑定杖、按键 | 工厂界面细节 |
+| `client.screen` | 工厂工作台、主题、贴图、控件、仓库缓存、UI 配置 | 服务端状态 |
 | `integration` | AE2 / Applied Flux / JEI / jecharacters 适配 | 核心逻辑 |
 
 命名后缀固定：
@@ -99,7 +100,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`event` 指令树 + 审计包装 · `registry` MenuType · `menu` 36 个玩家槽位与 Shift 进仓库 · `network` 协议版本、负载、快照出口 · `client` 界面/控件/主题/客户端缓存 · `integration` 外部模组适配，反射失败必须降级。
+`event` 指令树 + 审计包装 · `registry` MenuType · `menu` 36 个玩家槽位与 Shift 进仓库 · `network` 协议版本、负载、快照出口 · `client` 客户端入口/世界链接/绑定杖/按键 · `client.screen` 工厂工作台唯一复杂屏幕：壳、状态、几何、分区渲染、输入、JEI、主题、贴图、九宫格、搜索框、仓库缓存和 UI 配置都在这里，类名统一 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -122,18 +123,18 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 风格：AE2 终端浅色、立体、科幻。不发挥。
 
-- 唯色源 `GuiTheme.AE2`；状态用 `statusRun / statusWarn / statusError / statusIdle` 四色。`DARK` 只保留，不用。
+- 唯色源 `FactoryGuiTheme.AE2`；状态用 `statusRun / statusWarn / statusError / statusIdle` 四色。`DARK` 只保留，不用。
 - 立体感只来自贴图：九宫格边框、内凹斜边、上/左深阴影、下/右高光、深色机器卡片。表格外层保留「深色 + 白色」双像素框。
 - 嵌套立体：下拉框本身是立体框，选项各自也是小立体框。
 - 1px 像素精度：线条不糊、不对齐就重画；槽位保留格子感与悬停/选中动画。
 - 图标主导，少文字：物品、机器、状态优先用图标 + 颜色 + 动画表达。
 - 状态表达：灯色 + 文字色 + 1px 状态条；列宽自适应，压缩机器名与状态，信息列优先。
-- 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步 `GuiTheme`。
+- 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步 `FactoryGuiTheme`。
 - 流体 / FE 图标按 AE2 风格：流体 still 贴图染色，FE 用 Applied Flux 图标（未装时绿色水贴图兜底）；物品用原版装饰层补耐久条。
 - 仓库格数量：物品 / FE 最多 4 字符、流体最多 5 字符，缩放 0.666；完整精度只放 tooltip 与速率。
 - 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
 - 几何只在 `FactoryLayout`。溢出先让位，不许压到相邻区域。
-- 绘制层级统一走 `client/widget/GuiLayer`，顺序固定：`BASE 0` → `ITEM 150` → `ITEM_DECORATION 200` → `GRID_COUNT 300` → `OVERLAY 360` → `DRAG 370` → `TOOLTIP 400`。浮层必须高于数量层（300），否则会被仓库/背包数量盖住；tooltip 由原版固定在 400，浮层打开时已抑制。新加图层先加枚举项再引用，禁止在调用点写 z 魔法数。
+- 绘制层级统一走 `client/screen/FactoryGuiLayer`，顺序固定：`BASE 0` → `ITEM 150` → `ITEM_DECORATION 200` → `GRID_COUNT 300` → `OVERLAY 360` → `DRAG 370` → `TOOLTIP 400`。浮层必须高于数量层（300），否则会被仓库/背包数量盖住；tooltip 由原版固定在 400，浮层打开时已抑制。新加图层先加枚举项再引用，禁止在调用点写 z 魔法数。
 - 尺寸问题先看 `logs/latest.log` 的 `Idle Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Didlefactory.gutter` 现场调。
 
 ### 3.3 便利性
@@ -223,7 +224,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `Machine.java` · `MachineLibrary.java` · `MachineIoGroup.java` · `MachineActions.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `LineSelectorMenu.java` · `GuiTheme.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `Machine.java` · `MachineLibrary.java` · `MachineIoGroup.java` · `MachineActions.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `FactoryLineMenu.java` · `FactoryGuiTheme.java` · `FactoryGuiLayer.java` · `FactoryStorageRepo.java` · `FactoryScreen.java` · `FactoryScreenState.java` · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -240,11 +241,11 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 11. 模糊规则没有候选 ≠ 输入堵塞：仓库缺料是 `WAITING_MATERIAL`，只有 `inputFull`（机器满 / 拒收）才是 `INPUT_BLOCKED`。
 12. 流体图标不透明：仓库格的悬停描边必须画在图标之后，否则只剩 1px 暗边。
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
-14. 新增浮层必须在 `GuiLayer` 里加枚举项再引用，调用点禁止写 z 魔法数字；浮层被物品/数量盖住、或反过来盖住 tooltip，基本都是层级散落导致的。
+14. 新增浮层必须在 `FactoryGuiLayer` 里加枚举项再引用，调用点禁止写 z 魔法数字；浮层被物品/数量盖住、或反过来盖住 tooltip，基本都是层级散落导致的。
 15. 排序键 / 方向 / 范围偏好写入客户端 CLIENT 配置（`config/idlefactory-client.toml`），关闭界面与重启客户端都保留；不写存档、不参与服务端。
 16. 机器失联只进 `FactoryLive.machineMissing`，不写档；产线只存 `machineIds`；只有显式删除机器才删规则。
 17. 左表产线机器行的叉号是“移出产线”，右侧机器库卡片的叉号是“删除机器”；两者语义不能混。
-18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `ResourceIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
+18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `FactoryResourceIconRender`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 
 ### 6.3 文档偏差
 
