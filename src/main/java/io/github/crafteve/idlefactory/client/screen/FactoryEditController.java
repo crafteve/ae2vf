@@ -171,15 +171,21 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     }
 
     /**
-     * 按锚点 id 在机器库组行里找当前的组。
+     * 按锚点 id 找当前的组。
      *
-     * <p>快照刷新后旧的组对象就过期了，拖拽源必须换成新对象，否则拖拽里读的是旧成员列表。</p>
+     * <p>先查左表（滚轮改台数只发生在左表），再查机器库（拖拽源）。快照刷新后旧对象就过期了，
+     * 拖拽源和滚轮都必须换成新对象，否则读到的是旧成员列表。</p>
      *
      * @param anchorId 锚点机器 id
      * @return 组；已经被删或重新分组后不在这里时为 {@code null}
      */
     @Nullable
     private FactoryMachineStack findStack(UUID anchorId) {
+        for (FactoryMachineStack stack : this.screen.state.tableStacks) {
+            if (stack.anchorId().equals(anchorId)) {
+                return stack;
+            }
+        }
         for (FactoryMachineStack stack : this.screen.state.libraryStacks) {
             if (stack.anchorId().equals(anchorId)) {
                 return stack;
@@ -424,9 +430,11 @@ public final class FactoryEditController implements FactoryScreenInteraction {
             if (this.screen.addMachineRowContains(mouseX, mouseY)) {
                 // 空槽 = 新开一行：默认只放一台，Shift 放整组。
                 if (Screen.hasShiftDown() && source.stacked()) {
+                    // 一次拖拽只能开一行：先定一个组 id，所有成员都塞进这一行。
+                    UUID stackId = UUID.randomUUID();
                     for (FactorySnapshotBuilder.MachineView member : source.members()) {
                         sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
-                                member.ref().id(), null, null);
+                                member.ref().id(), null, stackId);
                     }
                     return;
                 }
