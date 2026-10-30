@@ -273,17 +273,16 @@ final class FactoryScreenState {
     }
 
     /**
-     * 这一组最多能扩到几台：当前台数 + 空闲同类机器数。
+     * 可以并进这一组的空闲机器，按快照顺序。
      *
-     * <p>规则和服务端的池子一致：同方块、同方块实体、不在任何产线，并且「没有规则」或者
-     * 「规则和本组完全一样」。客户端先夹一次，避免本地乐观值滚到 7、服务端再打回 3 的闪烁；
-     * 服务端仍然会重新夹紧，这里只是让显示别先骗人。</p>
+     * <p>规则和服务端一致：同方块、同方块实体、不在任何产线，并且「没有规则」或者
+     * 「规则和本组完全一样」。客户端拿它做滚轮上限和逐台放机器的候选。</p>
      *
      * @param stack 机器组
-     * @return 上限；至少等于当前台数
+     * @return 候选机器 id
      */
-    int maxStackCount(FactoryMachineStack stack) {
-        int pool = 0;
+    List<UUID> stackPool(FactoryMachineStack stack) {
+        List<UUID> pool = new ArrayList<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
             if (!machine.lineIds().isEmpty()) {
                 continue;
@@ -296,9 +295,40 @@ final class FactoryScreenState {
             if (!empty && !FactoryMachineStack.signatureOf(machine).equals(stack.signature())) {
                 continue;
             }
-            pool++;
+            pool.add(machine.ref().id());
         }
-        return Math.min(MAX_STACK_COUNT, stack.count() + pool);
+        return pool;
+    }
+
+    /**
+     * 这一组最多能扩到几台：当前台数 + 空闲同类机器数。
+     *
+     * <p>客户端先夹一次，避免本地乐观值滚到 7、服务端再打回 3 的闪烁；服务端仍然会重新校验，
+     * 这里只是让显示别先骗人。</p>
+     *
+     * @param stack 机器组
+     * @return 上限；至少等于当前台数
+     */
+    int maxStackCount(FactoryMachineStack stack) {
+        return Math.min(MAX_STACK_COUNT, stack.count() + stackPool(stack).size());
+    }
+
+    /**
+     * 这一组还能不能用滚轮改台数。
+     *
+     * <p>只有「组内一台规则都没有」时才允许：已经配好 IO 的行多半在跑，滚一下多一台既难发现
+     * 也会让组内签名不一致。要给它加机器，只能从库拖进去（明确动作）。</p>
+     *
+     * @param stack 机器组
+     * @return 可以滚轮时为 {@code true}
+     */
+    boolean stackEditable(FactoryMachineStack stack) {
+        for (FactorySnapshotBuilder.MachineView member : stack.members()) {
+            if (member.ruleCount() > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -308,6 +338,9 @@ final class FactoryScreenState {
      * @param delta 增量；正数加、负数减
      */
     void scrollStackCount(FactoryMachineStack stack, int delta) {
+        if (!stackEditable(stack)) {
+            return;
+        }
         long now = System.currentTimeMillis();
         if (!stack.anchorId().equals(this.pendingStackAnchorId)) {
             this.pendingStackAnchorId = stack.anchorId();

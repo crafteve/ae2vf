@@ -191,6 +191,11 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeVarLong(machine.sinceInputMoveTicks());
         buf.writeByte(machine.inputReason().ordinal());
         buf.writeByte(machine.outputReason().ordinal());
+        buf.writeBoolean(machine.stackId() != null);
+        if (machine.stackId() != null) {
+            buf.writeUUID(machine.stackId());
+            buf.writeVarInt(Math.max(0, machine.stackIndex()));
+        }
     }
 
     private static FactorySnapshotBuilder.MachineView readMachine(RegistryFriendlyByteBuf buf) {
@@ -227,13 +232,20 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         long sinceInputMoveTicks = buf.readVarLong();
         IoResult.Reason inputReason = readEnum(buf, IoResult.Reason.values(), "input reason");
         IoResult.Reason outputReason = readEnum(buf, IoResult.Reason.values(), "output reason");
+        UUID stackId = null;
+        int stackIndex = -1;
+        if (buf.readBoolean()) {
+            stackId = buf.readUUID();
+            stackIndex = buf.readVarInt();
+        }
         MachineRef ref = new MachineRef(id,
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
         return new FactorySnapshotBuilder.MachineView(ref, machineMissing, health, blockId,
                 groupBlockId, beTypeId, presence, lineNames, lineIds, ruleCount, inputs, outputs,
                 inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,
-                sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons);
+                sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons,
+                stackId, stackIndex);
     }
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,

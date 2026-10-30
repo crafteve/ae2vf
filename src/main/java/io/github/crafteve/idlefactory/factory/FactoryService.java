@@ -449,52 +449,6 @@ public final class FactoryService {
                 + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""), null);
     }
 
-    /**
-     * 按一台机器删除整组同规则、同方块、没编线的机器。
-     *
-     * <p>只处理「没编线」的组：在产线里的组要先移出产线，避免一次点击让产线突然少一截。
-     * 删除会连规则一起删，所以有规则时必须确认；界面上的确认框负责显示台数与规则数。</p>
-     *
-     * @param factory   工厂
-     * @param anchorId  组里任意一台机器
-     * @param confirmed 是否已经确认（有规则时必须为 {@code true}）
-     * @return 动作结果；回执里是实际删除的台数
-     */
-    public static LineActions.Result deleteStack(Factory factory, UUID anchorId, boolean confirmed) {
-        Optional<Machine> anchorFound = factory.config().machines().byId(anchorId);
-        if (anchorFound.isEmpty()) {
-            return LineActions.Result.err("找不到机器");
-        }
-        if (FactoryRefs.lineOf(factory, anchorId).isPresent()) {
-            return LineActions.Result.err("这组机器还在产线里，先移出产线再删除");
-        }
-        FactoryRuntime runtime = FactoryRuntime.get();
-        List<UUID> members = new ArrayList<>();
-        members.add(anchorId);
-        members.addAll(FactoryRefs.idleStackMembers(factory,
-                runtime == null ? null : runtime.observations(), anchorId));
-
-        int rules = 0;
-        for (UUID memberId : members) {
-            Optional<Machine> found = factory.config().machines().byId(memberId);
-            if (found.isPresent()) {
-                rules += found.get().ruleCount();
-            }
-        }
-        if (rules > 0 && !confirmed) {
-            return LineActions.Result.err("这组机器还有 " + rules + " 条 IO 配置，需要确认");
-        }
-
-        int removed = 0;
-        for (UUID memberId : members) {
-            if (deleteMachineById(factory, memberId, true).ok()) {
-                removed++;
-            }
-        }
-        return LineActions.Result.ok("已删除 " + removed + " 台机器"
-                + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""), null);
-    }
-
     // ------------------------------------------------------------------
     // ---- 04. 占用门禁（LinkGate / GateFilter） ----
     // 负责绑定前的全服占用检查与拒绝文案；被机器 toggle、仓库 toggle 与容器连锁三条路径复用。

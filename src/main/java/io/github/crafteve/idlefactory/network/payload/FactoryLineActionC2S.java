@@ -24,25 +24,21 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 客户端对产线做出的管理动作：新建 / 重命名 / 删除 / 启动 / 暂停 / 放机器 / 移出机器 / 删除机器，
- * 以及机器组的整组动作：改台数 / 整组移出 / 整组删除。
+ * 客户端对产线做出的管理动作：新建 / 重命名 / 删除 / 启动 / 暂停 / 放机器 / 移出机器 / 删除机器。
  *
  * <p>只传 id 和名字，不传产线内容；所有校验由 {@link LineActions} 在服务端重新做。名字只在
- * 新建/重命名时有意义，其它动作忽略。台数只在 {@code RESIZE_STACK} 时有意义，由服务端夹紧。</p>
+ * 新建/重命名时有意义，其它动作忽略。</p>
  *
  * @param containerId 菜单容器 id
  * @param action      动作
  * @param lineId      目标产线 id；新建时为 {@code null}
- * @param machineId   机器 id；放机器/移出机器/删除机器，以及整组动作的锚点
+ * @param machineId   机器 id；放机器/移出机器/删除机器使用
  * @param name        新产线名；仅新建/重命名使用
- * @param count       目标台数；仅 {@code RESIZE_STACK} 使用，其它动作传 0
+ * @param stackId     目标堆叠组 id；仅放机器使用，{@code null} 表示新开一组
  */
 public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUID lineId,
-        @Nullable UUID machineId, @Nullable String name, int count)
+        @Nullable UUID machineId, @Nullable String name, @Nullable UUID stackId)
         implements CustomPacketPayload {
-
-    /** 目标台数的合法上限；和 {@link LineActions#MAX_STACK} 保持一致。 */
-    public static final int MAX_STACK_COUNT = LineActions.MAX_STACK;
 
     /** 包类型：{@code idlefactory:factory_line_action}。 */
     public static final Type<FactoryLineActionC2S> TYPE =
@@ -101,16 +97,11 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
             case START_LINE -> LineActions.setRunning(factory, payload.lineId(), true);
             case PAUSE_LINE -> LineActions.setRunning(factory, payload.lineId(), false);
             case PLACE_MACHINE -> LineActions.placeMachine(factory, payload.lineId(),
-                    payload.machineId());
+                    payload.machineId(), payload.stackId());
             case REMOVE_MACHINE -> LineActions.removeMachine(factory, payload.lineId(),
                     payload.machineId());
             case DELETE_MACHINE -> FactoryService.deleteMachineById(factory, payload.machineId(),
                     true);
-            case RESIZE_STACK -> LineActions.resizeStack(factory, payload.lineId(),
-                    payload.machineId(), payload.count());
-            case REMOVE_STACK -> LineActions.removeStack(factory, payload.lineId(),
-                    payload.machineId());
-            case DELETE_STACK -> FactoryService.deleteStack(factory, payload.machineId(), true);
         };
     }
 
@@ -129,7 +120,7 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
         if (payload.name() != null) {
             buf.writeUtf(payload.name(), LineActions.MAX_NAME_LENGTH);
         }
-        buf.writeVarInt(payload.count());
+        writeNullableUuid(buf, payload.stackId());
     }
 
     private static FactoryLineActionC2S read(RegistryFriendlyByteBuf buf) {
@@ -142,16 +133,13 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
         UUID lineId = readNullableUuid(buf);
         UUID machineId = readNullableUuid(buf);
         String name = buf.readBoolean() ? buf.readUtf(LineActions.MAX_NAME_LENGTH) : null;
-        int count = buf.readVarInt();
-        if (count < 0 || count > MAX_STACK_COUNT) {
-            throw new DecoderException("invalid stack count: " + count);
-        }
-        validate(action, lineId, machineId, name, count);
-        return new FactoryLineActionC2S(containerId, action, lineId, machineId, name, count);
+        UUID stackId = readNullableUuid(buf);
+        validate(action, lineId, machineId, name);
+        return new FactoryLineActionC2S(containerId, action, lineId, machineId, name, stackId);
     }
 
     private static void validate(Action action, @Nullable UUID lineId, @Nullable UUID machineId,
-            @Nullable String name, int count) {
+            @Nullable String name) {
         switch (action) {
             case CREATE_LINE -> {
                 if (name == null || name.isBlank()) {
@@ -176,21 +164,6 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
             case DELETE_MACHINE -> {
                 if (machineId == null) {
                     throw new DecoderException("delete machine requires a machine id");
-                }
-            }
-            case RESIZE_STACK -> {
-                if (lineId == null || machineId == null || count < 1) {
-                    throw new DecoderException("resize stack requires line, machine and count");
-                }
-            }
-            case REMOVE_STACK -> {
-                if (lineId == null || machineId == null) {
-                    throw new DecoderException("remove stack requires line and machine ids");
-                }
-            }
-            case DELETE_STACK -> {
-                if (machineId == null) {
-                    throw new DecoderException("delete stack requires a machine id");
                 }
             }
         }
@@ -225,12 +198,6 @@ public record FactoryLineActionC2S(int containerId, Action action, @Nullable UUI
         /** 把机器移出产线。 */
         REMOVE_MACHINE,
         /** 删除机器（界面确认后）。 */
-        DELETE_MACHINE,
-        /** 把一组机器的台数改成 {@code count}；服务端夹紧实际数量。 */
-        RESIZE_STACK,
-        /** 把一组机器整体移出产线，规则保留。 */
-        REMOVE_STACK,
-        /** 删除一组没编线的机器，连规则一起删。 */
-        DELETE_STACK
+        DELETE_MACHINE
     }
 }

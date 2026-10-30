@@ -370,6 +370,18 @@ final class FactoryScreenGeometry {
     }
 
     /**
+     * 鼠标下的左表行（含展开区），拖拽合并时用作落点。
+     *
+     * @param mouseY 屏幕 y
+     * @return 命中的组；不在行上为 {@code null}
+     */
+    @Nullable
+    FactoryMachineStack stackRowAt(double mouseY) {
+        StackHit hit = tableHitAt(mouseY);
+        return hit == null ? null : hit.stack();
+    }
+
+    /**
      * 该组在当前行位置上的展开高度。
      *
      * @param stack 机器组

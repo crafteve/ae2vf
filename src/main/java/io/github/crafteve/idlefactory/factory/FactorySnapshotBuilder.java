@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -131,6 +132,8 @@ public final class FactorySnapshotBuilder {
      * @param outputReason   输出侧原因
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
+     * @param stackId        所属堆叠组的 id；未编线时为 {@code null}
+     * @param stackIndex     堆叠组在产线面板里的序号；未编线时为 {@code -1}
      */
     public record MachineView(MachineRef ref, boolean machineMissing, Health health,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
@@ -141,7 +144,8 @@ public final class FactorySnapshotBuilder {
             long sinceMoveTicks, long blockedTicks,
             WorkState workState, boolean inputFull, long sinceInputMoveTicks,
             IoResult.Reason inputReason, IoResult.Reason outputReason,
-            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons) {
+            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons,
+            @Nullable UUID stackId, int stackIndex) {
 
         public MachineView {
             lineNames = List.copyOf(lineNames);
@@ -329,6 +333,18 @@ public final class FactorySnapshotBuilder {
             // 不做可用性判断；可用性仍然读 health。
             ResourceLocation groupBlockId = observation.blockId() != null
                     ? observation.blockId() : observation.lastBlockId();
+            // 面板分组由产线自己存，快照只负责带出去；未编线时没有组。
+            UUID stackId = null;
+            int stackIndex = -1;
+            Optional<PassiveLine> lineFound = FactoryRefs.lineOf(factory, ref.id());
+            if (lineFound.isPresent()) {
+                PassiveLine line = lineFound.get();
+                Optional<UUID> stackFound = line.stackOf(ref.id());
+                if (stackFound.isPresent()) {
+                    stackId = stackFound.get();
+                    stackIndex = line.stackIndex(stackId);
+                }
+            }
             views.add(new MachineView(ref,
                     factory.live().isMachineMissing(ref.id()),
                     observation.health(),
@@ -342,7 +358,8 @@ public final class FactorySnapshotBuilder {
                     inputs, outputs, inputRates, outputRates,
                     sinceMove, blocked, observation.workState(), inputFull,
                     sinceInput, inputReason, outputReason,
-                    inputReasons, outputReasons));
+                    inputReasons, outputReasons,
+                    stackId, stackIndex));
         }
         return views;
     }

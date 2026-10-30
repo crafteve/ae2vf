@@ -413,22 +413,35 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         }
         FactorySnapshotBuilder.MachineView anchor = source.anchor();
         if (this.dragFromLibrary) {
+            UUID lineId = this.screen.selectedLineId();
+            if (lineId == null) {
+                showFeedback("先选择一条产线", false);
+                return;
+            }
             if (this.screen.addMachineRowContains(mouseX, mouseY)) {
-                UUID lineId = this.screen.selectedLineId();
-                if (lineId == null) {
-                    showFeedback("先选择一条产线", false);
-                    return;
-                }
-                // 默认只放一台；Shift 拖全组（P2 接数量，这里先按整组逐台放）。
+                // 空槽 = 新开一行：默认只放一台，Shift 放整组。
                 if (Screen.hasShiftDown() && source.stacked()) {
                     for (FactorySnapshotBuilder.MachineView member : source.members()) {
                         sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
-                                member.ref().id(), null);
+                                member.ref().id(), null, null);
                     }
                     return;
                 }
                 sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
-                        anchor.ref().id(), null);
+                        anchor.ref().id(), null, null);
+                return;
+            }
+            FactoryMachineStack target = this.screen.geometry().stackRowAt(mouseY);
+            if (target != null) {
+                // 拖到已有行 = 合并：整组并进目标组，规则由服务端对齐。
+                if (target.stackId() == null) {
+                    showFeedback("目标行还没有持久化分组，重开一下界面再试", false);
+                    return;
+                }
+                for (FactorySnapshotBuilder.MachineView member : source.members()) {
+                    sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
+                            member.ref().id(), null, target.stackId());
+                }
             }
             return;
         }
@@ -437,9 +450,12 @@ public final class FactoryEditController implements FactoryScreenInteraction {
                 showFeedback("这台机器没有产线", false);
                 return;
             }
-            // 拖的是组，拖回库也整组移出，跟行尾 × 的语义一致。
-            sendLineAction(FactoryLineActionC2S.Action.REMOVE_STACK,
-                    anchor.lineIds().get(0), source.anchorId(), null);
+            // 拖的是组，拖回库也整组移出，跟行尾 × 的语义一致；服务端只认单台，这里逐台发。
+            UUID lineId = anchor.lineIds().get(0);
+            for (FactorySnapshotBuilder.MachineView member : source.members()) {
+                sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE, lineId,
+                        member.ref().id(), null);
+            }
         }
     }
 
@@ -752,19 +768,45 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     /**
      * 把一组机器的台数改到目标值；滚轮停止后由界面层调用一次。
      *
+     * <p>服务端只有单台放机器/移出机器，所以这里逐台发。加机器从「不在产线、同方块、
+     * 无规则或同签名」的池子里取，取够或取完为止；减机器从组末尾倒着移。</p>
+     *
      * @param anchorId 组锚点
-     * @param target   目标台数；服务端会再夹紧
+     * @param target   目标台数；客户端已经夹紧过
      */
-    public void resizeStack(UUID anchorId, int target) {
+    public void applyStackCount(UUID anchorId, int target) {
         UUID lineId = this.screen.selectedLineId();
         if (lineId == null) {
             return;
         }
-        sendLineAction(FactoryLineActionC2S.Action.RESIZE_STACK, lineId, anchorId, null, target);
+        FactoryMachineStack stack = findStack(anchorId);
+        if (stack == null) {
+            return;
+        }
+        int current = stack.count();
+        if (target == current) {
+            return;
+        }
+        if (target > current) {
+            List<UUID> pool = this.screen.state.stackPool(stack);
+            int need = Math.min(target - current, pool.size());
+            for (int i = 0; i < need; i++) {
+                sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId, pool.get(i),
+                        null, stack.stackId());
+            }
+            return;
+        }
+        List<FactorySnapshotBuilder.MachineView> members = stack.members();
+        for (int i = members.size() - 1; i >= target && i > 0; i--) {
+            sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE, lineId,
+                    members.get(i).ref().id(), null);
+        }
     }
 
     /**
      * 把整组机器移出当前产线；机器和规则回到机器库。
+     *
+     * <p>服务端只有单台移出，这里按成员逐台发。组的持久化由服务端在最后一台移出时自动清掉空组。</p>
      *
      * @param stack 机器组
      */
@@ -773,15 +815,17 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         if (lineId == null) {
             return;
         }
-        sendLineAction(FactoryLineActionC2S.Action.REMOVE_STACK, lineId,
-                stack.anchorId(), null);
+        for (FactorySnapshotBuilder.MachineView member : stack.members()) {
+            sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE, lineId,
+                    member.ref().id(), null);
+        }
     }
 
     /**
      * 打开删除整组的确认框。
      *
      * <p>在产线里的组不允许直接删，只能先移出；这里只处理未编线的组。确认框写清台数和规则数，
-     * 因为删除不可恢复。</p>
+     * 因为删除不可恢复。服务端只有单台删除，确认后逐台发。</p>
      *
      * @param stack 机器组
      */
@@ -802,17 +846,19 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         for (FactorySnapshotBuilder.MachineView member : stack.members()) {
             rules += member.ruleCount();
         }
+        Runnable deleteAll = () -> {
+            for (FactorySnapshotBuilder.MachineView member : stack.members()) {
+                sendLineAction(FactoryLineActionC2S.Action.DELETE_MACHINE, null,
+                        member.ref().id(), null);
+            }
+        };
         if (rules == 0) {
-            sendLineAction(FactoryLineActionC2S.Action.DELETE_STACK, null,
-                    stack.anchorId(), null);
+            deleteAll.run();
             return;
         }
         String message = "这一行有 " + stack.count() + " 台机器、还有 " + rules
                 + " 条 IO 配置。\n删除后规则无法恢复。";
-        this.confirmDialog.open("删除整组", message, "删除",
-                () -> sendLineAction(FactoryLineActionC2S.Action.DELETE_STACK, null,
-                        stack.anchorId(), null),
-                this.layout);
+        this.confirmDialog.open("删除整组", message, "删除", deleteAll, this.layout);
     }
 
     /**
@@ -852,24 +898,32 @@ public final class FactoryEditController implements FactoryScreenInteraction {
                 this.layout);
     }
 
-    private void sendLineAction(FactoryLineActionC2S.Action action, @Nullable UUID lineId,
-            @Nullable UUID machineId, @Nullable String name) {
-        sendLineAction(action, lineId, machineId, name, 0);
-    }
-
     /**
-     * 发产线动作；整组改台数用这个重载带目标数量。
+     * 发产线动作。
      *
      * @param action    动作
      * @param lineId    产线 id，可为 {@code null}
      * @param machineId 机器 id，可为 {@code null}
      * @param name      产线名，可为 {@code null}
-     * @param count     目标台数；非 {@code RESIZE_STACK} 动作传 0
      */
     private void sendLineAction(FactoryLineActionC2S.Action action, @Nullable UUID lineId,
-            @Nullable UUID machineId, @Nullable String name, int count) {
+            @Nullable UUID machineId, @Nullable String name) {
+        sendLineAction(action, lineId, machineId, name, null);
+    }
+
+    /**
+     * 发产线动作；放机器时用这个重载带目标堆叠组。
+     *
+     * @param action    动作
+     * @param lineId    产线 id，可为 {@code null}
+     * @param machineId 机器 id，可为 {@code null}
+     * @param name      产线名，可为 {@code null}
+     * @param stackId   目标堆叠组 id；{@code null} 表示新开一组
+     */
+    private void sendLineAction(FactoryLineActionC2S.Action action, @Nullable UUID lineId,
+            @Nullable UUID machineId, @Nullable String name, @Nullable UUID stackId) {
         PacketDistributor.sendToServer(new FactoryLineActionC2S(
-                this.screen.getMenu().containerId, action, lineId, machineId, name, count));
+                this.screen.getMenu().containerId, action, lineId, machineId, name, stackId));
     }
 
     private void drawFeedback(GuiGraphics graphics) {

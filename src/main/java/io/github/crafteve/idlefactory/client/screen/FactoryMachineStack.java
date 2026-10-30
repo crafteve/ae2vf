@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +34,7 @@ import net.minecraft.resources.ResourceLocation;
  * 规则顺序取锚点自己的顺序，只是显示顺序，不参与分组判断。</p>
  *
  * @param members     成员视图，按输入顺序；第一个是锚点
+ * @param stackId     堆叠组 id，由服务端持久化；未编线或未分组时为 {@code null}
  * @param blockId     分组用的方块 id；未加载时是最后一次看到的值
  * @param beTypeId    方块实体类型 id，用来区分同一个方块的多个等级
  * @param signature   规则签名，用来判断还能不能并进新成员
@@ -44,8 +46,9 @@ import net.minecraft.resources.ResourceLocation;
  * @param outputRates 与 {@code outputs} 同序的整组累加速率
  */
 record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
-        @Nullable ResourceLocation blockId, @Nullable ResourceLocation beTypeId,
-        MachineIoGroup.Signature signature, FactoryStatus.Kind statusKind, int statusCount,
+        @Nullable UUID stackId, @Nullable ResourceLocation blockId,
+        @Nullable ResourceLocation beTypeId, MachineIoGroup.Signature signature,
+        FactoryStatus.Kind statusKind, int statusCount,
         List<ResourceSpec> inputs, List<ResourceSpec> outputs,
         List<Long> inputRates, List<Long> outputRates) {
 
@@ -69,23 +72,38 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
     }
 
     /**
-     * 把一条产线里的机器按组归并。
+     * 把一条产线里的机器按服务端存的堆叠组归并。
      *
-     * <p>左表已经限定了一条产线，所以分组键不带产线；产线内同方块、同规则的机器就并成一行。</p>
+     * <p>左表不自动合并：一行就是产线里的一个 {@code stackId}，顺序取服务端的
+     * {@code stackIndex}。这样用户拖出来、滚出来的面板下次打开还是同一个样子。</p>
      *
-     * @param lineMachines 当前产线的机器，按界面顺序
-     * @return 组列表；顺序是组内第一个成员出现的先后
+     * @param lineMachines 当前产线的机器
+     * @return 组列表；按面板顺序
      */
     static List<FactoryMachineStack> table(List<FactorySnapshotBuilder.MachineView> lineMachines) {
-        return group(lineMachines, view -> new StackKey(view.groupBlockId(), view.beTypeId(),
-                signatureOf(view), List.of()));
+        Map<UUID, List<FactorySnapshotBuilder.MachineView>> buckets = new LinkedHashMap<>();
+        for (FactorySnapshotBuilder.MachineView view : lineMachines) {
+            UUID stackId = view.stackId();
+            if (stackId == null) {
+                // 左表只画编了线的机器；理论上到不了这里。
+                continue;
+            }
+            buckets.computeIfAbsent(stackId, key -> new ArrayList<>()).add(view);
+        }
+        List<UUID> ids = new ArrayList<>(buckets.keySet());
+        ids.sort(Comparator.comparingInt(id -> buckets.get(id).get(0).stackIndex()));
+        List<FactoryMachineStack> stacks = new ArrayList<>(ids.size());
+        for (UUID id : ids) {
+            stacks.add(of(buckets.get(id), id));
+        }
+        return stacks;
     }
 
     /**
      * 把整个机器库按组归并。
      *
-     * <p>机器库会同时显示已编线和未编线的机器，所以分组键必须带产线 id，否则同方块同规则的
-     * 两条产线会被并成一行。</p>
+     * <p>机器库是只读展示，仍然按「同方块、同规则、同产线」自动合并。它会同时显示已编线和
+     * 未编线的机器，所以分组键必须带产线 id，否则同方块同规则的两条产线会被并成一行。</p>
      *
      * @param machines 机器库视图
      * @return 组列表
@@ -93,6 +111,28 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
     static List<FactoryMachineStack> library(List<FactorySnapshotBuilder.MachineView> machines) {
         return group(machines, view -> new StackKey(view.groupBlockId(), view.beTypeId(),
                 signatureOf(view), view.lineIds()));
+    }
+
+    /**
+     * 从一批成员构造一组；堆叠组 id 由调用方给。
+     *
+     * @param members 成员视图，第一个是锚点
+     * @param stackId 堆叠组 id；库里的自动合并传 {@code null}
+     * @return 组
+     */
+    static FactoryMachineStack of(List<FactorySnapshotBuilder.MachineView> members,
+            @Nullable UUID stackId) {
+        FactorySnapshotBuilder.MachineView anchor = members.get(0);
+        Map<FactoryStatus.Kind, Integer> counts = new EnumMap<>(FactoryStatus.Kind.class);
+        for (FactorySnapshotBuilder.MachineView member : members) {
+            counts.merge(FactoryStatus.kindOf(member), 1, Integer::sum);
+        }
+        FactoryStatus.Kind dominant = dominant(counts);
+        return new FactoryMachineStack(members, stackId, anchor.groupBlockId(),
+                anchor.beTypeId(), signatureOf(anchor), dominant,
+                counts.getOrDefault(dominant, 0), anchor.inputs(), anchor.outputs(),
+                stackRates(members, true, anchor.inputs()),
+                stackRates(members, false, anchor.outputs()));
     }
 
     /**
@@ -115,26 +155,10 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
             buckets.computeIfAbsent(keyOf.apply(view), key -> new ArrayList<>()).add(view);
         }
         List<FactoryMachineStack> stacks = new ArrayList<>(buckets.size());
-        for (Map.Entry<StackKey, List<FactorySnapshotBuilder.MachineView>> entry
-                : buckets.entrySet()) {
-            stacks.add(create(entry.getKey(), entry.getValue()));
+        for (List<FactorySnapshotBuilder.MachineView> members : buckets.values()) {
+            stacks.add(of(members, null));
         }
         return stacks;
-    }
-
-    private static FactoryMachineStack create(StackKey key,
-            List<FactorySnapshotBuilder.MachineView> members) {
-        FactorySnapshotBuilder.MachineView anchor = members.get(0);
-        Map<FactoryStatus.Kind, Integer> counts = new EnumMap<>(FactoryStatus.Kind.class);
-        for (FactorySnapshotBuilder.MachineView member : members) {
-            counts.merge(FactoryStatus.kindOf(member), 1, Integer::sum);
-        }
-        FactoryStatus.Kind dominant = dominant(counts);
-        return new FactoryMachineStack(members, key.blockId(), key.beTypeId(), key.signature(),
-                dominant, counts.getOrDefault(dominant, 0),
-                anchor.inputs(), anchor.outputs(),
-                stackRates(members, true, anchor.inputs()),
-                stackRates(members, false, anchor.outputs()));
     }
 
     /**

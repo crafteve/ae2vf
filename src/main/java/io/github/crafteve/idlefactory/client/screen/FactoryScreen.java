@@ -462,7 +462,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
                 return;
             }
             this.state.markPendingStackSent(now);
-            controller.resizeStack(anchorId, target);
+            controller.applyStackCount(anchorId, target);
         } else if (this.state.pendingStackExpired(now)) {
             this.state.clearPendingStack();
         }
