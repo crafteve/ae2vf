@@ -7,9 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
@@ -36,7 +34,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>左表的每一行对应一个 {@link FactorySnapshotBuilder.MachineView}。行高不是固定的：
  * 机器可以展开成「输入/输出」两行规则详情，所以绘制和命中测试统一走
- * {@link #tableHitAt(double)}，不能再用固定 {@code rowY} 推算。</p>
+ * {@link FactoryScreenGeometry#tableHitAt(double)}，不能再用固定 {@code rowY} 推算。</p>
  *
  * <p>仓库区不伪造原版槽位，而是用 {@link FactoryStorageRepo} 维护服务端快照。
  * 仓库格点击只发送 {@code FactoryStorageActionC2S} 手势，实际数量、背包扣减和
@@ -47,10 +45,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 不应改这里。</p>
  *
  * <p>分节目录：01 字段与生命周期；02 快照请求与接收；03 搜索、过滤与排序；
- * 04 产线选择、表格视图与列宽；05 行数上限与搜索文本；06 布局日志与玩家槽位；
- * 07 绘制入口与静态底板；10 表格命中、拖放与 IO 展开操作；
- * 11 展开状态与表格命中；12 资源名称与图标；
- * 15 玩家槽位绘制；17 JEI 目标与布局访问。</p>
+ * 04 产线选择与快照访问；06 布局日志与玩家槽位；07 绘制入口与静态底板；
+ * 10 表格命中、拖放与 IO 展开操作；15 玩家槽位绘制；17 JEI 目标与布局访问。</p>
  *
  * <p>下面的分节只用于导航，不代表这个类已经拆分；真正的拆分另开计划，不在注释整理里
  * 移动方法归属。分节头按现有代码顺序放置，不改变字段或方法的声明顺序。</p>
@@ -298,118 +294,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
         this.state.onSortChanged();
     }
 
-    /**
-     * 取一个资源 key 的搜索字段，按 key 缓存。
-     *
-     * <p>名称、tooltip 和 tag 都要读注册表/物品栈，不能每帧重复算；缓存以完整
-     * {@link ResourceKey}（含组件）为键，所以同名不同组件的条目会分开。</p>
-     *
-     * @param key 资源
-     * @return 该资源的搜索字段
-     */
-
-
-    /**
-     * 构造一台机器的搜索字段。
-     *
-     * <p>机器名后追加产线名，保证搜索产线名也能命中机器；坐标和状态放进 tooltip
-     * 字段，让 {@code $} 语法也能搜到。</p>
-     *
-     * @param machine 机器视图
-     * @return 搜索字段
-     */
-
-
     // ------------------------------------------------------------------
-    // ---- 04. 产线选择、表格视图与列宽 ----
-    // 负责把快照按当前产线切成左表视图、按内容重算列宽，并提供产线选择与按钮文案。
+    // ---- 04. 产线选择与快照访问 ----
+    // 负责当前产线选择，并把服务端快照以只读视图暴露给编辑控制器和输入层。
     // ------------------------------------------------------------------
-
-    /**
-     * 左表最多能滚到第几行。
-     *
-     * <p>最后一行是「新增机器」空槽，下标等于机器数；它可以滚到顶部，所以上限是
-     * 当前产线的机器数，而不是机器数减一。</p>
-     *
-     * @return 最大首行下标；未选产线为 0
-     */
-    private int maxFirstRow() {
-        return this.state.maxFirstRow();
-    }
-
-    /**
-     * 当前左表产线下的机器；没有选产线时返回空表，不把不同产线混在一起。
-     *
-     * @return 当前产线机器
-     */
-    private List<FactorySnapshotBuilder.MachineView> tableMachines() {
-        return this.state.tableMachines();
-    }
-
-    /**
-     * 按当前内容重算四列宽度。
-     *
-     * <p>机器名/状态和输入输出规则都按实际文字宽度要空间，但每列有上下限；
-     * {@link FactoryLayout#relayoutColumns(int[])} 会在总宽不够时按优先级压缩或丢列。</p>
-     */
-    private void updateColumnWidths() {
-        this.state.updateColumnWidths();
-    }
-
-    /**
-     * 估一条规则列需要的宽度。
-     *
-     * <p>规则图标最多显示 3 条，列尾还要留一个「新增规则」空槽作为拖放目标；
-     * 这里只算文字和图标宽度，最终夹紧交给 {@link FactoryLayout}。</p>
-     *
-     * @param rules 规则
-     * @param rates 规则速率
-     * @return 最小 72 的列宽
-     */
-
-
-    /**
-     * 顶栏产线按钮的文案：未选线时显示提示，已选线显示产线名。
-     *
-     * @return 按钮文字
-     */
-    private String lineButtonText() {
-        return this.state.lineButtonText();
-    }
-
-    /**
-     * 当前选中的产线。
-     *
-     * @return 产线；未选择或已被删除时为 {@code null}
-     */
-    @Nullable
-    private FactorySnapshotBuilder.LineView selectedLine() {
-        return this.state.selectedLine();
-    }
-
-    /**
-     * 当前产线是否处于不执行 IO 的状态。
-     *
-     * <p>暂停与睡眠时卡片不再显示上一轮的红色诊断，改用中性文案；运行中返回
-     * {@code null}，由各卡片按真实原因上色。</p>
-     *
-     * @return 已暂停 / 睡眠中；运行中或未选线为 {@code null}
-     */
-    @Nullable
-    private String lineIdleLabel() {
-        return this.state.lineIdleLabel();
-    }
-
-    /**
-     * 按 id 找产线。
-     *
-     * @param id 产线 id
-     * @return 产线；不存在时为 {@code null}
-     */
-    @Nullable
-    private FactorySnapshotBuilder.LineView findLine(UUID id) {
-        return this.state.findLine(id);
-    }
 
     /**
      * 选中一条产线；切换后左表从第一行重新显示。
@@ -455,89 +343,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      */
     boolean hasFactory() {
         return this.state.hasFactory;
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 05. 行数上限与搜索文本 ----
-    // 负责仓库/机器库的可见行数、搜索字段拼装和 tooltip/tag 文本；这些只读快照，不探世界。
-    // ------------------------------------------------------------------
-
-    /**
-     * 仓库最多能滚到第几行。
-     *
-     * @return 最大首行下标；条目不足一屏时为 0
-     */
-    private int maxStorageFirstRow() {
-        return this.state.maxStorageFirstRow();
-    }
-
-    /**
-     * 机器库一屏能放几行卡片。
-     *
-     * <p>机器卡片行高是 {@link FactoryLayout#ROW_H}，但网格高度按物品格
-     * {@link FactoryLayout#CELL} 算，所以要做一次整除；至少保留 1 行。</p>
-     *
-     * @return 可见行数
-     */
-    private int machineRowsVisible() {
-        return this.state.machineRowsVisible();
-    }
-
-    /**
-     * 机器库最多能滚到第几行。
-     *
-     * @return 最大首行下标；不足一屏为 0
-     */
-    private int maxMachineFirstRow() {
-        return this.state.maxMachineFirstRow();
-    }
-
-    /**
-     * 模组显示名；查不到容器时退回 namespace。
-     *
-     * @param namespace 模组 id
-     * @return 显示名；空 namespace 返回空串
-     */
-    private static String modName(String namespace) {
-        return FactoryUiText.modName(namespace);
-    }
-
-    /**
-     * 资源 tooltip 文本，给搜索的 {@code $} 语法用。
-     *
-     * <p>FE 没有物品形态，直接返回 {@code FE}；物品走原版 tooltip 行，流体按桶物品
-     * 取提示。这里只读注册表/物品栈，不探世界。</p>
-     *
-     * @param key 资源
-     * @return 多行文本
-     */
-    private String resourceTooltip(ResourceKey key) {
-        return FactoryUiText.resourceTooltip(this.minecraft, key);
-    }
-
-    /**
-     * 资源标签，给搜索的 {@code #} 语法用。
-     *
-     * <p>只有物品和流体有 tag；能量/化学品没有，返回空表。</p>
-     *
-     * @param key 资源
-     * @return 标签 id 列表
-     */
-    private static List<String> resourceTags(ResourceKey key) {
-        return FactoryUiText.resourceTags(key);
-    }
-
-    /**
-     * 资源的物品形态，用于 tooltip 和 JEI 的兜底。
-     *
-     * <p>流体取桶（没有桶就用空桶），能量用红石粉只是视觉兜底；JEI 的 FE 目标
-     * 由 {@link #resourceTarget} 单独处理，不会把红石粉交给 JEI。</p>
-     *
-     * @param key 资源
-     * @return 物品栈；化学品等没有物品形态时为空
-     */
-    private static ItemStack resourceStack(ResourceKey key) {
-        return FactoryUiText.resourceStack(key);
     }
 
     // ------------------------------------------------------------------
@@ -691,18 +496,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     // ------------------------------------------------------------------
 
     /**
-     * “新增机器”行的顶部 y；放不下时为 {@code null}。
-     *
-     * <p>绘制、命中、拖放都用这一个函数，避免滚动/展开后坐标漂移。</p>
-     *
-     * @return 行顶部 y
-     */
-    @Nullable
-    private Integer addMachineRowY() {
-        return this.geometry.addMachineRowY();
-    }
-
-    /**
      * 鼠标是否在“新增机器”行上。
      *
      * @param mouseX 屏幕 x
@@ -723,41 +516,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     @Nullable
     FactorySnapshotBuilder.MachineView machineAt(double mouseX, double mouseY) {
         return this.geometry.machineAt(mouseX, mouseY);
-    }
-
-    /**
-     * 鼠标下的“移出产线”按钮（左表机器行最右侧的叉号）。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
-     */
-    @Nullable
-    FactorySnapshotBuilder.MachineView lineRemoveButtonAt(double mouseX, double mouseY) {
-        return this.geometry.lineRemoveButtonAt(mouseX, mouseY);
-    }
-
-    /**
-     * 左表机器行「移出产线」叉号的 x。
-     *
-     * <p>叉号放在展开按钮左侧 16px，避免和展开按钮的命中区重叠。</p>
-     *
-     * @return 叉号左边缘
-     */
-    private int lineRemoveButtonX() {
-        return this.geometry.lineRemoveButtonX();
-    }
-
-    /**
-     * 鼠标下的机器库删除按钮（右侧机器卡片右下角的叉号）。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
-     */
-    @Nullable
-    FactorySnapshotBuilder.MachineView libraryDeleteButtonAt(double mouseX, double mouseY) {
-        return this.geometry.libraryDeleteButtonAt(mouseX, mouseY);
     }
 
     /**
@@ -806,98 +564,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      */
     boolean isInStorageGrid(double mouseX, double mouseY) {
         return this.geometry.isInStorageGrid(mouseX, mouseY);
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 11. 展开状态与表格命中 ----
-    // 负责展开高度与状态、行尾按钮坐标和按行命中；绘制与输入共用同一套几何。
-    // ------------------------------------------------------------------
-
-    /**
-     * 该机器在当前行位置上的展开高度。
-     *
-     * <p>没有动画，直接按「这一行下面还剩多少空间」夹紧。绘制循环、命中测试和 JEI
-     * 都走同一个函数，保证点击不会落到相邻行。</p>
-     *
-     * @param machine 机器视图
-     * @param rowY    该行当前顶部
-     * @return 像素高度；未展开为 0
-     */
-    private int detailHeight(FactorySnapshotBuilder.MachineView machine, int rowY) {
-        return this.geometry.detailHeight(machine, rowY);
-    }
-
-    /**
-     * 该机器是否处于展开状态。
-     *
-     * @param machine 机器视图
-     * @return 已展开为 {@code true}
-     */
-    private boolean isOpen(FactorySnapshotBuilder.MachineView machine) {
-        return this.geometry.isOpen(machine);
-    }
-
-    /**
-     * 行尾展开按钮的 x。
-     *
-     * <p>按钮贴着左区右边缘，右边只留 4px，保证长机器名也有足够宽度。</p>
-     *
-     * @return 按钮左边缘
-     */
-    private int expandButtonX() {
-        return this.geometry.expandButtonX();
-    }
-
-    /**
-     * 按鼠标 y 找到它落在哪个可见机器行里。
-     *
-     * <p>行高可变，不能再用 {@code (mouseY - rowTop) / ROW_H}。这里从
-     * {@link #firstRow} 开始逐行累加，和绘制循环使用同一个 {@link #detailHeight}。</p>
-     *
-     * @param mouseY 屏幕 y
-     * @return 命中行；空白区或超出表格时为 {@code null}
-     */
-    @Nullable
-    private FactoryScreenGeometry.TableHit tableHitAt(double mouseY) {
-        return this.geometry.tableHitAt(mouseY);
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 12. 资源名称与图标 ----
-    // 负责资源显示名、规则面名，以及 tooltip/JEI 用的物品图标。
-    // ------------------------------------------------------------------
-
-    /**
-     * 资源对应的物品图标。
-     *
-     * <p>和 {@link FactoryResourceIconRender} 分开：这里是给 tooltip 和拖拽准备的物品形态，
-     * FE 仍会得到红石粉兜底；JEI 的 FE 目标在 {@link #resourceTarget} 里单独处理。</p>
-     *
-     * @param key 资源
-     * @return 物品栈
-     */
-    private static ItemStack iconStack(ResourceKey key) {
-        return FactoryLabels.icon(key);
-    }
-
-    /**
-     * 资源显示名。
-     *
-     * @param key 资源
-     * @return 名称
-     */
-    private static String resourceName(ResourceKey key) {
-        return FactoryLabels.name(key);
-    }
-
-    /**
-     * 规则面的中文单字。
-     *
-     * @param spec 规则
-     * @return 上/下/北/南/东/西/任意
-     */
-    private static String faceName(ResourceSpec spec) {
-        return FactoryLabels.face(spec);
     }
 
     // ------------------------------------------------------------------
@@ -1031,22 +697,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     @Nullable
     public JeiTarget jeiTargetAt(double mouseX, double mouseY) {
         return this.jeiTargets.at(mouseX, mouseY);
-    }
-
-    /**
-     * 把资源转成 JEI 目标。
-     *
-     * <p>能量在 JEI 里没有物品形态：{@code stack} 留空，由插件换成独立的 FE 配料；
-     * 物品/流体仍用 {@link #iconStack} 的图标，保持原来的 R/U 行为。</p>
-     *
-     * @param key  资源
-     * @param area 可点击区域
-     * @return JEI 目标
-     */
-    private JeiTarget resourceTarget(ResourceKey key, Rect2i area) {
-        ResourceKind kind = key.kind();
-        return new JeiTarget(kind,
-                kind == ResourceKind.ENERGY ? ItemStack.EMPTY : iconStack(key), area);
     }
 
     @Override
