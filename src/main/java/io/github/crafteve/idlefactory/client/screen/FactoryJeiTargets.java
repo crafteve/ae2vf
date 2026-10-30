@@ -109,7 +109,8 @@ final class FactoryJeiTargets {
                 FactorySnapshotBuilder.MachineView machine = hit.machine();
                 int y = hit.y();
 
-                if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)) {
+                if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)
+                        || this.context.geometry().inRemoveButton(hit, mouseX, mouseY)) {
                     return null;
                 }
 
@@ -157,7 +158,7 @@ final class FactoryJeiTargets {
                     FactoryScreen.JeiTarget target = ruleTarget(machine.outputs(),
                             machine.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
                             y + 4, l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                                    - FactoryLayout.EXPAND_BUTTON - 2, mouseX, mouseY);
+                                    - FactoryLayout.ROW_ACTIONS_W, mouseX, mouseY);
                     if (target != null) {
                         return target;
                     }

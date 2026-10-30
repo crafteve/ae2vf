@@ -16,7 +16,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
 
 /**
- * 全部悬停提示：搜索语法、排序按钮、仓库格、机器库、展开按钮、IO 卡片和规则列。
+ * 全部悬停提示：搜索语法、排序按钮、仓库格、机器库、行尾移出/展开按钮、IO 卡片和规则列。
  *
  * <p>顺序即优先级：先搜索框/排序，再玩家槽位、仓库/机器库，最后左表；命中即返回。
  * 产线下拉等浮层打开时整体跳过，避免提示和菜单叠在一起。</p>
@@ -132,7 +132,11 @@ final class FactoryTooltipRender {
                 return;
             }
             FactorySnapshotBuilder.MachineView machine = hit.machine();
-            // 展开按钮压在输出列右端，必须先判按钮，否则会弹出输出列规则提示。
+            // 行尾动作按钮与列区不重叠，但仍先判按钮，避免以后列宽调整后串到规则提示。
+            if (this.context.geometry().inRemoveButton(hit, mouseX, mouseY)) {
+                drawRemoveTooltip(graphics, mouseX, mouseY);
+                return;
+            }
             if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)) {
                 drawExpandTooltip(graphics, machine, mouseX, mouseY);
                 return;
@@ -176,6 +180,24 @@ final class FactoryTooltipRender {
         return Component.empty()
                 .append(FactoryLabels.coloredBold(key, tt.value()))
                 .append(FactoryLabels.colored(" " + description, tt.label()));
+    }
+
+    /**
+     * 移出产线按钮的提示。
+     *
+     * <p>按钮只删产线引用，机器本身与 IO 规则都保留；红叉容易被误解成删除机器，
+     * 所以必须把这条语义写在提示里。</p>
+     *
+     * @param graphics 画布
+     * @param mouseX   鼠标 x
+     * @param mouseY   鼠标 y
+     */
+    private void drawRemoveTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+        FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
+        graphics.renderComponentTooltip(this.context.font(), List.of(
+                FactoryLabels.colored("移出产线", tt.title()),
+                FactoryLabels.colored("只移除产线引用，机器与 IO 规则保留", tt.label())),
+                mouseX, mouseY);
     }
 
     /**

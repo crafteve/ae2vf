@@ -175,18 +175,19 @@ final class FactoryScreenGeometry {
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
         }
-        int x = lineRemoveButtonX();
-        return inside(mouseX, mouseY, x, hit.y() + 2, 12, FactoryLayout.ROW_H - 4)
+        int x = removeButtonX();
+        return inside(mouseX, mouseY, x, hit.y() + FactoryLayout.ROW_ACTION_TOP,
+                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON)
                 ? hit.machine() : null;
     }
 
     /**
-     * 左表机器行「移出产线」叉号的 x。
+     * 左表机器行「移出产线」按钮的 x。
      *
-     * @return 叉号左边缘
+     * @return 按钮左边缘
      */
-    int lineRemoveButtonX() {
-        return expandButtonX() - 16;
+    int removeButtonX() {
+        return expandButtonX() - FactoryLayout.ROW_ACTION_BUTTON - FactoryLayout.ROW_ACTION_GAP;
     }
 
     /**
@@ -291,8 +292,7 @@ final class FactoryScreenGeometry {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
                     machine.outputs(), machine.outputRates(),
                     l.columnX(FactoryLayout.COL_OUTPUT) + 2, hit.y() + 4,
-                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
                 return new IoDropTarget(machine, IoSide.OUTPUT);
             }
@@ -353,7 +353,7 @@ final class FactoryScreenGeometry {
      */
     int expandButtonX() {
         FactoryLayout l = this.screen.layout;
-        return l.leftX + l.leftW - FactoryLayout.EXPAND_BUTTON - 4;
+        return l.leftX + l.leftW - FactoryLayout.ROW_ACTION_BUTTON - 4;
     }
 
     /**
@@ -394,8 +394,21 @@ final class FactoryScreenGeometry {
      * @return 命中为 {@code true}
      */
     boolean inExpandButton(TableHit hit, double mouseX, double mouseY) {
-        return inside(mouseX, mouseY, expandButtonX(), hit.y() + 6,
-                FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
+        return inside(mouseX, mouseY, expandButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
+                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
+    }
+
+    /**
+     * 鼠标是否落在某行的「移出产线」按钮上。
+     *
+     * @param hit    命中行
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中为 {@code true}
+     */
+    boolean inRemoveButton(TableHit hit, double mouseX, double mouseY) {
+        return inside(mouseX, mouseY, removeButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
+                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
     }
 
     /**

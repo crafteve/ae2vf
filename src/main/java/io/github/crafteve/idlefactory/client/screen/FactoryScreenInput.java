@@ -227,14 +227,9 @@ final class FactoryScreenInput {
      * @return 命中并切换为 {@code true}
      */
     private boolean clickMachineExpand(double mouseX, double mouseY) {
-        int buttonX = this.screen.geometry().expandButtonX();
-        if (mouseX < buttonX || mouseX >= buttonX + FactoryLayout.EXPAND_BUTTON) {
-            return false;
-        }
         FactoryScreenGeometry.TableHit hit = this.screen.geometry().tableHitAt(mouseY);
         if (hit == null
-                || mouseY < hit.y() + 6
-                || mouseY >= hit.y() + 6 + FactoryLayout.EXPAND_BUTTON) {
+                || !this.screen.geometry().inExpandButton(hit, mouseX, mouseY)) {
             return false;
         }
         var ref = hit.machine().ref();
@@ -411,8 +406,7 @@ final class FactoryScreenInput {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
                     hit.machine().outputs(), hit.machine().outputRates(),
                     l.columnX(FactoryLayout.COL_OUTPUT) + 2, hit.y() + 4,
-                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
             if (entry != null && entry.ruleIndex() < hit.machine().outputs().size()) {
                 editController.beginRuleDrag(hit.machine(),

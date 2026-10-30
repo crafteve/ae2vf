@@ -68,8 +68,14 @@ public final class FactoryLayout {
     /** 小标题（合成 / 背包）与内容的间距。 */
     public static final int LABEL_GAP = 12;
 
-    /** 行尾展开按钮边长；也是输出列右侧要给按钮让出的宽度。 */
-    public static final int EXPAND_BUTTON = 14;
+    /** 行尾动作按钮边长：移出产线与展开 IO 共用。 */
+    public static final int ROW_ACTION_BUTTON = 14;
+    /** 行尾两枚动作按钮之间的间隙。 */
+    public static final int ROW_ACTION_GAP = 1;
+    /** 行尾动作区宽度：两枚按钮 + 间隙 + 与列内容之间的 2px 呼吸位；输出列排版时从右端让出。 */
+    public static final int ROW_ACTIONS_W = 2 * ROW_ACTION_BUTTON + ROW_ACTION_GAP + 2;
+    /** 动作按钮的上边距：行高 26，14px 按钮上下各留 6px。 */
+    public static final int ROW_ACTION_TOP = (ROW_H - ROW_ACTION_BUTTON) / 2;
     /** IO 详情面板内边距；包含九宫格边框占的 3px。 */
     public static final int IO_PANEL_PAD = 4;
     /** IO 段头高度。 */

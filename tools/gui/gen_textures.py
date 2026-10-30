@@ -254,13 +254,32 @@ def search_icon(size: int = 9) -> Image.Image:
     return img
 
 
+def close_icon(color, size: int = 7) -> Image.Image:
+    """7×7 的 X 图标：1px 对角线，四角内缩 1px。
+
+    搜索清空与行尾移出共用同一套像素语法，只换颜色；这样两处的叉号粗细、
+    斜率和留白完全一致，不会一处像字体、一处像图标。
+    """
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    for i in range(1, size - 1):
+        img.putpixel((i, i), color)
+        img.putpixel((size - 1 - i, i), color)
+    return img
+
+
 def search_clear_icon(size: int = 7) -> Image.Image:
     """搜索框清空按钮：7×7 的 X。"""
-    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    for i in range(1, 6):
-        img.putpixel((i, i), SEARCH_CLEAR)
-        img.putpixel((6 - i, i), SEARCH_CLEAR)
-    return img
+    return close_icon(SEARCH_CLEAR, size)
+
+
+def row_remove_icon(size: int = 7) -> Image.Image:
+    """行尾移出产线：7×7 深靛 X，与展开箭头同色。"""
+    return close_icon(PANEL_BORDER, size)
+
+
+def row_remove_hover_icon(size: int = 7) -> Image.Image:
+    """行尾移出产线悬停：7×7 警示红 X。"""
+    return close_icon(STATUS_ERROR, size)
 
 
 def solid(color) -> Image.Image:
@@ -459,6 +478,8 @@ SPECS = {
     "status_lamp_idle": (lambda: status_lamp(STATUS_IDLE), "状态灯：空闲"),
     "search": (search_icon, "搜索放大镜：9×9"),
     "search_clear": (search_clear_icon, "搜索清空：7×7"),
+    "row_remove": (row_remove_icon, "行尾移出：7×7 深靛 X"),
+    "row_remove_hover": (row_remove_hover_icon, "行尾移出悬停：7×7 警示红 X"),
     "divider": (lambda: solid(SLOT_DARK), "细分隔线：1×1 拉伸"),
     "divider_dark": (lambda: solid(PANEL_BORDER), "粗分隔线：1×1 拉伸"),
     "header_bg": (lambda: solid(PANEL_BEVEL_LIGHT), "表头底色：1×1 拉伸"),

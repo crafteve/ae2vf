@@ -84,6 +84,10 @@ public final class FactoryGuiTextures {
     public static final ResourceLocation CHEVRON_RIGHT = id("chevron_right");
     /** 展开箭头：7×7。 */
     public static final ResourceLocation CHEVRON_DOWN = id("chevron_down");
+    /** 行尾移出产线：7×7 深靛 X。 */
+    public static final ResourceLocation ROW_REMOVE = id("row_remove");
+    /** 行尾移出产线悬停：7×7 警示红 X。 */
+    public static final ResourceLocation ROW_REMOVE_HOVER = id("row_remove_hover");
 
     /** 1px 状态条：运行。 */
     public static final ResourceLocation STATUS_STRIP_RUN = id("status_strip_run");
@@ -131,6 +135,8 @@ public final class FactoryGuiTextures {
     public static final int IO_HEADER_BORDER = 1;
     /** 箭头贴图边长。 */
     public static final int CHEVRON_SIZE = 7;
+    /** 行尾动作图标边长；展开箭头与移出 X 都是 7×7。 */
+    public static final int ROW_ACTION_ICON_SIZE = 7;
     /** 状态灯边长。 */
     public static final int STATUS_LAMP_SIZE = 4;
     /** 搜索图标边长。 */

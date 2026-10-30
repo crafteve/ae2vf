@@ -6,6 +6,7 @@ import java.util.List;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
@@ -191,23 +192,13 @@ final class FactoryTableRender {
             int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.context.font(),
                     machine.outputs(), machine.outputRates(), stripX, y + 4,
-                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                            - FactoryLayout.EXPAND_BUTTON - 2, true);
+                    l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             FactoryRuleStrip.draw(graphics, this.context.font(), this.context.theme(), strip,
                     machine.outputs(), machine.outputRates(), machine.outputReasons(),
                     this.context.mouseX(), this.context.mouseY(), draggingResource,
                     idleLabel != null);
         }
-        drawExpandButton(graphics, y, this.context.geometry().isOpen(machine));
-        int removeX = this.context.geometry().lineRemoveButtonX();
-        boolean removeHovered = this.context.mouseX() >= removeX
-                && this.context.mouseX() < removeX + 12
-                && this.context.mouseY() >= y + 4
-                && this.context.mouseY() < y + FactoryLayout.ROW_H - 4;
-        graphics.drawString(this.context.font(), "×", removeX,
-                y + (FactoryLayout.ROW_H - 8) / 2,
-                removeHovered ? this.context.theme().error()
-                        : this.context.theme().textDim(), false);
+        drawRowActions(graphics, y, this.context.geometry().isOpen(machine));
         if (detailHeight > 0) {
             FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, machine,
                     y + FactoryLayout.ROW_H, detailHeight, this.context.font(),
@@ -267,29 +258,56 @@ final class FactoryTableRender {
     }
 
     /**
-     * 行尾展开按钮。
+     * 行尾两枚动作按钮：移出产线、展开/收起 IO。
+     *
+     * <p>两枚按钮共用同一套底板、图标尺寸与命中矩形，避免一个像字体、一个像控件。
+     * 移出在左、展开在右，破坏性动作不贴表格外缘。</p>
      *
      * @param graphics 画布
      * @param y        行顶部
-     * @param open     当前是否展开
+     * @param open     展开区是否已打开
      */
-    private void drawExpandButton(GuiGraphics graphics, int y, boolean open) {
-        int x = this.context.geometry().expandButtonX();
-        int buttonY = y + 6;
-        boolean hovered = FactoryScreenGeometry.inside(this.context.mouseX(),
-                this.context.mouseY(), x, buttonY,
-                FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
-        if (hovered) {
-            FactoryNineSlice.buttonHover(graphics, x, buttonY,
-                    FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
-        } else {
-            FactoryNineSlice.button(graphics, x, buttonY,
-                    FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
-        }
-        int offset = (FactoryLayout.EXPAND_BUTTON - FactoryGuiTextures.CHEVRON_SIZE) / 2;
-        FactoryNineSlice.icon(graphics,
+    private void drawRowActions(GuiGraphics graphics, int y, boolean open) {
+        int buttonY = y + FactoryLayout.ROW_ACTION_TOP;
+        int removeX = this.context.geometry().removeButtonX();
+        boolean removeHovered = FactoryScreenGeometry.inside(this.context.mouseX(),
+                this.context.mouseY(), removeX, buttonY,
+                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
+        drawRowActionButton(graphics, removeX, buttonY,
+                removeHovered ? FactoryGuiTextures.ROW_REMOVE_HOVER
+                        : FactoryGuiTextures.ROW_REMOVE, removeHovered);
+
+        int expandX = this.context.geometry().expandButtonX();
+        boolean expandHovered = FactoryScreenGeometry.inside(this.context.mouseX(),
+                this.context.mouseY(), expandX, buttonY,
+                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
+        drawRowActionButton(graphics, expandX, buttonY,
                 open ? FactoryGuiTextures.CHEVRON_DOWN : FactoryGuiTextures.CHEVRON_RIGHT,
-                x + offset, buttonY + offset, FactoryGuiTextures.CHEVRON_SIZE);
+                expandHovered);
+    }
+
+    /**
+     * 画一枚行尾动作按钮：凸起底板 + 7×7 图标。
+     *
+     * @param graphics 画布
+     * @param x        左边缘
+     * @param y        上边缘
+     * @param icon     7×7 图标
+     * @param hovered  是否悬停
+     */
+    private void drawRowActionButton(GuiGraphics graphics, int x, int y,
+            ResourceLocation icon, boolean hovered) {
+        if (hovered) {
+            FactoryNineSlice.buttonHover(graphics, x, y,
+                    FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
+        } else {
+            FactoryNineSlice.button(graphics, x, y,
+                    FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
+        }
+        int offset = (FactoryLayout.ROW_ACTION_BUTTON
+                - FactoryGuiTextures.ROW_ACTION_ICON_SIZE) / 2;
+        FactoryNineSlice.icon(graphics, icon, x + offset, y + offset,
+                FactoryGuiTextures.ROW_ACTION_ICON_SIZE);
     }
 
     /**
