@@ -232,6 +232,42 @@ public final class PassiveLine {
         return this.stacks.removeIf(stack -> stack.stackId().equals(stackId));
     }
 
+    /**
+     * 复制一份，只保留 {@code keep} 为真的成员，空组丢弃。
+     *
+     * <p>读档时用：存档里可能引用了已经不存在的机器，或者一台机器被两条产线引用。
+     * 过滤必须逐台做，但**不能重建组**——否则 5 台一组会被拆成 5 行。</p>
+     *
+     * @param keep 成员保留判断
+     * @return 新产线；id、名字、运行状态、组结构都保留
+     */
+    public PassiveLine copyFiltered(Filter keep) {
+        PassiveLine copy = new PassiveLine(this.id, this.name);
+        copy.running = this.running;
+        for (StackEntry stack : this.stacks) {
+            List<UUID> members = new ArrayList<>();
+            for (UUID machineId : stack.machineIds()) {
+                if (keep.test(machineId)) {
+                    members.add(machineId);
+                }
+            }
+            if (!members.isEmpty()) {
+                copy.stacks.add(new StackEntry(stack.stackId(), members));
+            }
+        }
+        return copy;
+    }
+
+    /** 成员过滤判断。 */
+    @FunctionalInterface
+    public interface Filter {
+        /**
+         * @param machineId 机器 id
+         * @return 是否保留
+         */
+        boolean test(UUID machineId);
+    }
+
     /** 给界面和指令用的短 id（前 8 位）。 */
     public String shortId() {
         return this.id.toString().substring(0, 8);

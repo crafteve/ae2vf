@@ -43,17 +43,13 @@ public final class FactoryManager {
             }
             Set<UUID> assigned = new HashSet<>();
             for (PassiveLine loaded : record.lines()) {
-                PassiveLine line = new PassiveLine(loaded.id(), loaded.name());
-                line.setRunning(loaded.running());
-                for (UUID machineId : loaded.machineIds()) {
+                // 只过滤失效/重复归属的机器，保留原来的组结构；重新 addMachine 会把一组拆成多行。
+                PassiveLine line = loaded.copyFiltered(machineId -> {
                     if (config.machines().byId(machineId).isEmpty()) {
-                        continue;
+                        return false;
                     }
-                    if (!assigned.add(machineId)) {
-                        continue;
-                    }
-                    line.addMachine(machineId);
-                }
+                    return assigned.add(machineId);
+                });
                 config.lines().add(line);
             }
             add(new Factory(record.id(), config));
