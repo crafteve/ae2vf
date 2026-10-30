@@ -33,7 +33,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>输入优先级：命名浮层 → 确认浮层 → 产线下拉 → 交给 {@link FactoryScreen} 的原有逻辑。</p>
  */
-public final class FactoryEditController {
+public final class FactoryEditController implements FactoryScreenInteraction {
     /** 底部反馈停留 tick。 */
     private static final int FEEDBACK_TICKS = 80;
 
@@ -416,7 +416,7 @@ public final class FactoryEditController {
     }
 
     private void finishResourceDrag(double mouseX, double mouseY) {
-        FactoryScreen.IoDropTarget target = this.screen.ioDropTargetAt(mouseX, mouseY);
+        FactoryScreenGeometry.IoDropTarget target = this.screen.ioDropTargetAt(mouseX, mouseY);
         if (target == null || this.dragResourceKey == null) {
             return;
         }

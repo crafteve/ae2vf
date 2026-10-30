@@ -94,79 +94,31 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     /** 仓库 tab 打开时每隔多少 tick 刷新一次仓库快照。 */
     private static final int STORAGE_REQUEST_INTERVAL = 100;
     /** tab 下标：仓库。 */
-    private static final int TAB_STORAGE = 0;
+    static final int TAB_STORAGE = 0;
     /** tab 下标：机器。 */
-    private static final int TAB_MACHINES = 1;
+    static final int TAB_MACHINES = 1;
 
     /** 界面唯色源；客户端主题配置取一次，避免每帧重复查。 */
     private final FactoryGuiTheme theme = FactoryGuiTheme.current();
+    /** 客户端状态与派生视图；绘制/命中/输入都从这里读。 */
+    final FactoryScreenState state = new FactoryScreenState(this.theme);
+    /** 几何/命中；绘制、输入、JEI 共用。 */
+    private final FactoryScreenGeometry geometry = new FactoryScreenGeometry(this);
     /** 当前屏幕尺寸下的几何；init 重建，绘制与命中只读它。 */
-    private FactoryLayout layout;
+    FactoryLayout layout;
     /** 搜索输入框；init 重建，关闭时把内容记进 rememberedSearch。 */
     private FactorySearchEditBox searchBox;
-    /** 服务端最近一次给的全量机器视图；左表和机器库都从这份数据派生。 */
-    private List<FactorySnapshotBuilder.MachineView> machines = List.of();
-    /** 服务端最近一次给的产线列表；产线下拉从这里取。 */
-    private List<FactorySnapshotBuilder.LineView> lines = List.of();
-    /** 服务端是否已经有工厂实例；没有时界面显示创建引导。 */
-    private boolean hasFactory;
-    /** 仓库链接是否在线；表格中的数量仍以仓库包为准。 */
-    private boolean storageOnline;
-    /** 工厂产线总数。 */
-    private int lineCount;
-    /** 当前运行中的产线数。 */
-    private int runningLineCount;
-    /** 左表当前滚动到的第一条机器下标。 */
-    private int firstRow;
     /** 机器表请求节拍器。 */
     private int requestTicker;
+    /** 仓库请求节拍器。 */
+    private int storageRequestTicker;
 
-    /** 当前右区 tab：仓库或机器。 */
-    private int activeTab = TAB_STORAGE;
-    /** 左表当前选中的产线 id；null 表示还没选择产线，此时左表为空。 */
-    @Nullable
-    private UUID selectedLineId;
     /** 编辑态总控：产线下拉、命名/确认浮层、反馈。 */
     @Nullable
     private FactoryEditController editController;
     /** 右区排序按钮：键、方向、范围。 */
     @Nullable
     private FactorySortButtons sortButtons;
-    /** 客户端仓库视图；全量快照在这里做稳定排序和过滤。 */
-    private final FactoryStorageRepo storageRepo = new FactoryStorageRepo();
-    /** 正在拼装的分片快照；last 到齐后才替换 {@link #storageRepo}。 */
-    private final List<FactoryStorageS2C.Entry> pendingStorageEntries = new ArrayList<>();
-    /** 下一个期望的分片序号，用来丢掉重复/错序的包。 */
-    private int pendingStoragePart;
-    /** 是否已经收到过一次仓库快照。 */
-    private boolean storageReceived;
-    /** 服务端仓库快照是否因上限被截断。 */
-    private boolean storageTruncated;
-    /** 仓库当前滚动到的第一条记录。 */
-    private int storageFirstRow;
-    /** 机器库当前滚动到的第一台机器。 */
-    private int machineFirstRow;
-    /** 仓库请求节拍器。 */
-    private int storageRequestTicker;
-    /** 已展开的机器；同一时间最多一台，快照刷新后仍能保持展开。 */
-    private final Set<MachineRef> expandedMachines = new HashSet<>();
-    /** 展开 IO 面板的像素滚动。 */
-    private int ioScroll;
-
-    /** 当前解析后的搜索条件；响应器更新它并重建两侧视图。 */
-    private FactorySearchQuery searchQuery = FactorySearchQuery.EMPTY;
-    /** 仓库搜索 + 排序后的可见条目；由 {@link #rebuildFiltered()} 重算。 */
-    private List<FactoryStorageS2C.Entry> filteredStorageEntries = List.of();
-    /** 机器库搜索 + 排序后的可见视图；左表还会再按当前产线过滤。 */
-    private List<FactorySnapshotBuilder.MachineView> filteredMachines = List.of();
-    /** 资源 → 搜索字段缓存；tooltip/tag 读取较重，避免每次过滤重复解析。 */
-    private final Map<ResourceKey, FactorySearchQuery.Fields> storageSearchFields =
-            new HashMap<>();
-    /** 跨界面保留的搜索词；关闭界面时写入。 */
-    private static String rememberedSearch = "";
-    /** 跨界面保留的产线选择；acceptTable 会校验该产线仍存在。 */
-    @Nullable
-    private static UUID rememberedLineId;
     /** 本帧鼠标 x；{@code renderSlot} 不接收鼠标坐标，只能在这里暂存。 */
     private int renderMouseX;
     /** 本帧鼠标 y；与 x 一起用于槽位/卡片悬停。 */
@@ -213,29 +165,28 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             buttons = new FactorySortButtons(this::onSortChanged);
             this.sortButtons = buttons;
         }
-        if (this.selectedLineId == null) {
-            this.selectedLineId = rememberedLineId;
+        this.state.bind(this.layout, this.font, buttons);
+        if (this.state.selectedLineId == null) {
+            this.state.selectedLineId = FactoryScreenState.rememberedLineId;
         }
         positionSlots();
         String previousQuery = this.searchBox == null
-                ? rememberedSearch
+                ? FactoryScreenState.rememberedSearch
                 : this.searchBox.getValue();
         int searchX = this.layout.rightX + 4;
         int searchW = this.layout.searchWidth();
         this.searchBox = new FactorySearchEditBox(this.font, searchX + 18,
                 this.layout.searchY + 3, searchW - 32, 10,
                 this.theme, Component.literal("搜索…"));
-        this.searchBox.setResponder(value -> {
-            this.searchQuery = FactorySearchQuery.parse(value, JecharactersCompat::contains);
-            rebuildFiltered();
-        });
+        this.searchBox.setResponder(value -> this.state.setSearchQuery(
+                FactorySearchQuery.parse(value, JecharactersCompat::contains)));
         this.searchBox.setValue(previousQuery);
         this.addRenderableWidget(this.searchBox);
-        this.searchQuery = FactorySearchQuery.parse(previousQuery, JecharactersCompat::contains);
-        rebuildFiltered();
+        this.state.setSearchQuery(
+                FactorySearchQuery.parse(previousQuery, JecharactersCompat::contains));
         logLayout();
         requestTable();
-        if (this.activeTab == TAB_STORAGE) {
+        if (this.state.activeTab == TAB_STORAGE) {
             requestStorage();
         }
     }
@@ -257,7 +208,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             this.requestTicker = 0;
             requestTable();
         }
-        if (this.activeTab == TAB_STORAGE
+        if (this.state.activeTab == TAB_STORAGE
                 && ++this.storageRequestTicker >= STORAGE_REQUEST_INTERVAL) {
             requestStorage();
         }
@@ -302,31 +253,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param payload 机器表快照
      */
     public void acceptTable(FactoryTableS2C payload) {
-        this.hasFactory = payload.hasFactory();
-        this.storageOnline = payload.storageOnline();
-        this.lineCount = payload.lineCount();
-        this.runningLineCount = payload.runningLineCount();
-        this.lines = payload.lines();
-        this.machines = payload.machines();
-        Set<MachineRef> currentRefs = new HashSet<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            currentRefs.add(machine.ref());
-        }
-        this.expandedMachines.retainAll(currentRefs);
-        if (this.selectedLineId != null && findLine(this.selectedLineId) == null) {
-            this.selectedLineId = null;
-        }
-        rememberedLineId = this.selectedLineId;
-        this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
-        if (!this.hasFactory) {
-            this.storageRepo.clear();
-            this.storageSearchFields.clear();
-            this.storageReceived = false;
-        }
-        rebuildFiltered();
-        updateColumnWidths();
+        this.state.acceptTable(payload);
         if (this.editController != null) {
-            this.editController.onTable(this.lines, this.selectedLineId, this.hasFactory);
+            this.editController.onTable(this.state.lines, this.state.selectedLineId,
+                    this.state.hasFactory);
         }
     }
 
@@ -340,25 +270,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param payload 仓库快照分片
      */
     public void acceptStorage(FactoryStorageS2C payload) {
-        if (payload.part() == 0) {
-            this.pendingStorageEntries.clear();
-            this.pendingStoragePart = 0;
-            this.storageReceived = false;
-        } else if (payload.part() != this.pendingStoragePart) {
-            // 错序或重复的分片直接丢弃，等下一份完整快照。
-            return;
-        }
-        this.pendingStorageEntries.addAll(payload.entries());
-        this.pendingStoragePart = payload.part() + 1;
-        if (!payload.last()) {
-            return;
-        }
-        this.storageRepo.replace(this.pendingStorageEntries);
-        this.pendingStorageEntries.clear();
-        this.storageOnline = payload.online();
-        this.storageTruncated = payload.truncated();
-        this.storageReceived = true;
-        rebuildFiltered();
+        this.state.acceptStorage(payload);
     }
 
     /**
@@ -388,46 +300,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * 过滤后还要夹紧两个滚动位置，避免搜索把当前页缩短后越界。</p>
      */
     private void rebuildFiltered() {
-        // 排序按钮在 init 前可能为 null；此时退回“不过滤、不排序”的安全默认，
-        // 不能为了首帧排序临时 new 一个按钮对象，否则会丢客户端配置。
-        FactorySortButtons buttons = this.sortButtons;
-        FactorySortButtons.Scope scope = buttons == null
-                ? FactorySortButtons.Scope.ALL : buttons.storageScope();
-        Comparator<FactoryStorageS2C.Entry> comparator = buttons == null ? null
-                : FactorySort.storage(buttons.storageKey(), buttons.storageDescending(),
-                        key -> storageSearchFields(key).name(),
-                        key -> storageSearchFields(key).modName());
-        if (this.searchQuery.isEmpty() && scope == FactorySortButtons.Scope.ALL) {
-            this.storageRepo.configure(null, comparator);
-        } else {
-            this.storageRepo.configure(entry ->
-                    (this.searchQuery.isEmpty()
-                            || this.searchQuery.matches(storageSearchFields(entry.key())))
-                            && scope.accepts(entry.key().kind()),
-                    comparator);
-        }
-
-        List<FactorySnapshotBuilder.MachineView> visible;
-        if (this.searchQuery.isEmpty()) {
-            visible = this.machines;
-        } else {
-            List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>();
-            for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-                if (this.searchQuery.matches(machineSearchFields(machine))) {
-                    machines.add(machine);
-                }
-            }
-            visible = machines;
-        }
-        this.filteredMachines = buttons == null ? visible
-                : FactorySort.machines(visible, buttons.machineKey(), buttons.machineDescending());
-
-        this.filteredStorageEntries = this.storageRepo.view();
-        // 搜索/排序后可见行数会变，两个列表的滚动位置都要重新夹紧，否则会停在空白页。
-        this.storageFirstRow = Math.max(0,
-                Math.min(this.storageFirstRow, maxStorageFirstRow()));
-        this.machineFirstRow = Math.max(0,
-                Math.min(this.machineFirstRow, maxMachineFirstRow()));
+        this.state.rebuildFiltered();
     }
 
     /**
@@ -436,9 +309,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * <p>排序变化会让原来的滚动位置失去意义，所以两个列表都回到顶部；搜索过滤保持不变。</p>
      */
     private void onSortChanged() {
-        this.storageFirstRow = 0;
-        this.machineFirstRow = 0;
-        rebuildFiltered();
+        this.state.onSortChanged();
     }
 
     /**
@@ -450,13 +321,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param key 资源
      * @return 该资源的搜索字段
      */
-    private FactorySearchQuery.Fields storageSearchFields(ResourceKey key) {
-        return this.storageSearchFields.computeIfAbsent(key, k -> {
-            String namespace = k.id().getNamespace();
-            return new FactorySearchQuery.Fields(resourceName(k), k.id().toString(),
-                    namespace, modName(namespace), resourceTooltip(k), resourceTags(k));
-        });
-    }
+
 
     /**
      * 构造一台机器的搜索字段。
@@ -467,23 +332,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param machine 机器视图
      * @return 搜索字段
      */
-    private FactorySearchQuery.Fields machineSearchFields(
-            FactorySnapshotBuilder.MachineView machine) {
-        String id = machine.blockId() == null ? "" : machine.blockId().toString();
-        String namespace = machine.blockId() == null ? "" : machine.blockId().getNamespace();
-        String name = FactoryLabels.blockName(machine.blockId());
-        if (!machine.lineNames().isEmpty()) {
-            name += " " + String.join(" ", machine.lineNames());
-        }
-        String tooltip = statusText(machine) + "\n"
-                + machine.ref().dimension().location() + " "
-                + machine.ref().pos().toShortString() + "\n"
-                + (machine.lineNames().isEmpty()
-                        ? "未编线" : "产线 " + String.join("/", machine.lineNames()))
-                + "\n规则 " + machine.ruleCount() + " 条";
-        return new FactorySearchQuery.Fields(name, id, namespace, modName(namespace),
-                tooltip, List.of());
-    }
+
 
     // ------------------------------------------------------------------
     // ---- 04. 产线选择、表格视图与列宽 ----
@@ -499,11 +348,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 最大首行下标；未选产线为 0
      */
     private int maxFirstRow() {
-        // 最后一行是“新增机器”空槽，下标等于机器数；它可以滚到顶部。
-        if (this.selectedLineId == null) {
-            return 0;
-        }
-        return Math.max(0, tableMachines().size());
+        return this.state.maxFirstRow();
     }
 
     /**
@@ -512,16 +357,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 当前产线机器
      */
     private List<FactorySnapshotBuilder.MachineView> tableMachines() {
-        if (this.selectedLineId == null) {
-            return List.of();
-        }
-        List<FactorySnapshotBuilder.MachineView> filtered = new ArrayList<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            if (machine.lineIds().contains(this.selectedLineId)) {
-                filtered.add(machine);
-            }
-        }
-        return filtered;
+        return this.state.tableMachines();
     }
 
     /**
@@ -531,23 +367,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * {@link FactoryLayout#relayoutColumns(int[])} 会在总宽不够时按优先级压缩或丢列。</p>
      */
     private void updateColumnWidths() {
-        if (this.layout == null) {
-            return;
-        }
-        int name = 72;
-        int state = 64;
-        int input = 72;
-        int output = 72;
-        for (FactorySnapshotBuilder.MachineView machine : tableMachines()) {
-            name = Math.max(name,
-                    this.font.width(FactoryLabels.blockName(machine.blockId())) + FactoryLayout.CELL + 12);
-            input = Math.max(input, ruleWidth(machine.inputs(), machine.inputRates()));
-            output = Math.max(output, ruleWidth(machine.outputs(), machine.outputRates()));
-        }
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            state = Math.max(state, this.font.width(statusText(machine)) + 17);
-        }
-        this.layout.relayoutColumns(new int[] { name, state, input, output });
+        this.state.updateColumnWidths();
     }
 
     /**
@@ -560,17 +380,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param rates 规则速率
      * @return 最小 72 的列宽
      */
-    private int ruleWidth(List<ResourceSpec> rules, List<Long> rates) {
-        int width = 4;
-        for (int i = 0; i < Math.min(3, rules.size()); i++) {
-            String rate = FactoryLabels.rateText(i < rates.size() ? rates.get(i) : 0L,
-                    rules.get(i).key().kind());
-            width += FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
-        }
-        // 末尾空槽是拖放目标，列宽必须给它留位置。
-        width += FactoryLayout.CELL + 2;
-        return Math.max(72, width);
-    }
+
 
     /**
      * 顶栏产线按钮的文案：未选线时显示提示，已选线显示产线名。
@@ -578,8 +388,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 按钮文字
      */
     private String lineButtonText() {
-        FactorySnapshotBuilder.LineView line = selectedLine();
-        return line == null ? "选择产线" : line.name();
+        return this.state.lineButtonText();
     }
 
     /**
@@ -589,7 +398,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     private FactorySnapshotBuilder.LineView selectedLine() {
-        return this.selectedLineId == null ? null : findLine(this.selectedLineId);
+        return this.state.selectedLine();
     }
 
     /**
@@ -602,14 +411,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     private String lineIdleLabel() {
-        FactorySnapshotBuilder.LineView line = selectedLine();
-        if (line == null) {
-            return null;
-        }
-        if (!line.running()) {
-            return "已暂停";
-        }
-        return line.sleeping() ? "睡眠中" : null;
+        return this.state.lineIdleLabel();
     }
 
     /**
@@ -620,12 +422,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     private FactorySnapshotBuilder.LineView findLine(UUID id) {
-        for (FactorySnapshotBuilder.LineView line : this.lines) {
-            if (line.id().equals(id)) {
-                return line;
-            }
-        }
-        return null;
+        return this.state.findLine(id);
     }
 
     /**
@@ -634,13 +431,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param lineId 产线 id；{@code null} 表示清空
      */
     void selectLine(@Nullable UUID lineId) {
-        if (java.util.Objects.equals(this.selectedLineId, lineId)) {
-            return;
-        }
-        this.selectedLineId = lineId;
-        rememberedLineId = lineId;
-        this.firstRow = 0;
-        updateColumnWidths();
+        this.state.selectLine(lineId);
     }
 
     /**
@@ -650,7 +441,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     UUID selectedLineId() {
-        return this.selectedLineId;
+        return this.state.selectedLineId;
     }
 
     /**
@@ -659,7 +450,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 产线视图
      */
     List<FactorySnapshotBuilder.LineView> lines() {
-        return this.lines;
+        return this.state.lines;
     }
 
     /**
@@ -668,7 +459,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 机器视图
      */
     List<FactorySnapshotBuilder.MachineView> machines() {
-        return this.machines;
+        return this.state.machines;
     }
 
     /**
@@ -677,7 +468,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 有工厂为 {@code true}
      */
     boolean hasFactory() {
-        return this.hasFactory;
+        return this.state.hasFactory;
     }
 
     /**
@@ -712,9 +503,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 最大首行下标；条目不足一屏时为 0
      */
     private int maxStorageFirstRow() {
-        int rows = (this.filteredStorageEntries.size() + FactoryLayout.GRID_COLS - 1)
-                / FactoryLayout.GRID_COLS;
-        return Math.max(0, rows - this.layout.gridRows);
+        return this.state.maxStorageFirstRow();
     }
 
     /**
@@ -726,7 +515,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 可见行数
      */
     private int machineRowsVisible() {
-        return Math.max(1, this.layout.gridRows * FactoryLayout.CELL / FactoryLayout.ROW_H);
+        return this.state.machineRowsVisible();
     }
 
     /**
@@ -735,7 +524,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 最大首行下标；不足一屏为 0
      */
     private int maxMachineFirstRow() {
-        return Math.max(0, this.filteredMachines.size() - machineRowsVisible());
+        return this.state.maxMachineFirstRow();
     }
 
     /**
@@ -745,12 +534,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 显示名；空 namespace 返回空串
      */
     private static String modName(String namespace) {
-        if (namespace == null || namespace.isEmpty()) {
-            return "";
-        }
-        return ModList.get().getModContainerById(namespace)
-                .map(container -> container.getModInfo().getDisplayName())
-                .orElse(namespace);
+        return FactoryUiText.modName(namespace);
     }
 
     /**
@@ -763,26 +547,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 多行文本
      */
     private String resourceTooltip(ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
-            return "FE";
-        }
-        if (this.minecraft == null) {
-            return key.id().toString();
-        }
-        ItemStack stack = resourceStack(key);
-        if (stack.isEmpty()) {
-            return key.id().toString();
-        }
-        StringBuilder text = new StringBuilder();
-        for (Component line : stack.getTooltipLines(
-                Item.TooltipContext.of(this.minecraft.level), this.minecraft.player,
-                TooltipFlag.Default.NORMAL)) {
-            if (!text.isEmpty()) {
-                text.append('\n');
-            }
-            text.append(line.getString());
-        }
-        return text.toString();
+        return FactoryUiText.resourceTooltip(this.minecraft, key);
     }
 
     /**
@@ -794,22 +559,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 标签 id 列表
      */
     private static List<String> resourceTags(ResourceKey key) {
-        List<String> tags = new ArrayList<>();
-        switch (key.kind()) {
-            case ITEM -> {
-                resourceStack(key).getTags()
-                        .forEach(tag -> tags.add(tag.location().toString()));
-            }
-            case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
-                BuiltInRegistries.FLUID.wrapAsHolder(fluid).tags()
-                        .forEach(tag -> tags.add(tag.location().toString()));
-            }
-            default -> {
-                // 能量和化学品没有物品 tag，搜索字段留空即可。
-            }
-        }
-        return tags;
+        return FactoryUiText.resourceTags(key);
     }
 
     /**
@@ -822,16 +572,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 物品栈；化学品等没有物品形态时为空
      */
     private static ItemStack resourceStack(ResourceKey key) {
-        return switch (key.kind()) {
-            case ITEM -> key.toStack();
-            case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
-                Item bucket = fluid.getBucket();
-                yield bucket == Items.AIR ? new ItemStack(Items.BUCKET) : new ItemStack(bucket);
-            }
-            case ENERGY -> new ItemStack(Items.REDSTONE);
-            default -> ItemStack.EMPTY;
-        };
+        return FactoryUiText.resourceStack(key);
     }
 
     // ------------------------------------------------------------------
@@ -986,11 +727,11 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             FactoryNineSlice.button(graphics, x, l.tabY, w, FactoryLayout.HEADER_H);
         }
         // 选中 tab 用一条 2px 深色上沿强调；宽度跟随当前 tab 的实际宽度。
-        int activeWidth = this.activeTab == FactoryLayout.TAB_COUNT - 1
-                ? l.rightW - this.activeTab * tabWidth
+        int activeWidth = this.state.activeTab == FactoryLayout.TAB_COUNT - 1
+                ? l.rightW - this.state.activeTab * tabWidth
                 : tabWidth;
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK,
-                l.rightX + this.activeTab * tabWidth, l.tabY, activeWidth, 2);
+                l.rightX + this.state.activeTab * tabWidth, l.tabY, activeWidth, 2);
 
         drawSearchField(graphics);
         FactoryNineSlice.icon(graphics, FactoryGuiTextures.SEARCH, l.rightX + 9, l.searchY + 2,
@@ -1000,7 +741,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     clearButtonX(), l.searchY + 4, FactoryGuiTextures.SEARCH_CLEAR_SIZE);
         }
         drawSortButtons(graphics);
-        if (this.activeTab == TAB_STORAGE) {
+        if (this.state.activeTab == TAB_STORAGE) {
             drawGrid(graphics, l.gridX, l.gridY, FactoryLayout.GRID_COLS, l.gridRows,
                     FactoryLayout.CELL);
         }
@@ -1099,7 +840,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         String status;
         int statusColor;
         FactorySnapshotBuilder.LineView activeLine = selectedLine();
-        if (!this.hasFactory) {
+        if (!this.state.hasFactory) {
             status = "未创建";
             statusColor = this.theme.statusIdle();
         } else if (activeLine != null) {
@@ -1127,10 +868,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         // 统计是最不重要的信息，放不下就直接省略，优先保证状态和关闭按钮可读。
         int storageColor = storageStatusColor();
         List<TextPart> stats = List.of(
-                new TextPart(Integer.toString(this.machines.size()), this.theme.textValue()),
+                new TextPart(Integer.toString(this.state.machines.size()), this.theme.textValue()),
                 new TextPart(" 台", this.theme.textPrimary()),
                 new TextPart(" · ", this.theme.textPrimary()),
-                new TextPart(Integer.toString(this.lineCount), this.theme.textValue()),
+                new TextPart(Integer.toString(this.state.lineCount), this.theme.textValue()),
                 new TextPart(" 线", this.theme.textPrimary()),
                 new TextPart(" · ", this.theme.textPrimary()),
                 new TextPart("仓库", storageColor),
@@ -1155,13 +896,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 状态文字
      */
     private String storageStatusText() {
-        if (!this.hasFactory) {
+        if (!this.state.hasFactory) {
             return "未创建";
         }
-        if (!this.storageReceived) {
+        if (!this.state.storageReceived) {
             return "同步中";
         }
-        return this.storageOnline ? "在线" : "离线";
+        return this.state.storageOnline ? "在线" : "离线";
     }
 
     /**
@@ -1170,10 +911,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 主题颜色
      */
     private int storageStatusColor() {
-        if (!this.hasFactory || !this.storageReceived) {
+        if (!this.state.hasFactory || !this.state.storageReceived) {
             return this.theme.statusIdle();
         }
-        return this.storageOnline ? this.theme.statusRun() : this.theme.error();
+        return this.state.storageOnline ? this.theme.statusRun() : this.theme.error();
     }
 
     // ------------------------------------------------------------------
@@ -1203,7 +944,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     color, false);
         }
 
-        if (this.selectedLineId == null) {
+        if (this.state.selectedLineId == null) {
             graphics.drawString(this.font, "先选择一条产线", l.tableX, l.footerY + 3,
                     this.theme.textDim(), false);
             drawTableFrame(graphics);
@@ -1215,7 +956,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int shown = 0;
         int y = l.rowTop;
         // 最后一行是“新增机器”空槽；selectedLineId 非空时始终存在。
-        for (int i = this.firstRow; i <= total; i++) {
+        for (int i = this.state.firstRow; i <= total; i++) {
             if (y + FactoryLayout.ROW_H > l.footerY) {
                 break;
             }
@@ -1263,9 +1004,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         footer.add(new TextPart(Integer.toString(missing), this.theme.error()));
         if (this.maxFirstRow() > 0) {
             footer.add(new TextPart(" · ", this.theme.textPrimary()));
-            footer.add(new TextPart(Integer.toString(this.firstRow + 1), this.theme.textValue()));
+            footer.add(new TextPart(Integer.toString(this.state.firstRow + 1), this.theme.textValue()));
             footer.add(new TextPart("-", this.theme.textPrimary()));
-            footer.add(new TextPart(Integer.toString(this.firstRow + shown), this.theme.textValue()));
+            footer.add(new TextPart(Integer.toString(this.state.firstRow + shown), this.theme.textValue()));
         }
         drawParts(graphics, footer, l.tableX, l.footerY + 3);
         drawTableFrame(graphics);
@@ -1302,7 +1043,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             int y, int detailHeight) {
         FactoryLayout l = this.layout;
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
-        Status status = statusOf(machine);
+        FactoryStatus status = statusOf(machine);
         String idleLabel = lineIdleLabel();
 
         FactoryNineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
@@ -1375,7 +1116,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 removeHovered ? this.theme.error() : this.theme.textDim(), false);
         if (detailHeight > 0) {
             FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, machine,
-                    y + FactoryLayout.ROW_H, detailHeight, this.font, this.ioScroll);
+                    y + FactoryLayout.ROW_H, detailHeight, this.font, this.state.ioScroll);
             FactoryIoDetailRender.draw(graphics, this.font, this.theme, l, machine, detail,
                     this.renderMouseX, this.renderMouseY,
                     this.editController != null && this.editController.isDraggingResource(),
@@ -1443,18 +1184,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     private Integer addMachineRowY() {
-        if (this.selectedLineId == null) {
-            return null;
-        }
-        List<FactorySnapshotBuilder.MachineView> table = tableMachines();
-        int y = this.layout.rowTop;
-        for (int i = this.firstRow; i < table.size(); i++) {
-            if (y + FactoryLayout.ROW_H > this.layout.footerY) {
-                return null;
-            }
-            y += FactoryLayout.ROW_H + detailHeight(table.get(i), y);
-        }
-        return y + FactoryLayout.ROW_H <= this.layout.footerY ? y : null;
+        return this.geometry.addMachineRowY();
     }
 
     /**
@@ -1465,11 +1195,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 命中为 {@code true}
      */
     boolean addMachineRowContains(double mouseX, double mouseY) {
-        Integer y = addMachineRowY();
-        return y != null
-                && mouseY >= y && mouseY < y + FactoryLayout.ROW_H
-                && mouseX >= this.layout.leftX + 2
-                && mouseX < this.layout.leftX + this.layout.leftW - 2;
+        return this.geometry.addMachineRowContains(mouseX, mouseY);
     }
 
     /**
@@ -1481,22 +1207,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     FactorySnapshotBuilder.MachineView machineAt(double mouseX, double mouseY) {
-        if (this.activeTab != TAB_MACHINES) {
-            return null;
-        }
-        FactoryLayout l = this.layout;
-        int gridW = FactoryLayout.GRID_COLS * FactoryLayout.CELL;
-        int gridH = l.gridRows * FactoryLayout.CELL;
-        if (mouseX < l.gridX || mouseX >= l.gridX + gridW
-                || mouseY < l.gridY || mouseY >= l.gridY + gridH) {
-            return null;
-        }
-        int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
-        int index = this.machineFirstRow + row;
-        if (row >= machineRowsVisible() || index < 0 || index >= this.filteredMachines.size()) {
-            return null;
-        }
-        return this.filteredMachines.get(index);
+        return this.geometry.machineAt(mouseX, mouseY);
     }
 
     /**
@@ -1508,16 +1219,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     FactorySnapshotBuilder.MachineView lineRemoveButtonAt(double mouseX, double mouseY) {
-        if (this.activeTab != TAB_MACHINES) {
-            return null;
-        }
-        TableHit hit = tableHitAt(mouseY);
-        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        int x = lineRemoveButtonX();
-        return inside(mouseX, mouseY, x, hit.y() + 2, 12, FactoryLayout.ROW_H - 4)
-                ? hit.machine() : null;
+        return this.geometry.lineRemoveButtonAt(mouseX, mouseY);
     }
 
     /**
@@ -1528,7 +1230,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 叉号左边缘
      */
     private int lineRemoveButtonX() {
-        return expandButtonX() - 16;
+        return this.geometry.lineRemoveButtonX();
     }
 
     /**
@@ -1540,17 +1242,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     FactorySnapshotBuilder.MachineView libraryDeleteButtonAt(double mouseX, double mouseY) {
-        FactorySnapshotBuilder.MachineView machine = machineAt(mouseX, mouseY);
-        if (machine == null) {
-            return null;
-        }
-        int row = (int) ((mouseY - this.layout.gridY) / FactoryLayout.ROW_H);
-        int cardX = this.layout.gridX + 2;
-        int cardW = FactoryLayout.GRID_COLS * FactoryLayout.CELL - 4;
-        int cardY = this.layout.gridY + row * FactoryLayout.ROW_H + 1;
-        int x = cardX + cardW - 12;
-        int y = cardY + 13 - 1;
-        return inside(mouseX, mouseY, x, y, 10, 10) ? machine : null;
+        return this.geometry.libraryDeleteButtonAt(mouseX, mouseY);
     }
 
     /**
@@ -1564,17 +1256,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     @Nullable
     FactorySnapshotBuilder.MachineView machineIconAt(double mouseX, double mouseY) {
-        if (this.selectedLineId == null) {
-            return null;
-        }
-        TableHit hit = tableHitAt(mouseY);
-        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        int x = this.layout.columnX(FactoryLayout.COL_NAME) + 2;
-        int width = this.layout.columnW(FactoryLayout.COL_NAME) - 4;
-        return inside(mouseX, mouseY, x, hit.y() + 2,
-                width, FactoryLayout.ROW_H - 4) ? hit.machine() : null;
+        return this.geometry.machineIconAt(mouseX, mouseY);
     }
 
     /**
@@ -1585,23 +1267,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 命中为 {@code true}
      */
     boolean isInMachineLibrary(double mouseX, double mouseY) {
-        if (this.activeTab != TAB_MACHINES) {
-            return false;
-        }
-        FactoryLayout l = this.layout;
-        return mouseX >= l.gridX
-                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
-                && mouseY >= l.gridY
-                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL;
-    }
-
-    /**
-     * 一个 IO 空卡的放置目标。
-     *
-     * @param machine 机器
-     * @param side    输入/输出
-     */
-    record IoDropTarget(FactorySnapshotBuilder.MachineView machine, IoSide side) {
+        return this.geometry.isInMachineLibrary(mouseX, mouseY);
     }
 
     /**
@@ -1612,44 +1278,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 目标；没命中为 {@code null}
      */
     @Nullable
-    IoDropTarget ioDropTargetAt(double mouseX, double mouseY) {
-        TableHit hit = tableHitAt(mouseY);
-        if (hit == null) {
-            return null;
-        }
-        FactorySnapshotBuilder.MachineView machine = hit.machine();
-        if (hit.detailHeight() > 0 && mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            FactoryIoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
-            if (card != null && card.empty()) {
-                return new IoDropTarget(machine, card.input() ? IoSide.INPUT : IoSide.OUTPUT);
-            }
-            return null;
-        }
-        if (mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        FactoryLayout l = this.layout;
-        if (l.hasColumn(FactoryLayout.COL_INPUT)
-                && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
-            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.inputs(),
-                    machine.inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
-                    hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
-            if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
-                return new IoDropTarget(machine, IoSide.INPUT);
-            }
-        }
-        if (l.hasColumn(FactoryLayout.COL_OUTPUT)
-                && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
-            FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.font, machine.outputs(),
-                    machine.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
-                    hit.y() + 4,
-                    l.columnW(FactoryLayout.COL_OUTPUT) - 4
-                            - FactoryLayout.EXPAND_BUTTON - 2, true);
-            if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
-                return new IoDropTarget(machine, IoSide.OUTPUT);
-            }
-        }
-        return null;
+    FactoryScreenGeometry.IoDropTarget ioDropTargetAt(double mouseX, double mouseY) {
+        return this.geometry.ioDropTargetAt(mouseX, mouseY);
     }
 
     /**
@@ -1660,14 +1290,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 命中为 {@code true}
      */
     boolean isInStorageGrid(double mouseX, double mouseY) {
-        if (this.activeTab != TAB_STORAGE) {
-            return false;
-        }
-        FactoryLayout l = this.layout;
-        return mouseX >= l.gridX
-                && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
-                && mouseY >= l.gridY
-                && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL;
+        return this.geometry.isInStorageGrid(mouseX, mouseY);
     }
 
     /**
@@ -1679,7 +1302,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 是否消费
      */
     private boolean ioScrollAt(double mouseX, double mouseY, double scrollY) {
-        TableHit hit = tableHitAt(mouseY);
+        FactoryScreenGeometry.TableHit hit = tableHitAt(mouseY);
         if (hit == null || hit.detailHeight() <= 0
                 || mouseY < hit.y() + FactoryLayout.ROW_H) {
             return false;
@@ -1689,12 +1312,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return false;
         }
         FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(this.layout, hit.machine(),
-                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
+                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.state.ioScroll);
         if (detail.maxScroll() <= 0) {
             return true;
         }
         int step = (int) Math.round(scrollY * FactoryLayout.IO_SCROLL_STEP);
-        this.ioScroll = Math.max(0, Math.min(detail.maxScroll(), this.ioScroll - step));
+        this.state.ioScroll = Math.max(0, Math.min(detail.maxScroll(), this.state.ioScroll - step));
         return true;
     }
 
@@ -1761,7 +1384,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (button != 0 || this.editController == null) {
             return false;
         }
-        TableHit hit = tableHitAt(mouseY);
+        FactoryScreenGeometry.TableHit hit = tableHitAt(mouseY);
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return false;
         }
@@ -1813,13 +1436,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 像素高度；未展开为 0
      */
     private int detailHeight(FactorySnapshotBuilder.MachineView machine, int rowY) {
-        if (!this.expandedMachines.contains(machine.ref())) {
-            return 0;
-        }
-        int required = FactoryIoDetailLayout.requiredHeight(this.layout, machine, this.font);
-        int available = Math.max(0, this.layout.footerY - rowY - FactoryLayout.ROW_H);
-        // 展开区最多占到 footer 上沿；剩余空间不足时宁可截断，也不能把后续行推出表格。
-        return Math.min(required, available);
+        return this.geometry.detailHeight(machine, rowY);
     }
 
     /**
@@ -1829,7 +1446,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 已展开为 {@code true}
      */
     private boolean isOpen(FactorySnapshotBuilder.MachineView machine) {
-        return this.expandedMachines.contains(machine.ref());
+        return this.geometry.isOpen(machine);
     }
 
     /**
@@ -1840,8 +1457,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 按钮左边缘
      */
     private int expandButtonX() {
-        FactoryLayout l = this.layout;
-        return l.leftX + l.leftW - FactoryLayout.EXPAND_BUTTON - 4;
+        return this.geometry.expandButtonX();
     }
 
     /**
@@ -1873,18 +1489,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     }
 
     /**
-     * 左表中一次命中。
-     *
-     * @param machine      机器视图
-     * @param y            行顶部 y
-     * @param height       该行当前实际高度（基础行 + 展开区）
-     * @param detailHeight 展开区高度；0 表示未展开
-     */
-    private record TableHit(FactorySnapshotBuilder.MachineView machine, int y, int height,
-            int detailHeight) {
-    }
-
-    /**
      * 按鼠标 y 找到它落在哪个可见机器行里。
      *
      * <p>行高可变，不能再用 {@code (mouseY - rowTop) / ROW_H}。这里从
@@ -1894,26 +1498,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 命中行；空白区或超出表格时为 {@code null}
      */
     @Nullable
-    private TableHit tableHitAt(double mouseY) {
-        FactoryLayout l = this.layout;
-        if (mouseY < l.rowTop || mouseY >= l.footerY) {
-            return null;
-        }
-        List<FactorySnapshotBuilder.MachineView> table = tableMachines();
-        int y = l.rowTop;
-        for (int i = this.firstRow; i < table.size(); i++) {
-            if (y + FactoryLayout.ROW_H > l.footerY) {
-                return null;
-            }
-            FactorySnapshotBuilder.MachineView machine = table.get(i);
-            int detailHeight = detailHeight(machine, y);
-            int height = FactoryLayout.ROW_H + detailHeight;
-            if (mouseY >= y && mouseY < y + height) {
-                return new TableHit(machine, y, height, detailHeight);
-            }
-            y += height;
-        }
-        return null;
+    private FactoryScreenGeometry.TableHit tableHitAt(double mouseY) {
+        return this.geometry.tableHitAt(mouseY);
     }
 
     /**
@@ -1931,22 +1517,22 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (mouseX < buttonX || mouseX >= buttonX + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
-        TableHit hit = tableHitAt(mouseY);
+        FactoryScreenGeometry.TableHit hit = tableHitAt(mouseY);
         if (hit == null
                 || mouseY < hit.y() + 6
                 || mouseY >= hit.y() + 6 + FactoryLayout.EXPAND_BUTTON) {
             return false;
         }
         MachineRef ref = hit.machine().ref();
-        if (this.expandedMachines.contains(ref)) {
-            this.expandedMachines.remove(ref);
+        if (this.state.expandedMachines.contains(ref)) {
+            this.state.expandedMachines.remove(ref);
         } else {
-            this.expandedMachines.clear();
-            this.expandedMachines.add(ref);
+            this.state.expandedMachines.clear();
+            this.state.expandedMachines.add(ref);
             ensureExpansionVisible(ref);
         }
-        this.ioScroll = 0;
-        this.firstRow = Math.max(0, Math.min(this.firstRow, maxFirstRow()));
+        this.state.ioScroll = 0;
+        this.state.firstRow = Math.max(0, Math.min(this.state.firstRow, maxFirstRow()));
         return true;
     }
 
@@ -1969,35 +1555,23 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (index < 0) {
             return;
         }
-        if (index < this.firstRow) {
-            this.firstRow = index;
+        if (index < this.state.firstRow) {
+            this.state.firstRow = index;
             return;
         }
         int y = this.layout.rowTop;
-        for (int i = this.firstRow; i < index; i++) {
+        for (int i = this.state.firstRow; i < index; i++) {
             y += FactoryLayout.ROW_H + detailHeight(table.get(i), y);
             if (y >= this.layout.footerY) {
-                this.firstRow = index;
+                this.state.firstRow = index;
                 return;
             }
         }
         int required = FactoryIoDetailLayout.requiredHeight(this.layout, table.get(index), this.font);
         int available = Math.max(0, this.layout.footerY - y - FactoryLayout.ROW_H);
         if (required > available) {
-            this.firstRow = index;
+            this.state.firstRow = index;
         }
-    }
-
-    /**
-     * 一台机器的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
-     *
-     * @param text  状态文字
-     * @param color 状态文字颜色
-     * @param strip 1px 状态条贴图
-     * @param lamp  状态灯贴图
-     */
-    private record Status(String text, int color, ResourceLocation strip,
-            ResourceLocation lamp) {
     }
 
     /**
@@ -2053,50 +1627,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param machine 机器视图
      * @return 状态展示
      */
-    private Status statusOf(FactorySnapshotBuilder.MachineView machine) {
-        return switch (machine.totalState()) {
-            case OFFLINE -> offlineStatus(machine);
-            case UNCONFIGURED -> new Status(machine.lineNames().isEmpty() ? "未编线" : "无规则",
-                    this.theme.statusIdle(), FactoryGuiTextures.STATUS_STRIP_IDLE,
-                    FactoryGuiTextures.STATUS_LAMP_IDLE);
-            case RUNNING -> new Status("运行", this.theme.statusRun(),
-                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
-            case IDLE -> new Status("空闲", this.theme.statusIdle(),
-                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
-            case WAITING_MATERIAL -> new Status("仓库缺料", this.theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
-            case INPUT_OK -> new Status("可输入", this.theme.statusRun(),
-                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
-            case INPUT_BLOCKED -> new Status("输入堵塞",
-                    this.theme.statusWarn(), FactoryGuiTextures.STATUS_STRIP_WARN,
-                    FactoryGuiTextures.STATUS_LAMP_WARN);
-            default -> new Status("未知", this.theme.statusIdle(),
-                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
-        };
-    }
-
-    /**
-     * 离线机器的细状态：失联 / 未载 / 未探测。
-     *
-     * <p>失联优先于健康度：方块被拆掉时健康度可能仍是旧的 PRESENT，不能显示成正常；
-     * 未载用警告色而非错误色，因为区块卸载是临时状态。</p>
-     *
-     * @param machine 机器视图
-     * @return 状态展示
-     */
-    private Status offlineStatus(FactorySnapshotBuilder.MachineView machine) {
-        if (machine.machineMissing()) {
-            return new Status("失联", this.theme.error(),
-                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
-        }
-        return switch (machine.health()) {
-            case MISSING, NO_DIMENSION -> new Status("失联", this.theme.error(),
-                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
-            case UNLOADED -> new Status("未载", this.theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
-            default -> new Status("未探测", this.theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
-        };
+    private FactoryStatus statusOf(FactorySnapshotBuilder.MachineView machine) {
+        return FactoryStatus.of(machine, this.theme);
     }
 
     /**
@@ -2227,7 +1759,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                     false);
         }
 
-        if (this.activeTab == TAB_STORAGE) {
+        if (this.state.activeTab == TAB_STORAGE) {
             drawStorageHover(graphics, mouseX, mouseY);
             drawStorageEntries(graphics);
             // 描边放在图标之后：流体贴图是不透明的，画在下面会被完全盖住。
@@ -2312,20 +1844,20 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     private void drawStorageEntries(GuiGraphics graphics) {
         FactoryLayout l = this.layout;
         // 同步中/离线由顶栏统计显示；仓库为空或搜索无匹配时也不在槽位区域放文字。
-        if (!this.storageReceived || !this.storageOnline) {
+        if (!this.state.storageReceived || !this.state.storageOnline) {
             return;
         }
-        if (this.storageRepo.all().isEmpty() || this.filteredStorageEntries.isEmpty()) {
+        if (this.state.storageRepo.all().isEmpty() || this.state.filteredStorageEntries.isEmpty()) {
             return;
         }
 
         for (int row = 0; row < l.gridRows; row++) {
             for (int col = 0; col < FactoryLayout.GRID_COLS; col++) {
-                int index = (this.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
-                if (index >= this.filteredStorageEntries.size()) {
+                int index = (this.state.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
+                if (index >= this.state.filteredStorageEntries.size()) {
                     return;
                 }
-                FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
+                FactoryStorageS2C.Entry entry = this.state.filteredStorageEntries.get(index);
                 int x = l.gridX + col * FactoryLayout.CELL;
                 int y = l.gridY + row * FactoryLayout.CELL;
                 drawStorageEntry(graphics, entry, x, y);
@@ -2384,7 +1916,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int sortButton = isSortButtonAt(mouseX, mouseY);
         if (sortButton >= 0 && this.sortButtons != null) {
             List<Component> lines = this.sortButtons
-                    .tooltipLines(sortButton, this.activeTab == TAB_STORAGE)
+                    .tooltipLines(sortButton, this.state.activeTab == TAB_STORAGE)
                     .stream().map(line -> (Component) Component.literal(line)).toList();
             if (!lines.isEmpty()) {
                 graphics.renderComponentTooltip(this.font, lines, mouseX, mouseY);
@@ -2400,14 +1932,14 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
 
-        if (this.activeTab == TAB_STORAGE
+        if (this.state.activeTab == TAB_STORAGE
                 && mouseX >= l.gridX && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             int col = (mouseX - l.gridX) / FactoryLayout.CELL;
             int row = (mouseY - l.gridY) / FactoryLayout.CELL;
-            int index = (this.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
-            if (index >= 0 && index < this.filteredStorageEntries.size()) {
-                FactoryStorageS2C.Entry entry = this.filteredStorageEntries.get(index);
+            int index = (this.state.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
+            if (index >= 0 && index < this.state.filteredStorageEntries.size()) {
+                FactoryStorageS2C.Entry entry = this.state.filteredStorageEntries.get(index);
                 // 仓库格同样不做自定义摘要：物品走原版 tooltip，流体/能量只保留名称。
                 if (entry.key().kind() == ResourceKind.ITEM) {
                     graphics.renderTooltip(this.font, iconStack(entry.key()), mouseX, mouseY);
@@ -2420,13 +1952,13 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
 
-        if (this.activeTab == TAB_MACHINES
+        if (this.state.activeTab == TAB_MACHINES
                 && mouseX >= l.gridX && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             int row = (mouseY - l.gridY) / FactoryLayout.ROW_H;
-            int index = this.machineFirstRow + row;
-            if (row < machineRowsVisible() && index >= 0 && index < this.filteredMachines.size()) {
-                FactorySnapshotBuilder.MachineView machine = this.filteredMachines.get(index);
+            int index = this.state.machineFirstRow + row;
+            if (row < machineRowsVisible() && index >= 0 && index < this.state.filteredMachines.size()) {
+                FactorySnapshotBuilder.MachineView machine = this.state.filteredMachines.get(index);
                 drawMachineTooltip(graphics, machine, mouseX, mouseY);
                 return;
             }
@@ -2442,7 +1974,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            TableHit hit = tableHitAt(mouseY);
+            FactoryScreenGeometry.TableHit hit = tableHitAt(mouseY);
             if (hit == null) {
                 return;
             }
@@ -2500,9 +2032,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @param mouseY 屏幕 y
      * @return 命中为 {@code true}
      */
-    private boolean inExpandButton(TableHit hit, double mouseX, double mouseY) {
-        return inside(mouseX, mouseY, expandButtonX(), hit.y() + 6,
-                FactoryLayout.EXPAND_BUTTON, FactoryLayout.EXPAND_BUTTON);
+    private boolean inExpandButton(FactoryScreenGeometry.TableHit hit,
+            double mouseX, double mouseY) {
+        return this.geometry.inExpandButton(hit, mouseX, mouseY);
     }
 
     /**
@@ -2514,13 +2046,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 卡片；没展开或没命中为 {@code null}
      */
     @Nullable
-    private FactoryIoDetailLayout.Card detailCardAt(TableHit hit, double mouseX, double mouseY) {
-        if (hit.detailHeight() <= 0) {
-            return null;
-        }
-        FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(this.layout, hit.machine(),
-                hit.y() + FactoryLayout.ROW_H, hit.detailHeight(), this.font, this.ioScroll);
-        return FactoryIoDetailLayout.cardAt(detail, mouseX, mouseY);
+    private FactoryIoDetailLayout.Card detailCardAt(FactoryScreenGeometry.TableHit hit,
+            double mouseX, double mouseY) {
+        return this.geometry.detailCardAt(hit, mouseX, mouseY);
     }
 
     /**
@@ -2643,8 +2171,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      * @return 命中为 {@code true}
      */
     private boolean inColumn(FactoryLayout layout, int column, double mouseX) {
-        return mouseX >= layout.columnX(column)
-                && mouseX < layout.columnX(column) + layout.columnW(column);
+        return this.geometry.inColumn(layout, column, mouseX);
     }
 
     /**
@@ -2745,17 +2272,17 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         int width = FactoryLayout.GRID_COLS * FactoryLayout.CELL;
         int rows = machineRowsVisible();
         for (int i = 0; i < rows; i++) {
-            int index = this.machineFirstRow + i;
-            if (index >= this.filteredMachines.size()) {
+            int index = this.state.machineFirstRow + i;
+            if (index >= this.state.filteredMachines.size()) {
                 break;
             }
-            FactorySnapshotBuilder.MachineView machine = this.filteredMachines.get(index);
+            FactorySnapshotBuilder.MachineView machine = this.state.filteredMachines.get(index);
             int y = l.gridY + i * FactoryLayout.ROW_H;
             drawMachineCard(graphics, machine, l.gridX, y, width);
         }
-        if (this.machines.isEmpty()) {
+        if (this.state.machines.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有机器");
-        } else if (this.filteredMachines.isEmpty()) {
+        } else if (this.state.filteredMachines.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有匹配");
         }
     }
@@ -2801,7 +2328,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 cardX + 2, cardY + 2, cardW, cardH);
         FactoryNineSlice.machineCard(graphics, cardX, cardY, cardW, cardH);
 
-        Status status = statusOf(machine);
+        FactoryStatus status = statusOf(machine);
         FactoryNineSlice.fill(graphics, status.strip(), cardX + 1, cardY + 2,
                 2, cardH - 4);
 
@@ -2935,7 +2462,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Nullable
     FactoryStorageS2C.Entry storageEntryAt(double mouseX, double mouseY) {
         FactoryLayout l = this.layout;
-        if (this.activeTab != TAB_STORAGE
+        if (this.state.activeTab != TAB_STORAGE
                 || mouseX < l.gridX
                 || mouseX >= l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 || mouseY < l.gridY
@@ -2944,9 +2471,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         int col = (int) ((mouseX - l.gridX) / FactoryLayout.CELL);
         int row = (int) ((mouseY - l.gridY) / FactoryLayout.CELL);
-        int index = (this.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
-        return index >= 0 && index < this.filteredStorageEntries.size()
-                ? this.filteredStorageEntries.get(index)
+        int index = (this.state.storageFirstRow + row) * FactoryLayout.GRID_COLS + col;
+        return index >= 0 && index < this.state.filteredStorageEntries.size()
+                ? this.state.filteredStorageEntries.get(index)
                 : null;
     }
 
@@ -3013,7 +2540,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         }
         if (sortButton >= 0) {
             if (this.sortButtons != null && (button == 0 || button == 1)) {
-                this.sortButtons.click(sortButton, this.activeTab == TAB_STORAGE, button == 1);
+                this.sortButtons.click(sortButton, this.state.activeTab == TAB_STORAGE, button == 1);
             }
             return true;
         }
@@ -3034,7 +2561,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (onTabBar) {
             int tab = Math.min(FactoryLayout.TAB_COUNT - 1,
                     (int) ((mouseX - l.rightX) / tabWidth));
-            this.activeTab = tab;
+            this.state.activeTab = tab;
             if (tab == TAB_STORAGE) {
                 requestStorage();
             }
@@ -3063,7 +2590,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (handleFactoryRuleStripMouse(mouseX, mouseY, button)) {
             return true;
         }
-        TableHit ioHit = tableHitAt(mouseY);
+        FactoryScreenGeometry.TableHit ioHit = tableHitAt(mouseY);
         if (ioHit != null && ioHit.detailHeight() > 0
                 && mouseY >= ioHit.y() + FactoryLayout.ROW_H) {
             FactoryIoDetailLayout.Card card = detailCardAt(ioHit, mouseX, mouseY);
@@ -3072,7 +2599,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 return true;
             }
         }
-        if (this.activeTab == TAB_STORAGE
+        if (this.state.activeTab == TAB_STORAGE
                 && mouseX >= l.gridX
                 && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY
@@ -3188,7 +2715,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
         if (buttons == null) {
             return;
         }
-        boolean storageTab = this.activeTab == TAB_STORAGE;
+        boolean storageTab = this.state.activeTab == TAB_STORAGE;
         int hovered = isSortButtonAt(this.renderMouseX, this.renderMouseY);
         for (int index = 0; index < FactoryLayout.SORT_BTN_COUNT; index++) {
             int x = l.sortButtonX(index);
@@ -3274,9 +2801,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
     @Override
     public void removed() {
         if (this.searchBox != null) {
-            rememberedSearch = this.searchBox.getValue();
+            FactoryScreenState.rememberedSearch = this.searchBox.getValue();
         }
-        rememberedLineId = this.selectedLineId;
+        FactoryScreenState.rememberedLineId = this.state.selectedLineId;
         if (this.editController != null) {
             this.editController.closeAll();
         }
@@ -3342,7 +2869,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             return true;
         }
         FactoryLayout l = this.layout;
-        if (this.activeTab == TAB_STORAGE
+        if (this.state.activeTab == TAB_STORAGE
                 && hasShiftDown()
                 && mouseX >= l.gridX
                 && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
@@ -3361,7 +2888,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             if (max > 0) {
                 // 滚轮只移动可视窗口，不改数据；max 为 0 时把事件交回原版，避免无意义消费。
                 int step = scrollY > 0 ? -1 : 1;
-                this.firstRow = Math.max(0, Math.min(max, this.firstRow + step));
+                this.state.firstRow = Math.max(0, Math.min(max, this.state.firstRow + step));
                 return true;
             }
         }
@@ -3370,18 +2897,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
                 && mouseY >= l.gridY
                 && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             int step = scrollY > 0 ? -1 : 1;
-            if (this.activeTab == TAB_STORAGE) {
+            if (this.state.activeTab == TAB_STORAGE) {
                 int max = maxStorageFirstRow();
                 if (max > 0) {
-                    this.storageFirstRow = Math.max(0, Math.min(max,
-                            this.storageFirstRow + step));
+                    this.state.storageFirstRow = Math.max(0, Math.min(max,
+                            this.state.storageFirstRow + step));
                     return true;
                 }
             } else {
                 int max = maxMachineFirstRow();
                 if (max > 0) {
-                    this.machineFirstRow = Math.max(0, Math.min(max,
-                            this.machineFirstRow + step));
+                    this.state.machineFirstRow = Math.max(0, Math.min(max,
+                            this.state.machineFirstRow + step));
                     return true;
                 }
             }
@@ -3437,7 +2964,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
 
-        if (this.activeTab == TAB_STORAGE
+        if (this.state.activeTab == TAB_STORAGE
                 && mouseX >= l.gridX
                 && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY
@@ -3453,22 +2980,22 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
             }
         }
 
-        if (this.activeTab == TAB_MACHINES
+        if (this.state.activeTab == TAB_MACHINES
                 && mouseX >= l.gridX
                 && mouseX < l.gridX + FactoryLayout.GRID_COLS * FactoryLayout.CELL
                 && mouseY >= l.gridY
                 && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
-            int index = this.machineFirstRow + row;
+            int index = this.state.machineFirstRow + row;
             if (row < machineRowsVisible()
-                    && index >= 0 && index < this.filteredMachines.size()) {
+                    && index >= 0 && index < this.state.filteredMachines.size()) {
                 int cardY = l.gridY + row * FactoryLayout.ROW_H;
                 int iconX = l.gridX + 6;
                 int iconY = cardY + 3;
                 if (inside(mouseX, mouseY, iconX, iconY,
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
                     FactorySnapshotBuilder.MachineView machine =
-                            this.filteredMachines.get(index);
+                            this.state.filteredMachines.get(index);
                     ItemStack stack = FactoryLabels.blockStack(machine.blockId());
                     if (!stack.isEmpty()) {
                         return new JeiTarget(ResourceKind.ITEM, stack,
@@ -3481,7 +3008,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            TableHit hit = tableHitAt(mouseY);
+            FactoryScreenGeometry.TableHit hit = tableHitAt(mouseY);
             if (hit != null) {
                 FactorySnapshotBuilder.MachineView machine = hit.machine();
                 int y = hit.y();
@@ -3619,8 +3146,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
      */
     private static boolean inside(double mouseX, double mouseY,
             int x, int y, int width, int height) {
-        return mouseX >= x && mouseX < x + width
-                && mouseY >= y && mouseY < y + height;
+        return FactoryScreenGeometry.inside(mouseX, mouseY, x, y, width, height);
     }
 
     /**
