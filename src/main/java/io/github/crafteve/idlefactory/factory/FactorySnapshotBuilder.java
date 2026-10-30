@@ -111,6 +111,9 @@ public final class FactorySnapshotBuilder {
      * @param machineMissing 方块是否已经消失（观测事实）
      * @param health    观测结论
      * @param blockId   观测到的方块 id；未知时 {@code null}
+     * @param groupBlockId 分组用的方块 id：{@code blockId} 为空时回退到「最后一次看到的方块」，
+     *                  让区块卸载不会把界面上的组拆散
+     * @param beTypeId  方块实体类型 id；没有方块实体时为 {@code null}
      * @param presence  无向能力
      * @param lineNames 挂在哪些产线上
      * @param lineIds   挂在哪些产线上（与 lineNames 同序，界面按 id 筛选用）
@@ -130,7 +133,8 @@ public final class FactorySnapshotBuilder {
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
     public record MachineView(MachineRef ref, boolean machineMissing, Health health,
-            @Nullable ResourceLocation blockId, Set<ResourceKind> presence,
+            @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
+            @Nullable ResourceLocation beTypeId, Set<ResourceKind> presence,
             List<String> lineNames, List<UUID> lineIds, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
             List<Long> inputRates, List<Long> outputRates,
@@ -321,10 +325,16 @@ public final class FactorySnapshotBuilder {
             IoResult.Reason outputReason = stats == null
                     ? IoResult.Reason.OK : stats.outputReason();
 
+            // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」，
+            // 不做可用性判断；可用性仍然读 health。
+            ResourceLocation groupBlockId = observation.blockId() != null
+                    ? observation.blockId() : observation.lastBlockId();
             views.add(new MachineView(ref,
                     factory.live().isMachineMissing(ref.id()),
                     observation.health(),
                     observation.blockId(),
+                    groupBlockId,
+                    observation.beTypeId(),
                     observation.presence(),
                     FactoryRefs.lineNamesOf(factory, ref.id()),
                     FactoryRefs.lineIdsOf(factory, ref.id()),

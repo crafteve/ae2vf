@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.factory.line;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -9,6 +10,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 /**
  * 被动产线的写操作层：指令和界面共用。
@@ -24,6 +26,8 @@ public final class LineActions {
     public static final int MAX_LINES = 64;
     /** 产线名最大字符数；命令按空格分词，所以名字里不能有空白。 */
     public static final int MAX_NAME_LENGTH = 32;
+    /** 一组机器最多多少台；和机器表上限一致。 */
+    public static final int MAX_STACK = 512;
 
     private LineActions() {
         // 纯静态动作层
@@ -267,6 +271,164 @@ public final class LineActions {
         markDirty();
         return Result.ok("已把机器 [" + machineFound.get().ref().shortId() + "] 移出产线 "
                 + line.name() + " · 机器和规则留在机器库", lineId);
+    }
+
+    /**
+     * 把一组机器的台数改到目标值。
+     *
+     * <p>组是按「同产线、同方块、同方块实体、同规则」现算出来的，不存盘。扩容从空闲池里
+     * 按机器库登记顺序取；新成员没有规则时，会把锚点的规则整套套给它，保证加入后仍然是同组。
+     * 缩容按产线登记顺序倒着移（等于撤销最近一次扩容），并且永远保留锚点。</p>
+     *
+     * <p>服务端夹紧目标值：客户端只传「想变成几台」，实际数量由这里决定。池子不够就按
+     * 实际加到的数量回执，不报错——这是常态，不是失败。</p>
+     *
+     * @param factory    工厂
+     * @param lineId     产线 id
+     * @param anchorId   组里任意一台机器（界面传锚点）
+     * @param targetCount 目标台数；小于 1 按 1 算，大于 {@link #MAX_STACK} 按上限算
+     * @return 结果；回执里是实际台数
+     */
+    public static Result resizeStack(Factory factory, UUID lineId, UUID anchorId, int targetCount) {
+        Optional<PassiveLine> lineFound = factory.config().lines().byId(lineId);
+        if (lineFound.isEmpty()) {
+            return Result.err("找不到产线");
+        }
+        PassiveLine line = lineFound.get();
+        Optional<Machine> anchorFound = factory.config().machines().byId(anchorId);
+        if (anchorFound.isEmpty()) {
+            return Result.err("找不到机器");
+        }
+        if (!line.containsMachine(anchorId)) {
+            return Result.err("这台机器不在当前产线里");
+        }
+        ObservationService observations = observations();
+        List<UUID> members = FactoryRefs.stackMembers(factory, observations, lineId, anchorId);
+        if (members.isEmpty()) {
+            return Result.err("找不到这一组机器");
+        }
+        int current = members.size();
+        int target = Math.max(1, Math.min(MAX_STACK, targetCount));
+        if (target == current) {
+            return Result.ok("这一组已经是 " + current + " 台", lineId);
+        }
+
+        Machine anchor = anchorFound.get();
+        int changed;
+        if (target > current) {
+            changed = grow(factory, line, anchor, observations, target - current);
+        } else {
+            changed = shrink(factory, line, anchorId, members, current - target);
+        }
+        wakeLine(lineId);
+        markDirty();
+
+        int actual = current + changed;
+        if (target > current && actual < target) {
+            return Result.ok("已扩到 " + actual + " 台 · 空闲的同类机器不够了", lineId);
+        }
+        return Result.ok((target > current ? "已扩到 " : "已缩到 ") + actual + " 台", lineId);
+    }
+
+    /**
+     * 把一组机器整体移出产线。
+     *
+     * <p>机器和规则都留在机器库；移出后它们会变成「空闲组」，可以再被别的产线用。</p>
+     *
+     * @param factory  工厂
+     * @param lineId   产线 id
+     * @param anchorId 组里任意一台机器
+     * @return 结果；回执里是实际移出的台数
+     */
+    public static Result removeStack(Factory factory, UUID lineId, UUID anchorId) {
+        Optional<PassiveLine> lineFound = factory.config().lines().byId(lineId);
+        if (lineFound.isEmpty()) {
+            return Result.err("找不到产线");
+        }
+        PassiveLine line = lineFound.get();
+        List<UUID> members = FactoryRefs.stackMembers(factory, observations(), lineId, anchorId);
+        if (members.isEmpty()) {
+            return Result.err("找不到这一组机器");
+        }
+        int removed = 0;
+        for (UUID memberId : members) {
+            if (line.removeMachine(memberId)) {
+                forgetRoutes(lineId, memberId);
+                removed++;
+            }
+        }
+        wakeLine(lineId);
+        markDirty();
+        return Result.ok("已把 " + removed + " 台移出产线 " + line.name()
+                + " · 机器和规则留在机器库", lineId);
+    }
+
+    /**
+     * 扩容：从池子里取机器加进产线，并给新成员套用锚点的规则。
+     *
+     * @param factory      工厂
+     * @param line         产线
+     * @param anchor       锚点机器，规则来源
+     * @param observations 观测服务，可为 {@code null}
+     * @param need         需要加几台
+     * @return 实际加进来的台数
+     */
+    private static int grow(Factory factory, PassiveLine line, Machine anchor,
+            @Nullable ObservationService observations, int need) {
+        int added = 0;
+        for (UUID candidateId : FactoryRefs.stackPool(factory, observations, anchor.id())) {
+            if (added >= need) {
+                break;
+            }
+            Optional<Machine> candidateFound = factory.config().machines().byId(candidateId);
+            if (candidateFound.isEmpty() || !line.addMachine(candidateId)) {
+                continue;
+            }
+            // 新成员先套用本组规则，否则它一加入就因为签名不同而分出去。
+            if (!anchor.io().isEmpty()) {
+                candidateFound.get().io().copyFrom(anchor.io());
+            }
+            forgetRoutes(line.id(), candidateId);
+            added++;
+        }
+        return added;
+    }
+
+    /**
+     * 缩容：从产线登记顺序的末尾倒着移出，永远跳过锚点。
+     *
+     * @param factory  工厂
+     * @param line     产线
+     * @param anchorId 锚点机器 id，不会被移出
+     * @param members  当前成员（产线登记顺序）
+     * @param need     需要移出几台
+     * @return 实际移出的台数（负数）
+     */
+    private static int shrink(Factory factory, PassiveLine line, UUID anchorId,
+            List<UUID> members, int need) {
+        int removed = 0;
+        for (int i = members.size() - 1; i >= 0 && removed < need; i--) {
+            UUID memberId = members.get(i);
+            if (memberId.equals(anchorId)) {
+                continue;
+            }
+            if (line.removeMachine(memberId)) {
+                forgetRoutes(line.id(), memberId);
+                removed++;
+            }
+        }
+        return -removed;
+    }
+
+    /**
+     * 当前观测服务；服务端还没启动时是 {@code null}，分组会退化成「只看规则」。
+     *
+     * @return 观测服务或 {@code null}
+     */
+    @Nullable
+    private static ObservationService observations() {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        return runtime == null ? null : runtime.observations();
     }
 
     // ------------------------------------------------------------------

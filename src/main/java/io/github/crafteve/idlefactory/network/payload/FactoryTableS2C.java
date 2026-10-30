@@ -166,6 +166,8 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeBoolean(machine.machineMissing());
         buf.writeByte(machine.health().ordinal());
         writeNullableResourceLocation(buf, machine.blockId());
+        writeNullableResourceLocation(buf, machine.groupBlockId());
+        writeNullableResourceLocation(buf, machine.beTypeId());
         buf.writeByte(kindMask(machine.presence()));
         buf.writeVarInt(machine.lineNames().size());
         for (String name : machine.lineNames()) {
@@ -198,6 +200,8 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean machineMissing = buf.readBoolean();
         Health health = readEnum(buf, Health.values(), "health");
         ResourceLocation blockId = readNullableResourceLocation(buf);
+        ResourceLocation groupBlockId = readNullableResourceLocation(buf);
+        ResourceLocation beTypeId = readNullableResourceLocation(buf);
         Set<ResourceKind> presence = readKinds(buf.readUnsignedByte());
         int lineCount = readCount(buf, MAX_LINE_NAMES, "line names");
         List<String> lineNames = new ArrayList<>(lineCount);
@@ -227,9 +231,9 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
         return new FactorySnapshotBuilder.MachineView(ref, machineMissing, health, blockId,
-                presence, lineNames, lineIds, ruleCount, inputs, outputs, inputRates, outputRates,
-                sinceMoveTicks, blockedTicks, workState, inputFull, sinceInputMoveTicks,
-                inputReason, outputReason, inputReasons, outputReasons);
+                groupBlockId, beTypeId, presence, lineNames, lineIds, ruleCount, inputs, outputs,
+                inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,
+                sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons);
     }
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,

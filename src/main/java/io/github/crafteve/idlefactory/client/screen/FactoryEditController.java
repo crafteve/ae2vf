@@ -760,8 +760,22 @@ public final class FactoryEditController implements FactoryScreenInteraction {
 
     private void sendLineAction(FactoryLineActionC2S.Action action, @Nullable UUID lineId,
             @Nullable UUID machineId, @Nullable String name) {
+        sendLineAction(action, lineId, machineId, name, 0);
+    }
+
+    /**
+     * 发产线动作；整组改台数用这个重载带目标数量。
+     *
+     * @param action    动作
+     * @param lineId    产线 id，可为 {@code null}
+     * @param machineId 机器 id，可为 {@code null}
+     * @param name      产线名，可为 {@code null}
+     * @param count     目标台数；非 {@code RESIZE_STACK} 动作传 0
+     */
+    private void sendLineAction(FactoryLineActionC2S.Action action, @Nullable UUID lineId,
+            @Nullable UUID machineId, @Nullable String name, int count) {
         PacketDistributor.sendToServer(new FactoryLineActionC2S(
-                this.screen.getMenu().containerId, action, lineId, machineId, name));
+                this.screen.getMenu().containerId, action, lineId, machineId, name, count));
     }
 
     private void drawFeedback(GuiGraphics graphics) {

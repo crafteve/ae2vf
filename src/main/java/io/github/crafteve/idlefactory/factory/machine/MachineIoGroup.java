@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory.machine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -46,6 +47,50 @@ public final class MachineIoGroup {
     /** 是否有任何规则。 */
     public boolean isEmpty() {
         return this.inputs.isEmpty() && this.outputs.isEmpty();
+    }
+
+    /**
+     * 这台机器规则的签名：两侧规则的集合。
+     *
+     * <p>签名用来判断两台机器能不能并成界面上的同一组。这里用集合而不是「排序后的列表」，
+     * 是因为集合相等与规则登记顺序无关；同时 {@code Set.hashCode} 能直接当分组键，
+     * 不需要再给 {@code ResourceKey} 定义一套排序键（物品组件没有天然顺序，按 hash 排会碰撞）。
+     * 同一侧同一资源只允许一条规则，所以集合不会丢掉规则数量。</p>
+     *
+     * @return 签名；没有规则时两侧都是空集
+     */
+    public Signature signature() {
+        return new Signature(Set.copyOf(this.inputs), Set.copyOf(this.outputs));
+    }
+
+    /**
+     * 把另一台机器的规则整体照抄过来，先清空自己。
+     *
+     * <p>扩容时用：新成员加入一个已经有规则的组，先把它套成本组锚点的规则，才能继续算同组。
+     * 调用方负责决定要不要复制，本方法不做任何判断。</p>
+     *
+     * @param source 源机器规则
+     */
+    public void copyFrom(MachineIoGroup source) {
+        this.inputs.clear();
+        this.inputs.addAll(source.inputs);
+        this.outputs.clear();
+        this.outputs.addAll(source.outputs);
+    }
+
+    /**
+     * 一组 IO 规则的签名。
+     *
+     * <p>只活在内存里：不落盘、不进网络包。客户端拿到快照后会从两侧规则列表现场构造。</p>
+     *
+     * @param inputs  输入规则集合
+     * @param outputs 输出规则集合
+     */
+    public record Signature(Set<ResourceSpec> inputs, Set<ResourceSpec> outputs) {
+        public Signature {
+            inputs = Set.copyOf(inputs);
+            outputs = Set.copyOf(outputs);
+        }
     }
 
     /**

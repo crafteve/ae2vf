@@ -55,6 +55,15 @@ public final class Observation {
     private long nextWorkProbeTick;
     @Nullable
     private ResourceLocation blockId;
+    /**
+     * 最后一次真的看到过的方块 id。
+     *
+     * <p>和 {@link #blockId} 分开是有意的：{@code blockId} 在未加载/维度不存在时必须是
+     * {@code null}，因为面表过期判断靠「方块 id 变没变」，保留旧值会让重载后继续用旧面表。
+     * 这个字段只在探到真方块时更新，专门给界面分组用——区块卸载时组不该散架。</p>
+     */
+    @Nullable
+    private ResourceLocation lastBlockId;
     @Nullable
     private ResourceLocation beTypeId;
     private final EnumSet<ResourceKind> presence = EnumSet.noneOf(ResourceKind.class);
@@ -124,6 +133,19 @@ public final class Observation {
         return this.blockId;
     }
 
+    /**
+     * 最后一次探到的方块 id，未加载时保留旧值。
+     *
+     * <p>只给界面分组与显示兜底用，<b>不参与任何执行判断</b>；判断「机器还在不在」一律看
+     * {@link #health()} 和 {@link #blockId()}。</p>
+     *
+     * @return 方块 id；从没探到过时为 {@code null}
+     */
+    @Nullable
+    public ResourceLocation lastBlockId() {
+        return this.lastBlockId;
+    }
+
     /** 观测到的方块实体类型 id；没有方块实体时为 {@code null}。 */
     @Nullable
     public ResourceLocation beTypeId() {
@@ -185,6 +207,11 @@ public final class Observation {
 
         this.health = result.health();
         this.blockId = result.blockId();
+        if (result.blockId() != null) {
+            // 只有真的看到方块才刷新「上次是什么」；未加载/维度不存在时保留，
+            // 否则玩家走远一步，界面上的组就会全部散成「未知」。
+            this.lastBlockId = result.blockId();
+        }
         this.beTypeId = result.beTypeId();
         this.presence.clear();
         this.presence.addAll(result.kinds());
