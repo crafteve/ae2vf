@@ -52,19 +52,19 @@ final class FactoryTableRender {
             return;
         }
 
-        List<FactorySnapshotBuilder.MachineView> table = state.tableMachines();
-        int total = table.size();
+        List<FactoryMachineStack> table = state.tableStacks;
+        int total = 0;
         int shown = 0;
         int y = l.rowTop;
         // 最后一行是“新增机器”空槽；selectedLineId 非空时始终存在。
-        for (int i = state.firstRow; i <= total; i++) {
+        for (int i = state.firstRow; i <= table.size(); i++) {
             if (y + FactoryLayout.ROW_H > l.footerY) {
                 break;
             }
-            if (i < total) {
-                FactorySnapshotBuilder.MachineView machine = table.get(i);
-                int detailHeight = this.context.geometry().detailHeight(machine, y);
-                drawRow(graphics, machine, y, detailHeight);
+            if (i < table.size()) {
+                FactoryMachineStack stack = table.get(i);
+                int detailHeight = this.context.geometry().detailHeight(stack, y);
+                drawRow(graphics, stack, y, detailHeight);
                 y += FactoryLayout.ROW_H + detailHeight;
             } else {
                 drawAddMachineRow(graphics, y);
@@ -76,16 +76,19 @@ final class FactoryTableRender {
         int ready = 0;
         int unloaded = 0;
         int missing = 0;
-        for (FactorySnapshotBuilder.MachineView machine : table) {
-            if (machine.machineMissing()) {
-                missing++;
-            } else {
-                switch (machine.health()) {
-                    case PRESENT -> ready++;
-                    case UNLOADED -> unloaded++;
-                    case MISSING, NO_DIMENSION -> missing++;
-                    default -> {
-                        // UNKNOWN 不计
+        for (FactoryMachineStack stack : table) {
+            total += stack.count();
+            for (FactorySnapshotBuilder.MachineView machine : stack.members()) {
+                if (machine.machineMissing()) {
+                    missing++;
+                } else {
+                    switch (machine.health()) {
+                        case PRESENT -> ready++;
+                        case UNLOADED -> unloaded++;
+                        case MISSING, NO_DIMENSION -> missing++;
+                        default -> {
+                            // UNKNOWN 不计
+                        }
                     }
                 }
             }
@@ -120,20 +123,24 @@ final class FactoryTableRender {
     }
 
     /**
-     * 画一台机器的基础行。
+     * 画一组机器的基础行。
+     *
+     * <p>图标、名字、产线名取锚点；状态和速率是整组聚合；规则条用整组累加速率。多台时在图标
+     * 右下角画数量徽标，样式跟原版物品数量一致。</p>
      *
      * @param graphics     画布
-     * @param machine      机器视图
+     * @param stack        机器组
      * @param y            行顶部
      * @param detailHeight 展开区高度；0 表示未展开
      */
-    private void drawRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            int y, int detailHeight) {
+    private void drawRow(GuiGraphics graphics, FactoryMachineStack stack, int y,
+            int detailHeight) {
         FactoryLayout l = this.context.layout();
         FactoryScreenState state = this.context.state();
         FactoryScreenInteraction interaction = this.context.interaction();
+        FactorySnapshotBuilder.MachineView anchor = stack.anchor();
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
-        FactoryStatus status = FactoryStatus.of(machine, this.context.theme());
+        FactoryStatus status = stack.status(this.context.theme());
         String idleLabel = state.lineIdleLabel();
 
         FactoryNineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
@@ -145,33 +152,34 @@ final class FactoryTableRender {
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
         FactoryNineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
                 FactoryLayout.CELL);
-        ItemStack icon = machine.machineMissing()
+        ItemStack icon = anchor.machineMissing()
                 ? new ItemStack(Items.BARRIER)
-                : FactoryLabels.blockStack(machine.blockId());
+                : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
+        drawCountBadge(graphics, stack, iconX, y + 5);
 
-        String name = machine.machineMissing()
-                ? "已失联" : FactoryLabels.blockName(machine.blockId());
+        String name = anchor.machineMissing()
+                ? "已失联" : FactoryLabels.blockName(anchor.blockId());
         int nameWidth = l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 10;
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(name, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 4,
                 this.context.theme().textPrimary(), false);
-        String lineName = machine.lineNames().isEmpty()
+        String lineName = anchor.lineNames().isEmpty()
                 ? "未编线"
-                : "产线 " + String.join("/", machine.lineNames());
+                : "产线 " + String.join("/", anchor.lineNames());
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(lineName, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 14,
-                machine.lineNames().isEmpty()
+                anchor.lineNames().isEmpty()
                         ? this.context.theme().textDim() : this.context.theme().textValue(),
                 false);
 
         int stateX = l.columnX(FactoryLayout.COL_STATE) + 4;
         FactoryNineSlice.icon(graphics, status.lamp(), stateX, textY + 2,
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
-        String statusLabel = status.text();
+        String statusLabel = stack.statusText(this.context.theme());
         int statusWidth = l.columnW(FactoryLayout.COL_STATE) - 14;
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(statusLabel, statusWidth),
@@ -181,32 +189,52 @@ final class FactoryTableRender {
         if (l.hasColumn(FactoryLayout.COL_INPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_INPUT) + 2;
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.context.font(),
-                    machine.inputs(), machine.inputRates(), stripX, y + 4,
+                    stack.inputs(), stack.inputRates(), stripX, y + 4,
                     l.columnW(FactoryLayout.COL_INPUT) - 4, true);
             FactoryRuleStrip.draw(graphics, this.context.font(), this.context.theme(), strip,
-                    machine.inputs(), machine.inputRates(), machine.inputReasons(),
+                    stack.inputs(), stack.inputRates(), anchor.inputReasons(),
                     this.context.mouseX(), this.context.mouseY(), draggingResource,
                     idleLabel != null);
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.context.font(),
-                    machine.outputs(), machine.outputRates(), stripX, y + 4,
+                    stack.outputs(), stack.outputRates(), stripX, y + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             FactoryRuleStrip.draw(graphics, this.context.font(), this.context.theme(), strip,
-                    machine.outputs(), machine.outputRates(), machine.outputReasons(),
+                    stack.outputs(), stack.outputRates(), anchor.outputReasons(),
                     this.context.mouseX(), this.context.mouseY(), draggingResource,
                     idleLabel != null);
         }
-        drawRowActions(graphics, y, this.context.geometry().isOpen(machine));
+        drawRowActions(graphics, y, this.context.geometry().isOpen(stack));
         if (detailHeight > 0) {
-            FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, machine,
+            FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, anchor,
                     y + FactoryLayout.ROW_H, detailHeight, this.context.font(),
                     state.ioScroll);
             FactoryIoDetailRender.draw(graphics, this.context.font(), this.context.theme(), l,
-                    machine, detail, this.context.mouseX(), this.context.mouseY(),
+                    anchor, detail, this.context.mouseX(), this.context.mouseY(),
                     draggingResource, idleLabel);
         }
+    }
+
+    /**
+     * 在图标右下角画整组台数，样式跟原版物品数量一致：白字、带阴影、右下对齐。
+     *
+     * @param graphics 画布
+     * @param stack    机器组
+     * @param iconX    图标左边缘
+     * @param iconY    图标上边缘
+     */
+    private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int iconX,
+            int iconY) {
+        if (!stack.stacked()) {
+            return;
+        }
+        String label = "×" + stack.count();
+        int textWidth = this.context.font().width(label);
+        graphics.drawString(this.context.font(), label,
+                iconX + FactoryLayout.CELL - 2 - textWidth, iconY + FactoryLayout.CELL - 8,
+                0xFFFFFFFF, true);
     }
 
     /**

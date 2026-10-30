@@ -62,7 +62,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
 
     /** 正在拖拽的机器；按下即记录，超过阈值才算拖拽。 */
     @Nullable
-    private FactorySnapshotBuilder.MachineView dragMachine;
+    private FactoryMachineStack dragStack;
     private boolean dragFromLibrary;
     private boolean dragActive;
     private double dragStartX;
@@ -80,7 +80,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     private boolean pendingStorageShift;
     /** 从 IO 规则卡拖出的规则；用于拖回仓库删除。 */
     @Nullable
-    private FactorySnapshotBuilder.MachineView dragRuleMachine;
+    private FactoryMachineStack dragRuleStack;
     @Nullable
     private IoSide dragRuleSide;
     @Nullable
@@ -151,35 +151,41 @@ public final class FactoryEditController implements FactoryScreenInteraction {
             this.nameDialog.close();
             this.confirmDialog.close();
         }
-        if (this.dragMachine != null) {
-            FactorySnapshotBuilder.MachineView refreshed = null;
-            for (FactorySnapshotBuilder.MachineView machine : this.screen.machines()) {
-                if (machine.ref().equals(this.dragMachine.ref())) {
-                    refreshed = machine;
-                    break;
-                }
-            }
+        if (this.dragStack != null) {
+            FactoryMachineStack refreshed = findStack(this.dragStack.anchorId());
             if (refreshed == null
-                    || (!this.dragFromLibrary && refreshed.lineIds().isEmpty())) {
+                    || (!this.dragFromLibrary && refreshed.anchor().lineIds().isEmpty())) {
                 cancelDrag();
             } else {
-                this.dragMachine = refreshed;
+                this.dragStack = refreshed;
             }
         }
-        if (this.dragRuleMachine != null && this.dragRuleSpec != null) {
-            FactorySnapshotBuilder.MachineView refreshed = null;
-            for (FactorySnapshotBuilder.MachineView machine : this.screen.machines()) {
-                if (machine.ref().equals(this.dragRuleMachine.ref())) {
-                    refreshed = machine;
-                    break;
-                }
-            }
+        if (this.dragRuleStack != null && this.dragRuleSpec != null) {
+            FactoryMachineStack refreshed = findStack(this.dragRuleStack.anchorId());
             if (refreshed == null) {
                 cancelDrag();
             } else {
-                this.dragRuleMachine = refreshed;
+                this.dragRuleStack = refreshed;
             }
         }
+    }
+
+    /**
+     * 按锚点 id 在机器库组行里找当前的组。
+     *
+     * <p>快照刷新后旧的组对象就过期了，拖拽源必须换成新对象，否则拖拽里读的是旧成员列表。</p>
+     *
+     * @param anchorId 锚点机器 id
+     * @return 组；已经被删或重新分组后不在这里时为 {@code null}
+     */
+    @Nullable
+    private FactoryMachineStack findStack(UUID anchorId) {
+        for (FactoryMachineStack stack : this.screen.state.libraryStacks) {
+            if (stack.anchorId().equals(anchorId)) {
+                return stack;
+            }
+        }
+        return null;
     }
 
     /**
@@ -228,24 +234,30 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         return this.dragActive && this.dragResourceKey != null;
     }
 
-    /** 是否正在拖拽机器（超过阈值）。 */
+    /** 是否正在拖拽机器组（超过阈值）。 */
     public boolean isDraggingMachine() {
-        return this.dragActive && this.dragMachine != null;
+        return this.dragActive && this.dragStack != null;
     }
 
-    /** 正在拖拽的机器名；没有拖拽时为空串。 */
+    /** 正在拖拽的机器名；多台时带台数，没有拖拽时为空串。 */
     public String draggedMachineName() {
-        return this.dragMachine == null ? "" : FactoryLabels.blockName(this.dragMachine.blockId());
+        if (this.dragStack == null) {
+            return "";
+        }
+        String name = FactoryLabels.blockName(this.dragStack.blockId());
+        return this.dragStack.stacked()
+                ? name + " ×" + this.dragStack.count() : name;
     }
 
     /**
-     * 这台机器是否是当前拖拽的源；用于把源卡片压暗。
+     * 这台机器是否是当前拖拽源所在组；用于把源卡片压暗。
      *
      * @param ref 机器引用
-     * @return 是拖拽源时为 {@code true}
+     * @return 是拖拽源所在组时为 {@code true}
      */
     public boolean isDragSource(MachineRef ref) {
-        return this.dragMachine != null && this.dragMachine.ref().equals(ref);
+        return this.dragStack != null && this.dragStack.members().stream()
+                .anyMatch(member -> member.ref().equals(ref));
     }
 
     /**
@@ -272,12 +284,12 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         }
         // 机器库卡片 / 左表机器行都可以作为拖拽源；按下先记录，移动超过阈值才变拖拽。
         if (button == 0 && !hasDragSource()) {
-            FactorySnapshotBuilder.MachineView library = this.screen.machineAt(mouseX, mouseY);
+            FactoryMachineStack library = this.screen.libraryStackAt(mouseX, mouseY);
             if (library != null) {
                 beginMachineDrag(library, true, mouseX, mouseY);
                 return true;
             }
-            FactorySnapshotBuilder.MachineView row = this.screen.machineIconAt(mouseX, mouseY);
+            FactoryMachineStack row = this.screen.machineIconAt(mouseX, mouseY);
             if (row != null) {
                 beginMachineDrag(row, false, mouseX, mouseY);
                 return true;
@@ -295,7 +307,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     }
 
     private boolean hasDragSource() {
-        return this.dragMachine != null || this.dragResourceKey != null
+        return this.dragStack != null || this.dragResourceKey != null
                 || this.dragRuleSpec != null;
     }
 
@@ -330,7 +342,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
      * @return 是否消费
      */
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.dragMachine != null && button == 0) {
+        if (this.dragStack != null && button == 0) {
             if (this.dragActive) {
                 finishMachineDrag(mouseX, mouseY);
             }
@@ -361,10 +373,10 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         return false;
     }
 
-    private void beginMachineDrag(FactorySnapshotBuilder.MachineView machine,
-            boolean fromLibrary, double mouseX, double mouseY) {
+    private void beginMachineDrag(FactoryMachineStack stack, boolean fromLibrary,
+            double mouseX, double mouseY) {
         cancelDrag();
-        this.dragMachine = machine;
+        this.dragStack = stack;
         this.dragFromLibrary = fromLibrary;
         beginDragPosition(mouseX, mouseY);
     }
@@ -389,10 +401,11 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     }
 
     private void finishMachineDrag(double mouseX, double mouseY) {
-        FactorySnapshotBuilder.MachineView source = this.dragMachine;
+        FactoryMachineStack source = this.dragStack;
         if (source == null) {
             return;
         }
+        FactorySnapshotBuilder.MachineView anchor = source.anchor();
         if (this.dragFromLibrary) {
             if (this.screen.addMachineRowContains(mouseX, mouseY)) {
                 UUID lineId = this.screen.selectedLineId();
@@ -400,18 +413,27 @@ public final class FactoryEditController implements FactoryScreenInteraction {
                     showFeedback("先选择一条产线", false);
                     return;
                 }
+                // 默认只放一台；Shift 拖全组（P2 接数量，这里先按整组逐台放）。
+                if (Screen.hasShiftDown() && source.stacked()) {
+                    for (FactorySnapshotBuilder.MachineView member : source.members()) {
+                        sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
+                                member.ref().id(), null);
+                    }
+                    return;
+                }
                 sendLineAction(FactoryLineActionC2S.Action.PLACE_MACHINE, lineId,
-                        source.ref().id(), null);
+                        anchor.ref().id(), null);
             }
             return;
         }
         if (this.screen.isInMachineLibrary(mouseX, mouseY)) {
-            if (source.lineIds().isEmpty()) {
+            if (anchor.lineIds().isEmpty()) {
                 showFeedback("这台机器没有产线", false);
                 return;
             }
-            sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE,
-                    source.lineIds().get(0), source.ref().id(), null);
+            // 拖的是组，拖回库也整组移出，跟行尾 × 的语义一致。
+            sendLineAction(FactoryLineActionC2S.Action.REMOVE_STACK,
+                    anchor.lineIds().get(0), source.anchorId(), null);
         }
     }
 
@@ -420,22 +442,22 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         if (target == null || this.dragResourceKey == null) {
             return;
         }
-        FactorySnapshotBuilder.MachineView machine = target.machine();
-        if (machine.lineIds().isEmpty()) {
+        FactoryMachineStack stack = target.stack();
+        if (stack.anchor().lineIds().isEmpty()) {
             showFeedback("这台机器没有产线", false);
             return;
         }
-        sendRuleAction(FactoryRuleActionC2S.Action.ADD, machine, target.side(),
+        sendRuleAction(FactoryRuleActionC2S.Action.ADD, stack, target.side(),
                 this.dragResourceKey, null, MatchMode.EXACT);
     }
 
     private void finishRuleDrag(double mouseX, double mouseY) {
         if (!this.screen.isInStorageGrid(mouseX, mouseY)
-                || this.dragRuleMachine == null || this.dragRuleSide == null
+                || this.dragRuleStack == null || this.dragRuleSide == null
                 || this.dragRuleSpec == null) {
             return;
         }
-        sendRuleAction(FactoryRuleActionC2S.Action.REMOVE, this.dragRuleMachine,
+        sendRuleAction(FactoryRuleActionC2S.Action.REMOVE, this.dragRuleStack,
                 this.dragRuleSide, this.dragRuleSpec.key(), null, null);
     }
 
@@ -461,67 +483,81 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     /**
      * 开始拖一条 IO 规则；松开在仓库网格上时删除它。
      *
-     * @param machine 机器
-     * @param side    输入/输出
-     * @param spec    规则
-     * @param mouseX  屏幕 x
-     * @param mouseY  屏幕 y
+     * <p>规则作用于整组，拖拽源记锚点所在的组。</p>
+     *
+     * @param stack  机器组
+     * @param side   输入/输出
+     * @param spec   规则
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
      */
-    public void beginRuleDrag(FactorySnapshotBuilder.MachineView machine, IoSide side,
+    public void beginRuleDrag(FactoryMachineStack stack, IoSide side,
             ResourceSpec spec, double mouseX, double mouseY) {
         cancelDrag();
-        this.dragRuleMachine = machine;
+        this.dragRuleStack = stack;
         this.dragRuleSide = side;
         this.dragRuleSpec = spec;
         beginDragPosition(mouseX, mouseY);
     }
 
     /**
-     * 删除一条规则。
+     * 删除一条规则；作用于整组。
      *
-     * @param machine 机器
-     * @param side    输入/输出
-     * @param spec    规则
+     * @param stack 机器组
+     * @param side  输入/输出
+     * @param spec  规则
      */
-    public void removeRule(FactorySnapshotBuilder.MachineView machine, IoSide side,
-            ResourceSpec spec) {
-        sendRuleAction(FactoryRuleActionC2S.Action.REMOVE, machine, side, spec.key(), null, null);
+    public void removeRule(FactoryMachineStack stack, IoSide side, ResourceSpec spec) {
+        sendRuleAction(FactoryRuleActionC2S.Action.REMOVE, stack, side, spec.key(), null, null);
     }
 
     /**
-     * 更新规则的面 / 匹配模式。
+     * 更新规则的面 / 匹配模式；作用于整组。
      *
-     * @param machine 机器
-     * @param side    输入/输出
-     * @param spec    规则
-     * @param face    新面
-     * @param mode    新匹配模式
+     * @param stack 机器组
+     * @param side  输入/输出
+     * @param spec  规则
+     * @param face  新面
+     * @param mode  新匹配模式
      */
-    public void updateRule(FactorySnapshotBuilder.MachineView machine, IoSide side,
-            ResourceSpec spec, @Nullable Direction face, MatchMode mode) {
-        sendRuleAction(FactoryRuleActionC2S.Action.UPDATE, machine, side, spec.key(), face, mode);
+    public void updateRule(FactoryMachineStack stack, IoSide side, ResourceSpec spec,
+            @Nullable Direction face, MatchMode mode) {
+        sendRuleAction(FactoryRuleActionC2S.Action.UPDATE, stack, side, spec.key(), face, mode);
     }
 
-    private void sendRuleAction(FactoryRuleActionC2S.Action action,
-            FactorySnapshotBuilder.MachineView machine, IoSide side, ResourceKey key,
-            @Nullable Direction face, @Nullable MatchMode mode) {
-        if (machine.lineIds().isEmpty()) {
+    /**
+     * 发一条规则动作。
+     *
+     * <p>只传锚点 id 和锚点所在产线；哪些机器算一组由服务端重新推，客户端不传成员列表，
+     * 避免「客户端说这组有 5 台」这种不可信输入。</p>
+     *
+     * @param action 动作
+     * @param stack  机器组
+     * @param side   输入/输出
+     * @param key    资源
+     * @param face   面，可为 {@code null}
+     * @param mode   匹配模式，可为 {@code null}
+     */
+    private void sendRuleAction(FactoryRuleActionC2S.Action action, FactoryMachineStack stack,
+            IoSide side, ResourceKey key, @Nullable Direction face, @Nullable MatchMode mode) {
+        FactorySnapshotBuilder.MachineView anchor = stack.anchor();
+        if (anchor.lineIds().isEmpty()) {
             showFeedback("这台机器没有产线", false);
             return;
         }
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(
-                this.screen.getMenu().containerId, action, machine.lineIds().get(0),
-                machine.ref().id(), side, key, face,
+                this.screen.getMenu().containerId, action, anchor.lineIds().get(0),
+                stack.anchorId(), side, key, face,
                 mode == null ? MatchMode.EXACT : mode));
     }
 
     private void cancelDrag() {
-        this.dragMachine = null;
+        this.dragStack = null;
         this.dragActive = false;
         this.dragFromLibrary = false;
         this.dragResourceKey = null;
         this.pendingStorageKey = null;
-        this.dragRuleMachine = null;
+        this.dragRuleStack = null;
         this.dragRuleSide = null;
         this.dragRuleSpec = null;
     }
@@ -619,8 +655,8 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         graphics.pose().popPose();
         if (this.dragActive) {
             ItemStack icon = ItemStack.EMPTY;
-            if (this.dragMachine != null) {
-                icon = FactoryLabels.blockStack(this.dragMachine.blockId());
+            if (this.dragStack != null) {
+                icon = FactoryLabels.blockStack(this.dragStack.blockId());
             } else if (this.dragResourceKey != null) {
                 icon = FactoryLabels.icon(this.dragResourceKey);
             } else if (this.dragRuleSpec != null) {
@@ -708,21 +744,59 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     }
 
     /**
-     * 把机器移出当前产线；机器和规则回到机器库。
+     * 把整组机器移出当前产线；机器和规则回到机器库。
      *
-     * @param machine 机器
+     * @param stack 机器组
      */
-    public void removeMachineFromLine(FactorySnapshotBuilder.MachineView machine) {
+    public void removeStackFromLine(FactoryMachineStack stack) {
         UUID lineId = this.screen.selectedLineId();
         if (lineId == null) {
             return;
         }
-        sendLineAction(FactoryLineActionC2S.Action.REMOVE_MACHINE, lineId,
-                machine.ref().id(), null);
+        sendLineAction(FactoryLineActionC2S.Action.REMOVE_STACK, lineId,
+                stack.anchorId(), null);
     }
 
     /**
-     * 打开删除机器的确认框；有规则时由调用方显示规则数。
+     * 打开删除整组的确认框。
+     *
+     * <p>在产线里的组不允许直接删，只能先移出；这里只处理未编线的组。确认框写清台数和规则数，
+     * 因为删除不可恢复。</p>
+     *
+     * @param stack 机器组
+     */
+    public void confirmDeleteStack(FactoryMachineStack stack) {
+        if (this.layout == null) {
+            return;
+        }
+        FactorySnapshotBuilder.MachineView anchor = stack.anchor();
+        if (!anchor.lineIds().isEmpty()) {
+            showFeedback("这组机器还在产线里，先移出产线再删除", false);
+            return;
+        }
+        if (!stack.stacked()) {
+            confirmDeleteMachine(anchor);
+            return;
+        }
+        int rules = 0;
+        for (FactorySnapshotBuilder.MachineView member : stack.members()) {
+            rules += member.ruleCount();
+        }
+        if (rules == 0) {
+            sendLineAction(FactoryLineActionC2S.Action.DELETE_STACK, null,
+                    stack.anchorId(), null);
+            return;
+        }
+        String message = "这一行有 " + stack.count() + " 台机器、还有 " + rules
+                + " 条 IO 配置。\n删除后规则无法恢复。";
+        this.confirmDialog.open("删除整组", message, "删除",
+                () -> sendLineAction(FactoryLineActionC2S.Action.DELETE_STACK, null,
+                        stack.anchorId(), null),
+                this.layout);
+    }
+
+    /**
+     * 打开删除单台机器的确认框；有规则时由调用方显示规则数。
      *
      * @param machine 机器
      */

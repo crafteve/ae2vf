@@ -127,24 +127,25 @@ final class FactoryTooltipRender {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            FactoryScreenGeometry.TableHit hit = this.context.geometry().tableHitAt(mouseY);
+            FactoryScreenGeometry.StackHit hit = this.context.geometry().tableHitAt(mouseY);
             if (hit == null) {
                 return;
             }
-            FactorySnapshotBuilder.MachineView machine = hit.machine();
+            FactoryMachineStack stack = hit.stack();
+            FactorySnapshotBuilder.MachineView anchor = stack.anchor();
             // 行尾动作按钮与列区不重叠，但仍先判按钮，避免以后列宽调整后串到规则提示。
             if (this.context.geometry().inRemoveButton(hit, mouseX, mouseY)) {
-                drawRemoveTooltip(graphics, mouseX, mouseY);
+                drawRemoveTooltip(graphics, stack, mouseX, mouseY);
                 return;
             }
             if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)) {
-                drawExpandTooltip(graphics, machine, mouseX, mouseY);
+                drawExpandTooltip(graphics, stack, mouseX, mouseY);
                 return;
             }
             FactoryIoDetailLayout.Card card = this.context.geometry()
                     .detailCardAt(hit, mouseX, mouseY);
             if (card != null) {
-                drawCardTooltip(graphics, machine, card, mouseX, mouseY);
+                drawCardTooltip(graphics, anchor, card, mouseX, mouseY);
                 return;
             }
             // 列规则提示只对基础行有效；展开区不再回落成列提示。
@@ -153,15 +154,15 @@ final class FactoryTooltipRender {
             }
             if (l.hasColumn(FactoryLayout.COL_INPUT)
                     && this.context.geometry().inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
-                drawRuleTooltip(graphics, "输入", machine.inputs(),
-                        machine.inputRates(), machine.inputReasons(), mouseX, mouseY,
+                drawRuleTooltip(graphics, "输入", stack.inputs(),
+                        stack.inputRates(), anchor.inputReasons(), mouseX, mouseY,
                         state.lineIdleLabel());
                 return;
             }
             if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                     && this.context.geometry().inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
-                drawRuleTooltip(graphics, "输出", machine.outputs(),
-                        machine.outputRates(), machine.outputReasons(), mouseX, mouseY,
+                drawRuleTooltip(graphics, "输出", stack.outputs(),
+                        stack.outputRates(), anchor.outputReasons(), mouseX, mouseY,
                         state.lineIdleLabel());
                 return;
             }
@@ -186,16 +187,19 @@ final class FactoryTooltipRender {
      * 移出产线按钮的提示。
      *
      * <p>按钮只删产线引用，机器本身与 IO 规则都保留；红叉容易被误解成删除机器，
-     * 所以必须把这条语义写在提示里。</p>
+     * 所以必须把这条语义写在提示里。多台时写明会移出几台。</p>
      *
      * @param graphics 画布
+     * @param stack    机器组
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
-    private void drawRemoveTooltip(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void drawRemoveTooltip(GuiGraphics graphics, FactoryMachineStack stack, int mouseX,
+            int mouseY) {
         FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
+        String title = stack.stacked() ? "移出整组 " + stack.count() + " 台" : "移出产线";
         graphics.renderComponentTooltip(this.context.font(), List.of(
-                FactoryLabels.colored("移出产线", tt.title()),
+                FactoryLabels.colored(title, tt.title()),
                 FactoryLabels.colored("只移除产线引用，机器与 IO 规则保留", tt.label())),
                 mouseX, mouseY);
     }
@@ -204,25 +208,29 @@ final class FactoryTooltipRender {
      * 展开按钮的提示。
      *
      * @param graphics 画布
-     * @param machine  机器视图
+     * @param stack    机器组
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
-    private void drawExpandTooltip(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, int mouseX, int mouseY) {
+    private void drawExpandTooltip(GuiGraphics graphics, FactoryMachineStack stack, int mouseX,
+            int mouseY) {
         List<Component> lines = new ArrayList<>();
         FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
         lines.add(FactoryLabels.colored(
-                this.context.geometry().isOpen(machine) ? "收起 IO 详情" : "展开 IO 详情",
+                this.context.geometry().isOpen(stack) ? "收起 IO 详情" : "展开 IO 详情",
                 tt.title()));
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("输入 ", tt.label()))
                 .append(FactoryLabels.coloredBold(
-                        Integer.toString(machine.inputs().size()), tt.value()))
+                        Integer.toString(stack.inputs().size()), tt.value()))
                 .append(FactoryLabels.colored(" · 输出 ", tt.label()))
                 .append(FactoryLabels.coloredBold(
-                        Integer.toString(machine.outputs().size()), tt.value()))
+                        Integer.toString(stack.outputs().size()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));
+        if (stack.stacked()) {
+            lines.add(FactoryLabels.colored(
+                    "这一行是 " + stack.count() + " 台，改动会同步到整组", tt.label()));
+        }
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }
 

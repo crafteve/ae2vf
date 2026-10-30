@@ -77,7 +77,8 @@ final class FactoryScreenState {
     /** 机器库当前滚动到的第一台机器。 */
     int machineFirstRow;
     /** 已展开的机器；同一时间最多一台，快照刷新后仍能保持展开。 */
-    final Set<MachineRef> expandedMachines = new HashSet<>();
+    /** 展开的组，按锚点机器 id 存；签名变化不影响展开状态。 */
+    final Set<UUID> expandedStacks = new HashSet<>();
     /** 展开 IO 面板的像素滚动。 */
     int ioScroll;
 
@@ -134,11 +135,11 @@ final class FactoryScreenState {
         this.runningLineCount = payload.runningLineCount();
         this.lines = payload.lines();
         this.machines = payload.machines();
-        Set<MachineRef> currentRefs = new HashSet<>();
+        Set<UUID> currentIds = new HashSet<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            currentRefs.add(machine.ref());
+            currentIds.add(machine.ref().id());
         }
-        this.expandedMachines.retainAll(currentRefs);
+        this.expandedStacks.retainAll(currentIds);
         if (this.selectedLineId != null && findLine(this.selectedLineId) == null) {
             this.selectedLineId = null;
         }

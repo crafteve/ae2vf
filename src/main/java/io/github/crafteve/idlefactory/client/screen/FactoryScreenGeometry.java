@@ -27,10 +27,10 @@ final class FactoryScreenGeometry {
     /**
      * 一个 IO 空卡的放置目标。
      *
-     * @param machine 机器
-     * @param side    输入/输出
+     * @param stack 机器组；规则写到整组
+     * @param side  输入/输出
      */
-    record IoDropTarget(FactorySnapshotBuilder.MachineView machine, IoSide side) {
+    record IoDropTarget(FactoryMachineStack stack, IoSide side) {
     }
 
     /**
@@ -86,13 +86,17 @@ final class FactoryScreenGeometry {
     /**
      * 左表中一次命中。
      *
-     * @param machine      机器视图
+     * @param stack        命中的机器组
      * @param y            行顶部 y
      * @param height       该行当前实际高度（基础行 + 展开区）
      * @param detailHeight 展开区高度；0 表示未展开
      */
-    record TableHit(FactorySnapshotBuilder.MachineView machine, int y, int height,
-            int detailHeight) {
+    record StackHit(FactoryMachineStack stack, int y, int height, int detailHeight) {
+
+        /** 组内第一台机器，取名字/图标/规则展示都用它。 */
+        FactorySnapshotBuilder.MachineView anchor() {
+            return this.stack.anchor();
+        }
     }
 
     /**
@@ -105,7 +109,7 @@ final class FactoryScreenGeometry {
         if (this.screen.state.selectedLineId == null) {
             return null;
         }
-        List<FactorySnapshotBuilder.MachineView> table = this.screen.state.tableMachines();
+        List<FactoryMachineStack> table = this.screen.state.tableStacks;
         int y = this.screen.layout.rowTop;
         for (int i = this.screen.state.firstRow; i < table.size(); i++) {
             if (y + FactoryLayout.ROW_H > this.screen.layout.footerY) {
@@ -132,14 +136,14 @@ final class FactoryScreenGeometry {
     }
 
     /**
-     * 鼠标下的机器库卡片（机器 tab）。
+     * 鼠标下的机器库组行（机器 tab）。
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView machineAt(double mouseX, double mouseY) {
+    FactoryMachineStack libraryStackAt(double mouseX, double mouseY) {
         if (this.screen.state.activeTab != FactoryScreen.TAB_MACHINES) {
             return null;
         }
@@ -153,10 +157,10 @@ final class FactoryScreenGeometry {
         int row = (int) ((mouseY - l.gridY) / FactoryLayout.ROW_H);
         int index = this.screen.state.machineFirstRow + row;
         if (row >= this.screen.state.machineRowsVisible()
-                || index < 0 || index >= this.screen.state.filteredMachines.size()) {
+                || index < 0 || index >= this.screen.state.libraryStacks.size()) {
             return null;
         }
-        return this.screen.state.filteredMachines.get(index);
+        return this.screen.state.libraryStacks.get(index);
     }
 
     /**
@@ -164,21 +168,21 @@ final class FactoryScreenGeometry {
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 命中的机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView lineRemoveButtonAt(double mouseX, double mouseY) {
+    FactoryMachineStack lineRemoveButtonAt(double mouseX, double mouseY) {
         if (this.screen.state.activeTab != FactoryScreen.TAB_MACHINES) {
             return null;
         }
-        TableHit hit = tableHitAt(mouseY);
+        StackHit hit = tableHitAt(mouseY);
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
         }
         int x = removeButtonX();
         return inside(mouseX, mouseY, x, hit.y() + FactoryLayout.ROW_ACTION_TOP,
                 FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON)
-                ? hit.machine() : null;
+                ? hit.stack() : null;
     }
 
     /**
@@ -195,12 +199,12 @@ final class FactoryScreenGeometry {
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 命中的机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView libraryDeleteButtonAt(double mouseX, double mouseY) {
-        FactorySnapshotBuilder.MachineView machine = machineAt(mouseX, mouseY);
-        if (machine == null) {
+    FactoryMachineStack libraryDeleteButtonAt(double mouseX, double mouseY) {
+        FactoryMachineStack stack = libraryStackAt(mouseX, mouseY);
+        if (stack == null) {
             return null;
         }
         int row = (int) ((mouseY - this.screen.layout.gridY) / FactoryLayout.ROW_H);
@@ -209,7 +213,7 @@ final class FactoryScreenGeometry {
         int cardY = this.screen.layout.gridY + row * FactoryLayout.ROW_H + 1;
         int x = cardX + cardW - 12;
         int y = cardY + 13 - 1;
-        return inside(mouseX, mouseY, x, y, 10, 10) ? machine : null;
+        return inside(mouseX, mouseY, x, y, 10, 10) ? stack : null;
     }
 
     /**
@@ -217,21 +221,21 @@ final class FactoryScreenGeometry {
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 命中的机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView machineIconAt(double mouseX, double mouseY) {
+    FactoryMachineStack machineIconAt(double mouseX, double mouseY) {
         if (this.screen.state.selectedLineId == null) {
             return null;
         }
-        TableHit hit = tableHitAt(mouseY);
+        StackHit hit = tableHitAt(mouseY);
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return null;
         }
         int x = this.screen.layout.columnX(FactoryLayout.COL_NAME) + 2;
         int width = this.screen.layout.columnW(FactoryLayout.COL_NAME) - 4;
         return inside(mouseX, mouseY, x, hit.y() + 2,
-                width, FactoryLayout.ROW_H - 4) ? hit.machine() : null;
+                width, FactoryLayout.ROW_H - 4) ? hit.stack() : null;
     }
 
     /**
@@ -261,15 +265,15 @@ final class FactoryScreenGeometry {
      */
     @Nullable
     IoDropTarget ioDropTargetAt(double mouseX, double mouseY) {
-        TableHit hit = tableHitAt(mouseY);
+        StackHit hit = tableHitAt(mouseY);
         if (hit == null) {
             return null;
         }
-        FactorySnapshotBuilder.MachineView machine = hit.machine();
+        FactoryMachineStack stack = hit.stack();
         if (hit.detailHeight() > 0 && mouseY >= hit.y() + FactoryLayout.ROW_H) {
             FactoryIoDetailLayout.Card card = detailCardAt(hit, mouseX, mouseY);
             if (card != null && card.empty()) {
-                return new IoDropTarget(machine, card.input() ? IoSide.INPUT : IoSide.OUTPUT);
+                return new IoDropTarget(stack, card.input() ? IoSide.INPUT : IoSide.OUTPUT);
             }
             return null;
         }
@@ -280,21 +284,21 @@ final class FactoryScreenGeometry {
         if (l.hasColumn(FactoryLayout.COL_INPUT)
                 && inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
-                    machine.inputs(), machine.inputRates(),
+                    stack.inputs(), stack.inputRates(),
                     l.columnX(FactoryLayout.COL_INPUT) + 2,
                     hit.y() + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, true);
             if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
-                return new IoDropTarget(machine, IoSide.INPUT);
+                return new IoDropTarget(stack, IoSide.INPUT);
             }
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                 && inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
-                    machine.outputs(), machine.outputRates(),
+                    stack.outputs(), stack.outputRates(),
                     l.columnX(FactoryLayout.COL_OUTPUT) + 2, hit.y() + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             if (FactoryRuleStrip.hitAdd(strip, mouseX, mouseY)) {
-                return new IoDropTarget(machine, IoSide.OUTPUT);
+                return new IoDropTarget(stack, IoSide.OUTPUT);
             }
         }
         return null;
@@ -319,31 +323,31 @@ final class FactoryScreenGeometry {
     }
 
     /**
-     * 该机器在当前行位置上的展开高度。
+     * 该组在当前行位置上的展开高度。
      *
-     * @param machine 机器视图
-     * @param rowY    该行当前顶部
+     * @param stack 机器组
+     * @param rowY  该行当前顶部
      * @return 像素高度；未展开为 0
      */
-    int detailHeight(FactorySnapshotBuilder.MachineView machine, int rowY) {
-        if (!this.screen.state.expandedMachines.contains(machine.ref())) {
+    int detailHeight(FactoryMachineStack stack, int rowY) {
+        if (!this.screen.state.expandedStacks.contains(stack.anchorId())) {
             return 0;
         }
         int required = FactoryIoDetailLayout.requiredHeight(
-                this.screen.layout, machine, this.screen.state.font);
+                this.screen.layout, stack.anchor(), this.screen.state.font);
         int available = Math.max(0,
                 this.screen.layout.footerY - rowY - FactoryLayout.ROW_H);
         return Math.min(required, available);
     }
 
     /**
-     * 该机器是否处于展开状态。
+     * 该组是否处于展开状态。
      *
-     * @param machine 机器视图
+     * @param stack 机器组
      * @return 已展开为 {@code true}
      */
-    boolean isOpen(FactorySnapshotBuilder.MachineView machine) {
-        return this.screen.state.expandedMachines.contains(machine.ref());
+    boolean isOpen(FactoryMachineStack stack) {
+        return this.screen.state.expandedStacks.contains(stack.anchorId());
     }
 
     /**
@@ -363,22 +367,22 @@ final class FactoryScreenGeometry {
      * @return 命中行；空白区或超出表格时为 {@code null}
      */
     @Nullable
-    TableHit tableHitAt(double mouseY) {
+    StackHit tableHitAt(double mouseY) {
         FactoryLayout l = this.screen.layout;
         if (mouseY < l.rowTop || mouseY >= l.footerY) {
             return null;
         }
-        List<FactorySnapshotBuilder.MachineView> table = this.screen.state.tableMachines();
+        List<FactoryMachineStack> table = this.screen.state.tableStacks;
         int y = l.rowTop;
         for (int i = this.screen.state.firstRow; i < table.size(); i++) {
             if (y + FactoryLayout.ROW_H > l.footerY) {
                 return null;
             }
-            FactorySnapshotBuilder.MachineView machine = table.get(i);
-            int detailHeight = detailHeight(machine, y);
+            FactoryMachineStack stack = table.get(i);
+            int detailHeight = detailHeight(stack, y);
             int height = FactoryLayout.ROW_H + detailHeight;
             if (mouseY >= y && mouseY < y + height) {
-                return new TableHit(machine, y, height, detailHeight);
+                return new StackHit(stack, y, height, detailHeight);
             }
             y += height;
         }
@@ -393,7 +397,7 @@ final class FactoryScreenGeometry {
      * @param mouseY 屏幕 y
      * @return 命中为 {@code true}
      */
-    boolean inExpandButton(TableHit hit, double mouseX, double mouseY) {
+    boolean inExpandButton(StackHit hit, double mouseX, double mouseY) {
         return inside(mouseX, mouseY, expandButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
                 FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
     }
@@ -406,7 +410,7 @@ final class FactoryScreenGeometry {
      * @param mouseY 屏幕 y
      * @return 命中为 {@code true}
      */
-    boolean inRemoveButton(TableHit hit, double mouseX, double mouseY) {
+    boolean inRemoveButton(StackHit hit, double mouseX, double mouseY) {
         return inside(mouseX, mouseY, removeButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
                 FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
     }
@@ -420,12 +424,12 @@ final class FactoryScreenGeometry {
      * @return 卡片；没展开或没命中为 {@code null}
      */
     @Nullable
-    FactoryIoDetailLayout.Card detailCardAt(TableHit hit, double mouseX, double mouseY) {
+    FactoryIoDetailLayout.Card detailCardAt(StackHit hit, double mouseX, double mouseY) {
         if (hit.detailHeight() <= 0) {
             return null;
         }
         FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(
-                this.screen.layout, hit.machine(), hit.y() + FactoryLayout.ROW_H,
+                this.screen.layout, hit.anchor(), hit.y() + FactoryLayout.ROW_H,
                 hit.detailHeight(), this.screen.state.font, this.screen.state.ioScroll);
         return FactoryIoDetailLayout.cardAt(detail, mouseX, mouseY);
     }

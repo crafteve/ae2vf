@@ -28,7 +28,7 @@ final class FactoryMachineLibraryRender {
     }
 
     /**
-     * 机器库：按行画深色卡片，每行一台机器。
+     * 机器库：按组画深色卡片，一组一行。
      *
      * @param graphics 画布
      */
@@ -39,16 +39,16 @@ final class FactoryMachineLibraryRender {
         int rows = state.machineRowsVisible();
         for (int i = 0; i < rows; i++) {
             int index = state.machineFirstRow + i;
-            if (index >= state.filteredMachines.size()) {
+            if (index >= state.libraryStacks.size()) {
                 break;
             }
-            FactorySnapshotBuilder.MachineView machine = state.filteredMachines.get(index);
+            FactoryMachineStack stack = state.libraryStacks.get(index);
             int y = l.gridY + i * FactoryLayout.ROW_H;
-            drawMachineCard(graphics, machine, l.gridX, y, width);
+            drawMachineCard(graphics, stack, l.gridX, y, width);
         }
         if (state.machines.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有机器");
-        } else if (state.filteredMachines.isEmpty()) {
+        } else if (state.libraryStacks.isEmpty()) {
             drawMachineLibraryEmpty(graphics, "没有匹配");
         }
     }
@@ -68,16 +68,17 @@ final class FactoryMachineLibraryRender {
     }
 
     /**
-     * 单张机器卡片。
+     * 单张机器卡片；一组机器只画一张。
      *
      * @param graphics 画布
-     * @param machine  机器视图
+     * @param stack    机器组
      * @param x        卡片行左边缘
      * @param y        卡片行顶部
      * @param width    卡片行总宽
      */
-    private void drawMachineCard(GuiGraphics graphics,
-            FactorySnapshotBuilder.MachineView machine, int x, int y, int width) {
+    private void drawMachineCard(GuiGraphics graphics, FactoryMachineStack stack, int x, int y,
+            int width) {
+        FactorySnapshotBuilder.MachineView anchor = stack.anchor();
         int cardX = x + 2;
         int cardY = y + 1;
         int cardW = width - 4;
@@ -88,7 +89,7 @@ final class FactoryMachineLibraryRender {
                 cardX + 2, cardY + 2, cardW, cardH);
         FactoryNineSlice.machineCard(graphics, cardX, cardY, cardW, cardH);
 
-        FactoryStatus status = FactoryStatus.of(machine, this.context.theme());
+        FactoryStatus status = stack.status(this.context.theme());
         FactoryNineSlice.fill(graphics, status.strip(), cardX + 1, cardY + 2,
                 2, cardH - 4);
 
@@ -96,18 +97,19 @@ final class FactoryMachineLibraryRender {
         int iconSlotY = cardY + 2;
         FactoryNineSlice.slot(graphics, iconSlotX, iconSlotY,
                 FactoryLayout.CELL, FactoryLayout.CELL);
-        ItemStack icon = machine.machineMissing()
+        ItemStack icon = anchor.machineMissing()
                 ? new ItemStack(Items.BARRIER)
-                : FactoryLabels.blockStack(machine.blockId());
+                : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconSlotX + 1, iconSlotY + 1);
+        drawCountBadge(graphics, stack, iconSlotX + 1, iconSlotY + 1);
 
         int textX = iconSlotX + FactoryLayout.CELL + 5;
         int right = cardX + cardW - 5;
         int nameY = cardY + 3;
         int lineY = cardY + 13;
 
-        String statusText = status.text();
+        String statusText = stack.statusText(this.context.theme());
         int statusWidth = this.context.font().width(statusText);
         int statusX = right - statusWidth;
         int lampX = Math.max(textX, statusX - 7);
@@ -115,18 +117,18 @@ final class FactoryMachineLibraryRender {
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
 
         int nameWidth = Math.max(18, lampX - textX - 4);
-        String cardName = machine.machineMissing()
-                ? "已失联" : FactoryLabels.blockName(machine.blockId());
+        String cardName = anchor.machineMissing()
+                ? "已失联" : FactoryLabels.blockName(anchor.blockId());
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(cardName, nameWidth),
                 textX, nameY, CARD_NAME, false);
         graphics.drawString(this.context.font(), statusText, statusX, nameY,
                 status.color(), false);
 
-        String lines = machine.lineNames().isEmpty()
-                ? "未编线" : String.join(" / ", machine.lineNames());
+        String lines = anchor.lineNames().isEmpty()
+                ? "未编线" : String.join(" / ", anchor.lineNames());
         String rulesLabel = "规则 ";
-        String rulesValue = Integer.toString(machine.ruleCount());
+        String rulesValue = Integer.toString(anchor.ruleCount());
         int rulesWidth = this.context.font().width(rulesLabel)
                 + this.context.font().width(rulesValue);
         int deleteX = cardX + cardW - 12;
@@ -135,7 +137,7 @@ final class FactoryMachineLibraryRender {
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(lines, lineWidth),
                 textX, lineY,
-                machine.lineNames().isEmpty()
+                anchor.lineNames().isEmpty()
                         ? this.context.theme().textDim() : this.context.theme().textValue(),
                 false);
         graphics.drawString(this.context.font(), rulesLabel, rulesX, lineY, CARD_META, false);
@@ -151,8 +153,28 @@ final class FactoryMachineLibraryRender {
                         : this.context.theme().textDim(), false);
 
         FactoryScreenInteraction interaction = this.context.interaction();
-        if (interaction != null && interaction.isDragSource(machine.ref())) {
+        if (interaction != null && interaction.isDragSource(anchor.ref())) {
             graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0x66000000);
         }
+    }
+
+    /**
+     * 在图标右下角画整组台数，样式跟原版物品数量一致。
+     *
+     * @param graphics 画布
+     * @param stack    机器组
+     * @param iconX    图标左边缘
+     * @param iconY    图标上边缘
+     */
+    private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int iconX,
+            int iconY) {
+        if (!stack.stacked()) {
+            return;
+        }
+        String label = "×" + stack.count();
+        int textWidth = this.context.font().width(label);
+        graphics.drawString(this.context.font(), label,
+                iconX + FactoryLayout.CELL - 2 - textWidth, iconY + FactoryLayout.CELL - 8,
+                0xFFFFFFFF, true);
     }
 }

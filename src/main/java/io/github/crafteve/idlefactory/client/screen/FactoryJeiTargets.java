@@ -104,9 +104,10 @@ final class FactoryJeiTargets {
 
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
-            FactoryScreenGeometry.TableHit hit = this.context.geometry().tableHitAt(mouseY);
+            FactoryScreenGeometry.StackHit hit = this.context.geometry().tableHitAt(mouseY);
             if (hit != null) {
-                FactorySnapshotBuilder.MachineView machine = hit.machine();
+                FactoryMachineStack stack = hit.stack();
+                FactorySnapshotBuilder.MachineView anchor = stack.anchor();
                 int y = hit.y();
 
                 if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)
@@ -122,7 +123,7 @@ final class FactoryJeiTargets {
                                     card.x() + 3, card.y() + 3,
                                     FactoryLayout.CELL, FactoryLayout.CELL)) {
                         List<ResourceSpec> rules = card.input()
-                                ? machine.inputs() : machine.outputs();
+                                ? stack.inputs() : stack.outputs();
                         if (card.ruleIndex() < rules.size()) {
                             return resourceTarget(rules.get(card.ruleIndex()).key(),
                                     new Rect2i(card.x() + 4, card.y() + 4,
@@ -139,24 +140,24 @@ final class FactoryJeiTargets {
                 int iconX = l.columnX(FactoryLayout.COL_NAME) + 4;
                 if (FactoryScreenGeometry.inside(mouseX, mouseY, iconX, y + 4,
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
-                    ItemStack stack = FactoryLabels.blockStack(machine.blockId());
-                    if (!stack.isEmpty()) {
-                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, stack,
+                    ItemStack stackIcon = FactoryLabels.blockStack(anchor.blockId());
+                    if (!stackIcon.isEmpty()) {
+                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, stackIcon,
                                 new Rect2i(iconX, y + 4, FactoryLayout.CELL,
                                         FactoryLayout.CELL));
                     }
                 }
                 if (l.hasColumn(FactoryLayout.COL_INPUT)) {
-                    FactoryScreen.JeiTarget target = ruleTarget(machine.inputs(),
-                            machine.inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
+                    FactoryScreen.JeiTarget target = ruleTarget(stack.inputs(),
+                            stack.inputRates(), l.columnX(FactoryLayout.COL_INPUT) + 2,
                             y + 4, l.columnW(FactoryLayout.COL_INPUT) - 4, mouseX, mouseY);
                     if (target != null) {
                         return target;
                     }
                 }
                 if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
-                    FactoryScreen.JeiTarget target = ruleTarget(machine.outputs(),
-                            machine.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
+                    FactoryScreen.JeiTarget target = ruleTarget(stack.outputs(),
+                            stack.outputRates(), l.columnX(FactoryLayout.COL_OUTPUT) + 2,
                             y + 4, l.columnW(FactoryLayout.COL_OUTPUT) - 4
                                     - FactoryLayout.ROW_ACTIONS_W, mouseX, mouseY);
                     if (target != null) {

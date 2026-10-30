@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import java.util.UUID;
+
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
@@ -108,7 +110,7 @@ final class FactoryScreenInput {
             var libraryDelete = this.screen.geometry()
                     .libraryDeleteButtonAt(mouseX, mouseY);
             if (libraryDelete != null) {
-                editController.confirmDeleteMachine(libraryDelete);
+                editController.confirmDeleteStack(libraryDelete);
                 return true;
             }
         }
@@ -156,7 +158,7 @@ final class FactoryScreenInput {
         if (button == 0 && editController != null) {
             var removeTarget = this.screen.geometry().lineRemoveButtonAt(mouseX, mouseY);
             if (removeTarget != null) {
-                editController.removeMachineFromLine(removeTarget);
+                editController.removeStackFromLine(removeTarget);
                 return true;
             }
         }
@@ -166,13 +168,13 @@ final class FactoryScreenInput {
         if (handleFactoryRuleStripMouse(mouseX, mouseY, button)) {
             return true;
         }
-        FactoryScreenGeometry.TableHit ioHit = this.screen.geometry().tableHitAt(mouseY);
+        FactoryScreenGeometry.StackHit ioHit = this.screen.geometry().tableHitAt(mouseY);
         if (ioHit != null && ioHit.detailHeight() > 0
                 && mouseY >= ioHit.y() + FactoryLayout.ROW_H) {
             FactoryIoDetailLayout.Card card = this.screen.geometry()
                     .detailCardAt(ioHit, mouseX, mouseY);
             if (card != null) {
-                handleIoCardMouse(ioHit.machine(), card, mouseX, mouseY, button);
+                handleIoCardMouse(ioHit.stack(), card, mouseX, mouseY, button);
                 return true;
             }
         }
@@ -227,19 +229,20 @@ final class FactoryScreenInput {
      * @return 命中并切换为 {@code true}
      */
     private boolean clickMachineExpand(double mouseX, double mouseY) {
-        FactoryScreenGeometry.TableHit hit = this.screen.geometry().tableHitAt(mouseY);
+        FactoryScreenGeometry.StackHit hit = this.screen.geometry().tableHitAt(mouseY);
         if (hit == null
                 || !this.screen.geometry().inExpandButton(hit, mouseX, mouseY)) {
             return false;
         }
-        var ref = hit.machine().ref();
+        UUID anchorId = hit.stack().anchorId();
         FactoryScreenState state = this.screen.state;
-        if (state.expandedMachines.contains(ref)) {
-            state.expandedMachines.remove(ref);
+        if (state.expandedStacks.contains(anchorId)) {
+            state.expandedStacks.remove(anchorId);
         } else {
-            state.expandedMachines.clear();
-            state.expandedMachines.add(ref);
-            ensureExpansionVisible(ref);
+            // 一次只展开一组：展开区很高，多开会把表格挤没。
+            state.expandedStacks.clear();
+            state.expandedStacks.add(anchorId);
+            ensureExpansionVisible(anchorId);
         }
         state.ioScroll = 0;
         state.firstRow = Math.max(0, Math.min(state.firstRow, state.maxFirstRow()));
@@ -249,15 +252,15 @@ final class FactoryScreenInput {
     /**
      * 展开行需要的高度超过当前剩余空间时，把它滚到表格顶部。
      *
-     * @param ref 要保证可见的机器
+     * @param anchorId 要保证可见的组锚点
      */
-    private void ensureExpansionVisible(io.github.crafteve.idlefactory.factory.machine.MachineRef ref) {
+    private void ensureExpansionVisible(UUID anchorId) {
         FactoryLayout l = this.screen.layout;
         FactoryScreenState state = this.screen.state;
-        var table = state.tableMachines();
+        var table = state.tableStacks;
         int index = -1;
         for (int i = 0; i < table.size(); i++) {
-            if (table.get(i).ref().equals(ref)) {
+            if (table.get(i).anchorId().equals(anchorId)) {
                 index = i;
                 break;
             }
@@ -278,7 +281,7 @@ final class FactoryScreenInput {
             }
         }
         int required = FactoryIoDetailLayout.requiredHeight(
-                l, table.get(index), this.screen.state.font);
+                l, table.get(index).anchor(), this.screen.state.font);
         int available = Math.max(0, l.footerY - y - FactoryLayout.ROW_H);
         if (required > available) {
             state.firstRow = index;
@@ -296,7 +299,7 @@ final class FactoryScreenInput {
     private boolean ioScrollAt(double mouseX, double mouseY, double scrollY) {
         FactoryLayout l = this.screen.layout;
         FactoryScreenState state = this.screen.state;
-        FactoryScreenGeometry.TableHit hit = this.screen.geometry().tableHitAt(mouseY);
+        FactoryScreenGeometry.StackHit hit = this.screen.geometry().tableHitAt(mouseY);
         if (hit == null || hit.detailHeight() <= 0
                 || mouseY < hit.y() + FactoryLayout.ROW_H) {
             return false;
@@ -304,7 +307,7 @@ final class FactoryScreenInput {
         if (mouseX < l.leftX || mouseX >= l.leftX + l.leftW) {
             return false;
         }
-        FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, hit.machine(),
+        FactoryIoDetailLayout.Detail detail = FactoryIoDetailLayout.layout(l, hit.anchor(),
                 hit.y() + FactoryLayout.ROW_H, hit.detailHeight(),
                 state.font, state.ioScroll);
         if (detail.maxScroll() <= 0) {
@@ -318,14 +321,16 @@ final class FactoryScreenInput {
     /**
      * 点击展开区卡片上的控件。
      *
-     * @param machine 机器
+     * <p>规则改动作用于整组：控制器只传锚点 id，成员由服务端现推。</p>
+     *
+     * @param stack   机器组
      * @param card    卡片
      * @param mouseX  屏幕 x
      * @param mouseY  屏幕 y
      * @param button  鼠标键
      * @return 是否消费
      */
-    boolean handleIoCardMouse(io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineView machine,
+    boolean handleIoCardMouse(FactoryMachineStack stack,
             FactoryIoDetailLayout.Card card, double mouseX, double mouseY, int button) {
         FactoryEditController editController = this.screen.editController();
         var side = card.input()
@@ -334,7 +339,7 @@ final class FactoryScreenInput {
         if (card.empty() || editController == null) {
             return true;
         }
-        var rules = card.input() ? machine.inputs() : machine.outputs();
+        var rules = card.input() ? stack.inputs() : stack.outputs();
         if (card.ruleIndex() >= rules.size()) {
             return true;
         }
@@ -346,19 +351,19 @@ final class FactoryScreenInput {
                 if (button == 0 || button == 1) {
                     Direction next = FactoryIoCardControls.nextFace(spec.face(),
                             button == 0 ? 1 : -1);
-                    editController.updateRule(machine, side, spec, next, spec.mode());
+                    editController.updateRule(stack, side, spec, next, spec.mode());
                 }
             }
             case MATCH -> {
                 if (button == 0) {
                     MatchMode next = spec.mode() == MatchMode.IGNORE_COMPONENTS
                             ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
-                    editController.updateRule(machine, side, spec, spec.face(), next);
+                    editController.updateRule(stack, side, spec, spec.face(), next);
                 }
             }
             case BODY -> {
                 if (button == 0) {
-                    editController.beginRuleDrag(machine, side, spec, mouseX, mouseY);
+                    editController.beginRuleDrag(stack, side, spec, mouseX, mouseY);
                 }
             }
             default -> {
@@ -382,21 +387,21 @@ final class FactoryScreenInput {
             return false;
         }
         FactoryLayout l = this.screen.layout;
-        FactoryScreenGeometry.TableHit hit = this.screen.geometry().tableHitAt(mouseY);
+        FactoryScreenGeometry.StackHit hit = this.screen.geometry().tableHitAt(mouseY);
         if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
             return false;
         }
         if (l.hasColumn(FactoryLayout.COL_INPUT)
                 && this.screen.geometry().inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
-                    hit.machine().inputs(), hit.machine().inputRates(),
+                    hit.stack().inputs(), hit.stack().inputRates(),
                     l.columnX(FactoryLayout.COL_INPUT) + 2, hit.y() + 4,
                     l.columnW(FactoryLayout.COL_INPUT) - 4, true);
             FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
-            if (entry != null && entry.ruleIndex() < hit.machine().inputs().size()) {
-                editController.beginRuleDrag(hit.machine(),
+            if (entry != null && entry.ruleIndex() < hit.stack().inputs().size()) {
+                editController.beginRuleDrag(hit.stack(),
                         io.github.crafteve.idlefactory.factory.line.IoSide.INPUT,
-                        hit.machine().inputs().get(entry.ruleIndex()), mouseX, mouseY);
+                        hit.stack().inputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
             return FactoryRuleStrip.hitAdd(strip, mouseX, mouseY);
@@ -404,14 +409,14 @@ final class FactoryScreenInput {
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                 && this.screen.geometry().inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
             FactoryRuleStrip.Layout strip = FactoryRuleStrip.layout(this.screen.state.font,
-                    hit.machine().outputs(), hit.machine().outputRates(),
+                    hit.stack().outputs(), hit.stack().outputRates(),
                     l.columnX(FactoryLayout.COL_OUTPUT) + 2, hit.y() + 4,
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
-            if (entry != null && entry.ruleIndex() < hit.machine().outputs().size()) {
-                editController.beginRuleDrag(hit.machine(),
+            if (entry != null && entry.ruleIndex() < hit.stack().outputs().size()) {
+                editController.beginRuleDrag(hit.stack(),
                         io.github.crafteve.idlefactory.factory.line.IoSide.OUTPUT,
-                        hit.machine().outputs().get(entry.ruleIndex()), mouseX, mouseY);
+                        hit.stack().outputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
             return FactoryRuleStrip.hitAdd(strip, mouseX, mouseY);

@@ -507,15 +507,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     }
 
     /**
-     * 鼠标下的机器库卡片（机器 tab）。
+     * 鼠标下的机器库组行（机器 tab）。
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView machineAt(double mouseX, double mouseY) {
-        return this.geometry.machineAt(mouseX, mouseY);
+    FactoryMachineStack libraryStackAt(double mouseX, double mouseY) {
+        return this.geometry.libraryStackAt(mouseX, mouseY);
     }
 
     /**
@@ -525,10 +525,10 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
-     * @return 机器视图；没命中为 {@code null}
+     * @return 机器组；没命中为 {@code null}
      */
     @Nullable
-    FactorySnapshotBuilder.MachineView machineIconAt(double mouseX, double mouseY) {
+    FactoryMachineStack machineIconAt(double mouseX, double mouseY) {
         return this.geometry.machineIconAt(mouseX, mouseY);
     }
 
