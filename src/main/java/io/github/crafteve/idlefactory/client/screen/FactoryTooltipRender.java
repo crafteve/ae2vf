@@ -390,7 +390,8 @@ final class FactoryTooltipRender {
         int count = this.context.state().displayCount(stack);
 
         String name = FactoryLabels.blockName(stack.blockId());
-        lines.add(FactoryLabels.colored(count > 1 ? name + " ×" + count : name, tt.title()));
+        lines.add(FactoryLabels.colored(count > 1 ? name + " · " + count + " 台" : name,
+                tt.title()));
         lines.add(FactoryLabels.coloredBold(stack.statusText(this.context.theme()),
                 stack.status(this.context.theme()).color()));
 

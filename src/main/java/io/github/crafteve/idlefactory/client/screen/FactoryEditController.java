@@ -239,14 +239,20 @@ public final class FactoryEditController implements FactoryScreenInteraction {
         return this.dragActive && this.dragStack != null;
     }
 
-    /** 正在拖拽的机器名；多台时带台数，没有拖拽时为空串。 */
+    /**
+     * 正在拖拽的机器名；多台时带台数，没有拖拽时为空串。
+     *
+     * <p>只带数字，不带 ×：× 在界面里专指删除按钮，混用会让拖拽文字看起来像「删 5 台」。</p>
+     *
+     * @return 拖拽文字
+     */
     public String draggedMachineName() {
         if (this.dragStack == null) {
             return "";
         }
         String name = FactoryLabels.blockName(this.dragStack.blockId());
         return this.dragStack.stacked()
-                ? name + " ×" + this.dragStack.count() : name;
+                ? name + " · " + this.dragStack.count() + " 台" : name;
     }
 
     /**

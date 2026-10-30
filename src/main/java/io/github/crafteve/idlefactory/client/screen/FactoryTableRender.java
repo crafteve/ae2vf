@@ -161,7 +161,7 @@ final class FactoryTableRender {
                 : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
-        drawCountBadge(graphics, stack, iconX, y + 5);
+        drawCountBadge(graphics, stack, iconX - 1, y + 4);
         if (iconHovered) {
             drawIconHoverOutline(graphics, iconX, y + 5);
         }
@@ -250,19 +250,37 @@ final class FactoryTableRender {
      * @param iconX    图标左边缘
      * @param iconY    图标上边缘
      */
-    private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int iconX,
-            int iconY) {
+    /**
+     * 在图标槽位右下角画整组台数，和仓库格的数量同一套画法：小号字、右下对齐、
+     * 画在 {@link FactoryGuiLayer#GRID_COUNT} 层。
+     *
+     * <p>只画数字，不带 ×：这一格在图标的数量位，符号反而让 18px 的槽位更挤。台数为 1 时
+     * 不画，和原版物品数量一致。</p>
+     *
+     * @param graphics 画布
+     * @param stack    机器组
+     * @param slotX    图标槽位左边缘
+     * @param slotY    图标槽位上边缘
+     */
+    private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int slotX,
+            int slotY) {
         int count = this.context.state().displayCount(stack);
         if (count <= 1) {
             return;
         }
-        String label = "×" + count;
-        int textWidth = this.context.font().width(label);
-        // 图标画在 ITEM(150) 层，这里必须抬到 GRID_COUNT(300)，否则数量会被图标盖住。
+        String text = Integer.toString(count);
+        float scale = 0.666F;
+        float textWidth = this.context.font().width(text);
+        if (textWidth * scale > FactoryLayout.CELL - 2) {
+            scale = Math.max(0.5F, (FactoryLayout.CELL - 2) / textWidth);
+        }
+        float width = textWidth * scale;
+        float height = this.context.font().lineHeight * scale;
         graphics.pose().pushPose();
-        graphics.pose().translate(iconX + FactoryLayout.CELL - 2 - textWidth,
-                iconY + FactoryLayout.CELL - 8, FactoryGuiLayer.GRID_COUNT.z());
-        graphics.drawString(this.context.font(), label, 0, 0, 0xFFFFFFFF, true);
+        graphics.pose().translate(slotX + FactoryLayout.CELL - width - 1.0F,
+                slotY + FactoryLayout.CELL - height, FactoryGuiLayer.GRID_COUNT.z());
+        graphics.pose().scale(scale, scale, 1.0F);
+        graphics.drawString(this.context.font(), text, 0, 0, 0xFFFFFFFF, true);
         graphics.pose().popPose();
     }
 
