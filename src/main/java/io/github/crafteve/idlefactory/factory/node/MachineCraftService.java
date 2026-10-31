@@ -2,16 +2,21 @@ package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.helpers.patternprovider.PatternProviderTarget;
 
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
@@ -48,12 +53,67 @@ final class MachineCraftService implements ICraftingProvider {
 
     @Override
     public boolean pushPattern(IPatternDetails details, KeyCounter[] inputHolder) {
-        return false;
+        MachineProvider provider = this.node.machine().provider();
+        if (this.isBusy() || !this.node.isAvailable() || !this.node.isNodeOnline()) {
+            return false;
+        }
+        if (!this.patterns.contains(details) || !details.supportsPushInputsToExternalInventory()) {
+            return false;
+        }
+        ProviderFaceResolver.Faces faces = this.node.faces();
+        if (faces == null) {
+            return false;
+        }
+        // 已经往机器里塞过东西之后不能再报失败：CPU 会把同一份输入再推给下一家，造成复制
+        boolean[] committed = {false};
+        try {
+            if (provider.blocking().isOn() && faces.blockingHit(this.patternInputs)) {
+                return false;
+            }
+            Map<AEKey, Long> needed = new LinkedHashMap<>();
+            for (KeyCounter counter : inputHolder) {
+                for (var entry : counter) {
+                    if (entry.getLongValue() > 0L) {
+                        needed.merge(entry.getKey(), entry.getLongValue(), Long::sum);
+                    }
+                }
+            }
+            if (needed.isEmpty()) {
+                return false;
+            }
+            Map<AEKey, Direction> selections = new LinkedHashMap<>(needed.size());
+            for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
+                Direction face = faces.select(entry.getKey(), entry.getValue());
+                if (face == null) {
+                    return false;
+                }
+                selections.put(entry.getKey(), face);
+            }
+            details.pushInputsToExternalInventory(inputHolder, (key, amount) -> {
+                if (amount <= 0L) {
+                    return;
+                }
+                Direction face = selections.get(key);
+                PatternProviderTarget target = face == null ? null : faces.target(face);
+                long inserted = target == null ? 0L : target.insert(key, amount, Actionable.MODULATE);
+                if (inserted > 0L) {
+                    committed[0] = true;
+                }
+                if (inserted < amount) {
+                    ProviderOverflow.push(this.node, key, amount - inserted, face);
+                }
+            });
+            committed[0] = true;
+            return true;
+        } catch (RuntimeException e) {
+            this.node.logThrottled(this.node.gameTime(), "派单异常：" + e);
+            return committed[0];
+        }
     }
 
     @Override
     public boolean isBusy() {
-        return false;
+        return this.node.machine().provider().pendingCount() > 0;
     }
 
     /** 机器上所有样板的输入 key 并集。 */

@@ -161,19 +161,21 @@ public final class NodeManager {
     }
 
     /**
-     * 拆掉一台机器的节点；机器删除、删除工厂都走这里。
+     * 拆掉一台机器的节点，并把余量还回网络；机器删除走这里。
      *
      * @param machineId 机器 id
      */
     public void removeMachine(UUID machineId) {
         MachineNode node = this.nodes.remove(machineId);
         if (node != null) {
-            node.detach();
+            node.detachReturning();
         }
     }
 
     /**
-     * 拆掉一个工厂的全部节点。
+     * 拆掉一个工厂的全部节点，并把余量还回网络；只有工厂记录会被删除时才用。
+     *
+     * <p>仓库模式切换不删机器记录，交给下一轮对账走 {@link MachineNode#detach()}。</p>
      *
      * @param factoryId 工厂 id
      */
@@ -182,7 +184,7 @@ public final class NodeManager {
         while (iterator.hasNext()) {
             MachineNode node = iterator.next().getValue();
             if (node.factoryId().equals(factoryId)) {
-                node.detach();
+                node.detachReturning();
                 iterator.remove();
             }
         }
@@ -243,7 +245,8 @@ public final class NodeManager {
             MachineNode node;
             try {
                 node = new MachineNode(this.server, spec.factoryId(), spec.machine(),
-                        spec.anchor(), spec.anchorLevel(), spec.available(), this.dataChanged);
+                        spec.anchor(), spec.anchorLevel(), spec.available(), this.dataChanged,
+                        this.notice);
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 构造机器节点失败 [{}]：{}",
                         spec.machine().ref().shortId(), e.toString());

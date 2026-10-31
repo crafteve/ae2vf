@@ -1,8 +1,10 @@
 package io.github.crafteve.idlefactory.factory.node;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -21,6 +23,8 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.storage.MEStorage;
 import appeng.helpers.patternprovider.PatternContainer;
 
 import net.minecraft.ChatFormatting;
@@ -29,6 +33,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -53,8 +58,10 @@ public final class MachineNode
     private final IGridNode anchor;
     private final ServerLevel anchorLevel;
     private final Runnable dataChanged;
+    private final Consumer<NodeManager.Notice> notice;
     private final MachineCraftService craft;
     private final MachinePatternInventory patternInventory;
+    private final ProviderFaceResolver faceResolver;
     private final IManagedGridNode managed;
     private final IActionSource actionSource;
     private final long sortOrder;
@@ -80,9 +87,11 @@ public final class MachineNode
      * @param anchorLevel 锚点所在维度，虚拟节点只借它做构造参数
      * @param available   机器方块此刻是否在线
      * @param dataChanged 存档数据变化回调，由运行时转成 {@code markDirty}
+     * @param notice      节点告警出口
      */
     MachineNode(MinecraftServer server, UUID factoryId, Machine machine, IGridNode anchor,
-            ServerLevel anchorLevel, boolean available, Runnable dataChanged) {
+            ServerLevel anchorLevel, boolean available, Runnable dataChanged,
+            Consumer<NodeManager.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
         this.machine = machine;
@@ -90,10 +99,12 @@ public final class MachineNode
         this.anchorLevel = anchorLevel;
         this.available = available;
         this.dataChanged = dataChanged;
+        this.notice = notice;
         this.sortOrder = sortOrder(machine);
 
         this.craft = new MachineCraftService(this);
         this.patternInventory = new MachinePatternInventory(this);
+        this.faceResolver = new ProviderFaceResolver(this);
         this.icon = this.resolveIcon();
         this.group = this.buildGroup();
 
@@ -129,12 +140,32 @@ public final class MachineNode
     }
 
     /**
-     * 拆节点，尽量把余量送回网络。
+     * 拆节点，尽量把余量送进机器。
      *
-     * <p>机器被删、锚点换了、工厂切回容器模式都走这里。送不回去的余量留在机器记录里，
-     * 下次建节点再冲刷。</p>
+     * <p>对账时锚点换了、机器还在：送不进去的余量留在机器记录里，下次建节点再冲刷。
+     * 机器真的被删时走 {@link #detachReturning()}。</p>
      */
     void detach() {
+        try {
+            ProviderOverflow.flush(this);
+        } catch (RuntimeException e) {
+            this.logThrottled(this.server.overworld().getGameTime(), "拆节点前冲刷余量失败：" + e);
+        }
+        this.managed.destroy();
+    }
+
+    /**
+     * 拆节点并把余量还回去；机器记录马上要删时用。
+     *
+     * <p>先送回机器，送不进去的插 ME 网络，网络也收不下才掉在机器坐标——数据就要被删了，
+     * 不能留在队列里。</p>
+     */
+    void detachReturning() {
+        try {
+            ProviderOverflow.drain(this);
+        } catch (RuntimeException e) {
+            this.logThrottled(this.server.overworld().getGameTime(), "拆节点时退回余量失败：" + e);
+        }
         this.managed.destroy();
     }
 
@@ -144,13 +175,16 @@ public final class MachineNode
     }
 
     /**
-     * 每 tick 一次：把攒下的样板变化与存档变化收口。
+     * 每 tick 一次：冲刷余量，再把攒下的样板变化与存档变化收口。
      *
      * @param now 当前游戏时间
      * @return 是否改动了要落盘的数据
      */
     boolean tick(long now) {
         boolean changed = false;
+        if (this.machine.provider().pendingCount() > 0) {
+            changed |= ProviderOverflow.flush(this);
+        }
         if (this.patternsDirty) {
             this.patternsDirty = false;
             this.craft.rebuild();
@@ -236,6 +270,11 @@ public final class MachineNode
         return this.server.getLevel(this.machine.ref().dimension());
     }
 
+    /** 当前游戏时间，告警与回收节奏用。 */
+    long gameTime() {
+        return this.server.overworld().getGameTime();
+    }
+
     /**
      * 解码样板用的世界：优先机器所在世界，没加载时退回锚点世界。
      *
@@ -260,6 +299,61 @@ public final class MachineNode
     /** 产物白名单大小。 */
     public int productCount() {
         return this.craft.products().size();
+    }
+
+    /**
+     * 开一次派单 / 回收用的六面快照。
+     *
+     * @return 快照；机器所在区块没加载时为 {@code null}
+     */
+    @Nullable
+    ProviderFaceResolver.Faces faces() {
+        return this.faceResolver.snapshot();
+    }
+
+    /**
+     * 锚点网络的库存。
+     *
+     * @return ME 库存；节点还没接进网络时为 {@code null}
+     */
+    @Nullable
+    MEStorage networkStorage() {
+        IGrid grid = this.getGrid();
+        return grid == null ? null : grid.getStorageService().getInventory();
+    }
+
+    /** 标记存档数据已变；下一次节点 tick 统一落盘。 */
+    void markDataChanged() {
+        this.dataDirty = true;
+    }
+
+    /**
+     * 把一份退不回去的资源掉在机器坐标，作为最后的兜底。
+     *
+     * @param key    资源
+     * @param amount 数量
+     * @return 是否真的掉出去了；区块没加载或数量不为正时返回 {@code false}
+     */
+    boolean dropAtMachine(AEKey key, long amount) {
+        ServerLevel level = this.machineLevel();
+        if (level == null || amount <= 0L || !level.isLoaded(this.machine.ref().pos())) {
+            return false;
+        }
+        List<ItemStack> drops = new ArrayList<>();
+        key.addDrops(amount, drops, level, this.machine.ref().pos());
+        for (ItemStack stack : drops) {
+            Block.popResource(level, this.machine.ref().pos(), stack);
+        }
+        return true;
+    }
+
+    /**
+     * 发一条玩家可见的节点事件。
+     *
+     * @param message 短句
+     */
+    void report(String message) {
+        this.notice.accept(new NodeManager.Notice(this.factoryId, this.machine.id(), message));
     }
 
     /** 派单时用的动作源，标记成机器自己发起。 */
