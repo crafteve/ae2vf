@@ -14,6 +14,7 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.core.definitions.AEItems;
 import appeng.helpers.patternprovider.PatternProviderTarget;
 
 import net.minecraft.core.Direction;
@@ -145,7 +146,8 @@ final class MachineCraftService implements ICraftingProvider {
         Set<AEKey> outputs = new HashSet<>();
         for (int slot = 0; slot < provider.capacity(); slot++) {
             ItemStack stack = provider.pattern(slot);
-            if (stack.isEmpty()) {
+            // 槽位只收处理样板；老档被手改过时也在这里挡掉，不能拿合成样板去广告。
+            if (stack.isEmpty() || !AEItems.PROCESSING_PATTERN.is(stack)) {
                 continue;
             }
             IPatternDetails details = decode(stack, level);
