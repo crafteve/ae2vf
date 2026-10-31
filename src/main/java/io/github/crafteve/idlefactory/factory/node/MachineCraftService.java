@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
+
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
@@ -20,7 +22,6 @@ import appeng.helpers.patternprovider.PatternProviderTarget;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
 
 /**
  * 机器的虚拟样板供应器：把机器上的样板广告给 CPU，并接住 CPU 派来的一份输入。

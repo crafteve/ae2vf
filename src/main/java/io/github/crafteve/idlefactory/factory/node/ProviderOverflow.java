@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
 
 import appeng.api.config.Actionable;
@@ -53,12 +54,13 @@ final class ProviderOverflow {
         }
         long returned = returnToNetwork(node, key, amount);
         long left = amount - returned;
-        if (left > 0L && !dropAtMachine(node, key, left)) {
-            node.report("余量队列已满，退回网络失败：" + key.getDisplayName().getString());
-            return;
+        boolean dropped = left <= 0L || dropAtMachine(node, key, left);
+        node.report("余量队列已满：退回网络 " + returned + "/" + amount + " "
+                + key.getDisplayName().getString() + (dropped ? "" : "，其余无处可放"));
+        if (!dropped) {
+            IdleFactory.LOGGER.warn("Idle Factory: 机器 [{}] 有余量无处可放：{} x{}",
+                    node.machine().ref().shortId(), key.getId(), left);
         }
-        node.report("余量队列已满，把 " + amount + " " + key.getDisplayName().getString()
-                + " 退回网络");
     }
 
     /**
@@ -137,6 +139,10 @@ final class ProviderOverflow {
         }
         provider.clearPending();
         node.markDataChanged();
+        if (failed > 0) {
+            IdleFactory.LOGGER.warn("Idle Factory: 机器 [{}] 拆除时有 {} 条余量既送不回机器也无法落物",
+                    node.machine().ref().shortId(), failed);
+        }
         node.report("拆除机器：退回 " + entries.size() + " 条余量"
                 + (failed > 0 ? "（" + failed + " 条无处可放，已记日志）" : ""));
     }
