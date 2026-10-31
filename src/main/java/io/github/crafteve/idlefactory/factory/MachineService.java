@@ -6,8 +6,10 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
+import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -262,6 +264,61 @@ public final class MachineService {
      */
     public static int outputRemoveEnergy(ServerPlayer player, String machineRef) {
         return remove(player, machineRef, AeKeySupport.energy(), IoSide.OUTPUT);
+    }
+
+    /**
+     * 设置机器的阻挡开关。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param mode       新开关
+     * @return 命令结果
+     */
+    public static int blocking(ServerPlayer player, String machineRef, BlockingMode mode) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        MachineRef machine = requireMachine(player, factory, machineRef);
+        if (machine == null) {
+            return 0;
+        }
+        return send(player, MachineActions.setBlocking(factory, machine.id(), mode));
+    }
+
+    /**
+     * 打印一台机器的样板供应器状态：阻挡、样板槽、余量与虚拟节点。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int provider(ServerPlayer player, String machineRef) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        MachineRef ref = requireMachine(player, factory, machineRef);
+        if (ref == null) {
+            return 0;
+        }
+        Optional<Machine> entry = factory.config().machines().byId(ref.id());
+        if (entry.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("这台机器不在机器库"));
+            return 0;
+        }
+        MachineProvider provider = entry.get().provider();
+        FactoryMessages.send(player, FactoryMessages.info(
+                "机器 [" + ref.shortId() + "] " + ref.dimension().location() + " "
+                        + ref.pos().toShortString()));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  阻挡: " + (provider.blocking().isOn() ? "开" : "关")
+                        + " · 样板: " + provider.patternCount() + "/" + provider.capacity()
+                        + " · 余量: " + provider.pendingCount() + " 条",
+                FactoryMessages.PLAIN));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  虚拟节点：未接入（后续分片实现）", FactoryMessages.PLAIN));
+        return 1;
     }
 
     private static int add(ServerPlayer player, String machineRef, AEKey key,

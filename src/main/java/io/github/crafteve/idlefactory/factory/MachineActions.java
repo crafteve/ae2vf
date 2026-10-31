@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
@@ -65,6 +66,34 @@ public final class MachineActions {
 
     private MachineActions() {
         // 纯静态动作层
+    }
+
+    /**
+     * 设置机器的阻挡开关。
+     *
+     * <p>阻挡只影响虚拟样板供应器的派单判定，不改 IO 规则，所以既不清路由也不唤醒执行器；
+     * 供应器下一次派单自带读到新值。</p>
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @param mode      新开关；{@code null} 按不阻挡处理
+     * @return 结果
+     */
+    public static Result setBlocking(Factory factory, UUID machineId,
+            @Nullable BlockingMode mode) {
+        Optional<Machine> found = factory.config().machines().byId(machineId);
+        if (found.isEmpty()) {
+            return Result.err("找不到机器");
+        }
+        Machine machine = found.get();
+        BlockingMode next = mode == null ? BlockingMode.OFF : mode;
+        machine.provider().setBlocking(next);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        return Result.ok("阻挡已" + (next.isOn() ? "开启" : "关闭") + "：["
+                + machine.ref().shortId() + "]");
     }
 
     /**

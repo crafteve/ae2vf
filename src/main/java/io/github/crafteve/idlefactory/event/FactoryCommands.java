@@ -14,6 +14,7 @@ import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.MachineService;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
+import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -180,6 +181,18 @@ public final class FactoryCommands {
                                 machineRef(context)))
                         .then(Commands.literal("info")
                                 .executes(context -> MachineService.info(player(context),
+                                        machineRef(context))))
+                        .then(Commands.literal("blocking")
+                                .then(Commands.literal("on")
+                                        .executes(audit("machine.blocking",
+                                                context -> MachineService.blocking(player(context),
+                                                        machineRef(context), BlockingMode.ON))))
+                                .then(Commands.literal("off")
+                                        .executes(audit("machine.blocking",
+                                                context -> MachineService.blocking(player(context),
+                                                        machineRef(context), BlockingMode.OFF)))))
+                        .then(Commands.literal("provider")
+                                .executes(context -> MachineService.provider(player(context),
                                         machineRef(context))))
                         .then(side(event, true))
                         .then(side(event, false)));
