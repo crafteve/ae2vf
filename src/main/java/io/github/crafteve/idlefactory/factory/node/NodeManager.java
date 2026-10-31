@@ -124,7 +124,12 @@ public final class NodeManager {
             Map.Entry<UUID, MachineNode> entry = iterator.next();
             Spec spec = wanted.get(entry.getKey());
             if (spec == null || !entry.getValue().matches(spec)) {
-                entry.getValue().detach();
+                try {
+                    entry.getValue().detach();
+                } catch (RuntimeException e) {
+                    entry.getValue().logThrottled(this.server.overworld().getGameTime(),
+                            "拆节点异常：" + e);
+                }
                 iterator.remove();
             }
         }
@@ -138,7 +143,12 @@ public final class NodeManager {
         for (Spec spec : wanted.values()) {
             MachineNode node = this.nodes.get(spec.machine().id());
             if (node != null) {
-                node.setAvailable(spec.available());
+                try {
+                    node.setAvailable(spec.available());
+                } catch (RuntimeException e) {
+                    node.logThrottled(this.server.overworld().getGameTime(),
+                            "更新可用性异常：" + e);
+                }
             }
         }
     }
@@ -175,7 +185,11 @@ public final class NodeManager {
     public void removeMachine(UUID machineId) {
         MachineNode node = this.nodes.remove(machineId);
         if (node != null) {
-            node.detachReturning();
+            try {
+                node.detachReturning();
+            } catch (RuntimeException e) {
+                node.logThrottled(this.server.overworld().getGameTime(), "拆节点异常：" + e);
+            }
         }
     }
 
@@ -191,7 +205,11 @@ public final class NodeManager {
         while (iterator.hasNext()) {
             MachineNode node = iterator.next().getValue();
             if (node.factoryId().equals(factoryId)) {
-                node.detachReturning();
+                try {
+                    node.detachReturning();
+                } catch (RuntimeException e) {
+                    node.logThrottled(this.server.overworld().getGameTime(), "拆节点异常：" + e);
+                }
                 iterator.remove();
             }
         }
