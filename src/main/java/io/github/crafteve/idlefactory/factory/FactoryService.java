@@ -176,6 +176,7 @@ public final class FactoryService {
             return 0;
         }
         runtime.manager().remove(factory.get().id());
+        runtime.nodeManager().removeFactory(factory.get().id());
         runtime.markDirty();
         ok(player, "工厂已删除：" + factory.get().id());
         return 1;
@@ -437,6 +438,8 @@ public final class FactoryService {
         factory.config().machines().remove(machineId);
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
+            // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
+            runtime.nodeManager().removeMachine(machineId);
             runtime.machineRunner().forget(machineId);
         }
         markDirty();
@@ -705,6 +708,7 @@ public final class FactoryService {
         int deleted = 0;
         int skippedRules = 0;
         int skipped = 0;
+        FactoryRuntime runtime = FactoryRuntime.get();
         for (BlockPos targetPos : targets) {
             Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (machine == null) {
@@ -718,6 +722,9 @@ public final class FactoryService {
             }
             factory.live().clearMachineMissing(machine.id());
             factory.config().machines().remove(machine.id());
+            if (runtime != null) {
+                runtime.nodeManager().removeMachine(machine.id());
+            }
             deleted++;
         }
         if (deleted > 0) {

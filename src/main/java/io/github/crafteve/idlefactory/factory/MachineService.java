@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -11,6 +12,7 @@ import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.MachineNode;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
@@ -317,8 +319,26 @@ public final class MachineService {
                         + " · 余量: " + provider.pendingCount() + " 条",
                 FactoryMessages.PLAIN));
         FactoryMessages.send(player, FactoryMessages.text(
-                "  虚拟节点：未接入（后续分片实现）", FactoryMessages.PLAIN));
+                "  节点: " + describeNode(ref.id()), FactoryMessages.PLAIN));
         return 1;
+    }
+
+    /**
+     * 一句话描述虚拟节点状态。
+     *
+     * @param machineId 机器 id
+     * @return 给玩家看的短句
+     */
+    private static String describeNode(UUID machineId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        MachineNode node = runtime == null ? null : runtime.nodeManager().node(machineId);
+        if (node == null) {
+            return "未建（仓库不是 ME 模式，或锚点解析不出 ME 节点）";
+        }
+        if (!node.isAttached()) {
+            return "未接入";
+        }
+        return node.isNodeOnline() ? "在线" : "离线（网络没电 / 未启动）";
     }
 
     private static int add(ServerPlayer player, String machineRef, AEKey key,

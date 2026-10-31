@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -12,7 +14,9 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.MachineRunner;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -21,10 +25,16 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
+import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 
+import appeng.api.networking.IGridNode;
+
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -42,6 +52,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * <p>每 tick 的顺序是固定的：</p>
  * <ol>
  *   <li><b>观测</b>：把「被引用的位置集合」交给 {@link ObservationService}，再消费它吐出的状态迁移；</li>
+ *   <li><b>虚拟节点</b>：对账一次（该建的建、该拆的拆），再让节点处理余量、回收与样板刷新；</li>
  *   <li><b>仓库</b>：每 20 tick 重新解析一次地址，把上线/离线记进事件流；</li>
  *   <li><b>IO</b>：按 IO 间隔跑一轮搬运；</li>
  *   <li><b>心跳</b>：每 100 tick 打一条 trace 日志。</li>
@@ -57,6 +68,8 @@ public final class FactoryRuntime {
     private static final int NOTICE_INTERVAL = 200;
     /** 仓库状态刷新间隔（tick）：每秒重新解析一次，别让 online 变成启动时的快照。 */
     private static final int REFRESH_INTERVAL = 20;
+    /** 虚拟节点对账间隔（tick）。 */
+    private static final int NODE_RECONCILE_INTERVAL = 20;
     /** IO 执行间隔（tick）的下限。 */
     public static final int MIN_IO_INTERVAL = 1;
     /** IO 执行间隔（tick）的上限。 */
@@ -82,6 +95,8 @@ public final class FactoryRuntime {
     private final Map<UUID, Integer> restoredNotices = new HashMap<>();
     /** 每个工厂上一次弹 actionbar 的时刻，用来节流。 */
     private final Map<UUID, Long> lastNoticeTick = new HashMap<>();
+    /** 虚拟机器节点：对账、分帧创建、每 tick 推进。 */
+    private final NodeManager nodeManager;
     private FactoryStore store;
     @Nullable
     private ObservationService observations;
@@ -94,6 +109,7 @@ public final class FactoryRuntime {
 
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
+        this.nodeManager = new NodeManager(server, this::markDirty, this::recordNodeNotice);
     }
 
     /**
@@ -117,6 +133,7 @@ public final class FactoryRuntime {
             return;
         }
         runtime.save();
+        runtime.nodeManager.destroyAll();
         runtime.machineRunner.clear();
         DiagService.clearWatches();
         runtime.storageResolver = null;
@@ -166,6 +183,11 @@ public final class FactoryRuntime {
         return this.observations;
     }
 
+    /** 虚拟机器节点管理器。 */
+    public NodeManager nodeManager() {
+        return this.nodeManager;
+    }
+
     /** 服务端实例。 */
     public MinecraftServer server() {
         return this.server;
@@ -199,6 +221,8 @@ public final class FactoryRuntime {
     public void markDirty() {
         save();
         this.links.rebuild(this.manager);
+        // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
+        this.nodeManager.requestReconcile();
     }
 
     /**
@@ -238,12 +262,28 @@ public final class FactoryRuntime {
     /**
      * 每 tick 推进一次。
      *
-     * <p>观测 → 仓库 → IO → 心跳。观测一定在最前：IO 的门禁读的是观测结论。</p>
+     * <p>观测 → 虚拟节点 → 仓库 → IO → 心跳。观测一定在最前：IO 的门禁与节点可用性读的都是
+     * 观测结论。</p>
      */
     public void tick() {
         this.tickCounter++;
 
         this.observe();
+
+        if ((this.tickCounter - 1) % NODE_RECONCILE_INTERVAL == 0
+                || this.nodeManager.isReconcileRequested()) {
+            try {
+                this.reconcileNodes();
+            } catch (RuntimeException e) {
+                // 对账炸了不能让整个服务器 tick 跟着炸；下一轮对账会把状态补齐
+                IdleFactory.LOGGER.warn("Idle Factory: 虚拟节点对账失败：{}", e.toString());
+            }
+        }
+        try {
+            this.nodeManager.tick();
+        } catch (RuntimeException e) {
+            IdleFactory.LOGGER.warn("Idle Factory: 虚拟节点 tick 失败：{}", e.toString());
+        }
 
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
             long now = this.server.overworld().getGameTime();
@@ -347,6 +387,8 @@ public final class FactoryRuntime {
                     // UNLOADED / UNKNOWN 不记
                 }
             }
+            // 节点跟着观测走：方块不在就下架样板，回来再上架
+            this.nodeManager.setAvailable(machine.id(), transition.to() == Health.PRESENT);
         }
         this.handleContainerTransition(transition, now);
     }
@@ -446,6 +488,56 @@ public final class FactoryRuntime {
                 online ? "仓库上线" : "仓库离线"));
     }
 
+    /**
+     * 虚拟节点对账：把「ME 模式 + 锚点可解析」的工厂机器拼成期望集合。
+     *
+     * <p>只在运行时这一侧拼：节点层不认识工厂，也不需要知道仓库模式。锚点方块不在、区块没加载
+     * 或没有 ME 节点时这家工厂不贡献任何期望节点，已有节点会被拆掉；锚点回来后再按预算重建。</p>
+     */
+    private void reconcileNodes() {
+        List<NodeManager.Spec> specs = new ArrayList<>();
+        for (Factory factory : this.manager.all()) {
+            if (factory.config().storageMode() != StorageMode.ME) {
+                continue;
+            }
+            if (!(factory.config().storageAnchor() instanceof MeAnchor anchor)) {
+                continue;
+            }
+            ServerLevel level = this.server.getLevel(anchor.dimension());
+            if (level == null || !level.isLoaded(anchor.pos())) {
+                continue;
+            }
+            IGridNode anchorNode = Ae2Binder.nodeAt(level, anchor.pos());
+            if (anchorNode == null) {
+                continue;
+            }
+            for (Machine machine : factory.config().machines().all()) {
+                boolean available = this.observations != null
+                        && this.observations.observe(machine.ref().blockKey()).health()
+                                == Health.PRESENT;
+                specs.add(new NodeManager.Spec(factory.id(), machine, anchorNode, level, available));
+            }
+        }
+        this.nodeManager.reconcile(specs);
+    }
+
+    /**
+     * 把节点告警写进所属工厂的事件流；工厂已经没了就只记日志。
+     *
+     * @param notice 节点告警
+     */
+    private void recordNodeNotice(NodeManager.Notice notice) {
+        Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
+        if (factory == null) {
+            IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",
+                    notice.machineId(), notice.message());
+            return;
+        }
+        long now = this.server.overworld().getGameTime();
+        factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
+                DiagEvent.Category.MACH, notice.machineId(), null, notice.message()));
+    }
+
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
         start(event.getServer());
@@ -462,6 +554,8 @@ public final class FactoryRuntime {
         FactoryRuntime runtime = instance;
         if (runtime != null) {
             runtime.save();
+            // 写盘之后再拆节点：拆节点不会再改数据，但可能碰到已经被拆掉的网络
+            runtime.nodeManager().destroyAll();
         }
     }
 
