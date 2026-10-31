@@ -11,10 +11,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 /**
- * 左表渲染：表头、机器行、展开区、新增机器行、底部统计和表框。
+ * 左表渲染：表头、机器行、展开区、底部统计和表框。
  *
  * <p>行高由 {@link FactoryScreenGeometry#detailHeight} 决定，绘制和命中共用同一套计算。
  * 渲染器只读状态/几何，不写滚动位置，也不发包。</p>
+ *
+ * <p>P1 删除产线后左表逐台铺开：不再有「新增机器」行，也不再有「移出产线」按钮。</p>
  */
 final class FactoryTableRender {
     private final FactoryScreenContext context;
@@ -45,35 +47,26 @@ final class FactoryTableRender {
                     color, false);
         }
 
-        if (state.selectedLineId == null) {
-            graphics.drawString(this.context.font(), "先选择一条产线", l.tableX,
-                    l.footerY + 3, this.context.theme().textDim(), false);
-            drawTableFrame(graphics);
-            return;
-        }
-
         List<FactoryMachineStack> table = state.tableStacks;
-        // 悬停的图标槽位只认一次，避免每行都重算一遍命中。
-        FactoryMachineStack hoveredIcon = this.context.geometry()
-                .stackIconAt(this.context.mouseX(), this.context.mouseY());
         int total = 0;
         int shown = 0;
         int y = l.rowTop;
-        // 最后一行是“新增机器”空槽；selectedLineId 非空时始终存在。
-        for (int i = state.firstRow; i <= table.size(); i++) {
+        for (int i = state.firstRow; i < table.size(); i++) {
             if (y + FactoryLayout.ROW_H > l.footerY) {
                 break;
             }
-            if (i < table.size()) {
-                FactoryMachineStack stack = table.get(i);
-                int detailHeight = this.context.geometry().detailHeight(stack, y);
-                drawRow(graphics, stack, y, detailHeight, stack.equals(hoveredIcon));
-                y += FactoryLayout.ROW_H + detailHeight;
-            } else {
-                drawAddMachineRow(graphics, y);
-                y += FactoryLayout.ROW_H;
-            }
+            FactoryMachineStack stack = table.get(i);
+            int detailHeight = this.context.geometry().detailHeight(stack, y);
+            drawRow(graphics, stack, y, detailHeight);
+            y += FactoryLayout.ROW_H + detailHeight;
             shown++;
+        }
+        if (table.isEmpty()) {
+            graphics.drawString(this.context.font(),
+                    state.hasFactory ? "还没有机器 · 用 /idf factory connect 接入" : "先执行 /idf create",
+                    l.tableX, l.footerY + 3, this.context.theme().textDim(), false);
+            drawTableFrame(graphics);
+            return;
         }
 
         int ready = 0;
@@ -126,26 +119,23 @@ final class FactoryTableRender {
     }
 
     /**
-     * 画一组机器的基础行。
+     * 画一行机器。
      *
-     * <p>图标、名字、产线名取锚点；状态和速率是整组聚合；规则条用整组累加速率。多台时在图标
-     * 右下角画数量徽标，样式跟原版物品数量一致。</p>
+     * <p>图标、名字、坐标取锚点；状态和速率是整行聚合；规则条用整行累加速率。</p>
      *
      * @param graphics     画布
-     * @param stack        机器组
+     * @param stack        机器行
      * @param y            行顶部
      * @param detailHeight 展开区高度；0 表示未展开
-     * @param iconHovered  鼠标是否停在图标槽位上（滚轮改数量的入口）
      */
     private void drawRow(GuiGraphics graphics, FactoryMachineStack stack, int y,
-            int detailHeight, boolean iconHovered) {
+            int detailHeight) {
         FactoryLayout l = this.context.layout();
         FactoryScreenState state = this.context.state();
         FactoryScreenInteraction interaction = this.context.interaction();
         FactorySnapshotBuilder.MachineView anchor = stack.anchor();
         int textY = y + (FactoryLayout.ROW_H - 9) / 2;
         FactoryStatus status = stack.status(this.context.theme());
-        String idleLabel = state.lineIdleLabel();
 
         FactoryNineSlice.card(graphics, l.leftX + 2, y, l.leftW - 4,
                 FactoryLayout.ROW_H - 1);
@@ -161,10 +151,6 @@ final class FactoryTableRender {
                 : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
-        drawCountBadge(graphics, stack, iconX - 1, y + 4);
-        if (iconHovered) {
-            drawIconHoverOutline(graphics, iconX, y + 5);
-        }
 
         String name = anchor.machineMissing()
                 ? "已失联" : FactoryLabels.blockName(anchor.blockId());
@@ -173,15 +159,12 @@ final class FactoryTableRender {
                 this.context.font().plainSubstrByWidth(name, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 4,
                 this.context.theme().textPrimary(), false);
-        String lineName = anchor.lineNames().isEmpty()
-                ? "未编线"
-                : "产线 " + String.join("/", anchor.lineNames());
+        String where = anchor.ref().dimension().location() + " "
+                + anchor.ref().pos().toShortString();
         graphics.drawString(this.context.font(),
-                this.context.font().plainSubstrByWidth(lineName, nameWidth),
+                this.context.font().plainSubstrByWidth(where, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 14,
-                anchor.lineNames().isEmpty()
-                        ? this.context.theme().textDim() : this.context.theme().textValue(),
-                false);
+                this.context.theme().textDim(), false);
 
         int stateX = l.columnX(FactoryLayout.COL_STATE) + 4;
         FactoryNineSlice.icon(graphics, status.lamp(), stateX, textY + 2,
@@ -200,8 +183,7 @@ final class FactoryTableRender {
                     l.columnW(FactoryLayout.COL_INPUT) - 4, true);
             FactoryRuleStrip.draw(graphics, this.context.font(), this.context.theme(), strip,
                     stack.inputs(), stack.inputRates(), anchor.inputReasons(),
-                    this.context.mouseX(), this.context.mouseY(), draggingResource,
-                    idleLabel != null);
+                    this.context.mouseX(), this.context.mouseY(), draggingResource, false);
         }
         if (l.hasColumn(FactoryLayout.COL_OUTPUT)) {
             int stripX = l.columnX(FactoryLayout.COL_OUTPUT) + 2;
@@ -210,8 +192,7 @@ final class FactoryTableRender {
                     l.columnW(FactoryLayout.COL_OUTPUT) - 4 - FactoryLayout.ROW_ACTIONS_W, true);
             FactoryRuleStrip.draw(graphics, this.context.font(), this.context.theme(), strip,
                     stack.outputs(), stack.outputRates(), anchor.outputReasons(),
-                    this.context.mouseX(), this.context.mouseY(), draggingResource,
-                    idleLabel != null);
+                    this.context.mouseX(), this.context.mouseY(), draggingResource, false);
         }
         drawRowActions(graphics, y, this.context.geometry().isOpen(stack));
         if (detailHeight > 0) {
@@ -220,123 +201,14 @@ final class FactoryTableRender {
                     state.ioScroll);
             FactoryIoDetailRender.draw(graphics, this.context.font(), this.context.theme(), l,
                     anchor, detail, this.context.mouseX(), this.context.mouseY(),
-                    draggingResource, idleLabel);
+                    draggingResource, null);
         }
     }
 
     /**
-     * 图标槽位的 1px 悬停描边，提示「这里滚轮可以改台数」。
+     * 行尾动作按钮：展开/收起 IO。
      *
-     * @param graphics 画布
-     * @param iconX    图标左边缘
-     * @param iconY    图标上边缘
-     */
-    private void drawIconHoverOutline(GuiGraphics graphics, int iconX, int iconY) {
-        int color = this.context.theme().hoverOutline();
-        int x = iconX - 1;
-        int y = iconY - 1;
-        int size = FactoryLayout.CELL + 2;
-        graphics.fill(x, y, x + size, y + 1, color);
-        graphics.fill(x, y + size - 1, x + size, y + size, color);
-        graphics.fill(x, y, x + 1, y + size, color);
-        graphics.fill(x + size - 1, y, x + size, y + size, color);
-    }
-
-    /**
-     * 在图标右下角画整组台数，样式跟原版物品数量一致：白字、带阴影、右下对齐。
-     *
-     * @param graphics 画布
-     * @param stack    机器组
-     * @param iconX    图标左边缘
-     * @param iconY    图标上边缘
-     */
-    /**
-     * 在图标槽位右下角画整组台数，和仓库格的数量同一套画法：小号字、右下对齐、
-     * 画在 {@link FactoryGuiLayer#GRID_COUNT} 层。
-     *
-     * <p>只画数字，不带 ×：这一格在图标的数量位，符号反而让 18px 的槽位更挤。台数为 1 时
-     * 不画，和原版物品数量一致。</p>
-     *
-     * @param graphics 画布
-     * @param stack    机器组
-     * @param slotX    图标槽位左边缘
-     * @param slotY    图标槽位上边缘
-     */
-    private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int slotX,
-            int slotY) {
-        int count = this.context.state().displayCount(stack);
-        if (count <= 1) {
-            return;
-        }
-        String text = Integer.toString(count);
-        float scale = 0.666F;
-        float textWidth = this.context.font().width(text);
-        if (textWidth * scale > FactoryLayout.CELL - 2) {
-            scale = Math.max(0.5F, (FactoryLayout.CELL - 2) / textWidth);
-        }
-        float width = textWidth * scale;
-        float height = this.context.font().lineHeight * scale;
-        graphics.pose().pushPose();
-        graphics.pose().translate(slotX + FactoryLayout.CELL - width - 1.0F,
-                slotY + FactoryLayout.CELL - height, FactoryGuiLayer.GRID_COUNT.z());
-        graphics.pose().scale(scale, scale, 1.0F);
-        graphics.drawString(this.context.font(), text, 0, 0, 0xFFFFFFFF, true);
-        graphics.pose().popPose();
-    }
-
-    /**
-     * 画“新增机器”行。
-     *
-     * @param graphics 画布
-     * @param y        行顶部
-     */
-    private void drawAddMachineRow(GuiGraphics graphics, int y) {
-        FactoryLayout l = this.context.layout();
-        FactoryScreenInteraction interaction = this.context.interaction();
-        int cardX = l.leftX + 2;
-        int cardW = l.leftW - 4;
-        FactoryNineSlice.card(graphics, cardX, y, cardW, FactoryLayout.ROW_H - 1);
-
-        boolean dragging = interaction != null && interaction.isDraggingMachine();
-        boolean hover = dragging && this.context.geometry().addMachineRowContains(
-                this.context.mouseX(), this.context.mouseY());
-        if (hover) {
-            FactoryNineSlice.fill(graphics, FactoryGuiTextures.ROW_ALT, cardX + 1, y + 1,
-                    cardW - 2, FactoryLayout.ROW_H - 3);
-        }
-
-        int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
-        FactoryNineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
-                FactoryLayout.CELL);
-        String plus = "+";
-        graphics.drawString(this.context.font(), plus,
-                iconX + (FactoryLayout.CELL - this.context.font().width(plus)) / 2, y + 8,
-                this.context.theme().textDim(), false);
-
-        String title = "新增机器";
-        String hint;
-        if (dragging) {
-            String name = interaction == null ? "" : interaction.draggedMachineName();
-            hint = hover ? "松手放入 " + name : "放到这里";
-        } else {
-            hint = "从右侧机器库拖入";
-        }
-        graphics.drawString(this.context.font(), title, iconX + FactoryLayout.CELL + 2, y + 4,
-                this.context.theme().textPrimary(), false);
-        int hintX = iconX + FactoryLayout.CELL + 2;
-        int hintWidth = Math.max(0, cardX + cardW - 4 - hintX);
-        graphics.drawString(this.context.font(),
-                this.context.font().plainSubstrByWidth(hint, hintWidth),
-                hintX, y + 14,
-                hover ? this.context.theme().statusRun()
-                        : this.context.theme().textDim(), false);
-    }
-
-    /**
-     * 行尾两枚动作按钮：移出产线、展开/收起 IO。
-     *
-     * <p>两枚按钮共用同一套底板、图标尺寸与命中矩形，避免一个像字体、一个像控件。
-     * 移出在左、展开在右，破坏性动作不贴表格外缘。</p>
+     * <p>P1 删除产线后行尾只剩展开按钮：原来「移出产线」依赖产线引用，已随产线删除。</p>
      *
      * @param graphics 画布
      * @param y        行顶部
@@ -344,14 +216,6 @@ final class FactoryTableRender {
      */
     private void drawRowActions(GuiGraphics graphics, int y, boolean open) {
         int buttonY = y + FactoryLayout.ROW_ACTION_TOP;
-        int removeX = this.context.geometry().removeButtonX();
-        boolean removeHovered = FactoryScreenGeometry.inside(this.context.mouseX(),
-                this.context.mouseY(), removeX, buttonY,
-                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
-        drawRowActionButton(graphics, removeX, buttonY,
-                removeHovered ? FactoryGuiTextures.ROW_REMOVE_HOVER
-                        : FactoryGuiTextures.ROW_REMOVE, removeHovered);
-
         int expandX = this.context.geometry().expandButtonX();
         boolean expandHovered = FactoryScreenGeometry.inside(this.context.mouseX(),
                 this.context.mouseY(), expandX, buttonY,

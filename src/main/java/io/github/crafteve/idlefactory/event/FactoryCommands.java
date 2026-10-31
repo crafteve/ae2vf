@@ -12,9 +12,8 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
+import io.github.crafteve.idlefactory.factory.MachineService;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
-import io.github.crafteve.idlefactory.factory.line.LineService;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -56,34 +55,19 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 /**
  * 工厂指令入口。
  *
- * <p>命令树以产线为主语：{@code /idf line <line> add <machine>}，而不是先动词后对象。</p>
+ * <p>P1 删除产线后命令树以机器为主语：{@code /idf machine <machine> input add <item>}，
+ * 而不是先动词后对象。</p>
  *
  * <p>界面从 P0 起只有一个入口：{@code /idf gui}。没有终端物品，也没有"装备奇点才能打开"这条链，
  * 所以"为什么打不开"只剩一种可能。</p>
  *
- * <p>Tab 补全按上下文过滤：{@code add} 只补还没进任何产线的机器，{@code remove} / {@code manage}
- * 只补这条线里的机器，{@code remove} 的物品只补已经配过的。补全面时会顺带探一下这个面有没有物品
- * 能力，有能力的排在前面。</p>
+ * <p>Tab 补全按上下文过滤：{@code machine} 参数补全机器短 id；{@code remove} 的物品只补这台机器
+ * 已经配过的。补全面时会顺带探一下这个面有没有物品能力，有能力的排在前面。</p>
  *
  * <p>会改状态的命令都套了 {@link #audit}，执行结果进诊断事件流，{@code /idf diag tail} 能看到。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryCommands {
-    /** 产线参数补全：短 id + 名字，悬停带运行状态。 */
-    private static final SuggestionProvider<CommandSourceStack> LINE_SUGGESTIONS = (context, builder) -> {
-        Factory factory = factoryFor(context.getSource());
-        if (factory != null) {
-            for (PassiveLine line : factory.config().lines().all()) {
-                // 一条产线只建议一次：名字优先，短 id 作兜底
-                String label = FactoryRefs.isReservedName(line.name()) ? line.shortId() : line.name();
-                builder.suggest(label, Component.literal("[" + line.shortId() + "] " + line.name()
-                        + " · " + (line.running() ? "运行" : "停止")
-                        + " · " + line.machineCount() + " 台"));
-            }
-        }
-        return builder.buildFuture();
-    };
-
     /** 面补全：{@code any} + 六向，能探到能力的排前面。 */
     private static final SuggestionProvider<CommandSourceStack> FACE_SUGGESTIONS = (context, builder) -> {        builder.suggest(ResourceSpec.ANY, Component.literal("不限面，按顺序尝试所有面"));
         Direction[] directions = Direction.values();
@@ -146,7 +130,7 @@ public final class FactoryCommands {
                         .executes(audit("factory.delete",
                                 context -> FactoryService.delete(player(context)))))
                 .then(factory())
-                .then(line(event))
+                .then(machine(event))
                 .then(storage(event))
                 .then(diag());
     }
@@ -177,103 +161,74 @@ public final class FactoryCommands {
                         .executes(context -> FactoryService.info(player(context))));
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> line(RegisterCommandsEvent event) {
-        return Commands.literal("line")
-                // /idf line 不带参数 = 列产线
-                .executes(context -> LineService.list(player(context)))
-                .then(Commands.literal("create")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(audit("line.create",
-                                        context -> LineService.create(player(context),
-                                                StringArgumentType.getString(context, "name"))))))
-                .then(Commands.argument("line", StringArgumentType.word())
-                        .suggests(LINE_SUGGESTIONS)
-                        // /idf line 3f2a 不带子命令 = 看这条线
-                        .executes(context -> LineService.info(player(context), lineRef(context)))
+    /**
+     * {@code /idf machine ...}：机器列表、单机详情与 IO 规则读写。
+     *
+     * <p>P1 删除产线后，原来挂在 {@code /idf line <line> manage ...} 下的规则操作整体提到这里，
+     * 少一层「先选产线」的上下文。</p>
+     *
+     * @param event 注册事件，物品参数需要它的注册表上下文
+     * @return 命令树
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> machine(RegisterCommandsEvent event) {
+        return Commands.literal("machine")
+                .executes(context -> MachineService.list(player(context)))
+                .then(Commands.argument("machine", StringArgumentType.word())
+                        .suggests(allMachines())
+                        .executes(context -> MachineService.info(player(context),
+                                machineRef(context)))
                         .then(Commands.literal("info")
-                                .executes(context -> LineService.info(player(context), lineRef(context))))
-                        .then(Commands.literal("start")
-                                .executes(audit("line.start",
-                                        context -> LineService.start(player(context), lineRef(context)))))
-                        .then(Commands.literal("end")
-                                .executes(audit("line.end",
-                                        context -> LineService.end(player(context), lineRef(context)))))
-                        .then(Commands.literal("delete")
-                                .executes(audit("line.delete",
-                                        context -> LineService.delete(player(context), lineRef(context)))))
-                        .then(Commands.literal("rename")
-                                .then(Commands.argument("name", StringArgumentType.word())
-                                        .executes(audit("line.rename",
-                                                context -> LineService.rename(player(context),
-                                                        lineRef(context),
-                                                        StringArgumentType.getString(context, "name"))))))
-                        .then(Commands.literal("add")
-                                .then(Commands.argument("machine", StringArgumentType.word())
-                                        .suggests(freeMachines())
-                                        .executes(audit("line.add",
-                                                context -> LineService.add(player(context),
-                                                        lineRef(context), machineRef(context))))))
-                        .then(Commands.literal("remove")
-                                .then(Commands.argument("machine", StringArgumentType.word())
-                                        .suggests(lineMachines())
-                                        .executes(audit("line.remove",
-                                                context -> LineService.remove(player(context),
-                                                        lineRef(context), machineRef(context))))))
-                        .then(Commands.literal("manage")
-                                .then(Commands.argument("machine", StringArgumentType.word())
-                                        .suggests(lineMachines())
-                                        .then(Commands.literal("info")
-                                                .executes(context -> LineService.manageInfo(player(context),
-                                                        lineRef(context), machineRef(context))))
-                                        .then(manageSide(event, true))
-                                        .then(manageSide(event, false)))));
+                                .executes(context -> MachineService.info(player(context),
+                                        machineRef(context))))
+                        .then(side(event, true))
+                        .then(side(event, false)));
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> manageSide(RegisterCommandsEvent event,
+    private static LiteralArgumentBuilder<CommandSourceStack> side(RegisterCommandsEvent event,
             boolean input) {
         String side = input ? "input" : "output";
         return Commands.literal(side)
                 .then(Commands.literal("add")
                         .then(Commands.literal("item")
                                 .then(Commands.argument("item", ItemArgument.item(event.getBuildContext()))
-                                        .executes(audit("line." + side + ".add",
+                                        .executes(audit("machine." + side + ".add",
                                                 context -> addSpec(context, input, null)))
                                         .then(Commands.argument("face", StringArgumentType.word())
                                                 .suggests(FACE_SUGGESTIONS)
-                                                .executes(audit("line." + side + ".add",
+                                                .executes(audit("machine." + side + ".add",
                                                         context -> addSpec(context, input,
                                                                 StringArgumentType.getString(context, "face")))))))
                         .then(Commands.literal("fluid")
                                 .then(Commands.argument("fluid", ResourceLocationArgument.id())
                                         .suggests(FLUID_SUGGESTIONS)
-                                        .executes(audit("line." + side + ".add",
+                                        .executes(audit("machine." + side + ".add",
                                                 context -> addFluidSpec(context, input, null)))
                                         .then(Commands.argument("face", StringArgumentType.word())
                                                 .suggests(FACE_SUGGESTIONS)
-                                                .executes(audit("line." + side + ".add",
+                                                .executes(audit("machine." + side + ".add",
                                                         context -> addFluidSpec(context, input,
                                                                 StringArgumentType.getString(context, "face")))))))
                         .then(Commands.literal("energy")
-                                .executes(audit("line." + side + ".add",
+                                .executes(audit("machine." + side + ".add",
                                         context -> addEnergySpec(context, input, null)))
                                 .then(Commands.argument("face", StringArgumentType.word())
                                         .suggests(FACE_SUGGESTIONS)
-                                        .executes(audit("line." + side + ".add",
+                                        .executes(audit("machine." + side + ".add",
                                                 context -> addEnergySpec(context, input,
                                                         StringArgumentType.getString(context, "face")))))))
                 .then(Commands.literal("remove")
                         .then(Commands.literal("item")
                                 .then(Commands.argument("item", ItemArgument.item(event.getBuildContext()))
                                         .suggests(configuredItems(input, ResourceKind.ITEM))
-                                        .executes(audit("line." + side + ".remove",
+                                        .executes(audit("machine." + side + ".remove",
                                                 context -> removeSpec(context, input)))))
                         .then(Commands.literal("fluid")
                                 .then(Commands.argument("fluid", ResourceLocationArgument.id())
                                         .suggests(configuredItems(input, ResourceKind.FLUID))
-                                        .executes(audit("line." + side + ".remove",
+                                        .executes(audit("machine." + side + ".remove",
                                                 context -> removeFluidSpec(context, input)))))
                         .then(Commands.literal("energy")
-                                .executes(audit("line." + side + ".remove",
+                                .executes(audit("machine." + side + ".remove",
                                         context -> removeEnergySpec(context, input)))));
     }
 
@@ -352,29 +307,30 @@ public final class FactoryCommands {
                 .then(Commands.literal("links")
                         .executes(context -> DiagService.links(player(context))))
                 .then(Commands.literal("why")
-                        .then(Commands.argument("line", StringArgumentType.word())
-                                .suggests(LINE_SUGGESTIONS)
-                                .executes(context -> DiagService.why(player(context), lineRef(context)))
-                                .then(Commands.argument("machine", StringArgumentType.word())
-                                        .suggests(lineMachines())
-                                        .executes(context -> DiagService.whyMachine(player(context),
-                                                lineRef(context), machineRef(context))))))
+                        .then(Commands.argument("machine", StringArgumentType.word())
+                                .suggests(allMachines())
+                                .executes(context -> DiagService.why(player(context),
+                                        machineRef(context)))))
                 .then(Commands.literal("tail")
                         .executes(context -> DiagService.tail(player(context), 10))
                         .then(Commands.argument("count", IntegerArgumentType.integer(1, 20))
                                 .executes(context -> DiagService.tail(player(context),
                                         IntegerArgumentType.getInteger(context, "count")))))
                 .then(Commands.literal("watch")
-                        .then(Commands.argument("line", StringArgumentType.word())
-                                .suggests(LINE_SUGGESTIONS)
-                                .executes(context -> DiagService.watch(player(context), lineRef(context), 1, false))
+                        .then(Commands.argument("machine", StringArgumentType.word())
+                                .suggests(allMachines())
+                                .executes(context -> DiagService.watch(player(context),
+                                        machineRef(context), 1, false))
                                 .then(Commands.literal("detail")
-                                        .executes(context -> DiagService.watch(player(context), lineRef(context), 5, true))
+                                        .executes(context -> DiagService.watch(player(context),
+                                                machineRef(context), 5, true))
                                         .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
-                                                .executes(context -> DiagService.watch(player(context), lineRef(context),
+                                                .executes(context -> DiagService.watch(player(context),
+                                                        machineRef(context),
                                                         IntegerArgumentType.getInteger(context, "seconds"), true))))
                                 .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
-                                        .executes(context -> DiagService.watch(player(context), lineRef(context),
+                                        .executes(context -> DiagService.watch(player(context),
+                                                machineRef(context),
                                                 IntegerArgumentType.getInteger(context, "seconds"), false)))))
                 .then(Commands.literal("io")
                         .executes(context -> DiagService.io(player(context)))
@@ -404,56 +360,25 @@ public final class FactoryCommands {
         };
     }
 
-    /** 还没进任何产线的机器（{@code line add} 用）。 */
+    /** 还没进任何分组的机器（备用补全；P1 后所有机器都在机器库里）。 */
     private static SuggestionProvider<CommandSourceStack> freeMachines() {
-        return (context, builder) -> {
-            Factory factory = factoryFor(context.getSource());
-            if (factory != null) {
-                Set<UUID> assigned = FactoryRefs.assignedMachines(factory);
-                for (Machine machine : factory.config().machines().all()) {
-                    MachineRef target = machine.ref();
-                    if (!assigned.contains(target.id())) {
-                        builder.suggest(target.shortId(), machineTooltip(factory, target));
-                    }
-                }
-            }
-            return builder.buildFuture();
-        };
-    }
-
-    /** 这条线里的机器（{@code remove} / {@code manage} 用）。 */
-    private static SuggestionProvider<CommandSourceStack> lineMachines() {
-        return (context, builder) -> {
-            Factory factory = factoryFor(context.getSource());
-            PassiveLine line = lineFrom(context, factory);
-            if (factory != null && line != null) {
-                for (UUID machineId : line.machineIds()) {
-                    factory.config().machines().byId(machineId)
-                            .ifPresent(machine -> builder.suggest(machine.ref().shortId(),
-                                    machineTooltip(factory, machine.ref())));
-                }
-            }
-            return builder.buildFuture();
-        };
+        return allMachines();
     }
 
     /** 这台机器已经配过的同类资源（{@code remove} 用）。 */
     private static SuggestionProvider<CommandSourceStack> configuredItems(boolean input, ResourceKind kind) {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
-            PassiveLine line = lineFrom(context, factory);
             MachineRef machine = machineFrom(context, factory);
-            if (factory != null && line != null && machine != null) {
-                if (line.containsMachine(machine.id())) {
-                    factory.config().machines().byId(machine.id()).ifPresent(entry -> {
-                        var io = entry.io();
-                        for (ResourceSpec spec : input ? io.inputs() : io.outputs()) {
-                            if (spec.key().kind() == kind) {
-                                builder.suggest(spec.key().id().toString());
-                            }
+            if (factory != null && machine != null) {
+                factory.config().machines().byId(machine.id()).ifPresent(entry -> {
+                    var io = entry.io();
+                    for (ResourceSpec spec : input ? io.inputs() : io.outputs()) {
+                        if (spec.key().kind() == kind) {
+                            builder.suggest(spec.key().id().toString());
                         }
-                    });
-                }
+                    }
+                });
             }
             return builder.buildFuture();
         };
@@ -508,8 +433,8 @@ public final class FactoryCommands {
         ServerPlayer player = player(context);
         ItemStack item = item(context);
         return input
-                ? LineService.manageInputAdd(player, lineRef(context), machineRef(context), item, face)
-                : LineService.manageOutputAdd(player, lineRef(context), machineRef(context), item, face);
+                ? MachineService.inputAdd(player, machineRef(context), item, face)
+                : MachineService.outputAdd(player, machineRef(context), item, face);
     }
 
     private static int addFluidSpec(CommandContext<CommandSourceStack> context, boolean input,
@@ -517,16 +442,16 @@ public final class FactoryCommands {
         ServerPlayer player = player(context);
         String fluid = ResourceLocationArgument.getId(context, "fluid").toString();
         return input
-                ? LineService.manageInputAddFluid(player, lineRef(context), machineRef(context), fluid, face)
-                : LineService.manageOutputAddFluid(player, lineRef(context), machineRef(context), fluid, face);
+                ? MachineService.inputAddFluid(player, machineRef(context), fluid, face)
+                : MachineService.outputAddFluid(player, machineRef(context), fluid, face);
     }
 
     private static int addEnergySpec(CommandContext<CommandSourceStack> context, boolean input,
             @Nullable String face) throws CommandSyntaxException {
         ServerPlayer player = player(context);
         return input
-                ? LineService.manageInputAddEnergy(player, lineRef(context), machineRef(context), face)
-                : LineService.manageOutputAddEnergy(player, lineRef(context), machineRef(context), face);
+                ? MachineService.inputAddEnergy(player, machineRef(context), face)
+                : MachineService.outputAddEnergy(player, machineRef(context), face);
     }
 
     private static int removeSpec(CommandContext<CommandSourceStack> context, boolean input)
@@ -534,8 +459,8 @@ public final class FactoryCommands {
         ServerPlayer player = player(context);
         ItemStack item = item(context);
         return input
-                ? LineService.manageInputRemove(player, lineRef(context), machineRef(context), item)
-                : LineService.manageOutputRemove(player, lineRef(context), machineRef(context), item);
+                ? MachineService.inputRemove(player, machineRef(context), item)
+                : MachineService.outputRemove(player, machineRef(context), item);
     }
 
     private static int removeFluidSpec(CommandContext<CommandSourceStack> context, boolean input)
@@ -543,16 +468,16 @@ public final class FactoryCommands {
         ServerPlayer player = player(context);
         String fluid = ResourceLocationArgument.getId(context, "fluid").toString();
         return input
-                ? LineService.manageInputRemoveFluid(player, lineRef(context), machineRef(context), fluid)
-                : LineService.manageOutputRemoveFluid(player, lineRef(context), machineRef(context), fluid);
+                ? MachineService.inputRemoveFluid(player, machineRef(context), fluid)
+                : MachineService.outputRemoveFluid(player, machineRef(context), fluid);
     }
 
     private static int removeEnergySpec(CommandContext<CommandSourceStack> context, boolean input)
             throws CommandSyntaxException {
         ServerPlayer player = player(context);
         return input
-                ? LineService.manageInputRemoveEnergy(player, lineRef(context), machineRef(context))
-                : LineService.manageOutputRemoveEnergy(player, lineRef(context), machineRef(context));
+                ? MachineService.inputRemoveEnergy(player, machineRef(context))
+                : MachineService.outputRemoveEnergy(player, machineRef(context));
     }
 
     /**
@@ -572,22 +497,6 @@ public final class FactoryCommands {
         } catch (CommandSyntaxException e) {
             return null;
         }
-    }
-
-    /**
-     * 从已解析的命令上下文里读产线参数。
-     *
-     * <p>补全阶段 Brigadier 传进来的上下文不一定带 {@code getArgument}，所以先按已解析节点的
-     * 文本范围取，取不到再按关键字在原始输入里找。两种都失败就当没有。</p>
-     */
-    @Nullable
-    private static PassiveLine lineFrom(CommandContext<CommandSourceStack> context,
-            @Nullable Factory factory) {
-        if (factory == null) {
-            return null;
-        }
-        String ref = argText(context, "line");
-        return ref == null ? null : FactoryRefs.line(factory, ref).orElse(null);
     }
 
     /** 从已解析的命令上下文里读机器参数；读不到返回 {@code null}。 */
@@ -624,17 +533,13 @@ public final class FactoryCommands {
         } catch (RuntimeException ignored) {
             // 落到下面的词法兜底
         }
-        if ("line".equals(name)) {
-            String after = tokenAfter(input, "line");
-            return after != null ? after : tokenAfter(input, "why");
-        }
         if ("machine".equals(name)) {
-            String after = tokenAfter(input, "manage");
+            String after = tokenAfter(input, "machine");
             if (after == null) {
-                after = tokenAfter(input, "add");
+                after = tokenAfter(input, "why");
             }
             if (after == null) {
-                after = tokenAfter(input, "remove");
+                after = tokenAfter(input, "watch");
             }
             return after;
         }
@@ -673,10 +578,6 @@ public final class FactoryCommands {
     private static ServerPlayer player(CommandContext<CommandSourceStack> context)
             throws CommandSyntaxException {
         return context.getSource().getPlayerOrException();
-    }
-
-    private static String lineRef(CommandContext<CommandSourceStack> context) {
-        return StringArgumentType.getString(context, "line");
     }
 
     private static String machineRef(CommandContext<CommandSourceStack> context) {

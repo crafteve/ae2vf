@@ -7,7 +7,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * 破坏性操作的确认浮层（当前用于删除产线）。
+ * 破坏性操作的确认浮层（当前用于删除机器）。
  *
  * <p>不带输入框；确认后立即关闭并执行回调，结果由服务端反馈显示在底部状态条。Esc / 取消关闭，
  * 回车确认。浮层外点击一律吞掉，避免误触背后的表格。</p>

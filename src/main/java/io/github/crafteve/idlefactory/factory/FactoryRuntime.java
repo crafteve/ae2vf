@@ -263,7 +263,7 @@ public final class FactoryRuntime {
                 String afterError = factory.live().storageError();
                 if (afterError != null && !afterError.equals(beforeError)) {
                     factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
-                            DiagEvent.Category.STOR, null, null, null, "仓库解析异常：" + afterError));
+                            DiagEvent.Category.STOR, null, null, "仓库解析异常：" + afterError));
                 }
             }
             DiagService.tick(this.server);
@@ -315,7 +315,7 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 消费一次状态迁移：记事件、维护 machineMissing、必要时唤醒产线。
+     * 消费一次状态迁移：记事件、维护 machineMissing、必要时唤醒机器。
      *
      * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
      * 未加载只在 {@code diag observe} 里看得到。</p>
@@ -335,7 +335,7 @@ public final class FactoryRuntime {
                 case MISSING, NO_DIMENSION -> {
                     if (factory.live().markMachineMissing(ref.id())) {
                         factory.live().stats().record(DiagEvent.of(now,
-                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, null, ref.id(),
+                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, ref.id(),
                                 null, transition.to().describe() + "，机器仍留在机器库"));
                         this.missingNotices.merge(factory.id(), 1, Integer::sum);
                     }
@@ -344,7 +344,7 @@ public final class FactoryRuntime {
                     boolean wasMissing = factory.live().clearMachineMissing(ref.id());
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
-                                DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
+                                DiagEvent.Category.MACH, ref.id(), null, "机器已恢复"));
                         this.wakeMachine(factory, ref.id());
                         if (wasMissing) {
                             this.restoredNotices.merge(factory.id(), 1, Integer::sum);
@@ -383,7 +383,7 @@ public final class FactoryRuntime {
                 }
                 factory.live().stats().record(DiagEvent.of(now,
                         transition.to() == Health.PRESENT ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
-                        DiagEvent.Category.STOR, null, null, null,
+                        DiagEvent.Category.STOR, null, null,
                         "容器 [" + ref.shortId() + "] " + transition.to().describe()));
             }
         }
@@ -450,7 +450,7 @@ public final class FactoryRuntime {
         boolean online = factory.live().storageOnline();
         factory.live().stats().record(DiagEvent.of(now,
                 online ? DiagEvent.Level.OK : DiagEvent.Level.WARN,
-                DiagEvent.Category.STOR, null, null, null,
+                DiagEvent.Category.STOR, null, null,
                 online ? "仓库上线" : "仓库离线"));
     }
 

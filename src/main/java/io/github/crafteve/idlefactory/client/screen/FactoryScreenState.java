@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,9 +24,11 @@ import net.minecraft.client.gui.Font;
 /**
  * 工厂界面的客户端状态与派生视图。
  *
- * <p>只保存服务端已经算好的机器/仓库视图，以及界面自己的搜索、排序、滚动、展开、tab
- * 和选中产线；不探世界、不推导服务端状态。绘制、命中、输入都从这里读，避免同一份状态
- * 在多个类里各存一份。</p>
+ * <p>只保存服务端已经算好的机器/仓库视图，以及界面自己的搜索、排序、滚动、展开和 tab；
+ * 不探世界、不推导服务端状态。绘制、命中、输入都从这里读，避免同一份状态在多个类里各存一份。</p>
+ *
+ * <p>P1 删除产线后不再有「选中产线」这个状态：左表直接铺开工厂机器库里的每一台机器，
+ * 拖拽改台数、加机器行等以产线堆叠组为前提的交互一并删除。</p>
  *
  * <p>字段保持包内可见：同包的渲染器/输入类直接读，减少一层无意义的 getter；可变集合
  * 不暴露给包外。</p>
@@ -45,23 +46,14 @@ final class FactoryScreenState {
 
     /** 服务端最近一次给的全量机器视图；左表和机器库都从这份数据派生。 */
     List<FactorySnapshotBuilder.MachineView> machines = List.of();
-    /** 服务端最近一次给的产线列表；产线下拉从这里取。 */
-    List<FactorySnapshotBuilder.LineView> lines = List.of();
     /** 服务端是否已经有工厂实例；没有时界面显示创建引导。 */
     boolean hasFactory;
     /** 仓库链接是否在线；表格中的数量仍以仓库包为准。 */
     boolean storageOnline;
-    /** 工厂产线总数。 */
-    int lineCount;
-    /** 当前运行中的产线数。 */
-    int runningLineCount;
     /** 左表当前滚动到的第一条机器下标。 */
     int firstRow;
     /** 当前右区 tab：仓库或机器。 */
     int activeTab = FactoryScreen.TAB_STORAGE;
-    /** 左表当前选中的产线 id；null 表示还没选择产线，此时左表为空。 */
-    @Nullable
-    UUID selectedLineId;
     /** 客户端仓库视图；全量快照在这里做稳定排序和过滤。 */
     final FactoryStorageRepo storageRepo = new FactoryStorageRepo();
     /** 正在拼装的分片快照；last 到齐后才替换 {@link #storageRepo}。 */
@@ -76,8 +68,7 @@ final class FactoryScreenState {
     int storageFirstRow;
     /** 机器库当前滚动到的第一台机器。 */
     int machineFirstRow;
-    /** 已展开的机器；同一时间最多一台，快照刷新后仍能保持展开。 */
-    /** 展开的组，按锚点机器 id 存；签名变化不影响展开状态。 */
+    /** 已展开的左表行，按锚点机器 id 存；签名变化不影响展开状态。 */
     final Set<UUID> expandedStacks = new HashSet<>();
 
     /** 机器库展开的组，按锚点 id 记；一次只展开一张卡。 */
@@ -89,22 +80,6 @@ final class FactoryScreenState {
     /** 机器库成员行高。 */
     static final int LIBRARY_MEMBER_H = 16;
 
-    /** 滚轮改台数的合并窗口（毫秒）；滚轮一格在 Windows 上常一次发多个事件。 */
-    static final long STACK_SCROLL_MERGE_MS = 150L;
-    /** 发出改数量请求后，本地乐观显示最多保留多久（毫秒），等快照回来。 */
-    static final long STACK_SCROLL_ECHO_MS = 500L;
-    /** 一组最多多少台；和服务端 LineActions.MAX_STACK 一致。 */
-    static final int MAX_STACK_COUNT = 512;
-
-    /** 正在用滚轮改的组锚点；{@code null} 表示没有待发请求。 */
-    @Nullable
-    UUID pendingStackAnchorId;
-    /** 目标台数，本地乐观显示用。 */
-    int pendingStackTarget;
-    /** 最后一次滚轮时间。 */
-    long pendingStackChangedAt;
-    /** 请求发出的时间；{@code 0} 表示还没发。 */
-    long pendingStackSentAt;
     /** 展开 IO 面板的像素滚动。 */
     int ioScroll;
 
@@ -112,22 +87,19 @@ final class FactoryScreenState {
     FactorySearchQuery searchQuery = FactorySearchQuery.EMPTY;
     /** 仓库搜索 + 排序后的可见条目。 */
     List<FactoryStorageS2C.Entry> filteredStorageEntries = List.of();
-    /** 机器库搜索 + 排序后的可见视图；左表还会再按当前产线过滤。 */
+    /** 机器库搜索 + 排序后的可见视图；左表与机器库共用它。 */
     List<FactorySnapshotBuilder.MachineView> filteredMachines = List.of();
 
     /** 机器库按组聚合后的行；与 {@link #filteredMachines} 一起重算。 */
     List<FactoryMachineStack> libraryStacks = List.of();
 
-    /** 当前产线按组聚合后的行；左表只画这些。 */
+    /** 左表逐台铺开后的行。 */
     List<FactoryMachineStack> tableStacks = List.of();
     /** 资源 → 搜索字段缓存；tooltip/tag 读取较重，避免每次过滤重复解析。 */
     final Map<ResourceKey, FactorySearchQuery.Fields> storageSearchFields = new HashMap<>();
 
     /** 跨界面保留的搜索词；关闭界面时写入。 */
     static String rememberedSearch = "";
-    /** 跨界面保留的产线选择；acceptTable 会校验该产线仍存在。 */
-    @Nullable
-    static UUID rememberedLineId;
 
     /**
      * @param theme 当前主题
@@ -157,9 +129,6 @@ final class FactoryScreenState {
     void acceptTable(FactoryTableS2C payload) {
         this.hasFactory = payload.hasFactory();
         this.storageOnline = payload.storageOnline();
-        this.lineCount = payload.lineCount();
-        this.runningLineCount = payload.runningLineCount();
-        this.lines = payload.lines();
         this.machines = payload.machines();
         Set<UUID> currentIds = new HashSet<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
@@ -171,10 +140,6 @@ final class FactoryScreenState {
             // 展开的那台被删了：收起，避免下一次同名锚点出现时意外展开。
             this.expandedLibraryAnchor = null;
         }
-        if (this.selectedLineId != null && findLine(this.selectedLineId) == null) {
-            this.selectedLineId = null;
-        }
-        rememberedLineId = this.selectedLineId;
         if (!this.hasFactory) {
             this.storageRepo.clear();
             this.storageSearchFields.clear();
@@ -257,14 +222,14 @@ final class FactoryScreenState {
     }
 
     /**
-     * 重算左表和机器库的组行。
+     * 重算左表和机器库的行。
      *
      * <p>分组是纯视图操作，不缓存跨快照状态：每次可见视图变化都从头算，512 台上限下开销可以忽略。
-     * 先算机器库是因为它用 {@code filteredMachines}（已搜索、已排序），左表则按机器库登记顺序。</p>
+     * 左表逐台铺开，机器库按「同方块、同规则」自动合并。</p>
      */
     private void rebuildStacks() {
         this.libraryStacks = FactoryMachineStack.library(this.filteredMachines);
-        this.tableStacks = FactoryMachineStack.table(tableMachines());
+        this.tableStacks = FactoryMachineStack.flat(this.filteredMachines);
     }
 
     /**
@@ -284,47 +249,6 @@ final class FactoryScreenState {
     void setSearchQuery(FactorySearchQuery query) {
         this.searchQuery = query;
         rebuildFiltered();
-    }
-
-    /**
-     * 可以并进这一组的空闲机器，按快照顺序。
-     *
-     * <p>规则和服务端一致：同方块、同方块实体、不在任何产线，并且「没有规则」或者
-     * 「规则和本组完全一样」。客户端拿它做滚轮上限和逐台放机器的候选。</p>
-     *
-     * @param stack 机器组
-     * @return 候选机器 id
-     */
-    List<UUID> stackPool(FactoryMachineStack stack) {
-        List<UUID> pool = new ArrayList<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            if (!machine.lineIds().isEmpty()) {
-                continue;
-            }
-            if (!Objects.equals(machine.groupBlockId(), stack.blockId())
-                    || !Objects.equals(machine.beTypeId(), stack.beTypeId())) {
-                continue;
-            }
-            boolean empty = machine.inputs().isEmpty() && machine.outputs().isEmpty();
-            if (!empty && !FactoryMachineStack.signatureOf(machine).equals(stack.signature())) {
-                continue;
-            }
-            pool.add(machine.ref().id());
-        }
-        return pool;
-    }
-
-    /**
-     * 这一组最多能扩到几台：当前台数 + 空闲同类机器数。
-     *
-     * <p>客户端先夹一次，避免本地乐观值滚到 7、服务端再打回 3 的闪烁；服务端仍然会重新校验，
-     * 这里只是让显示别先骗人。</p>
-     *
-     * @param stack 机器组
-     * @return 上限；至少等于当前台数
-     */
-    int maxStackCount(FactoryMachineStack stack) {
-        return Math.min(MAX_STACK_COUNT, stack.count() + stackPool(stack).size());
     }
 
     /**
@@ -356,99 +280,6 @@ final class FactoryScreenState {
     }
 
     /**
-     * 这一组还能不能用滚轮改台数。
-     *
-     * <p>只有「组内一台规则都没有」时才允许：已经配好 IO 的行多半在跑，滚一下多一台既难发现
-     * 也会让组内签名不一致。要给它加机器，只能从库拖进去（明确动作）。</p>
-     *
-     * @param stack 机器组
-     * @return 可以滚轮时为 {@code true}
-     */
-    boolean stackEditable(FactoryMachineStack stack) {
-        for (FactorySnapshotBuilder.MachineView member : stack.members()) {
-            if (member.ruleCount() > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * 滚轮改某组台数：先从当前台数起算，同一组的连续滚动会累加。
-     *
-     * @param stack 机器组
-     * @param delta 增量；正数加、负数减
-     */
-    void scrollStackCount(FactoryMachineStack stack, int delta) {
-        if (!stackEditable(stack)) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (!stack.anchorId().equals(this.pendingStackAnchorId)) {
-            this.pendingStackAnchorId = stack.anchorId();
-            this.pendingStackTarget = stack.count();
-            this.pendingStackSentAt = 0L;
-        } else if (this.pendingStackSentAt > 0L) {
-            // 上一个请求已经发出，又在它回来之前继续滚：以当前目标为基准接着加。
-            this.pendingStackSentAt = 0L;
-        }
-        int max = maxStackCount(stack);
-        this.pendingStackTarget = Math.max(1,
-                Math.min(max, this.pendingStackTarget + delta));
-        this.pendingStackChangedAt = now;
-    }
-
-    /**
-     * 该组的显示台数：有未发出的滚轮请求时用目标值，其余用真实台数。
-     *
-     * @param stack 机器组
-     * @return 显示用台数
-     */
-    int displayCount(FactoryMachineStack stack) {
-        long now = System.currentTimeMillis();
-        if (stack.anchorId().equals(this.pendingStackAnchorId)) {
-            if (this.pendingStackSentAt == 0L
-                    || now - this.pendingStackSentAt <= STACK_SCROLL_ECHO_MS) {
-                return this.pendingStackTarget;
-            }
-        }
-        return stack.count();
-    }
-
-    /**
-     * 是否该把滚轮累计的台数发给服务端。
-     *
-     * @param now 当前毫秒
-     * @return 停手超过合并窗口且还没发过时为 {@code true}
-     */
-    boolean pendingStackDue(long now) {
-        return this.pendingStackAnchorId != null && this.pendingStackSentAt == 0L
-                && now - this.pendingStackChangedAt >= STACK_SCROLL_MERGE_MS;
-    }
-
-    /** 标记请求已发出，本地乐观显示开始倒计时。 */
-    void markPendingStackSent(long now) {
-        this.pendingStackSentAt = now;
-    }
-
-    /**
-     * 乐观显示是否过期；过期后回到服务端快照的真实台数。
-     *
-     * @param now 当前毫秒
-     * @return 过期为 {@code true}
-     */
-    boolean pendingStackExpired(long now) {
-        return this.pendingStackAnchorId != null && this.pendingStackSentAt > 0L
-                && now - this.pendingStackSentAt > STACK_SCROLL_ECHO_MS;
-    }
-
-    /** 放弃未发出的滚轮请求。 */
-    void clearPendingStack() {
-        this.pendingStackAnchorId = null;
-        this.pendingStackSentAt = 0L;
-    }
-
-    /**
      * 取一个资源 key 的搜索字段，按 key 缓存。
      *
      * @param key 资源
@@ -474,15 +305,10 @@ final class FactoryScreenState {
         String id = machine.blockId() == null ? "" : machine.blockId().toString();
         String namespace = machine.blockId() == null ? "" : machine.blockId().getNamespace();
         String name = FactoryLabels.blockName(machine.blockId());
-        if (!machine.lineNames().isEmpty()) {
-            name += " " + String.join(" ", machine.lineNames());
-        }
         String tooltip = FactoryStatus.text(machine, this.theme) + "\n"
                 + machine.ref().dimension().location() + " "
                 + machine.ref().pos().toShortString() + "\n"
-                + (machine.lineNames().isEmpty()
-                        ? "未编线" : "产线 " + String.join("/", machine.lineNames()))
-                + "\n规则 " + machine.ruleCount() + " 条";
+                + "规则 " + machine.ruleCount() + " 条";
         return new FactorySearchQuery.Fields(name, id, namespace,
                 FactoryUiText.modName(namespace), tooltip, List.of());
     }
@@ -490,31 +316,10 @@ final class FactoryScreenState {
     /**
      * 左表最多能滚到第几行。
      *
-     * @return 最大首行下标；未选产线为 0
+     * @return 最大首行下标；不足一屏为 0
      */
     int maxFirstRow() {
-        if (this.selectedLineId == null) {
-            return 0;
-        }
         return Math.max(0, this.tableStacks.size());
-    }
-
-    /**
-     * 当前左表产线下的机器；没有选产线时返回空表。
-     *
-     * @return 当前产线机器
-     */
-    List<FactorySnapshotBuilder.MachineView> tableMachines() {
-        if (this.selectedLineId == null) {
-            return List.of();
-        }
-        List<FactorySnapshotBuilder.MachineView> filtered = new ArrayList<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            if (machine.lineIds().contains(this.selectedLineId)) {
-                filtered.add(machine);
-            }
-        }
-        return filtered;
     }
 
     /**
@@ -558,75 +363,6 @@ final class FactoryScreenState {
         // 末尾空槽是拖放目标，列宽必须给它留位置。
         width += FactoryLayout.CELL + 2;
         return Math.max(72, width);
-    }
-
-    /**
-     * 顶栏产线按钮的文案。
-     *
-     * @return 按钮文字
-     */
-    String lineButtonText() {
-        FactorySnapshotBuilder.LineView line = selectedLine();
-        return line == null ? "选择产线" : line.name();
-    }
-
-    /**
-     * 当前选中的产线。
-     *
-     * @return 产线；未选择或已被删除时为 {@code null}
-     */
-    @Nullable
-    FactorySnapshotBuilder.LineView selectedLine() {
-        return this.selectedLineId == null ? null : findLine(this.selectedLineId);
-    }
-
-    /**
-     * 当前产线是否处于不执行 IO 的状态。
-     *
-     * @return 已暂停 / 睡眠中；运行中或未选线为 {@code null}
-     */
-    @Nullable
-    String lineIdleLabel() {
-        FactorySnapshotBuilder.LineView line = selectedLine();
-        if (line == null) {
-            return null;
-        }
-        if (!line.running()) {
-            return "已暂停";
-        }
-        return line.sleeping() ? "睡眠中" : null;
-    }
-
-    /**
-     * 按 id 找产线。
-     *
-     * @param id 产线 id
-     * @return 产线；不存在时为 {@code null}
-     */
-    @Nullable
-    FactorySnapshotBuilder.LineView findLine(UUID id) {
-        for (FactorySnapshotBuilder.LineView line : this.lines) {
-            if (line.id().equals(id)) {
-                return line;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 选中一条产线；切换后左表从第一行重新显示。
-     *
-     * @param lineId 产线 id；{@code null} 表示清空
-     */
-    void selectLine(@Nullable UUID lineId) {
-        if (Objects.equals(this.selectedLineId, lineId)) {
-            return;
-        }
-        this.selectedLineId = lineId;
-        rememberedLineId = lineId;
-        this.firstRow = 0;
-        rebuildStacks();
-        updateColumnWidths();
     }
 
     /**

@@ -84,10 +84,6 @@ public final class FactoryGuiTextures {
     public static final ResourceLocation CHEVRON_RIGHT = id("chevron_right");
     /** 展开箭头：7×7。 */
     public static final ResourceLocation CHEVRON_DOWN = id("chevron_down");
-    /** 行尾移出产线：7×7 深靛 X。 */
-    public static final ResourceLocation ROW_REMOVE = id("row_remove");
-    /** 行尾移出产线悬停：7×7 警示红 X。 */
-    public static final ResourceLocation ROW_REMOVE_HOVER = id("row_remove_hover");
 
     /** 1px 状态条：运行。 */
     public static final ResourceLocation STATUS_STRIP_RUN = id("status_strip_run");

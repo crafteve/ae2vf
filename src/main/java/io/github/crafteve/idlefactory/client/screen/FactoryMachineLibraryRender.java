@@ -9,7 +9,7 @@ import net.minecraft.world.item.Items;
 /**
  * 机器库：深色机器卡片、空状态提示与卡片内部排布。
  *
- * <p>只读当前过滤/排序后的机器视图和滚动位置；卡片内按名称、产线、状态、规则数
+ * <p>只读当前过滤/排序后的机器视图和滚动位置；卡片内按名称、坐标、状态、规则数
  * 四块排文字，所有坐标与命中都由 {@link FactoryScreenGeometry} 给出。</p>
  */
 final class FactoryMachineLibraryRender {
@@ -171,8 +171,8 @@ final class FactoryMachineLibraryRender {
         graphics.drawString(this.context.font(), statusText, statusX, nameY,
                 status.color(), false);
 
-        String lines = anchor.lineNames().isEmpty()
-                ? "未编线" : String.join(" / ", anchor.lineNames());
+        String where = anchor.ref().dimension().location() + " "
+                + anchor.ref().pos().toShortString();
         String rulesLabel = "规则 ";
         String rulesValue = Integer.toString(anchor.ruleCount());
         int rulesWidth = this.context.font().width(rulesLabel)
@@ -181,11 +181,8 @@ final class FactoryMachineLibraryRender {
         int rulesX = deleteX - 6 - rulesWidth;
         int lineWidth = Math.max(12, rulesX - 6 - textX);
         graphics.drawString(this.context.font(),
-                this.context.font().plainSubstrByWidth(lines, lineWidth),
-                textX, lineY,
-                anchor.lineNames().isEmpty()
-                        ? this.context.theme().textDim() : this.context.theme().textValue(),
-                false);
+                this.context.font().plainSubstrByWidth(where, lineWidth),
+                textX, lineY, this.context.theme().textDim(), false);
         graphics.drawString(this.context.font(), rulesLabel, rulesX, lineY, CARD_META, false);
         graphics.drawString(this.context.font(), rulesValue,
                 rulesX + this.context.font().width(rulesLabel), lineY,
@@ -197,11 +194,6 @@ final class FactoryMachineLibraryRender {
         graphics.drawString(this.context.font(), "×", deleteX, lineY,
                 deleteHovered ? this.context.theme().error()
                         : this.context.theme().textDim(), false);
-
-        FactoryScreenInteraction interaction = this.context.interaction();
-        if (interaction != null && interaction.isDragSource(anchor.ref())) {
-            graphics.fill(cardX, cardY, cardX + cardW, cardY + cardH, 0x66000000);
-        }
     }
 
     /**
@@ -225,7 +217,7 @@ final class FactoryMachineLibraryRender {
      */
     private void drawCountBadge(GuiGraphics graphics, FactoryMachineStack stack, int slotX,
             int slotY) {
-        int count = this.context.state().displayCount(stack);
+        int count = stack.count();
         if (count <= 1) {
             return;
         }

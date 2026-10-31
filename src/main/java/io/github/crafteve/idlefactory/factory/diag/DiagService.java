@@ -23,7 +23,6 @@ import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -49,7 +48,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 public final class DiagService {
     /** 最多给一个玩家同时监控几条线。 */
     private static final int MAX_WATCHES = 4;
-    /** status 最多列几条产线。 */
+    /** status 最多列几台机器。 */
     private static final int STATUS_LINES = 8;
     /** tail 上限。 */
     private static final int TAIL_MAX = 20;
@@ -70,7 +69,7 @@ public final class DiagService {
     // ------------------------------------------------------------------
 
     /**
-     * 健康摘要：工厂一行，每条产线一行，最后一条最近事件。
+     * 健康摘要：工厂一行，每台机器一行，最后一条最近事件。
      *
      * @param player 玩家
      * @return 命令结果
@@ -82,21 +81,26 @@ public final class DiagService {
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        List<PassiveLine> lines = factory.config().lines().all();
+        List<Machine> machines = factory.config().machines().all();
 
         FactoryMessages.send(player, FactoryMessages.info("── 工厂 " + DiagRender.shortId(factory.id())
                 + " · 仓库" + (factory.live().storageOnline() ? "在线" : "离线")));
         FactoryMessages.send(player, FactoryMessages.info(
-                FactorySnapshotBuilder.health(factory, runtime.observations()).describe()
-                        + " · 产线 " + lines.size()));
+                FactorySnapshotBuilder.health(factory, runtime.observations()).describe()));
 
-        int shown = Math.min(lines.size(), STATUS_LINES);
-        for (int i = 0; i < shown; i++) {
-            FactoryMessages.send(player, statusRow(factory, lines.get(i), now, runtime));
-        }
-        if (lines.size() > shown) {
+        if (machines.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.info(
-                    "… 还有 " + (lines.size() - shown) + " 条，用 /idf line 查看"));
+                    "还没有机器。对准方块执行 /idf factory connect 接入"));
+            return 1;
+        }
+
+        int shown = Math.min(machines.size(), STATUS_LINES);
+        for (int i = 0; i < shown; i++) {
+            FactoryMessages.send(player, statusRow(factory, machines.get(i), now, runtime));
+        }
+        if (machines.size() > shown) {
+            FactoryMessages.send(player, FactoryMessages.info(
+                    "… 还有 " + (machines.size() - shown) + " 台，用 /idf machine 查看"));
         }
 
         List<DiagEvent> recent = factory.live().stats().recent(1);
@@ -186,20 +190,26 @@ public final class DiagService {
                 .append(FactoryMessages.text(" " + where + " · " + tail, FactoryMessages.INFO));
     }
 
-    private static Component statusRow(Factory factory, PassiveLine line, long now,
+    private static Component statusRow(Factory factory, Machine machine, long now,
             FactoryRuntime runtime) {
         DiagStats stats = factory.live().stats();
+        DiagStats.MachineStats machineStats = stats.machineOrNull(machine.id());
+        long rate = 0L;
+        if (machineStats != null) {
+            rate = machineStats.lastMoveTick() > 0L ? 1L : 0L;
+        }
+        MachineRef ref = machine.ref();
+        String where = ref.dimension().location() + " " + ref.pos().toShortString();
         MutableComponent row = Component.empty()
-                .append(DiagRender.levelTag(line.running()
-                        ? DiagEvent.Level.OK : DiagEvent.Level.IDLE))
+                .append(DiagRender.levelTag(machine.io().isEmpty()
+                        ? DiagEvent.Level.IDLE : DiagEvent.Level.OK))
                 .append(FactoryMessages.text(" ", FactoryMessages.INFO))
-                .append(FactoryMessages.lineLink(line.shortId()))
-                .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
-                .append(FactoryMessages.text(line.running() ? "运行" : "停止",
-                        line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + line.machineCount() + " 组 · "
+                .append(FactoryMessages.hover(ref.shortId(), where))
+                .append(FactoryMessages.text(" " + where + " · ", FactoryMessages.INFO))
+                .append(FactoryMessages.text(machine.io().inputs().size() + " 入 / "
+                        + machine.io().outputs().size() + " 出 · "
                         + stats.totalRate() + "/s", FactoryMessages.INFO));
-        long sleepUntil = DiagRender.lineSleepUntil(runtime, line, now);
+        long sleepUntil = runtime.machineRunner().sleepUntil(ref.id());
         if (sleepUntil > now) {
             row.append(FactoryMessages.text(" · 睡眠 " + seconds(sleepUntil - now) + "s",
                     FactoryMessages.DIM));
@@ -208,88 +218,42 @@ public final class DiagService {
     }
 
     /**
-     * 体检一条产线。
+     * 体检一台机器。
      *
-     * @param player  玩家
-     * @param lineRef 产线引用
+     * @param player     玩家
+     * @param machineRef 机器短 id
      * @return 命令结果
      */
-    public static int why(ServerPlayer player, String lineRef) {
+    public static int why(ServerPlayer player, String machineRef) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
         }
-        PassiveLine line = requireLine(player, factory, lineRef);
-        if (line == null) {
+        Optional<MachineRef> target = FactoryRefs.machine(factory, machineRef);
+        if (target.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
+            FactoryMessages.send(player, FactoryMessages.info("用 /idf machine 查看机器库"));
             return 0;
         }
+        MachineRef machine = target.get();
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        long sleepUntil = DiagRender.lineSleepUntil(runtime, line, now);
+        long sleepUntil = runtime.machineRunner().sleepUntil(machine.id());
+        long sleepSince = runtime.machineRunner().sleepSince(machine.id());
 
         MutableComponent header = Component.empty()
                 .append(FactoryMessages.text("── ", FactoryMessages.DIM))
-                .append(FactoryMessages.lineLink(line.shortId()))
-                .append(FactoryMessages.text(" " + line.name() + " · ", FactoryMessages.INFO))
-                .append(FactoryMessages.text(line.running() ? "运行" : "停止",
-                        line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
-                .append(FactoryMessages.text(" · " + line.machineCount() + " 组", FactoryMessages.INFO))
+                .append(FactoryMessages.hover(machine.shortId(),
+                        machine.dimension().location() + " " + machine.pos().toShortString()))
+                .append(FactoryMessages.text(" " + machine.dimension().location() + " "
+                        + machine.pos().toShortString(), FactoryMessages.INFO))
                 .append(FactoryMessages.text(sleepUntil > now
                         ? " · 睡眠剩余 " + seconds(sleepUntil - now) + "s"
                         : " · 清醒", FactoryMessages.DIM));
         FactoryMessages.send(player, header);
-
-        if (line.machineIds().isEmpty()) {
-            FactoryMessages.send(player, FactoryMessages.info(
-                    "还没有机器。用 /idf line " + line.shortId() + " add <机器> 加入"));
-            return 1;
-        }
-
-        for (DiagChecks.GroupCheck check : DiagChecks.check(runtime.server(), factory, line)) {
-            FactoryMessages.send(player, DiagRender.check(check, now));
-        }
+        FactoryMessages.send(player, DiagRender.check(
+                DiagChecks.check(runtime.server(), factory, machine.id()), now));
         return 1;
-    }
-
-    /**
-     * 体检一条产线里的一台机器。
-     *
-     * @param player      玩家
-     * @param lineRef     产线引用
-     * @param machineRef  机器引用
-     * @return 命令结果
-     */
-    public static int whyMachine(ServerPlayer player, String lineRef, String machineRef) {
-        Factory factory = requireFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        PassiveLine line = requireLine(player, factory, lineRef);
-        if (line == null) {
-            return 0;
-        }
-        UUID machineId;
-        Optional<MachineRef> machine = FactoryRefs.machine(factory, machineRef);
-        if (machine.isEmpty()) {
-            FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
-            FactoryMessages.send(player, FactoryMessages.info("用 /idf factory info 查看机器库"));
-            return 0;
-        }
-        if (!line.containsMachine(machine.get().id())) {
-            FactoryMessages.send(player, FactoryMessages.err(
-                    "机器 " + machineRef + " 不在产线 " + line.name() + " 里"));
-            return 0;
-        }
-        machineId = machine.get().id();
-        FactoryRuntime runtime = FactoryRuntime.get();
-        long now = now(runtime.server());
-        for (DiagChecks.GroupCheck check : DiagChecks.check(runtime.server(), factory, line)) {
-            if (check.machineId().equals(machineId)) {
-                FactoryMessages.send(player, DiagRender.check(check, now));
-                return 1;
-            }
-        }
-        return 0;
     }
 
     /**
@@ -388,26 +352,29 @@ public final class DiagService {
     /**
      * 开关实时监控：汇总走 actionbar，详情走聊天栏。
      *
-     * @param player  玩家
-     * @param lineRef 产线引用
-     * @param seconds 推送间隔（秒，1–60）
-     * @param detail  是否推详情（聊天栏多行）
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param seconds    推送间隔（秒，1–60）
+     * @param detail     是否推详情（聊天栏多行）
      * @return 命令结果
      */
-    public static int watch(ServerPlayer player, String lineRef, int seconds, boolean detail) {
+    public static int watch(ServerPlayer player, String machineRef, int seconds, boolean detail) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
         }
-        PassiveLine line = requireLine(player, factory, lineRef);
-        if (line == null) {
+        Optional<MachineRef> target = FactoryRefs.machine(factory, machineRef);
+        if (target.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
+            FactoryMessages.send(player, FactoryMessages.info("用 /idf machine 查看机器库"));
             return 0;
         }
+        MachineRef machine = target.get();
         Watch existing = WATCHES.get(player.getUUID());
-        if (existing != null && existing.lineId.equals(line.id())) {
+        if (existing != null && existing.machineId.equals(machine.id())) {
             WATCHES.remove(player.getUUID());
             player.displayClientMessage(Component.empty(), true);
-            FactoryMessages.send(player, FactoryMessages.ok("已停止监控 " + line.shortId()));
+            FactoryMessages.send(player, FactoryMessages.ok("已停止监控 " + machine.shortId()));
             return 1;
         }
         if (WATCHES.size() >= MAX_WATCHES && !WATCHES.containsKey(player.getUUID())) {
@@ -415,10 +382,10 @@ public final class DiagService {
             return 0;
         }
         int clamped = Math.max(1, Math.min(60, seconds));
-        Watch watch = new Watch(factory.id(), line.id(), clamped * 20L,
+        Watch watch = new Watch(factory.id(), machine.id(), clamped * 20L,
                 now(FactoryRuntime.get().server()), detail);
         WATCHES.put(player.getUUID(), watch);
-        FactoryMessages.send(player, FactoryMessages.ok("开始监控 " + line.shortId()
+        FactoryMessages.send(player, FactoryMessages.ok("开始监控 " + machine.shortId()
                 + (detail ? "（详情，每 " + clamped + " 秒）" : "（汇总，每 " + clamped + " 秒）")
                 + "，再执行一次关闭"));
         return 1;
@@ -523,7 +490,7 @@ public final class DiagService {
         String text = player.getGameProfile().getName() + " " + action + (success ? "" : " 失败");
         factory.get().live().stats().record(DiagEvent.of(now,
                 success ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
-                DiagEvent.Category.CMD, null, null, null, text));
+                DiagEvent.Category.CMD, null, null, text));
     }
 
     /**
@@ -557,8 +524,9 @@ public final class DiagService {
                 iterator.remove();
                 continue;
             }
-            Optional<PassiveLine> line = factory.get().config().lines().byId(watch.lineId);
-            if (line.isEmpty()) {
+            Optional<MachineRef> machine = FactoryRefs.machine(factory.get(),
+                    DiagRender.shortId(watch.machineId));
+            if (machine.isEmpty()) {
                 iterator.remove();
                 continue;
             }
@@ -566,15 +534,15 @@ public final class DiagService {
                 continue;
             }
             watch.nextPush = now + watch.intervalTicks;
-            long sleepUntil = DiagRender.lineSleepUntil(runtime, line.get(), now);
-            long sleepSince = DiagRender.lineSleepSince(runtime, line.get(), now);
+            long sleepUntil = runtime.machineRunner().sleepUntil(machine.get().id());
+            long sleepSince = runtime.machineRunner().sleepSince(machine.get().id());
             if (watch.detail) {
-                for (Component row : DiagRender.watchDetail(server, factory.get(), line.get(),
+                for (Component row : DiagRender.watchDetail(server, factory.get(), machine.get(),
                         now, sleepUntil, sleepSince)) {
                     FactoryMessages.send(player, row);
                 }
             } else {
-                player.displayClientMessage(DiagRender.watchSummary(factory.get(), line.get(),
+                player.displayClientMessage(DiagRender.watchSummary(factory.get(), machine.get(),
                         now, sleepUntil, sleepSince), true);
             }
         }
@@ -657,28 +625,18 @@ public final class DiagService {
         return factory.get();
     }
 
-    @Nullable
-    private static PassiveLine requireLine(ServerPlayer player, Factory factory, String ref) {
-        Optional<PassiveLine> line = FactoryRefs.line(factory, ref);
-        if (line.isEmpty()) {
-            FactoryMessages.send(player, FactoryMessages.err("找不到产线 " + ref));
-            FactoryMessages.send(player, FactoryMessages.info("用 /idf line 查看现有产线"));
-            return null;
-        }
-        return line.get();
-    }
-
     /** 一个监控目标。 */
     private static final class Watch {
         private final UUID factoryId;
-        private final UUID lineId;
+        private final UUID machineId;
         private final long intervalTicks;
         private final boolean detail;
         private long nextPush;
 
-        private Watch(UUID factoryId, UUID lineId, long intervalTicks, long nextPush, boolean detail) {
+        private Watch(UUID factoryId, UUID machineId, long intervalTicks, long nextPush,
+                boolean detail) {
             this.factoryId = factoryId;
-            this.lineId = lineId;
+            this.machineId = machineId;
             this.intervalTicks = intervalTicks;
             this.nextPush = nextPush;
             this.detail = detail;

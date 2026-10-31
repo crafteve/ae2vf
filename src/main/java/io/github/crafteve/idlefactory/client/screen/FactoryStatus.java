@@ -83,7 +83,7 @@ record FactoryStatus(String text, int color, ResourceLocation strip, ResourceLoc
      * 把状态种类映射成文字、颜色和贴图。
      *
      * @param kind    状态种类
-     * @param machine 机器视图；{@link Kind#UNCONFIGURED} 需要用它区分「未编线」和「无规则」
+     * @param machine 机器视图；{@link Kind#UNCONFIGURED} 用它区分「没接入」和「无规则」
      * @param theme   当前主题
      * @return 状态展示
      */
@@ -95,7 +95,7 @@ record FactoryStatus(String text, int color, ResourceLocation strip, ResourceLoc
             case UNLOADED -> new FactoryStatus("未载", theme.statusWarn(),
                     FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
             case UNCONFIGURED -> new FactoryStatus(
-                    machine.lineNames().isEmpty() ? "未编线" : "无规则",
+                    "无规则",
                     theme.statusIdle(), FactoryGuiTextures.STATUS_STRIP_IDLE,
                     FactoryGuiTextures.STATUS_LAMP_IDLE);
             case RUNNING -> new FactoryStatus("运行", theme.statusRun(),

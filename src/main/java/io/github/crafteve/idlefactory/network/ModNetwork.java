@@ -2,9 +2,9 @@ package io.github.crafteve.idlefactory.network;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryLineActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
@@ -26,12 +26,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、仓库动作、产线动作、IO 规则动作、编辑反馈、终端打开界面与
+ * <p>当前包含机器表、仓库快照、仓库动作、机器动作、IO 规则动作、编辑反馈、终端打开界面与
  * 绑定杖链接同步。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "19";
+    public static final String PROTOCOL_VERSION = "20";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -72,9 +72,9 @@ public final class ModNetwork {
         registrar.playToServer(FactoryStorageActionC2S.TYPE,
                 FactoryStorageActionC2S.STREAM_CODEC, FactoryStorageActionC2S::handle);
 
-        // P1：产线 / IO 编辑
-        registrar.playToServer(FactoryLineActionC2S.TYPE, FactoryLineActionC2S.STREAM_CODEC,
-                FactoryLineActionC2S::handle);
+        // P1：机器 / IO 编辑
+        registrar.playToServer(FactoryMachineActionC2S.TYPE, FactoryMachineActionC2S.STREAM_CODEC,
+                FactoryMachineActionC2S::handle);
         registrar.playToServer(FactoryRuleActionC2S.TYPE, FactoryRuleActionC2S.STREAM_CODEC,
                 FactoryRuleActionC2S::handle);
         registrar.playToClient(FactoryEditFeedbackS2C.TYPE, FactoryEditFeedbackS2C.STREAM_CODEC,

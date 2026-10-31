@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
@@ -22,8 +21,8 @@ import net.minecraft.world.level.saveddata.SavedData;
 /**
  * 工厂档案的存档容器。
  *
- * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库地址、机器（含 IO 规则）
- * 和产线（只含机器引用）。运行时数据（仓库在线、诊断、机器失联）一律不写。</p>
+ * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库地址与机器（含 IO 规则）。
+ * 运行时数据（仓库在线、诊断、机器失联）一律不写。</p>
  *
  * <p>存档挂在主世界的 {@code DataStorage} 上，每个存档一份。</p>
  */
@@ -36,7 +35,6 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_ANCHOR = "Anchor";
     private static final String TAG_STORAGE_MODE = "StorageMode";
     private static final String TAG_MACHINES = "Machines";
-    private static final String TAG_LINES = "Lines";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -105,13 +103,6 @@ public final class FactoryStore extends SavedData {
                 }
                 entry.put(TAG_MACHINES, machines);
             }
-            if (!record.lines().isEmpty()) {
-                ListTag lines = new ListTag();
-                for (PassiveLine line : record.lines()) {
-                    lines.add(line.save(registries));
-                }
-                entry.put(TAG_LINES, lines);
-            }
             list.add(entry);
         }
         tag.put(TAG_FACTORIES, list);
@@ -140,16 +131,8 @@ public final class FactoryStore extends SavedData {
                     machines.add(machine);
                 }
             }
-            List<PassiveLine> lines = new ArrayList<>();
-            ListTag lineList = entry.getList(TAG_LINES, Tag.TAG_COMPOUND);
-            for (int j = 0; j < lineList.size(); j++) {
-                PassiveLine line = PassiveLine.load(lineList.getCompound(j), registries);
-                if (line != null) {
-                    lines.add(line);
-                }
-            }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    storageMode, machines, lines));
+                    storageMode, machines));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -176,18 +159,17 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 一条存档记录：工厂身份、仓库地址、机器表与产线表。
+     * 一条存档记录：工厂身份、仓库地址与机器表。
      *
-     * <p>机器自己带 IO 规则；产线只存机器 id 引用。</p>
+     * <p>机器自己带 IO 规则；P1 删除产线后这里不再有产线表。</p>
      *
      * @param id          工厂 id
      * @param owner       拥有者玩家 uuid
      * @param anchor      仓库地址；未绑定为 {@code null}
      * @param storageMode 仓库接入模式（ME / 容器）
      * @param machines    机器表（含 IO 规则）
-     * @param lines       产线表（只含机器引用）
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            StorageMode storageMode, List<Machine> machines, List<PassiveLine> lines) {
+            StorageMode storageMode, List<Machine> machines) {
     }
 }

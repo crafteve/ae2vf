@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 public final class Factory {
     /** 工厂唯一 id。 */
     private final UUID id;
-    /** 写档部分：拥有者、仓库地址与模式、机器库、产线库。 */
+    /** 写档部分：拥有者、仓库地址与模式、机器库。 */
     private final FactoryConfig config;
     /** 运行时部分：解析出的仓库、在线标记、诊断计数。 */
     private final FactoryLive live = new FactoryLive();

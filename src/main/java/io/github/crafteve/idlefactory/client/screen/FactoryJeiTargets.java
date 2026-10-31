@@ -104,8 +104,7 @@ final class FactoryJeiTargets {
                 FactorySnapshotBuilder.MachineView anchor = stack.anchor();
                 int y = hit.y();
 
-                if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)
-                        || this.context.geometry().inRemoveButton(hit, mouseX, mouseY)) {
+                if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)) {
                     return null;
                 }
 

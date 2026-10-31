@@ -101,13 +101,13 @@ public final class FactoryMessages {
     }
 
     /**
-     * 产线短 id，点击查看这条产线。
+     * 机器短 id，点击体检这台机器。
      *
-     * @param shortId 产线短 id
+     * @param shortId 机器短 id
      * @return 组件
      */
-    public static MutableComponent lineLink(String shortId) {
-        return link(shortId, "/idf line " + shortId, "查看产线 " + shortId);
+    public static MutableComponent machineLink(String shortId) {
+        return link(shortId, "/idf diag why " + shortId, "体检机器 " + shortId);
     }
 
     /**

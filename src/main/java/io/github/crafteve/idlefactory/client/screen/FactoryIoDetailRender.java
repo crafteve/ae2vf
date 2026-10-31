@@ -42,7 +42,7 @@ final class FactoryIoDetailRender {
      * @param mouseX           鼠标 x
      * @param mouseY           鼠标 y
      * @param draggingResource 是否正在拖资源
-     * @param idleLabel        产线暂停/睡眠时的中性文案；运行中传 {@code null}
+     * @param idleLabel        机器睡眠时的中性文案；运行中传 {@code null}
      */
     static void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, FactoryLayout layout,
             FactorySnapshotBuilder.MachineView machine, FactoryIoDetailLayout.Detail detail,

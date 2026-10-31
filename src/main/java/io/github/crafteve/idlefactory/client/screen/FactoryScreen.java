@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.List;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -28,9 +27,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 工厂工作台界面。
  *
- * <p>界面分成四块：顶栏负责工厂状态、产线筛选和统计；左表显示服务端
- * {@link FactoryTableS2C} 给出的机器视图；右侧上半区在「仓库」和「机器」
- * 两个 tab 间切换；右上角搜索框只过滤当前可见内容，不改变服务端数据。</p>
+ * <p>界面分成四块：顶栏负责工厂状态与统计；左表显示服务端 {@link FactoryTableS2C} 给出的
+ * 机器视图；右侧上半区在「仓库」和「机器」两个 tab 间切换；右上角搜索框只过滤当前可见内容，
+ * 不改变服务端数据。</p>
+ *
+ * <p>P1 删除产线后左表不再按产线筛选：工厂机器库里的每一台机器各占一行。</p>
  *
  * <p>左表的每一行对应一个 {@link FactorySnapshotBuilder.MachineView}。行高不是固定的：
  * 机器可以展开成「输入/输出」两行规则详情，所以绘制和命中测试统一走
@@ -45,7 +46,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 不应改这里。</p>
  *
  * <p>分节目录：01 字段与生命周期；02 快照请求与接收；03 搜索、过滤与排序；
- * 04 产线选择与快照访问；06 布局日志与玩家槽位；07 绘制入口与静态底板；
+ * 04 快照访问；06 布局日志与玩家槽位；07 绘制入口与静态底板；
  * 10 表格命中、拖放与 IO 展开操作；15 玩家槽位绘制；17 JEI 目标与布局访问。</p>
  *
  * <p>下面的分节只用于导航，不代表这个类已经拆分；真正的拆分另开计划，不在注释整理里
@@ -95,7 +96,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     /** 仓库请求节拍器。 */
     private int storageRequestTicker;
 
-    /** 编辑态总控：产线下拉、命名/确认浮层、反馈。 */
+    /** 编辑态总控：确认浮层、拖拽与反馈。 */
     @Nullable
     private FactoryEditController editController;
     /** 右区排序按钮：键、方向、范围。 */
@@ -148,9 +149,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
             this.sortButtons = buttons;
         }
         this.state.bind(this.layout, this.font, buttons);
-        if (this.state.selectedLineId == null) {
-            this.state.selectedLineId = FactoryScreenState.rememberedLineId;
-        }
         positionSlots();
         String previousQuery = this.searchBox == null
                 ? FactoryScreenState.rememberedSearch
@@ -237,8 +235,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     public void acceptTable(FactoryTableS2C payload) {
         this.state.acceptTable(payload);
         if (this.editController != null) {
-            this.editController.onTable(this.state.lines, this.state.selectedLineId,
-                    this.state.hasFactory);
+            this.editController.onTable(this.state.hasFactory);
         }
     }
 
@@ -295,37 +292,9 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     }
 
     // ------------------------------------------------------------------
-    // ---- 04. 产线选择与快照访问 ----
-    // 负责当前产线选择，并把服务端快照以只读视图暴露给编辑控制器和输入层。
+    // ---- 04. 快照访问 ----
+    // 把服务端快照以只读视图暴露给编辑控制器和输入层。
     // ------------------------------------------------------------------
-
-    /**
-     * 选中一条产线；切换后左表从第一行重新显示。
-     *
-     * @param lineId 产线 id；{@code null} 表示清空
-     */
-    void selectLine(@Nullable UUID lineId) {
-        this.state.selectLine(lineId);
-    }
-
-    /**
-     * 当前选中产线 id，给编辑控制器读。
-     *
-     * @return 产线 id；未选择时为 {@code null}
-     */
-    @Nullable
-    UUID selectedLineId() {
-        return this.state.selectedLineId;
-    }
-
-    /**
-     * 服务端最近一次给的产线列表。
-     *
-     * @return 产线视图
-     */
-    List<FactorySnapshotBuilder.LineView> lines() {
-        return this.state.lines;
-    }
 
     /**
      * 服务端最近一次给的机器视图。
@@ -431,7 +400,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         this.renderMouseX = mouseX;
         this.renderMouseY = mouseY;
-        flushPendingStack();
         super.render(graphics, mouseX, mouseY, partialTick);
         this.chromeRender.drawHeader(graphics);
         this.tableRender.drawTable(graphics);
@@ -439,32 +407,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
         this.tooltipRender.draw(graphics, mouseX, mouseY);
         if (this.editController != null) {
             this.editController.draw(graphics, mouseX, mouseY, partialTick);
-        }
-    }
-
-    /**
-     * 把滚轮累计的台数发给服务端。
-     *
-     * <p>滚轮一格在 Windows 上常一次发多个事件，所以这里按「停手 150ms 合并一次」发送。
-     * 发出后本地乐观显示最多保留 500ms，等快照回来再校正；过期没等到就回到快照值，
-     * 不会一直显示一个服务端没接受的数字。</p>
-     */
-    private void flushPendingStack() {
-        FactoryEditController controller = this.editController;
-        if (controller == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        if (this.state.pendingStackDue(now)) {
-            int target = this.state.pendingStackTarget;
-            UUID anchorId = this.state.pendingStackAnchorId;
-            if (anchorId == null) {
-                return;
-            }
-            this.state.markPendingStackSent(now);
-            controller.applyStackCount(anchorId, target);
-        } else if (this.state.pendingStackExpired(now)) {
-            this.state.clearPendingStack();
         }
     }
 
@@ -523,17 +465,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     // ------------------------------------------------------------------
 
     /**
-     * 鼠标是否在“新增机器”行上。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中为 {@code true}
-     */
-    boolean addMachineRowContains(double mouseX, double mouseY) {
-        return this.geometry.addMachineRowContains(mouseX, mouseY);
-    }
-
-    /**
      * 鼠标下的机器库组行（机器 tab）。
      *
      * @param mouseX 屏幕 x
@@ -543,31 +474,6 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     @Nullable
     FactoryMachineStack libraryStackAt(double mouseX, double mouseY) {
         return this.geometry.libraryStackAt(mouseX, mouseY);
-    }
-
-    /**
-     * 鼠标下的左表机器行（机器列），用作“拖回机器库”的源。
-     *
-     * <p>不只认 18×18 图标：机器名也算，减少“必须精准按住图标”的摩擦。</p>
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 机器组；没命中为 {@code null}
-     */
-    @Nullable
-    FactoryMachineStack machineIconAt(double mouseX, double mouseY) {
-        return this.geometry.machineIconAt(mouseX, mouseY);
-    }
-
-    /**
-     * 鼠标是否落在机器库网格上（移出机器的拖放目标）。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中为 {@code true}
-     */
-    boolean isInMachineLibrary(double mouseX, double mouseY) {
-        return this.geometry.isInMachineLibrary(mouseX, mouseY);
     }
 
     /**
@@ -678,17 +584,15 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
     }
 
     /**
-     * 关闭界面时保存搜索词和产线选择。
+     * 关闭界面时保存搜索词。
      *
-     * <p>这两项是纯客户端状态，跨打开保留；产线还会在 acceptTable 里校验，
-     * 如果服务端已经没有该产线就自动清空。</p>
+     * <p>搜索词是纯客户端状态，跨打开保留。</p>
      */
     @Override
     public void removed() {
         if (this.searchBox != null) {
             FactoryScreenState.rememberedSearch = this.searchBox.getValue();
         }
-        FactoryScreenState.rememberedLineId = this.state.selectedLineId;
         if (this.editController != null) {
             this.editController.closeAll();
         }

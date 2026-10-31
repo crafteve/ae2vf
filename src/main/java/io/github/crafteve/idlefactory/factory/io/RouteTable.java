@@ -30,7 +30,7 @@ import net.minecraft.core.Direction;
  *   <li><b>{@link #clearAll}</b>：玩家改了规则时清空。</li>
  * </ul>
  *
- * <p>不写存档。服务器重启、产线重开都会从空表开始，第一次搬运自己重建。</p>
+ * <p>不写存档。服务器重启、工厂重开都会从空表开始，第一次搬运自己重建。</p>
  */
 public final class RouteTable {
     /**

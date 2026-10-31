@@ -99,7 +99,7 @@ final class FactoryRuleStrip {
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      * @param dragging 是否正在拖资源（用于空槽高亮）
-     * @param inactive 产线是否暂停/睡眠；此时速率用中性色
+     * @param inactive 机器是否睡眠；此时速率用中性色
      */
     static void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, Layout layout,
             List<ResourceSpec> rules, List<Long> rates, List<IoResult.Reason> reasons,

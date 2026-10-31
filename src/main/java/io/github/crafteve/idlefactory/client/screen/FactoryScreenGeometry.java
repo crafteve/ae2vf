@@ -34,27 +34,6 @@ final class FactoryScreenGeometry {
     }
 
     /**
-     * 顶栏产线按钮的 x。
-     *
-     * @return 按钮左边缘
-     */
-    int lineButtonX() {
-        return this.screen.layout.headerX + 6
-                + this.screen.state.font.width("放置工厂")
-                + FactoryChromeRender.TITLE_GAP;
-    }
-
-    /**
-     * 顶栏产线按钮的宽度。
-     *
-     * @return 按钮宽度
-     */
-    int lineButtonW() {
-        return Math.max(24, Math.min(140,
-                this.screen.state.font.width(this.screen.state.lineButtonText()) + 14));
-    }
-
-    /**
      * 搜索框清空按钮的 x。
      *
      * @return 清空按钮左边缘
@@ -97,42 +76,6 @@ final class FactoryScreenGeometry {
         FactorySnapshotBuilder.MachineView anchor() {
             return this.stack.anchor();
         }
-    }
-
-    /**
-     * “新增机器”行的顶部 y；放不下时为 {@code null}。
-     *
-     * @return 行顶部 y
-     */
-    @Nullable
-    Integer addMachineRowY() {
-        if (this.screen.state.selectedLineId == null) {
-            return null;
-        }
-        List<FactoryMachineStack> table = this.screen.state.tableStacks;
-        int y = this.screen.layout.rowTop;
-        for (int i = this.screen.state.firstRow; i < table.size(); i++) {
-            if (y + FactoryLayout.ROW_H > this.screen.layout.footerY) {
-                return null;
-            }
-            y += FactoryLayout.ROW_H + detailHeight(table.get(i), y);
-        }
-        return y + FactoryLayout.ROW_H <= this.screen.layout.footerY ? y : null;
-    }
-
-    /**
-     * 鼠标是否在“新增机器”行上。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中为 {@code true}
-     */
-    boolean addMachineRowContains(double mouseX, double mouseY) {
-        Integer y = addMachineRowY();
-        return y != null
-                && mouseY >= y && mouseY < y + FactoryLayout.ROW_H
-                && mouseX >= this.screen.layout.leftX + 2
-                && mouseX < this.screen.layout.leftX + this.screen.layout.leftW - 2;
     }
 
     /**
@@ -207,35 +150,6 @@ final class FactoryScreenGeometry {
     }
 
     /**
-     * 鼠标下的“移出产线”按钮。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中的机器组；没命中为 {@code null}
-     */
-    @Nullable
-    FactoryMachineStack lineRemoveButtonAt(double mouseX, double mouseY) {
-        // 不限制右侧 tab：左表的 × 是产线自己的动作，和右边显示仓库还是机器库无关。
-        StackHit hit = tableHitAt(mouseY);
-        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        int x = removeButtonX();
-        return inside(mouseX, mouseY, x, hit.y() + FactoryLayout.ROW_ACTION_TOP,
-                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON)
-                ? hit.stack() : null;
-    }
-
-    /**
-     * 左表机器行「移出产线」按钮的 x。
-     *
-     * @return 按钮左边缘
-     */
-    int removeButtonX() {
-        return expandButtonX() - FactoryLayout.ROW_ACTION_BUTTON - FactoryLayout.ROW_ACTION_GAP;
-    }
-
-    /**
      * 鼠标下的机器库删除按钮。
      *
      * @param mouseX 屏幕 x
@@ -258,28 +172,6 @@ final class FactoryScreenGeometry {
         int x = cardX + cardW - 12;
         int buttonY = cardY + 13 - 1;
         return inside(mouseX, mouseY, x, buttonY, 10, 10) ? stack : null;
-    }
-
-    /**
-     * 鼠标下的左表机器行（机器列），用作“拖回机器库”的源。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中的机器组；没命中为 {@code null}
-     */
-    @Nullable
-    FactoryMachineStack machineIconAt(double mouseX, double mouseY) {
-        if (this.screen.state.selectedLineId == null) {
-            return null;
-        }
-        StackHit hit = tableHitAt(mouseY);
-        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        int x = this.screen.layout.columnX(FactoryLayout.COL_NAME) + 2;
-        int width = this.screen.layout.columnW(FactoryLayout.COL_NAME) - 4;
-        return inside(mouseX, mouseY, x, hit.y() + 2,
-                width, FactoryLayout.ROW_H - 4) ? hit.stack() : null;
     }
 
     /**
@@ -367,28 +259,7 @@ final class FactoryScreenGeometry {
     }
 
     /**
-     * 鼠标下的左表图标槽位（18×18），只在基础行有效。
-     *
-     * <p>滚轮改台数只认这块区域，行体其余位置仍然翻行；这是为了避免「想翻行却改了数量」。</p>
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中的组；没命中为 {@code null}
-     */
-    @Nullable
-    FactoryMachineStack stackIconAt(double mouseX, double mouseY) {
-        StackHit hit = tableHitAt(mouseY);
-        if (hit == null || mouseY >= hit.y() + FactoryLayout.ROW_H) {
-            return null;
-        }
-        int x = this.screen.layout.columnX(FactoryLayout.COL_NAME) + 4;
-        int y = hit.y() + 4;
-        return inside(mouseX, mouseY, x, y, FactoryLayout.CELL, FactoryLayout.CELL)
-                ? hit.stack() : null;
-    }
-
-    /**
-     * 鼠标是否落在左表行体上（改台数的滚轮区域之外）。
+     * 鼠标是否落在左表行体上。
      *
      * @param mouseX 屏幕 x
      * @param mouseY 屏幕 y
@@ -398,18 +269,6 @@ final class FactoryScreenGeometry {
         FactoryLayout l = this.screen.layout;
         return mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY;
-    }
-
-    /**
-     * 鼠标下的左表行（含展开区），拖拽合并时用作落点。
-     *
-     * @param mouseY 屏幕 y
-     * @return 命中的组；不在行上为 {@code null}
-     */
-    @Nullable
-    FactoryMachineStack stackRowAt(double mouseY) {
-        StackHit hit = tableHitAt(mouseY);
-        return hit == null ? null : hit.stack();
     }
 
     /**
@@ -489,19 +348,6 @@ final class FactoryScreenGeometry {
      */
     boolean inExpandButton(StackHit hit, double mouseX, double mouseY) {
         return inside(mouseX, mouseY, expandButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
-                FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
-    }
-
-    /**
-     * 鼠标是否落在某行的「移出产线」按钮上。
-     *
-     * @param hit    命中行
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中为 {@code true}
-     */
-    boolean inRemoveButton(StackHit hit, double mouseX, double mouseY) {
-        return inside(mouseX, mouseY, removeButtonX(), hit.y() + FactoryLayout.ROW_ACTION_TOP,
                 FactoryLayout.ROW_ACTION_BUTTON, FactoryLayout.ROW_ACTION_BUTTON);
     }
 

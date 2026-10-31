@@ -18,7 +18,7 @@ public enum FactoryGuiLayer {
     ITEM_DECORATION(200.0F),
     /** 仓库/背包的自定义数量。 */
     GRID_COUNT(300.0F),
-    /** 产线下拉、二级菜单、命名/确认浮层。 */
+    /** 确认浮层等覆盖内容。 */
     OVERLAY(360.0F),
     /** 拖拽时跟随鼠标的物品幽灵。 */
     DRAG(370.0F),

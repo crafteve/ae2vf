@@ -1,0 +1,371 @@
+package io.github.crafteve.idlefactory.factory;
+
+import java.util.Locale;
+import java.util.Optional;
+
+import org.jetbrains.annotations.Nullable;
+
+import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
+import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.Fluids;
+
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+
+/**
+ * 机器指令的逻辑层：{@code /idf machine ...} 的读写动作。
+ *
+ * <p>P1 删除产线后，原来挂在 {@code /idf line <line> manage ...} 下的 IO 规则操作改为直接以机器为主语；
+ * 本类只做「解析引用 + 调 {@link MachineActions} + 拼聊天栏回执」，规则本身仍然跟着机器走。</p>
+ *
+ * <p>引用解析统一走 {@link FactoryRefs}，消息统一走 {@link FactoryMessages}。</p>
+ */
+public final class MachineService {
+    /** 一次列表最多列多少台。 */
+    private static final int LIST_LIMIT = 24;
+
+    private MachineService() {
+        // 纯静态工具类
+    }
+
+    /**
+     * 列出玩家工厂里的机器。
+     *
+     * @param player 发起请求的玩家
+     * @return 命令结果
+     */
+    public static int list(ServerPlayer player) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        if (factory.config().machines().isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.info(
+                    "还没有机器。对准方块执行 /idf factory connect 接入"));
+            return 1;
+        }
+        FactoryMessages.send(player, FactoryMessages.info(
+                "机器 " + factory.config().machines().size() + " 台："));
+        int shown = 0;
+        for (Machine machine : factory.config().machines().all()) {
+            if (shown >= LIST_LIMIT) {
+                FactoryMessages.send(player, FactoryMessages.info(
+                        "… 还有 " + (factory.config().machines().size() - shown) + " 台"));
+                break;
+            }
+            MachineRef ref = machine.ref();
+            String where = ref.dimension().location() + " " + ref.pos().toShortString();
+            FactoryMessages.send(player, Component.empty()
+                    .append(FactoryMessages.hover(ref.shortId(), where))
+                    .append(FactoryMessages.text("  输入 " + machine.io().inputs().size()
+                            + " / 输出 " + machine.io().outputs().size() + " 条 · "
+                            + where, FactoryMessages.INFO)));
+            shown++;
+        }
+        return 1;
+    }
+
+    /**
+     * 查看一台机器的 IO 规则。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int info(ServerPlayer player, String machineRef) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        MachineRef machine = requireMachine(player, factory, machineRef);
+        if (machine == null) {
+            return 0;
+        }
+        Optional<Machine> entry = factory.config().machines().byId(machine.id());
+        if (entry.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("这台机器不在机器库"));
+            return 0;
+        }
+        MachineIoGroup io = entry.get().io();
+        String where = machine.dimension().location() + " " + machine.pos().toShortString();
+        FactoryMessages.send(player, FactoryMessages.info(
+                "机器 [" + machine.shortId() + "] " + where));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  输入: " + describeSpecs(io.inputs()), FactoryMessages.PLAIN));
+        FactoryMessages.send(player, FactoryMessages.text(
+                "  输出: " + describeSpecs(io.outputs()), FactoryMessages.PLAIN));
+        return 1;
+    }
+
+    /**
+     * 加一条输入规则（物品）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param item       物品样本
+     * @param face       面名；{@code null} 或 {@code any} 表示不限
+     * @return 命令结果
+     */
+    public static int inputAdd(ServerPlayer player, String machineRef, ItemStack item,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, ResourceKey.item(item), face, IoSide.INPUT);
+    }
+
+    /**
+     * 加一条输入规则（流体）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int inputAddFluid(ServerPlayer player, String machineRef, String fluidId,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, parseFluid(fluidId), face, IoSide.INPUT);
+    }
+
+    /**
+     * 加一条输入规则（能量）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int inputAddEnergy(ServerPlayer player, String machineRef,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, ResourceKey.ENERGY, face, IoSide.INPUT);
+    }
+
+    /**
+     * 移除一条输入规则（物品）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param item       物品样本
+     * @return 命令结果
+     */
+    public static int inputRemove(ServerPlayer player, String machineRef, ItemStack item) {
+        return remove(player, machineRef, ResourceKey.item(item), IoSide.INPUT);
+    }
+
+    /**
+     * 移除一条输入规则（流体）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @return 命令结果
+     */
+    public static int inputRemoveFluid(ServerPlayer player, String machineRef, String fluidId)
+            throws CommandSyntaxException {
+        return remove(player, machineRef, parseFluid(fluidId), IoSide.INPUT);
+    }
+
+    /**
+     * 移除一条输入规则（能量）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int inputRemoveEnergy(ServerPlayer player, String machineRef) {
+        return remove(player, machineRef, ResourceKey.ENERGY, IoSide.INPUT);
+    }
+
+    /**
+     * 加一条输出规则（物品）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param item       物品样本
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int outputAdd(ServerPlayer player, String machineRef, ItemStack item,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, ResourceKey.item(item), face, IoSide.OUTPUT);
+    }
+
+    /**
+     * 加一条输出规则（流体）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int outputAddFluid(ServerPlayer player, String machineRef, String fluidId,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, parseFluid(fluidId), face, IoSide.OUTPUT);
+    }
+
+    /**
+     * 加一条输出规则（能量）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param face       面名
+     * @return 命令结果
+     */
+    public static int outputAddEnergy(ServerPlayer player, String machineRef,
+            @Nullable String face) throws CommandSyntaxException {
+        return add(player, machineRef, ResourceKey.ENERGY, face, IoSide.OUTPUT);
+    }
+
+    /**
+     * 移除一条输出规则（物品）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param item       物品样本
+     * @return 命令结果
+     */
+    public static int outputRemove(ServerPlayer player, String machineRef, ItemStack item) {
+        return remove(player, machineRef, ResourceKey.item(item), IoSide.OUTPUT);
+    }
+
+    /**
+     * 移除一条输出规则（流体）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @param fluidId    流体注册名
+     * @return 命令结果
+     */
+    public static int outputRemoveFluid(ServerPlayer player, String machineRef, String fluidId)
+            throws CommandSyntaxException {
+        return remove(player, machineRef, parseFluid(fluidId), IoSide.OUTPUT);
+    }
+
+    /**
+     * 移除一条输出规则（能量）。
+     *
+     * @param player     玩家
+     * @param machineRef 机器短 id
+     * @return 命令结果
+     */
+    public static int outputRemoveEnergy(ServerPlayer player, String machineRef) {
+        return remove(player, machineRef, ResourceKey.ENERGY, IoSide.OUTPUT);
+    }
+
+    private static int add(ServerPlayer player, String machineRef, ResourceKey key,
+            @Nullable String face, IoSide side) throws CommandSyntaxException {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        MachineRef machine = requireMachine(player, factory, machineRef);
+        if (machine == null) {
+            return 0;
+        }
+        // mode 传 null = 沿用旧命令默认（无组件物品模糊），界面会显式传精确。
+        return send(player, MachineActions.addRule(factory, machine.id(), side, key,
+                parseFace(face), null));
+    }
+
+    private static int remove(ServerPlayer player, String machineRef, ResourceKey key, IoSide side) {
+        Factory factory = requireFactory(player);
+        if (factory == null) {
+            return 0;
+        }
+        MachineRef machine = requireMachine(player, factory, machineRef);
+        if (machine == null) {
+            return 0;
+        }
+        return send(player, MachineActions.removeRule(factory, machine.id(), side, key));
+    }
+
+    @Nullable
+    private static Factory requireFactory(ServerPlayer player) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            FactoryMessages.send(player, FactoryMessages.err("Idle Factory 尚未启动（服务端未就绪）"));
+            return null;
+        }
+        Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
+        if (factory.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("你还没有工厂"));
+            FactoryMessages.send(player, FactoryMessages.info("先执行 /idf create"));
+            return null;
+        }
+        return factory.get();
+    }
+
+    @Nullable
+    private static MachineRef requireMachine(ServerPlayer player, Factory factory, String ref) {
+        Optional<MachineRef> target = FactoryRefs.machine(factory, ref);
+        if (target.isEmpty()) {
+            FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + ref));
+            FactoryMessages.send(player, FactoryMessages.info(
+                    "用 /idf machine 查看机器库（短 id 8 位）"));
+            return null;
+        }
+        return target.get();
+    }
+
+    @Nullable
+    private static Direction parseFace(@Nullable String face) throws CommandSyntaxException {
+        if (face == null || face.isEmpty() || ResourceSpec.ANY.equalsIgnoreCase(face)) {
+            return null;
+        }
+        Direction direction = Direction.byName(face.toLowerCase(Locale.ROOT));
+        if (direction == null) {
+            throw new SimpleCommandExceptionType(Component.literal(
+                    "未知的面：" + face + "（可用 any/north/south/east/west/up/down）")).create();
+        }
+        return direction;
+    }
+
+    private static ResourceKey parseFluid(String fluidId) throws CommandSyntaxException {
+        ResourceLocation id = ResourceLocation.tryParse(fluidId);
+        Fluid fluid = id == null ? Fluids.EMPTY : BuiltInRegistries.FLUID.get(id);
+        if (fluid == Fluids.EMPTY) {
+            throw new SimpleCommandExceptionType(Component.literal(
+                    "未知流体：" + fluidId)).create();
+        }
+        return ResourceKey.fluid(fluid);
+    }
+
+    private static String describeSpecs(java.util.List<ResourceSpec> specs) {
+        if (specs.isEmpty()) {
+            return "(空)";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (ResourceSpec spec : specs) {
+            if (builder.length() > 0) {
+                builder.append(", ");
+            }
+            builder.append(spec.describe());
+        }
+        return builder.toString();
+    }
+
+    /**
+     * 把动作层的结果转成聊天栏消息。
+     *
+     * @param player 接收者
+     * @param result 动作结果
+     * @return 命令返回值：成功 {@code 1}，失败 {@code 0}
+     */
+    private static int send(ServerPlayer player, MachineActions.Result result) {
+        FactoryMessages.send(player, result.ok()
+                ? FactoryMessages.ok(result.message())
+                : FactoryMessages.err(result.message()));
+        return result.ok() ? 1 : 0;
+    }
+}

@@ -13,7 +13,7 @@ import net.minecraft.nbt.CompoundTag;
  * 机器库里的一个真实机器：身份 + 位置 + 这台机器的 IO 规则。
  *
  * <p>{@link MachineRef} 负责“哪台机器”，{@link MachineIoGroup} 负责“搬什么”；本类只是把两者
- * 绑在一起。规则跟着机器走，所以从产线移除机器不会丢规则。</p>
+ * 绑在一起。规则跟着机器走：只有删除机器才会丢规则。</p>
  *
  * <p>一台机器当前只有一个 {@link MachineIoGroup}；以后如果要做样板组，再把这个字段换成
  * 可选的规则集。</p>

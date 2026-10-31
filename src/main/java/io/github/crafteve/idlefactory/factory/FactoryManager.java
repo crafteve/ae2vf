@@ -3,16 +3,13 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 
 /**
@@ -28,7 +25,7 @@ public final class FactoryManager {
     /**
      * 从存档记录重建工厂。启动时调一次。
      *
-     * <p>机器先建，产线后建；产线引用只保留机器库里存在的 id，且一台机器只能属于一条产线。</p>
+     * <p>P1 删除产线后只剩机器：把记录里的机器逐台灌进机器库即可。</p>
      *
      * @param records 存档里的工厂记录
      */
@@ -40,17 +37,6 @@ public final class FactoryManager {
                     record.anchor());
             for (Machine machine : record.machines()) {
                 config.machines().add(machine);
-            }
-            Set<UUID> assigned = new HashSet<>();
-            for (PassiveLine loaded : record.lines()) {
-                // 只过滤失效/重复归属的机器，保留原来的组结构；重新 addMachine 会把一组拆成多行。
-                PassiveLine line = loaded.copyFiltered(machineId -> {
-                    if (config.machines().byId(machineId).isEmpty()) {
-                        return false;
-                    }
-                    return assigned.add(machineId);
-                });
-                config.lines().add(line);
             }
             add(new Factory(record.id(), config));
         }
@@ -65,7 +51,7 @@ public final class FactoryManager {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
                         factory.config().storageAnchor(), factory.config().storageMode(),
-                        factory.config().machines().all(), factory.config().lines().all()))
+                        factory.config().machines().all()))
                 .toList();
     }
 

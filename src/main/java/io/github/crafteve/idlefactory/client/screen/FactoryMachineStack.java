@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,22 +18,18 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 界面上的一个机器组：同产线、同方块、同方块实体、同 IO 规则的若干台机器。
+ * 界面上的一个机器行：一台或多台「同方块、同方块实体、同 IO 规则」的机器。
  *
- * <p><b>组是视图，不是存档实体。</b>产线仍然存 N 个 machineId，规则仍然跟着机器走；删掉这个类
- * 不会丢任何数据。分组每次从最新快照现算，不缓存跨快照的状态。</p>
+ * <p><b>组是视图，不是存档实体。</b>规则跟着机器走；删掉这个类不会丢任何数据。分组每次从最新
+ * 快照现算，不缓存跨快照的状态。</p>
  *
- * <p>不变量：成员必定同产线、同 {@code blockId}、同 {@code beTypeId}、同规则签名。任何一条
- * 不满足就说明它已经分叉，必须单独成组——这里不做「修复」，只按事实呈现。</p>
+ * <p>P1 删除产线后左表不再有「用户拖出来的堆叠行」：左表一行就是一台机器
+ * （{@link #flat}），只有右侧机器库还按「同方块、同规则」自动合并（{@link #library}）。</p>
  *
  * <p>组身份用锚点（组内第一台）的 machineId 表示，而不是签名：签名在玩家改规则时会变，
- * 但组还在。界面状态（展开、悬停、滚轮待发数量）绑锚点 id 才稳定。</p>
- *
- * <p>速率是整组累加：同组规则相同，但每台的实际速率不同，所以每条规则的速率是各成员之和。
- * 规则顺序取锚点自己的顺序，只是显示顺序，不参与分组判断。</p>
+ * 但组还在。界面状态（展开、悬停）绑锚点 id 才稳定。</p>
  *
  * @param members     成员视图，按输入顺序；第一个是锚点
- * @param stackId     堆叠组 id，由服务端持久化；未编线或未分组时为 {@code null}
  * @param blockId     分组用的方块 id；未加载时是最后一次看到的值
  * @param beTypeId    方块实体类型 id，用来区分同一个方块的多个等级
  * @param signature   规则签名，用来判断还能不能并进新成员
@@ -46,7 +41,7 @@ import net.minecraft.resources.ResourceLocation;
  * @param outputRates 与 {@code outputs} 同序的整组累加速率
  */
 record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
-        @Nullable UUID stackId, @Nullable ResourceLocation blockId,
+        @Nullable ResourceLocation blockId,
         @Nullable ResourceLocation beTypeId, MachineIoGroup.Signature signature,
         FactoryStatus.Kind statusKind, int statusCount,
         List<ResourceSpec> inputs, List<ResourceSpec> outputs,
@@ -65,36 +60,22 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
 
     /** 分组键：同键才能并成一行。 */
     private record StackKey(@Nullable ResourceLocation blockId, @Nullable ResourceLocation beTypeId,
-            MachineIoGroup.Signature signature, List<UUID> lineIds) {
-        StackKey {
-            lineIds = List.copyOf(lineIds);
-        }
+            MachineIoGroup.Signature signature) {
     }
 
     /**
-     * 把一条产线里的机器按服务端存的堆叠组归并。
+     * 把机器库铺成一行一台。
      *
-     * <p>左表不自动合并：一行就是产线里的一个 {@code stackId}，顺序取服务端的
-     * {@code stackIndex}。这样用户拖出来、滚出来的面板下次打开还是同一个样子。</p>
+     * <p>左表不做自动合并：每台机器都有自己的 IO 规则和坐标，合并只会让「改哪台」变模糊。
+     * 顺序沿用快照顺序（机器库登记顺序）。</p>
      *
-     * @param lineMachines 当前产线的机器
-     * @return 组列表；按面板顺序
+     * @param machines 机器视图
+     * @return 组列表；每项恰好一台
      */
-    static List<FactoryMachineStack> table(List<FactorySnapshotBuilder.MachineView> lineMachines) {
-        Map<UUID, List<FactorySnapshotBuilder.MachineView>> buckets = new LinkedHashMap<>();
-        for (FactorySnapshotBuilder.MachineView view : lineMachines) {
-            UUID stackId = view.stackId();
-            if (stackId == null) {
-                // 左表只画编了线的机器；理论上到不了这里。
-                continue;
-            }
-            buckets.computeIfAbsent(stackId, key -> new ArrayList<>()).add(view);
-        }
-        List<UUID> ids = new ArrayList<>(buckets.keySet());
-        ids.sort(Comparator.comparingInt(id -> buckets.get(id).get(0).stackIndex()));
-        List<FactoryMachineStack> stacks = new ArrayList<>(ids.size());
-        for (UUID id : ids) {
-            stacks.add(of(buckets.get(id), id));
+    static List<FactoryMachineStack> flat(List<FactorySnapshotBuilder.MachineView> machines) {
+        List<FactoryMachineStack> stacks = new ArrayList<>(machines.size());
+        for (FactorySnapshotBuilder.MachineView machine : machines) {
+            stacks.add(of(List.of(machine)));
         }
         return stacks;
     }
@@ -102,33 +83,30 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
     /**
      * 把整个机器库按组归并。
      *
-     * <p>机器库是只读展示，仍然按「同方块、同规则、同产线」自动合并。它会同时显示已编线和
-     * 未编线的机器，所以分组键必须带产线 id，否则同方块同规则的两条产线会被并成一行。</p>
+     * <p>机器库是只读展示，按「同方块、同规则」自动合并；不再按产线分组。</p>
      *
      * @param machines 机器库视图
      * @return 组列表
      */
     static List<FactoryMachineStack> library(List<FactorySnapshotBuilder.MachineView> machines) {
         return group(machines, view -> new StackKey(view.groupBlockId(), view.beTypeId(),
-                signatureOf(view), view.lineIds()));
+                signatureOf(view)));
     }
 
     /**
-     * 从一批成员构造一组；堆叠组 id 由调用方给。
+     * 从一批成员构造一组。
      *
      * @param members 成员视图，第一个是锚点
-     * @param stackId 堆叠组 id；库里的自动合并传 {@code null}
      * @return 组
      */
-    static FactoryMachineStack of(List<FactorySnapshotBuilder.MachineView> members,
-            @Nullable UUID stackId) {
+    static FactoryMachineStack of(List<FactorySnapshotBuilder.MachineView> members) {
         FactorySnapshotBuilder.MachineView anchor = members.get(0);
         Map<FactoryStatus.Kind, Integer> counts = new EnumMap<>(FactoryStatus.Kind.class);
         for (FactorySnapshotBuilder.MachineView member : members) {
             counts.merge(FactoryStatus.kindOf(member), 1, Integer::sum);
         }
         FactoryStatus.Kind dominant = dominant(counts);
-        return new FactoryMachineStack(members, stackId, anchor.groupBlockId(),
+        return new FactoryMachineStack(members, anchor.groupBlockId(),
                 anchor.beTypeId(), signatureOf(anchor), dominant,
                 counts.getOrDefault(dominant, 0), anchor.inputs(), anchor.outputs(),
                 stackRates(members, true, anchor.inputs()),
@@ -156,7 +134,7 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
         }
         List<FactoryMachineStack> stacks = new ArrayList<>(buckets.size());
         for (List<FactorySnapshotBuilder.MachineView> members : buckets.values()) {
-            stacks.add(of(members, null));
+            stacks.add(of(members));
         }
         return stacks;
     }
@@ -209,7 +187,7 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
         return rates;
     }
 
-    /** 锚点机器：取图标、名字、产线名都用它。 */
+    /** 锚点机器：取图标、名字都用它。 */
     FactorySnapshotBuilder.MachineView anchor() {
         return this.members.get(0);
     }

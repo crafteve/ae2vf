@@ -13,7 +13,6 @@ import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -37,10 +36,13 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 
 /**
- * 产线体检：回答「这台机器为什么不动」。
+ * 机器体检：回答「这台机器为什么不动」。
  *
  * <p>现场重新模拟一遍，不回放历史。按资源类型取对应的方块能力，判定顺序固定：
  * 机器还在吗 → 区块加载了吗 → 面有能力吗 → 仓库有料吗 → 机器收得下吗 → 输出槽有东西吗。</p>
+ *
+ * <p>P1 删除产线后体检直接以机器为粒度：{@link #checkAll} 给出整个机器库，
+ * {@link #check} 只给一台。</p>
  *
  * <p>「槽满」是 warning 不是「空闲」：没读机器状态就不能假设它在加工——塞满煤炭却不工作的
  * 熔炉和正在烧的熔炉，从 IO 这一侧看是一样的。</p>
@@ -62,29 +64,41 @@ public final class DiagChecks {
     }
 
     /**
-     * 体检一条产线。
+     * 体检整个机器库。
      *
      * @param server  服务端
      * @param factory 工厂
-     * @param line    产线
      * @return 每台机器一条结果
      */
-    public static List<GroupCheck> check(MinecraftServer server, Factory factory, PassiveLine line) {
+    public static List<GroupCheck> checkAll(MinecraftServer server, Factory factory) {
         List<GroupCheck> result = new ArrayList<>();
         Storage storage = factory.live().storage();
         boolean online = factory.live().storageOnline();
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
-        for (UUID machineId : line.machineIds()) {
-            Optional<Machine> target = factory.config().machines().byId(machineId);
-            if (target.isEmpty()) {
-                result.add(simple(machineId, DiagEvent.Level.ERROR, "机器已不在机器库"));
-                continue;
-            }
-            Machine entry = target.get();
+        for (Machine entry : factory.config().machines().all()) {
             result.add(checkGroup(server, storage, online, entry.ref(), entry.io(), observations));
         }
         return result;
+    }
+
+    /**
+     * 体检一台机器。
+     *
+     * @param server    服务端
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @return 结果；机器不在机器库时为一条 ERROR
+     */
+    public static GroupCheck check(MinecraftServer server, Factory factory, UUID machineId) {
+        Optional<Machine> target = factory.config().machines().byId(machineId);
+        if (target.isEmpty()) {
+            return simple(machineId, DiagEvent.Level.ERROR, "机器已不在机器库");
+        }
+        Machine entry = target.get();
+        FactoryRuntime runtime = FactoryRuntime.get();
+        return checkGroup(server, factory.live().storage(), factory.live().storageOnline(),
+                entry.ref(), entry.io(), runtime == null ? null : runtime.observations());
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,

@@ -10,7 +10,6 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.line.LineActions;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
@@ -31,20 +30,19 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 客户端对一台机器的 IO 规则做出的动作：新增 / 更新面或匹配模式 / 删除。
  *
- * <p>只传资源 key、面、匹配模式和位置 id；规则数量固定“塞满”，服务端不接受客户端指定数量。
- * 规则身份是资源 key，更新和删除都按 key 找。</p>
+ * <p>只传资源 key、面、匹配模式和机器 id；规则数量固定“塞满”，服务端不接受客户端指定数量。
+ * 规则身份是资源 key，更新和删除都按 key 找。P1 删除产线后不再附带产线 id。</p>
  *
  * @param containerId 菜单容器 id
  * @param action      动作
- * @param lineId      产线 id
  * @param machineId   机器 id
  * @param side        输入 / 输出
  * @param key         资源
  * @param face        面；{@code null} 表示不限；删除时忽略
  * @param mode        匹配模式；删除时忽略
  */
-public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
-        UUID machineId, IoSide side, ResourceKey key, @Nullable Direction face,
+public record FactoryRuleActionC2S(int containerId, Action action, UUID machineId,
+        IoSide side, ResourceKey key, @Nullable Direction face,
         MatchMode mode) implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:factory_rule_action}。 */
@@ -86,7 +84,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
                 sendFeedback(player, payload.containerId(), false, "你还没有工厂");
                 return;
             }
-            LineActions.Result result = dispatch(factory.get(), payload);
+            MachineActions.Result result = dispatch(factory.get(), payload);
             sendFeedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {
                 FactoryTableSnapshots.send(player, payload.containerId());
@@ -94,13 +92,13 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
         });
     }
 
-    private static LineActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
+    private static MachineActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
         return switch (payload.action()) {
-            case ADD -> MachineActions.addRule(factory, payload.lineId(), payload.machineId(),
+            case ADD -> MachineActions.addRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case UPDATE -> MachineActions.updateRule(factory, payload.lineId(), payload.machineId(),
+            case UPDATE -> MachineActions.updateRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case REMOVE -> MachineActions.removeRule(factory, payload.lineId(), payload.machineId(),
+            case REMOVE -> MachineActions.removeRule(factory, payload.machineId(),
                     payload.side(), payload.key());
         };
     }
@@ -114,7 +112,6 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
     private static void write(RegistryFriendlyByteBuf buf, FactoryRuleActionC2S payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeByte(payload.action().ordinal());
-        buf.writeUUID(payload.lineId());
         buf.writeUUID(payload.machineId());
         buf.writeByte(payload.side().ordinal());
         ResourceKeyCodec.write(buf, payload.key());
@@ -132,7 +129,6 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
             throw new DecoderException("invalid rule action: " + actionOrdinal);
         }
         Action action = Action.values()[actionOrdinal];
-        UUID lineId = buf.readUUID();
         UUID machineId = buf.readUUID();
         int sideOrdinal = buf.readUnsignedByte();
         if (sideOrdinal >= IoSide.values().length) {
@@ -153,7 +149,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID lineId,
             throw new DecoderException("invalid match mode: " + modeOrdinal);
         }
         MatchMode mode = MatchMode.values()[modeOrdinal];
-        return new FactoryRuleActionC2S(containerId, action, lineId, machineId, side, key, face, mode);
+        return new FactoryRuleActionC2S(containerId, action, machineId, side, key, face, mode);
     }
 
     /** IO 规则动作。 */

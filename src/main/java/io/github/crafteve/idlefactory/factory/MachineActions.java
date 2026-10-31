@@ -7,8 +7,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.line.LineActions;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
@@ -22,195 +20,145 @@ import net.minecraft.world.level.material.Fluids;
 /**
  * 机器 IO 规则的写操作层：指令和界面共用。
  *
- * <p>规则跟着机器走，所以这里只按机器 id 找 {@link Machine}，不要求机器已经编进产线。产线只用于
- * 回执定位与唤醒；规则本身不存产线。</p>
+ * <p>规则跟着机器走，所以这里只按机器 id 找 {@link Machine}，不要求机器编进任何分组。规则写入
+ * 后清掉这台机器的面路由并唤醒它，让下一轮按新规则重新探面。</p>
+ *
+ * <p>P1 删除产线后不再有「整组一起改」的语义：产线不再承载堆叠组，一次写操作只作用在一台机器上。
+ * 原来「产线」参数只是为了回执里带 id，这里一并删掉。</p>
+ *
+ * <p>它只做「校验 + 改配置 + 标记存档 + 唤醒执行器」，不直接发聊天栏消息，也不依赖菜单/网络。
+ * 返回值里的 {@link Result#message()} 是给玩家看的短句，命令侧用 {@code FactoryMessages} 包一层，
+ * 界面侧放进反馈包。</p>
  */
 public final class MachineActions {
     /** 每侧规则上限；和网络包、AGENTS 的规模约束一致。 */
     public static final int MAX_RULES_PER_SIDE = 16;
+
+    /**
+     * 一次写操作的结果。
+     *
+     * @param ok      是否成功
+     * @param message 给玩家看的一句话
+     */
+    public record Result(boolean ok, String message) {
+        /**
+         * 成功结果。
+         *
+         * @param message 文案
+         * @return 结果
+         */
+        public static Result ok(String message) {
+            return new Result(true, message);
+        }
+
+        /**
+         * 失败结果。
+         *
+         * @param message 文案
+         * @return 结果
+         */
+        public static Result err(String message) {
+            return new Result(false, message);
+        }
+    }
 
     private MachineActions() {
         // 纯静态动作层
     }
 
     /**
-     * 加一条输入/输出规则；机器属于某个堆叠组时，整组一起加。
-     *
-     * <p>组由产线自己存（{@code stackId}），这里只负责按锚点找到同组成员逐个写。已经有的
-     * 成员跳过并计数，回执写实际写入的台数，不假装全成功。</p>
+     * 加一条输入/输出规则。
      *
      * @param factory   工厂
-     * @param lineId    回执里带上的产线 id；可为 {@code null}
-     * @param machineId 机器 id；组场景里是锚点
+     * @param machineId 机器 id
      * @param side      输入 / 输出
      * @param key       资源
      * @param face      面；{@code null} 表示不限
      * @param mode      匹配模式；非物品会被规范化成精确
      * @return 结果
      */
-    public static LineActions.Result addRule(Factory factory, @Nullable UUID lineId,
-            UUID machineId, IoSide side, ResourceKey key, @Nullable Direction face,
-            MatchMode mode) {
-        List<UUID> targets = stackTargets(factory, machineId);
-        if (targets.isEmpty()) {
-            return LineActions.Result.err("找不到机器");
+    public static Result addRule(Factory factory, UUID machineId, IoSide side, ResourceKey key,
+            @Nullable Direction face, MatchMode mode) {
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
+        if (ioFound.isEmpty()) {
+            return Result.err("找不到机器");
         }
         String resourceError = validateResource(key);
         if (resourceError != null) {
-            return LineActions.Result.err(resourceError);
+            return Result.err(resourceError);
+        }
+        MachineIoGroup io = ioFound.get();
+        List<ResourceSpec> rules = rules(io, side);
+        if (rules.size() >= MAX_RULES_PER_SIDE) {
+            return Result.err(sideName(side) + "已达上限 " + MAX_RULES_PER_SIDE + " 条");
+        }
+        if (find(rules, key) != null) {
+            return Result.err(sideName(side) + "里已经有 " + key.describe());
         }
         ResourceSpec spec = new ResourceSpec(key, face, 0L, mode);
-        int written = 0;
-        int skipped = 0;
-        for (UUID target : targets) {
-            Optional<MachineIoGroup> ioFound = requireIo(factory, target);
-            if (ioFound.isEmpty()) {
-                skipped++;
-                continue;
-            }
-            MachineIoGroup io = ioFound.get();
-            List<ResourceSpec> rules = rules(io, side);
-            if (rules.size() >= MAX_RULES_PER_SIDE || find(rules, key) != null) {
-                skipped++;
-                continue;
-            }
-            boolean added = side == IoSide.INPUT ? io.addInput(spec) : io.addOutput(spec);
-            if (!added) {
-                skipped++;
-                continue;
-            }
-            afterRuleChange(factory, target);
-            written++;
+        boolean added = side == IoSide.INPUT ? io.addInput(spec) : io.addOutput(spec);
+        if (!added) {
+            return Result.err(sideName(side) + "没有写入（已存在或已满）");
         }
-        if (written == 0) {
-            return LineActions.Result.err(sideName(side) + "没有写入任何一台（已存在或已满）");
-        }
-        String suffix = skipped > 0 ? "（跳过 " + skipped + " 台）" : "";
-        return LineActions.Result.ok("已加" + sideName(side) + "到 " + written + " 台："
-                + spec.describe() + suffix, lineId);
+        afterRuleChange(machineId);
+        return Result.ok("已加" + sideName(side) + "：" + spec.describe());
     }
 
     /**
-     * 原地更新一条规则的面 / 匹配模式，整组一起改。
-     *
-     * @param factory   工厂
-     * @param lineId    回执里带上的产线 id；可为 {@code null}
-     * @param machineId 机器 id；组场景里是锚点
-     * @param side      输入 / 输出
-     * @param key       规则 key
-     * @param face      新面；{@code null} 表示不限
-     * @param mode      新匹配模式；非物品会被规范化成精确
-     * @return 结果
-     */
-    public static LineActions.Result updateRule(Factory factory, @Nullable UUID lineId,
-            UUID machineId, IoSide side, ResourceKey key, @Nullable Direction face,
-            MatchMode mode) {
-        List<UUID> targets = stackTargets(factory, machineId);
-        if (targets.isEmpty()) {
-            return LineActions.Result.err("找不到机器");
-        }
-        int written = 0;
-        int skipped = 0;
-        ResourceSpec replacement = null;
-        for (UUID target : targets) {
-            Optional<MachineIoGroup> ioFound = requireIo(factory, target);
-            if (ioFound.isEmpty()) {
-                skipped++;
-                continue;
-            }
-            MachineIoGroup io = ioFound.get();
-            ResourceSpec current = find(rules(io, side), key);
-            if (current == null) {
-                skipped++;
-                continue;
-            }
-            replacement = new ResourceSpec(key, face, current.amount(),
-                    mode == null ? current.mode() : mode);
-            boolean replaced = side == IoSide.INPUT
-                    ? io.replaceInput(key, replacement)
-                    : io.replaceOutput(key, replacement);
-            if (!replaced) {
-                skipped++;
-                continue;
-            }
-            afterRuleChange(factory, target);
-            written++;
-        }
-        if (written == 0 || replacement == null) {
-            return LineActions.Result.err(sideName(side) + "里没有 " + key.describe());
-        }
-        String suffix = skipped > 0 ? "（跳过 " + skipped + " 台）" : "";
-        return LineActions.Result.ok("已更新" + sideName(side) + "到 " + written + " 台："
-                + replacement.describe() + suffix, lineId);
-    }
-
-    /**
-     * 删除一条规则，整组一起删。
-     *
-     * @param factory   工厂
-     * @param lineId    回执里带上的产线 id；可为 {@code null}
-     * @param machineId 机器 id；组场景里是锚点
-     * @param side      输入 / 输出
-     * @param key       规则 key
-     * @return 结果
-     */
-    public static LineActions.Result removeRule(Factory factory, @Nullable UUID lineId,
-            UUID machineId, IoSide side, ResourceKey key) {
-        List<UUID> targets = stackTargets(factory, machineId);
-        if (targets.isEmpty()) {
-            return LineActions.Result.err("找不到机器");
-        }
-        int removed = 0;
-        int skipped = 0;
-        for (UUID target : targets) {
-            Optional<MachineIoGroup> ioFound = requireIo(factory, target);
-            if (ioFound.isEmpty()) {
-                skipped++;
-                continue;
-            }
-            MachineIoGroup io = ioFound.get();
-            boolean ok = side == IoSide.INPUT ? io.removeInput(key) : io.removeOutput(key);
-            if (!ok) {
-                skipped++;
-                continue;
-            }
-            afterRuleChange(factory, target);
-            removed++;
-        }
-        if (removed == 0) {
-            return LineActions.Result.err(sideName(side) + "里没有 " + key.describe());
-        }
-        String suffix = skipped > 0 ? "（跳过 " + skipped + " 台）" : "";
-        return LineActions.Result.ok("已移除" + sideName(side) + " " + removed + " 台："
-                + key.describe() + suffix, lineId);
-    }
-
-    /**
-     * 一条规则要写到哪些机器：编了线且在某个堆叠组里就是整组，否则只写它自己。
+     * 原地更新一条规则的面 / 匹配模式。
      *
      * @param factory   工厂
      * @param machineId 机器 id
-     * @return 目标机器 id；找不到机器时为空
+     * @param side      输入 / 输出
+     * @param key       规则 key
+     * @param face      新面；{@code null} 表示不限
+     * @param mode      新匹配模式；{@code null} 表示保留原值
+     * @return 结果
      */
-    private static List<UUID> stackTargets(Factory factory, UUID machineId) {
-        if (factory.config().machines().byId(machineId).isEmpty()) {
-            return List.of();
+    public static Result updateRule(Factory factory, UUID machineId, IoSide side, ResourceKey key,
+            @Nullable Direction face, @Nullable MatchMode mode) {
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
+        if (ioFound.isEmpty()) {
+            return Result.err("找不到机器");
         }
-        Optional<PassiveLine> lineFound = FactoryRefs.lineOf(factory, machineId);
-        if (lineFound.isEmpty()) {
-            return List.of(machineId);
+        MachineIoGroup io = ioFound.get();
+        ResourceSpec current = find(rules(io, side), key);
+        if (current == null) {
+            return Result.err(sideName(side) + "里没有 " + key.describe());
         }
-        PassiveLine line = lineFound.get();
-        Optional<UUID> stackFound = line.stackOf(machineId);
-        if (stackFound.isEmpty()) {
-            return List.of(machineId);
+        ResourceSpec replacement = new ResourceSpec(key, face, current.amount(),
+                mode == null ? current.mode() : mode);
+        boolean replaced = side == IoSide.INPUT
+                ? io.replaceInput(key, replacement)
+                : io.replaceOutput(key, replacement);
+        if (!replaced) {
+            return Result.err(sideName(side) + "里没有 " + key.describe());
         }
-        for (PassiveLine.StackEntry stack : line.stacks()) {
-            if (stack.stackId().equals(stackFound.get())) {
-                return stack.machineIds();
-            }
+        afterRuleChange(machineId);
+        return Result.ok("已更新" + sideName(side) + "：" + replacement.describe());
+    }
+
+    /**
+     * 删除一条规则。
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @param side      输入 / 输出
+     * @param key       规则 key
+     * @return 结果
+     */
+    public static Result removeRule(Factory factory, UUID machineId, IoSide side, ResourceKey key) {
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
+        if (ioFound.isEmpty()) {
+            return Result.err("找不到机器");
         }
-        return List.of(machineId);
+        MachineIoGroup io = ioFound.get();
+        boolean ok = side == IoSide.INPUT ? io.removeInput(key) : io.removeOutput(key);
+        if (!ok) {
+            return Result.err(sideName(side) + "里没有 " + key.describe());
+        }
+        afterRuleChange(machineId);
+        return Result.ok("已移除" + sideName(side) + "：" + key.describe());
     }
 
     private static Optional<MachineIoGroup> requireIo(Factory factory, UUID machineId) {
@@ -249,16 +197,13 @@ public final class MachineActions {
         };
     }
 
-    private static void afterRuleChange(Factory factory, UUID machineId) {
+    private static void afterRuleChange(UUID machineId) {
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.markDirty();
+        if (runtime == null) {
+            return;
         }
-        FactoryRefs.lineOf(factory, machineId).ifPresent(line -> {
-            if (runtime != null) {
-                runtime.machineRunner().forgetRoutes(machineId);
-                runtime.machineRunner().wake(machineId);
-            }
-        });
+        runtime.markDirty();
+        runtime.machineRunner().forgetRoutes(machineId);
+        runtime.machineRunner().wake(machineId);
     }
 }

@@ -41,20 +41,13 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param containerId     菜单容器 id
  * @param hasFactory      玩家是否已有工厂
  * @param storageOnline   仓库是否在线
- * @param lineCount       产线数
- * @param runningLineCount 运行中的产线数
- * @param lines           产线列表（界面菜单/筛选）
  * @param machines        机器库视图
  */
 public record FactoryTableS2C(int containerId, boolean hasFactory,
-        boolean storageOnline, int lineCount, int runningLineCount,
-        List<FactorySnapshotBuilder.LineView> lines,
+        boolean storageOnline,
         List<FactorySnapshotBuilder.MachineView> machines) implements CustomPacketPayload {
 
     private static final int MAX_MACHINES = 512;
-    private static final int MAX_LINES = 64;
-    private static final int MAX_LINE_NAME = 64;
-    private static final int MAX_LINE_NAMES = 8;
     private static final int MAX_RULES_PER_SIDE = 16;
 
     /** 包类型：{@code idlefactory:factory_table}。 */
@@ -66,14 +59,12 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
             StreamCodec.of(FactoryTableS2C::write, FactoryTableS2C::read);
 
     public FactoryTableS2C {
-        lines = List.copyOf(lines);
         machines = List.copyOf(machines);
     }
 
     /** 没有工厂时的空表。 */
     public static FactoryTableS2C empty(int containerId) {
-        return new FactoryTableS2C(containerId, false, false, 0, 0,
-                List.of(), List.of());
+        return new FactoryTableS2C(containerId, false, false, List.of());
     }
 
     @Override
@@ -95,9 +86,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeVarInt(payload.containerId());
         buf.writeBoolean(payload.hasFactory());
         buf.writeBoolean(payload.storageOnline());
-        buf.writeVarInt(payload.lineCount());
-        buf.writeVarInt(payload.runningLineCount());
-        writeLines(buf, payload.lines());
         buf.writeVarInt(payload.machines().size());
         for (FactorySnapshotBuilder.MachineView machine : payload.machines()) {
             writeMachine(buf, machine);
@@ -108,53 +96,12 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int lineCount = buf.readVarInt();
-        int runningLineCount = buf.readVarInt();
-        List<FactorySnapshotBuilder.LineView> lines = readLines(buf);
         int count = readCount(buf, MAX_MACHINES, "machines");
         List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
-        return new FactoryTableS2C(containerId, hasFactory, storageOnline,
-                lineCount, runningLineCount, lines, machines);
-    }
-
-    private static void writeLines(RegistryFriendlyByteBuf buf,
-            List<FactorySnapshotBuilder.LineView> lines) {
-        int count = Math.min(lines.size(), MAX_LINES);
-        buf.writeVarInt(count);
-        for (int i = 0; i < count; i++) {
-            FactorySnapshotBuilder.LineView line = lines.get(i);
-            buf.writeUUID(line.id());
-            buf.writeUtf(line.name(), MAX_LINE_NAME);
-            buf.writeBoolean(line.running());
-            buf.writeVarInt(Math.max(0, line.machineCount()));
-            buf.writeBoolean(line.sleeping());
-            buf.writeVarLong(Math.max(0L, line.sleepRemainingTicks()));
-        }
-    }
-
-    private static List<FactorySnapshotBuilder.LineView> readLines(RegistryFriendlyByteBuf buf) {
-        int count = readCount(buf, MAX_LINES, "lines");
-        List<FactorySnapshotBuilder.LineView> lines = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            UUID id = buf.readUUID();
-            String name = buf.readUtf(MAX_LINE_NAME);
-            boolean running = buf.readBoolean();
-            int machineCount = buf.readVarInt();
-            if (machineCount < 0) {
-                throw new DecoderException("invalid line machine count: " + machineCount);
-            }
-            boolean sleeping = buf.readBoolean();
-            long sleepRemainingTicks = buf.readVarLong();
-            if (sleepRemainingTicks < 0L) {
-                throw new DecoderException("invalid line sleep ticks: " + sleepRemainingTicks);
-            }
-            lines.add(new FactorySnapshotBuilder.LineView(id, name, running, machineCount,
-                    sleeping, sleepRemainingTicks));
-        }
-        return lines;
+        return new FactoryTableS2C(containerId, hasFactory, storageOnline, machines);
     }
 
     private static void writeMachine(RegistryFriendlyByteBuf buf,
@@ -169,14 +116,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         writeNullableResourceLocation(buf, machine.groupBlockId());
         writeNullableResourceLocation(buf, machine.beTypeId());
         buf.writeByte(kindMask(machine.presence()));
-        buf.writeVarInt(machine.lineNames().size());
-        for (String name : machine.lineNames()) {
-            buf.writeUtf(name, MAX_LINE_NAME);
-        }
-        buf.writeVarInt(machine.lineIds().size());
-        for (UUID lineId : machine.lineIds()) {
-            buf.writeUUID(lineId);
-        }
         buf.writeVarInt(machine.ruleCount());
         writeRules(buf, machine.inputs());
         writeRates(buf, machine.inputRates());
@@ -191,11 +130,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeVarLong(machine.sinceInputMoveTicks());
         buf.writeByte(machine.inputReason().ordinal());
         buf.writeByte(machine.outputReason().ordinal());
-        buf.writeBoolean(machine.stackId() != null);
-        if (machine.stackId() != null) {
-            buf.writeUUID(machine.stackId());
-            buf.writeVarInt(Math.max(0, machine.stackIndex()));
-        }
     }
 
     private static FactorySnapshotBuilder.MachineView readMachine(RegistryFriendlyByteBuf buf) {
@@ -208,16 +142,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         ResourceLocation groupBlockId = readNullableResourceLocation(buf);
         ResourceLocation beTypeId = readNullableResourceLocation(buf);
         Set<ResourceKind> presence = readKinds(buf.readUnsignedByte());
-        int lineCount = readCount(buf, MAX_LINE_NAMES, "line names");
-        List<String> lineNames = new ArrayList<>(lineCount);
-        for (int i = 0; i < lineCount; i++) {
-            lineNames.add(buf.readUtf(MAX_LINE_NAME));
-        }
-        int lineIdCount = readCount(buf, MAX_LINE_NAMES, "line ids");
-        List<UUID> lineIds = new ArrayList<>(lineIdCount);
-        for (int i = 0; i < lineIdCount; i++) {
-            lineIds.add(buf.readUUID());
-        }
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
         List<Long> inputRates = readRates(buf, inputs.size());
@@ -232,20 +156,13 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         long sinceInputMoveTicks = buf.readVarLong();
         IoResult.Reason inputReason = readEnum(buf, IoResult.Reason.values(), "input reason");
         IoResult.Reason outputReason = readEnum(buf, IoResult.Reason.values(), "output reason");
-        UUID stackId = null;
-        int stackIndex = -1;
-        if (buf.readBoolean()) {
-            stackId = buf.readUUID();
-            stackIndex = buf.readVarInt();
-        }
         MachineRef ref = new MachineRef(id,
                 net.minecraft.resources.ResourceKey.create(Registries.DIMENSION, dimension),
                 BlockPos.of(packedPos));
         return new FactorySnapshotBuilder.MachineView(ref, machineMissing, health, blockId,
-                groupBlockId, beTypeId, presence, lineNames, lineIds, ruleCount, inputs, outputs,
+                groupBlockId, beTypeId, presence, ruleCount, inputs, outputs,
                 inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,
-                sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons,
-                stackId, stackIndex);
+                sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons);
     }
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,

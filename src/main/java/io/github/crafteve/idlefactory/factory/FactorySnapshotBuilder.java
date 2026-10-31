@@ -2,17 +2,13 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
@@ -68,45 +64,10 @@ public final class FactorySnapshotBuilder {
     }
 
     /**
-     * 一条产线在界面上的样子。
-     *
-     * <p>只来自配置层与执行器的睡眠状态：id、名字、运行开关、机器数、是否睡眠、剩余唤醒
-     * tick。产线菜单和左表筛选用它，不读观测。</p>
-     *
-     * @param id                 产线 id
-     * @param name               产线名
-     * @param running            是否运行
-     * @param machineCount       产线里的机器数
-     * @param sleeping           是否处于 IO 睡眠；暂停时恒为 {@code false}
-     * @param sleepRemainingTicks 距下次唤醒的 tick；不在睡眠为 {@code 0}
-     */
-    public record LineView(UUID id, String name, boolean running, int machineCount,
-            boolean sleeping, long sleepRemainingTicks) {
-    }
-
-    /**
-     * 生成产线列表（按登记顺序）。
-     *
-     * <p>睡眠状态属于执行层，不能从配置层推导，所以由调用方查好剩余 tick 再传进来。
-     * 暂停的产线即使执行器还留着睡眠标志，也强制显示为未睡眠。</p>
-     *
-     * @param factory       工厂
-     * @param sleepRemaining 产线 id → 距下次唤醒的 tick
-     * @return 产线视图
-     */
-    public static List<LineView> lines(Factory factory, Map<UUID, Long> sleepRemaining) {
-        List<LineView> views = new ArrayList<>(factory.config().lines().size());
-        for (PassiveLine line : factory.config().lines().all()) {
-            long remaining = Math.max(0L, sleepRemaining.getOrDefault(line.id(), 0L));
-            boolean sleeping = line.running() && remaining > 0L;
-            views.add(new LineView(line.id(), line.name(), line.running(),
-                    line.machineCount(), sleeping, sleeping ? remaining : 0L));
-        }
-        return views;
-    }
-
-    /**
      * 一台机器在界面上的样子。
+     *
+     * <p>P1 删除产线后视图里不再有「挂在哪些产线」「第几组」这类字段：机器就是工厂机器库里
+     * 的一台，界面按登记顺序铺开。</p>
      *
      * @param ref       机器引用（坐标 + id）
      * @param machineMissing 方块是否已经消失（观测事实）
@@ -116,8 +77,6 @@ public final class FactorySnapshotBuilder {
      *                  让区块卸载不会把界面上的组拆散
      * @param beTypeId  方块实体类型 id；没有方块实体时为 {@code null}
      * @param presence  无向能力
-     * @param lineNames 挂在哪些产线上
-     * @param lineIds   挂在哪些产线上（与 lineNames 同序，界面按 id 筛选用）
      * @param ruleCount 配了几条规则
      * @param inputs    输入规则（界面明细用）
      * @param outputs   输出规则（界面明细用）
@@ -132,24 +91,18 @@ public final class FactorySnapshotBuilder {
      * @param outputReason   输出侧原因
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
-     * @param stackId        所属堆叠组的 id；未编线时为 {@code null}
-     * @param stackIndex     堆叠组在产线面板里的序号；未编线时为 {@code -1}
      */
     public record MachineView(MachineRef ref, boolean machineMissing, Health health,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
-            @Nullable ResourceLocation beTypeId, Set<ResourceKind> presence,
-            List<String> lineNames, List<UUID> lineIds, int ruleCount,
+            @Nullable ResourceLocation beTypeId, Set<ResourceKind> presence, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
             WorkState workState, boolean inputFull, long sinceInputMoveTicks,
             IoResult.Reason inputReason, IoResult.Reason outputReason,
-            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons,
-            @Nullable UUID stackId, int stackIndex) {
+            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons) {
 
         public MachineView {
-            lineNames = List.copyOf(lineNames);
-            lineIds = List.copyOf(lineIds);
             inputs = List.copyOf(inputs);
             outputs = List.copyOf(outputs);
             inputRates = List.copyOf(inputRates);
@@ -216,7 +169,7 @@ public final class FactorySnapshotBuilder {
             if (this.machineMissing || this.health != Health.PRESENT) {
                 return TotalState.OFFLINE;
             }
-            if (this.lineNames.isEmpty() || this.ruleCount == 0) {
+            if (this.ruleCount == 0) {
                 return TotalState.UNCONFIGURED;
             }
             if (!this.inputs.isEmpty() && this.inputFull
@@ -250,11 +203,8 @@ public final class FactorySnapshotBuilder {
      * @param active       参与 IO 的数量（方块在、未失联）
      * @param unloaded     未加载
      * @param missing      失联（含维度不存在）
-     * @param lines        产线数
-     * @param runningLines 运行中的产线数
      */
-    public record FactoryHealth(int total, int active, int unloaded, int missing,
-            int lines, int runningLines) {
+    public record FactoryHealth(int total, int active, int unloaded, int missing) {
 
         /**
          * 一行摘要，给 {@code info} / {@code diag} 的头部用。
@@ -331,18 +281,6 @@ public final class FactorySnapshotBuilder {
             // 不做可用性判断；可用性仍然读 health。
             ResourceLocation groupBlockId = observation.blockId() != null
                     ? observation.blockId() : observation.lastBlockId();
-            // 面板分组由产线自己存，快照只负责带出去；未编线时没有组。
-            UUID stackId = null;
-            int stackIndex = -1;
-            Optional<PassiveLine> lineFound = FactoryRefs.lineOf(factory, ref.id());
-            if (lineFound.isPresent()) {
-                PassiveLine line = lineFound.get();
-                Optional<UUID> stackFound = line.stackOf(ref.id());
-                if (stackFound.isPresent()) {
-                    stackId = stackFound.get();
-                    stackIndex = line.stackIndex(stackId);
-                }
-            }
             views.add(new MachineView(ref,
                     factory.live().isMachineMissing(ref.id()),
                     observation.health(),
@@ -350,14 +288,11 @@ public final class FactorySnapshotBuilder {
                     groupBlockId,
                     observation.beTypeId(),
                     observation.presence(),
-                    FactoryRefs.lineNamesOf(factory, ref.id()),
-                    FactoryRefs.lineIdsOf(factory, ref.id()),
                     inputs.size() + outputs.size(),
                     inputs, outputs, inputRates, outputRates,
                     sinceMove, blocked, observation.workState(), inputFull,
                     sinceInput, inputReason, outputReason,
-                    inputReasons, outputReasons,
-                    stackId, stackIndex));
+                    inputReasons, outputReasons));
         }
         return views;
     }
@@ -413,13 +348,7 @@ public final class FactorySnapshotBuilder {
             }
         }
         int running = 0;
-        for (PassiveLine line : factory.config().lines().all()) {
-            if (line.running()) {
-                running++;
-            }
-        }
-        return new FactoryHealth(factory.config().machines().size(), active, unloaded, missing,
-                factory.config().lines().size(), running);
+        return new FactoryHealth(factory.config().machines().size(), active, unloaded, missing);
     }
 
     /**

@@ -19,7 +19,7 @@ import net.minecraft.world.inventory.Slot;
  * 全部悬停提示：搜索语法、排序按钮、仓库格、机器库、行尾移出/展开按钮、IO 卡片和规则列。
  *
  * <p>顺序即优先级：先搜索框/排序，再玩家槽位、仓库/机器库，最后左表；命中即返回。
- * 产线下拉等浮层打开时整体跳过，避免提示和菜单叠在一起。</p>
+ * 确认浮层与资源拖拽打开时整体跳过，避免提示和浮层叠在一起。</p>
  */
 final class FactoryTooltipRender {
     private final FactoryScreenContext context;
@@ -112,14 +112,6 @@ final class FactoryTooltipRender {
             }
         }
 
-        if (this.context.geometry().addMachineRowContains(mouseX, mouseY)) {
-            graphics.renderComponentTooltip(this.context.font(), List.of(
-                    FactoryLabels.colored("新增机器", this.context.theme().tooltip().title()),
-                    FactoryLabels.colored("在右侧机器库按住左键拖一台机器到这里",
-                            this.context.theme().tooltip().label())), mouseX, mouseY);
-            return;
-        }
-
         if (mouseX >= l.leftX && mouseX < l.rightX - FactoryLayout.GAP
                 && mouseY >= l.rowTop && mouseY < l.footerY) {
             FactoryScreenGeometry.StackHit hit = this.context.geometry().tableHitAt(mouseY);
@@ -129,10 +121,6 @@ final class FactoryTooltipRender {
             FactoryMachineStack stack = hit.stack();
             FactorySnapshotBuilder.MachineView anchor = stack.anchor();
             // 行尾动作按钮与列区不重叠，但仍先判按钮，避免以后列宽调整后串到规则提示。
-            if (this.context.geometry().inRemoveButton(hit, mouseX, mouseY)) {
-                drawRemoveTooltip(graphics, stack, mouseX, mouseY);
-                return;
-            }
             if (this.context.geometry().inExpandButton(hit, mouseX, mouseY)) {
                 drawExpandTooltip(graphics, stack, mouseX, mouseY);
                 return;
@@ -150,15 +138,13 @@ final class FactoryTooltipRender {
             if (l.hasColumn(FactoryLayout.COL_INPUT)
                     && this.context.geometry().inColumn(l, FactoryLayout.COL_INPUT, mouseX)) {
                 drawRuleTooltip(graphics, "输入", stack.inputs(),
-                        stack.inputRates(), anchor.inputReasons(), mouseX, mouseY,
-                        state.lineIdleLabel());
+                        stack.inputRates(), anchor.inputReasons(), mouseX, mouseY, null);
                 return;
             }
             if (l.hasColumn(FactoryLayout.COL_OUTPUT)
                     && this.context.geometry().inColumn(l, FactoryLayout.COL_OUTPUT, mouseX)) {
                 drawRuleTooltip(graphics, "输出", stack.outputs(),
-                        stack.outputRates(), anchor.outputReasons(), mouseX, mouseY,
-                        state.lineIdleLabel());
+                        stack.outputRates(), anchor.outputReasons(), mouseX, mouseY, null);
                 return;
             }
         }
@@ -176,28 +162,6 @@ final class FactoryTooltipRender {
         return Component.empty()
                 .append(FactoryLabels.coloredBold(key, tt.value()))
                 .append(FactoryLabels.colored(" " + description, tt.label()));
-    }
-
-    /**
-     * 移出产线按钮的提示。
-     *
-     * <p>按钮只删产线引用，机器本身与 IO 规则都保留；红叉容易被误解成删除机器，
-     * 所以必须把这条语义写在提示里。多台时写明会移出几台。</p>
-     *
-     * @param graphics 画布
-     * @param stack    机器组
-     * @param mouseX   鼠标 x
-     * @param mouseY   鼠标 y
-     */
-    private void drawRemoveTooltip(GuiGraphics graphics, FactoryMachineStack stack, int mouseX,
-            int mouseY) {
-        FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
-        int count = this.context.state().displayCount(stack);
-        String title = count > 1 ? "移出整组 " + count + " 台" : "移出产线";
-        graphics.renderComponentTooltip(this.context.font(), List.of(
-                FactoryLabels.colored(title, tt.title()),
-                FactoryLabels.colored("只移除产线引用，机器与 IO 规则保留", tt.label())),
-                mouseX, mouseY);
     }
 
     /**
@@ -223,12 +187,6 @@ final class FactoryTooltipRender {
                 .append(FactoryLabels.coloredBold(
                         Integer.toString(stack.outputs().size()), tt.value()))
                 .append(FactoryLabels.colored(" 条", tt.label())));
-        if (stack.stacked()) {
-            lines.add(FactoryLabels.colored(
-                    "这一行是 " + this.context.state().displayCount(stack)
-                            + " 台，改动会同步到整组", tt.label()));
-            lines.add(FactoryLabels.colored("图标上滚轮改台数，Shift 一次 ±10", tt.label()));
-        }
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }
 
@@ -257,7 +215,6 @@ final class FactoryTooltipRender {
             return;
         }
         ResourceSpec spec = rules.get(card.ruleIndex());
-        String idleLabel = this.context.state().lineIdleLabel();
         FactoryIoCardControls.Hit hit = FactoryIoCardControls.hit(card.x(), card.y(), card.width(),
                 false, spec, mouseX, mouseY);
         switch (hit.kind()) {
@@ -289,8 +246,7 @@ final class FactoryTooltipRender {
                 ? machine.inputReasons() : machine.outputReasons();
         IoResult.Reason reason = card.ruleIndex() < reasons.size()
                 ? reasons.get(card.ruleIndex()) : IoResult.Reason.NO_ITEM;
-        IoResult.Reason effective = idleLabel != null ? IoResult.Reason.NO_ITEM
-                : FactoryLabels.effectiveReason(rate, reason);
+        IoResult.Reason effective = FactoryLabels.effectiveReason(rate, reason);
 
         lines.add(Component.empty()
                 .append(FactoryLabels.colored(card.input() ? "输入" : "输出", tt.title()))
@@ -310,13 +266,7 @@ final class FactoryTooltipRender {
                 .append(FactoryLabels.colored("速率：", tt.label()))
                 .append(FactoryLabels.rate(rate, spec.key().kind(), effective,
                         this.context.theme())));
-        if (idleLabel != null) {
-            lines.add(Component.empty()
-                    .append(FactoryLabels.colored("状态：", tt.label()))
-                    .append(FactoryLabels.coloredBold(idleLabel, tt.idle())));
-        } else {
-            lines.add(FactoryLabels.state(effective, card.input(), this.context.theme()));
-        }
+        lines.add(FactoryLabels.state(effective, card.input(), this.context.theme()));
         lines.add(FactoryLabels.colored("拖回仓库删除", tt.label()));
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }
@@ -387,7 +337,7 @@ final class FactoryTooltipRender {
         List<Component> lines = new ArrayList<>();
         FactoryGuiTheme.Tooltip tt = this.context.theme().tooltip();
         FactorySnapshotBuilder.MachineView anchor = stack.anchor();
-        int count = this.context.state().displayCount(stack);
+        int count = stack.count();
 
         String name = FactoryLabels.blockName(stack.blockId());
         lines.add(FactoryLabels.colored(count > 1 ? name + " · " + count + " 台" : name,
@@ -395,12 +345,6 @@ final class FactoryTooltipRender {
         lines.add(FactoryLabels.coloredBold(stack.statusText(this.context.theme()),
                 stack.status(this.context.theme()).color()));
 
-        if (anchor.lineNames().isEmpty()) {
-            lines.add(FactoryLabels.colored("未编线", tt.idle()));
-        } else {
-            lines.add(FactoryLabels.labelValue("产线 ",
-                    String.join("/", anchor.lineNames()), this.context.theme()));
-        }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("规则 ", tt.label()))
                 .append(FactoryLabels.coloredBold(

@@ -129,7 +129,7 @@ public final class FactorySearchQuery {
     /**
      * 搜索字段。
      *
-     * @param name      显示名（机器可包含产线名）
+     * @param name      显示名（机器为方块名）
      * @param id        注册名
      * @param namespace 命名空间
      * @param modName   模组显示名

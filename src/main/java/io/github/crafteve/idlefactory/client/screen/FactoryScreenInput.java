@@ -84,20 +84,12 @@ final class FactoryScreenInput {
         FactorySearchEditBox searchBox = this.screen.searchBox();
         FactorySortButtons sortButtons = this.screen.sortButtons();
         FactoryEditController editController = this.screen.editController();
+        int closeX = l.rightX - 6 - FactoryChromeRender.CLOSE_SIZE;
         if (searchBox != null && searchBox.isFocused()
                 && !searchBox.isMouseOver(mouseX, mouseY)) {
             // 点击别处先退出搜索焦点，否则 R/U 会被 EditBox 当成输入吞掉。
             searchBox.setFocused(false);
         }
-        boolean onLineButton = button == 0
-                && mouseY >= l.headerY + 3
-                && mouseY < l.headerY + 3 + FactoryLayout.TAB_H
-                && mouseX >= this.screen.geometry().lineButtonX()
-                && mouseX < this.screen.geometry().lineButtonX()
-                        + this.screen.geometry().lineButtonW();
-        boolean lineMenuWasOpen = editController != null
-                && editController.isLineMenuOpen();
-        int closeX = l.rightX - 6 - FactoryChromeRender.CLOSE_SIZE;
         boolean onCloseButton = mouseX >= closeX
                 && mouseX < closeX + FactoryChromeRender.CLOSE_SIZE
                 && mouseY >= l.headerY + 4
@@ -110,7 +102,7 @@ final class FactoryScreenInput {
             var libraryDelete = this.screen.geometry()
                     .libraryDeleteButtonAt(mouseX, mouseY);
             if (libraryDelete != null) {
-                editController.confirmDeleteStack(libraryDelete);
+                editController.confirmDeleteMachine(libraryDelete.anchor());
                 return true;
             }
         }
@@ -121,13 +113,6 @@ final class FactoryScreenInput {
             if (sortButtons != null && (button == 0 || button == 1)) {
                 sortButtons.click(sortButton, state.activeTab == FactoryScreen.TAB_STORAGE,
                         button == 1);
-            }
-            return true;
-        }
-        if (onLineButton) {
-            if (!lineMenuWasOpen && editController != null) {
-                editController.toggleLineMenu(this.screen.geometry().lineButtonX(),
-                        l.headerY + FactoryLayout.HEADER_H + 2);
             }
             return true;
         }
@@ -154,13 +139,6 @@ final class FactoryScreenInput {
             searchBox.setValue("");
             searchBox.setFocused(true);
             return true;
-        }
-        if (button == 0 && editController != null) {
-            var removeTarget = this.screen.geometry().lineRemoveButtonAt(mouseX, mouseY);
-            if (removeTarget != null) {
-                editController.removeStackFromLine(removeTarget);
-                return true;
-            }
         }
         if (clickMachineExpand(mouseX, mouseY)) {
             return true;
@@ -514,16 +492,6 @@ final class FactoryScreenInput {
             return true;
         }
         if (ioScrollAt(mouseX, mouseY, scrollY)) {
-            return true;
-        }
-        // 左表图标槽位上滚轮改台数；其余区域仍翻行。
-        FactoryMachineStack scrollStack = this.screen.geometry().stackIconAt(mouseX, mouseY);
-        if (scrollStack != null && this.screen.selectedLineId() != null) {
-            int step = scrollY > 0 ? 1 : -1;
-            if (Screen.hasShiftDown()) {
-                step *= 10;
-            }
-            this.screen.state.scrollStackCount(scrollStack, step);
             return true;
         }
         FactoryLayout l = this.screen.layout;

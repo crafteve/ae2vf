@@ -12,8 +12,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.line.LineActions;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
@@ -235,11 +233,8 @@ public final class FactoryService {
         MachineRef ref = view.ref();
         String where = ref.dimension().location() + " " + ref.pos().toShortString();
         String status = FactorySnapshotBuilder.describe(view);
-        StringBuilder hover = new StringBuilder(where).append('\n').append(status);
-        if (!view.lineNames().isEmpty()) {
-            hover.append("\n产线：").append(String.join(" / ", view.lineNames()))
-                    .append(" · 规则 ").append(view.ruleCount()).append(" 条");
-        }
+        StringBuilder hover = new StringBuilder(where).append('\n').append(status)
+                .append(" · 规则 ").append(view.ruleCount()).append(" 条");
         Component row = Component.empty()
                 .append(FactoryMessages.text("  ", FactoryMessages.INFO))
                 .append(FactoryMessages.hover(ref.shortId(), hover.toString()))
@@ -393,7 +388,7 @@ public final class FactoryService {
     /**
      * 删除一台机器的唯一出口。
      *
-     * <p>有规则时必须确认；没有规则直接删。删除会同时删掉产线引用和失联标记，规则随机器一起消失。</p>
+     * <p>有规则时必须确认；没有规则直接删。删除会同时清掉失联标记，规则随机器一起消失。</p>
      *
      * @param player         玩家
      * @param factory        工厂
@@ -406,13 +401,11 @@ public final class FactoryService {
             boolean confirmed, String confirmCommand) {
         int rules = target.ruleCount();
         if (rules > 0 && !confirmed) {
-            String lines = String.join(" / ", FactoryRefs.lineNamesOf(factory, target.id()));
             warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + rules + " 条 IO 配置"
-                    + (lines.isEmpty() ? "" : "（" + lines + "）")
                     + "，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
             return 0;
         }
-        LineActions.Result result = deleteMachineById(factory, target.id(), true);
+        MachineActions.Result result = deleteMachineById(factory, target.id(), true);
         if (!result.ok()) {
             err(player, result.message());
             return 0;
@@ -429,24 +422,25 @@ public final class FactoryService {
      * @param confirmed 是否已经确认（有规则时必须为 {@code true}）
      * @return 动作结果
      */
-    public static LineActions.Result deleteMachineById(Factory factory, UUID machineId,
+    public static MachineActions.Result deleteMachineById(Factory factory, UUID machineId,
             boolean confirmed) {
         Machine target = factory.config().machines().byId(machineId).orElse(null);
         if (target == null) {
-            return LineActions.Result.err("找不到机器");
+            return MachineActions.Result.err("找不到机器");
         }
         int rules = target.ruleCount();
         if (rules > 0 && !confirmed) {
-            return LineActions.Result.err("这台机器还有 " + rules + " 条 IO 配置，需要确认");
-        }
-        for (PassiveLine line : factory.config().lines().all()) {
-            line.removeMachine(machineId);
+            return MachineActions.Result.err("这台机器还有 " + rules + " 条 IO 配置，需要确认");
         }
         factory.live().clearMachineMissing(machineId);
         factory.config().machines().remove(machineId);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.machineRunner().forget(machineId);
+        }
         markDirty();
-        return LineActions.Result.ok("已删除机器 [" + target.ref().shortId() + "]"
-                + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""), null);
+        return MachineActions.Result.ok("已删除机器 [" + target.ref().shortId() + "]"
+                + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""));
     }
 
     // ------------------------------------------------------------------
@@ -720,9 +714,6 @@ public final class FactoryService {
                 // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
                 skippedRules++;
                 continue;
-            }
-            for (PassiveLine line : factory.config().lines().all()) {
-                line.removeMachine(machine.id());
             }
             factory.live().clearMachineMissing(machine.id());
             factory.config().machines().remove(machine.id());
@@ -1337,7 +1328,7 @@ public final class FactoryService {
         }
 
         if (!factory.live().storageOnline()) {
-            warn(player, "仓库当前离线，产线不会搬运");
+            warn(player, "仓库当前离线，机器不会搬运");
             return 1;
         }
 
@@ -1445,7 +1436,7 @@ public final class FactoryService {
 
     // ------------------------------------------------------------------
     // ---- 14. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage / nextId） ----
-    // 负责取当前工厂、解析在线仓库、刷新观测、唤醒产线与生成工厂 id；本文件所有公开方法共用。
+    // 负责取当前工厂、解析在线仓库、刷新观测、唤醒机器与生成工厂 id；本文件所有公开方法共用。
     // ------------------------------------------------------------------
 
     /**

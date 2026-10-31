@@ -2,12 +2,10 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.List;
 
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * 顶栏与右区静态底板：标题、产线按钮、工厂状态、统计、关闭、tab、搜索框和排序按钮。
+ * 顶栏与右区静态底板：标题、工厂状态、统计、关闭、tab、搜索框和排序按钮。
  *
  * <p>只画静态 chrome 与搜索/排序控件，不画仓库物品、机器卡片或 tooltip；这些动态内容由
  * {@link FactoryRightContentRender} / {@link FactoryTooltipRender} 负责。所有坐标从
@@ -16,7 +14,7 @@ import net.minecraft.client.gui.GuiGraphics;
 final class FactoryChromeRender {
     /** 顶栏关闭按钮的边长。 */
     static final int CLOSE_SIZE = 14;
-    /** 标题文字与「选择产线」按钮之间的水平间距。 */
+    /** 标题文字与后面状态文字之间的水平间距。 */
     static final int TITLE_GAP = 10;
 
     private final FactoryScreenContext context;
@@ -81,7 +79,7 @@ final class FactoryChromeRender {
     }
 
     /**
-     * 顶栏：标题、产线选择、工厂状态、统计、关闭按钮。
+     * 顶栏：标题、工厂状态、统计、关闭按钮。
      *
      * @param graphics 画布
      */
@@ -96,35 +94,17 @@ final class FactoryChromeRender {
                 x, textY, 0xFFFFFFFF, false);
         x += this.context.font().width(title) + TITLE_GAP;
 
-        String line = state.lineButtonText();
-        int buttonW = this.context.geometry().lineButtonW();
-        FactoryNineSlice.button(graphics, x, l.headerY + 3, buttonW, FactoryLayout.TAB_H);
-        String lineLabel = this.context.font().plainSubstrByWidth(line, buttonW - 8);
-        graphics.drawString(this.context.font(), lineLabel,
-                x + (buttonW - this.context.font().width(lineLabel)) / 2, textY,
-                this.context.theme().textPrimary(), false);
-        x += buttonW + 8;
-
         String status;
         int statusColor;
-        FactorySnapshotBuilder.LineView activeLine = state.selectedLine();
         if (!state.hasFactory) {
             status = "未创建";
             statusColor = this.context.theme().statusIdle();
-        } else if (activeLine != null) {
-            if (!activeLine.running()) {
-                status = "已暂停";
-                statusColor = this.context.theme().error();
-            } else if (activeLine.sleeping()) {
-                status = "睡眠 " + FactoryLabels.seconds(activeLine.sleepRemainingTicks()) + "s";
-                statusColor = this.context.theme().statusIdle();
-            } else {
-                status = "运行中";
-                statusColor = this.context.theme().statusRun();
-            }
         } else {
-            status = "未选产线";
-            statusColor = this.context.theme().statusIdle();
+            // P1 删除产线后没有「暂停」概念：有工厂就跑，没规则才是空闲。
+            status = state.machines.isEmpty() ? "没有机器" : "运行中";
+            statusColor = state.machines.isEmpty()
+                    ? this.context.theme().statusIdle()
+                    : this.context.theme().statusRun();
         }
         graphics.drawString(this.context.font(), status, x + 4, textY, statusColor, false);
         int statusEnd = x + 4 + this.context.font().width(status);
@@ -134,10 +114,6 @@ final class FactoryChromeRender {
                 new FactoryUiText.TextPart(Integer.toString(state.machines.size()),
                         this.context.theme().textValue()),
                 new FactoryUiText.TextPart(" 台", this.context.theme().textPrimary()),
-                new FactoryUiText.TextPart(" · ", this.context.theme().textPrimary()),
-                new FactoryUiText.TextPart(Integer.toString(state.lineCount),
-                        this.context.theme().textValue()),
-                new FactoryUiText.TextPart(" 线", this.context.theme().textPrimary()),
                 new FactoryUiText.TextPart(" · ", this.context.theme().textPrimary()),
                 new FactoryUiText.TextPart("仓库", storageColor),
                 new FactoryUiText.TextPart(storageStatusText(), storageColor));

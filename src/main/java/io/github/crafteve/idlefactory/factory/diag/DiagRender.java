@@ -9,10 +9,8 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryMessages;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
@@ -82,10 +80,7 @@ public final class DiagRender {
                 .append(levelTag(event.level()))
                 .append(FactoryMessages.text(" " + event.category().name() + " ", FactoryMessages.DIM));
         if (event.machineId() != null) {
-            row.append(FactoryMessages.hover(shortId(event.machineId()), "机器 " + event.machineId()));
-            row.append(FactoryMessages.text(" ", FactoryMessages.INFO));
-        } else if (event.lineId() != null) {
-            row.append(FactoryMessages.lineLink(shortId(event.lineId())));
+            row.append(FactoryMessages.machineLink(shortId(event.machineId())));
             row.append(FactoryMessages.text(" ", FactoryMessages.INFO));
         }
         row.append(FactoryMessages.text(event.text(), FactoryMessages.PLAIN));
@@ -128,8 +123,6 @@ public final class DiagRender {
                 .append(event.category()).append(' ');
         if (event.machineId() != null) {
             builder.append("mach:").append(shortId(event.machineId())).append(' ');
-        } else if (event.lineId() != null) {
-            builder.append("line:").append(shortId(event.lineId())).append(' ');
         }
         builder.append(event.text());
         return builder.toString();
@@ -153,21 +146,21 @@ public final class DiagRender {
      * watch 的汇总行（actionbar）。
      *
      * @param factory    工厂
-     * @param line       产线
+     * @param machine    机器
      * @param now        当前游戏时间
      * @param sleepUntil 唤醒时间；0 表示没在睡
      * @param sleepSince 睡眠起点；-1 表示没在睡
      * @return 组件
      */
-    public static Component watchSummary(Factory factory, PassiveLine line, long now,
+    public static Component watchSummary(Factory factory, MachineRef machine, long now,
             long sleepUntil, long sleepSince) {
         DiagStats stats = factory.live().stats();
         List<Map.Entry<ResourceKey, Long>> rates = topRates(stats, 2);
 
         MutableComponent row = Component.empty()
-                .append(FactoryMessages.text(line.shortId() + " " + line.name() + " · ", FactoryMessages.INFO))
-                .append(FactoryMessages.text(line.running() ? "运行" : "停止",
-                        line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
+                .append(FactoryMessages.text(machine.shortId() + " · ", FactoryMessages.INFO))
+                .append(FactoryMessages.text(sleepUntil > now ? "睡眠" : "运行",
+                        sleepUntil > now ? FactoryMessages.INFO : FactoryMessages.OK))
                 .append(FactoryMessages.text(" · ", FactoryMessages.INFO));
 
         if (rates.isEmpty()) {
@@ -186,7 +179,8 @@ public final class DiagRender {
         }
 
         int blocked = stats.blockedMachines();
-        row.append(FactoryMessages.text(" · 卡 " + blocked + "/" + line.machineCount(),
+        row.append(FactoryMessages.text(" · 卡 " + blocked + "/"
+                        + factory.config().machines().size(),
                 blocked > 0 ? FactoryMessages.WARN : FactoryMessages.INFO));
         row.append(FactoryMessages.text(" · IO " + formatMs(DiagService.ioCostAvgMs()),
                 FactoryMessages.DIM));
@@ -200,23 +194,23 @@ public final class DiagRender {
      *
      * @param server     服务端
      * @param factory    工厂
-     * @param line       产线
+     * @param machine    机器
      * @param now        当前游戏时间
      * @param sleepUntil 唤醒时间
      * @param sleepSince 睡眠起点
      * @return 若干行
      */
-    public static List<Component> watchDetail(MinecraftServer server, Factory factory, PassiveLine line,
-            long now, long sleepUntil, long sleepSince) {
+    public static List<Component> watchDetail(MinecraftServer server, Factory factory,
+            MachineRef machine, long now, long sleepUntil, long sleepSince) {
         List<Component> rows = new ArrayList<>();
         DiagStats stats = factory.live().stats();
 
         rows.add(Component.empty()
                 .append(FactoryMessages.text("[watch] ", FactoryMessages.DIM))
-                .append(FactoryMessages.lineLink(line.shortId()))
-                .append(FactoryMessages.text(" " + line.name() + " · "
-                        + (line.running() ? "运行" : "停止")
-                        + " · " + line.machineCount() + " 组 · "
+                .append(FactoryMessages.hover(machine.shortId(),
+                        machine.dimension().location() + " " + machine.pos().toShortString()))
+                .append(FactoryMessages.text(" " + machine.dimension().location() + " "
+                        + machine.pos().toShortString() + " · "
                         + sleepText(now, sleepUntil, sleepSince), FactoryMessages.INFO)));
 
         rows.add(FactoryMessages.text("  入 " + ratesText(stats.rateIn())
@@ -225,21 +219,7 @@ public final class DiagRender {
                 + "ms（最大 " + formatMs(DiagService.ioCostMaxMs()) + "ms）",
                 FactoryMessages.PLAIN));
 
-        Map<UUID, String> reasons = new HashMap<>();
-        for (DiagChecks.GroupCheck check : DiagChecks.check(server, factory, line)) {
-            reasons.put(check.machineId(), check.detail());
-        }
-
-        int shown = 0;
-        for (UUID machineId : line.machineIds()) {
-            if (shown >= 4) {
-                rows.add(FactoryMessages.text("  … 还有 " + (line.machineCount() - shown) + " 台",
-                        FactoryMessages.DIM));
-                break;
-            }
-            rows.add(machineRow(factory, machineId, stats, reasons, now));
-            shown++;
-        }
+        rows.add(machineRow(factory, machine.id(), stats, Map.of(), now));
         return rows;
     }
 
@@ -261,55 +241,6 @@ public final class DiagRender {
                 : -1L;
         return FactoryMessages.text("  " + id + " · 就绪 · 上次 "
                 + (sinceMove >= 0L ? sinceMove + "s" : "—"), FactoryMessages.INFO);
-    }
-
-    /**
-     * 一条产线（一组机器）整体睡到什么时候。
-     *
-     * <p>P1 起执行器只有机器级睡眠：产线「在睡」当且仅当组内每台机器都在睡，
-     * 而其中任意一台先醒，这条线就该被看作醒着的，所以取最小唤醒时间。</p>
-     *
-     * @param runtime 运行时
-     * @param line    产线
-     * @param now     当前游戏时间
-     * @return 唤醒时间；没有机器在睡时为 {@code 0}
-     */
-    public static long lineSleepUntil(FactoryRuntime runtime, PassiveLine line, long now) {
-        long earliest = Long.MAX_VALUE;
-        boolean allSleeping = true;
-        for (UUID machineId : line.machineIds()) {
-            long until = runtime.machineRunner().sleepUntil(machineId);
-            if (until <= now) {
-                allSleeping = false;
-                continue;
-            }
-            earliest = Math.min(earliest, until);
-        }
-        return allSleeping && earliest != Long.MAX_VALUE ? earliest : 0L;
-    }
-
-    /**
-     * 一条产线整体从什么时候开始睡的。
-     *
-     * <p>取组内睡眠起点最晚的那台：那一台开始睡的一刻，整条线才真正睡着。</p>
-     *
-     * @param runtime 运行时
-     * @param line    产线
-     * @param now     当前游戏时间
-     * @return 睡眠起点；没在睡时为 {@code -1}
-     */
-    public static long lineSleepSince(FactoryRuntime runtime, PassiveLine line, long now) {
-        if (lineSleepUntil(runtime, line, now) <= now) {
-            return -1L;
-        }
-        long latest = -1L;
-        for (UUID machineId : line.machineIds()) {
-            long since = runtime.machineRunner().sleepSince(machineId);
-            if (since > latest) {
-                latest = since;
-            }
-        }
-        return latest;
     }
 
     private static String sleepText(long now, long sleepUntil, long sleepSince) {

@@ -68,11 +68,11 @@ public final class FactoryLayout {
     /** 小标题（合成 / 背包）与内容的间距。 */
     public static final int LABEL_GAP = 12;
 
-    /** 行尾动作按钮边长：移出产线与展开 IO 共用。 */
+    /** 行尾动作按钮边长：展开 IO 详情。 */
     public static final int ROW_ACTION_BUTTON = 14;
-    /** 行尾两枚动作按钮之间的间隙。 */
+    /** 行尾动作按钮之间的间隙（保留给第二个动作位）。 */
     public static final int ROW_ACTION_GAP = 1;
-    /** 行尾动作区宽度：两枚按钮 + 间隙 + 与列内容之间的 2px 呼吸位；输出列排版时从右端让出。 */
+    /** 行尾动作区宽度：按钮 + 间隙 + 与列内容之间的 2px 呼吸位；输出列排版时从右端让出。 */
     public static final int ROW_ACTIONS_W = 2 * ROW_ACTION_BUTTON + ROW_ACTION_GAP + 2;
     /** 动作按钮的上边距：行高 26，14px 按钮上下各留 6px。 */
     public static final int ROW_ACTION_TOP = (ROW_H - ROW_ACTION_BUTTON) / 2;
@@ -120,20 +120,6 @@ public final class FactoryLayout {
     /** 面板最小高。 */
     public static final int MIN_PANEL_H = 320;
 
-    /** 产线下拉每一行的高度。 */
-    public static final int LINE_ROW_H = 16;
-    /** 产线下拉底部“新建产线”行的高度。 */
-    public static final int LINE_ADD_ROW_H = 18;
-    /** 产线下拉的外框/内边距。 */
-    public static final int LINE_MENU_PAD = 3;
-    /** 产线行的二级菜单箭头宽度。 */
-    public static final int LINE_CARET_W = 12;
-    /** 二级菜单每一行的高度。 */
-    public static final int SUBMENU_ROW_H = 16;
-    /** 命名浮层宽。 */
-    public static final int DIALOG_W = 240;
-    /** 命名浮层高。 */
-    public static final int DIALOG_H = 96;
     /** 确认浮层宽。 */
     public static final int CONFIRM_W = 240;
     /** 确认浮层高。 */
@@ -394,35 +380,6 @@ public final class FactoryLayout {
     /** 展开详情面板可用于摆放单元格的宽度。 */
     public int ioInnerWidth() {
         return Math.max(0, ioPanelWidth() - IO_PANEL_PAD * 2);
-    }
-
-    /**
-     * 产线下拉的最大高度：从顶栏下沿到面板底边，至少留两行。
-     *
-     * @return 像素高度
-     */
-    public int lineMenuMaxHeight() {
-        int top = this.headerY + HEADER_H + 2;
-        return Math.max(LINE_ROW_H * 2 + LINE_ADD_ROW_H, this.panelY + this.panelH - PAD - top);
-    }
-
-    /**
-     * 产线下拉的最大宽度；名字再长也不许压到右侧面板外。
-     *
-     * @return 像素宽度
-     */
-    public int lineMenuMaxWidth() {
-        return Math.max(120, this.panelW - PAD * 2);
-    }
-
-    /** 命名浮层左上角 x。 */
-    public int dialogX() {
-        return this.panelX + (this.panelW - DIALOG_W) / 2;
-    }
-
-    /** 命名浮层左上角 y。 */
-    public int dialogY() {
-        return this.panelY + (this.panelH - DIALOG_H) / 2;
     }
 
     /** 确认浮层左上角 x。 */

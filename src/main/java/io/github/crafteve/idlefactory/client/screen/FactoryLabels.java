@@ -233,7 +233,7 @@ final class FactoryLabels {
     }
 
     /**
-     * tick 向上取整成秒，给产线睡眠提示用。
+     * tick 向上取整成秒，给睡眠提示用。
      *
      * <p>睡眠剩余按 tick 下发；显示时向上取整，避免剩余 1 tick 时出现「睡眠 0s」。</p>
      *

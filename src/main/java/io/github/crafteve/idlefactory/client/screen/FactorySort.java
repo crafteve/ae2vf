@@ -89,8 +89,8 @@ final class FactorySort {
         POSITION("坐标", "坐", false),
         /** 机器状态。 */
         STATUS("状态", "状", false),
-        /** 产线名；未编线排最后。 */
-        LINE("产线", "线", false),
+        /** 方块类型；同类方块聚在一起，取不到方块 id 的排最后。 */
+        LINE("方块", "块", false),
         /** 规则条数。 */
         RULES("规则数", "规", true),
         /** 距上次成功搬运的 tick；越近越前。 */
@@ -200,8 +200,9 @@ final class FactorySort {
                     .thenComparingInt(machine -> machine.ref().pos().getZ());
             case STATUS -> Comparator.comparingInt(machine -> stateRank(machine.totalState()));
             case LINE -> Comparator
-                    .comparing((MachineView machine) -> machine.lineNames().isEmpty())
-                    .thenComparing(machine -> String.join("/", machine.lineNames()),
+                    .comparing((MachineView machine) -> machine.groupBlockId() == null)
+                    .thenComparing(machine -> machine.groupBlockId() == null
+                            ? "" : machine.groupBlockId().toString(),
                             String.CASE_INSENSITIVE_ORDER);
             case RULES -> Comparator.comparingInt(MachineView::ruleCount);
             case RECENT -> Comparator.comparingLong(machine -> machine.sinceMoveTicks() < 0L
