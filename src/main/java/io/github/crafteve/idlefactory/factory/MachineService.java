@@ -341,6 +341,9 @@ public final class MachineService {
      * @return 给玩家看的短句
      */
     private static String describeSweep(MachineNode node, long now) {
+        if (node.returnSweep().lastSweepTick() == 0L) {
+            return "还没扫过";
+        }
         StringBuilder text = new StringBuilder();
         text.append(node.returnSweep().storageFaces()).append("/6 面可抽取");
         long lastExtract = node.returnSweep().lastExtractTick();
