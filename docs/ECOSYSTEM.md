@@ -37,7 +37,7 @@
 - Modrinth：https://modrinth.com/mod/appflux
 - 版本：1.21-2.1.5-neoforge（要求 AE2 `[19.2.2-beta,)`，需要 Glodium；GuideME 由 AE2 传递）
 - 描述：Store and transfer energy with ME network
-- 已接入：`FluxKey.of(EnergyType.FE)` 与 `ResourceKey.ENERGY` 双向映射；`EnergyType.FE.getIcon()` 用作 FE 图标
+- 已接入：直接使用 `FluxKey.of(EnergyType.FE)` 作为 FE 的 `AEKey`；`EnergyType.FE.getIcon()` 用作 FE 图标。**没装 Applied Flux 时没有 FE 这一类资源**，不写降级表示
 - 可选性：`compileOnly + localRuntime`，`AppFluxKeys.Bridge` 懒加载；`-PwithoutAppFlux` 验证未安装路径
 - 源码位置：Modrinth 标注为 https://github.com/GlodBlock/ExtendedAE，但仓库主描述是「36 槽 pattern provider」，Applied Flux 的独立源码位置仍未确认
 

@@ -7,7 +7,7 @@
 | [DECISIONS.md](DECISIONS.md) | ADR 决策记录。**唯一活的设计约束来源**——架构为什么长这样，看这里 | 持续维护 |
 | [ECOSYSTEM.md](ECOSYSTEM.md) | AE2 生态调研：存储后端、FE 支持、化学品边界 | 现状仍成立 |
 | [ui/P0.md](ui/P0.md) | 界面 P0：目标、尺寸、贴图管线、怎么试、P1 清单 | 现行 |
-| [ui/P1-EDIT.md](ui/P1-EDIT.md) | 界面 P1：产线菜单、机器拖拽、IO 卡片编辑、网络包与验收清单 | 现行 |
+| [ui/P1-EDIT.md](ui/P1-EDIT.md) | 界面 P1：产线菜单、机器拖拽、IO 卡片编辑。**产线菜单已随产线对象删除，界面整体待 P3 重写** | 部分过时 |
 | [ui/mockup-v2.png](ui/mockup-v2.png) | 界面定稿设计稿（v2），[HTML 源](ui/mockup-v2.html) 可直接改 | 现行 |
 | [ui/mockup-v1.png](ui/mockup-v1.png) | 第一版设计稿，仅作 v1→v2 的对照 | 历史 |
 | [../README.md](../README.md) | 当前状态、指令、包结构、核心约束 | 现行 |

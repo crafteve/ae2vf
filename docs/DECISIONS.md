@@ -248,7 +248,7 @@
 
 ## ADR-018 命令树以产线为主语
 
-**状态**：已决定
+**状态**：已被 ADR-033 取代（2026-10-31）
 
 **决定**：`/idf line <线> <动作> <对象>`，不是 `/idf line <动作> <线> <对象>`。
 
@@ -285,7 +285,7 @@
 
 ## ADR-020 仓库按资源类型建模，IO 默认每 tick 一轮
 
-**状态**：已决定
+**状态**：已被 ADR-033 取代（2026-10-31）
 
 **决定**：仓库和 IO 从物品专用改为 `ResourceKey(kind, id)`；本次支持物品、流体（mB）、FE。IO 默认每 tick 一轮，`/idf diag io` 可在 1–20 tick 间调；默认搬运量是「塞满」。
 
@@ -621,3 +621,31 @@
 | TBD-08 | 工厂维度是否还需要 |
 | TBD-09 | 多方块机器怎么接入 |
 | TBD-10 | AE2 与容器共存时的自指检测（storage bus 引用同一容器） |
+
+---
+
+## ADR-033 资源身份统一为 AE2 AEKey，删除产线与自研存储抽象
+
+**状态**：已决定（2026-10-31）
+
+**决定**：
+
+1. 资源身份直接用 AE2 的 `AEKey`（`AEItemKey` / `AEFluidKey` / Applied Flux 的 `FluxKey`），删除自研的 `ResourceKey` 与 `ResourceKind`。
+2. 删除 `Line` 数据对象，IO 按机器库遍历，产线降级为纯 UI 分组。
+3. 删除自研 `Storage` 接口，三个后端统一实现 AE2 的 `MEStorage`；模拟 / 提交的布尔语义收进 `AeKeySupport`。
+4. 资源类型覆盖范围 = AE2 原生 + 已安装的 AE 生态附属；FE 依赖 Applied Flux，化学品依赖 Applied Mekanistics，没装就不支持，不写降级表示。
+5. 观测层的能力分类独立成 `CapabilityKind{ITEM, FLUID, ENERGY}`，不再复用资源类型枚举。
+
+**理由**：
+
+- 自研资源模型是「仓库以容器为主、AE 只是可选后端」时期的产物（ADR-019 / ADR-020）。现在 AE2 是硬依赖、ME 是主线，平行模型只剩下转换成本：`ResourceKey` 的相等与哈希当年就要手动对齐 `AEItemKey`，等于在复刻一个已经存在的东西。
+- 下一步要做虚拟样板供应器，样板、`ICraftingProvider`、CPU 派单给的都是 `AEKey`；留一层自研 key 等于每次派单都翻译一遍。
+- 产线只是分组，不该是数据对象；删掉后 IO 遍历少一层，机器库成为唯一遍历单位。
+
+**后果**：
+
+- 存档不兼容，开发期直接弃档，不写迁移。
+- 规则描述改为 `名字[id][组件][模糊][面]`，便于指令核对组件身份。
+- ADR-018（命令树以产线为主语）作废，指令改为 `/idf machine <id> input|output ...`。
+- ADR-020（仓库按资源类型建模）作废，`ResourceKey(kind, id)` 不再存在。
+- 后续若要让 FE 进 AE，直接复用 Applied Flux 的 key，不再自建 `AEKeyType`。

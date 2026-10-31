@@ -12,8 +12,8 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - 服务端权威：IO 全在服务端；GUI 只是监视器，只渲染 + 发意图；menu 是登录壳。
 - 工厂不是数据库：仓库在 AE2 网络或方块容器组；仓库离线 = 没料，不是断网。
-- 被动产线：玩家配置输入输出，当前形态。主动产线：AE2 pattern / CPU 下单，未实现。
-- 基础概念：机器库（每台机器带自己的 IO 规则）、产线（只存机器引用）；失联是运行时状态，不写档。
+- 被动 IO：玩家给机器配输入输出规则，每 tick 搬运，当前形态。主动合成：AE2 pattern / CPU 下单，未实现。
+- 基础概念：机器库（每台机器带自己的 IO 规则）；**没有产线对象**，分组只是 UI 视图；失联是运行时状态，不写档。
 - 资源身份用 AE2 的 `AEKey`：物品带完整数据组件（`AEItemKey`），流体按注册名（`AEFluidKey`），不自己造平行的资源类型。
 - **资源类型的覆盖范围 = AE2 原生 + 已安装的 AE 生态附属，模组自己不新增任何资源类型**。FE 以 Applied Flux 为前提，化学品以 Applied Mekanistics 为前提；没装对应附属就没有那类资源，不写降级表示、不造平行 key。装了时它们的 key 都是 `AEKey`，走和物品 / 流体完全相同的规则。
 - IO 规则分精确 / 模糊：模糊忽略物品组件，旧规则默认按模糊读入。
@@ -42,11 +42,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 | 包 | 负责 | 不负责 |
 |---|---|---|
-| `resource` | 资源键、规格、类型 | 存储、执行 |
 | `observation` | 方块级观测、能力缓存、工作状态 | 配置、搬运 |
-| `machine` | 机器、机器库、机器 IO 规则 | 世界探测、搬运 |
-| `line` | 产线、机器引用 | IO 规则、执行 |
-| `storage` | 仓库抽象与后端（AE2 / 容器） | IO 事务 |
+| `machine` | 机器、机器库、IO 规则（`ResourceSpec` / `MatchMode`） | 世界探测、搬运 |
+| `storage` | 仓库后端（AE2 / 容器，统一实现 `MEStorage`）、`AeKeySupport` 工具 | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
 | `factory` | 工厂实例与编排（Runtime / Service / Store / Actions） | 存储实现、搬运实现 |
 | `diag` | 事件、统计、体检、渲染文本 | 改写配置 |
@@ -64,27 +62,26 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 硬条款：
 
 1. 包名只用单数领域名词。禁止 `util`、`common`、`misc`、`helper`。
-2. 一个概念只建模一处：资源 = `ResourceKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`。
-3. 依赖单向。现存例外只有 4 个：`storage → menu`、`storage → network`、`factory → integration.ae2`、`network.payload → client.network`。禁止新增跨层环。
+2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`，能力分类 = `CapabilityKind`。
+3. 依赖单向。现存例外只有 3 个：`storage → network`、`factory → integration.ae2`、`network.payload → client.network`。禁止新增跨层环。
 4. 发包只从 `network`。`FactoryStorageActions` 发包是历史例外，新代码不许学。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
-6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。唯一例外是 `ResourceKey`：它持一份 count=1 的 `ItemStack` 快照（构造时复制、对外只返回副本），用来承载物品数据组件。
+6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。资源 key 一律用 AE2 的 `AEKey`，它本身是不可变值对象，不需要额外例外。
 7. 单文件超过约 400 行先给拆分方案，不边想边改。
 8. 新建包、新建文件、改数据层交互结构（record 字段 / NBT / 网络字段 / 跨包签名），计划里必须逐项列出：文件、职责、依赖方向、迁移顺序。等你确认后再动手。
 
 ### 2.2 三层信息：配置 / 观测 / io
 
-- 配置（最高信息，写档）：`machine` 的机器与 IO 规则、`line` 的产线引用、`factory` 的机器库与仓库地址。只描述搬什么，不执行。
+- 配置（最高信息，写档）：`machine` 的机器与 IO 规则、`factory` 的机器库与仓库地址。只描述搬什么，不执行。
 - 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面、指令、执行门禁都只读它，读路径不探世界。
-- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `LineRunner → GroupRunner → IoTransfer`；结果只留在本轮与诊断里，不回写配置。
+- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `MachineRunner → GroupRunner → IoTransfer`；结果只留在本轮与诊断里，不回写配置。
 
 各包职责：
 
-- `factory`：工厂实例与编排。`Factory` 持仓库插头、机器库、产线库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是指令入口，`MachineActions` 管机器规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `line`：配置层。`PassiveLine` 只存 `machineIds`；`LineService` 做产线管理动作；规则写操作不在本包。
-- `io`：执行层。`LineRunner` 遍历线与机器、做两级睡眠、读观测门禁；`GroupRunner` 按规则调搬运；`RuleResolver` 负责取面与 handler：玩家配的面 > 路由表 > 扫面；物品先试无向 handler，无向不可用（缺失或只读）时逐面探测，命令里显式配了 `face` 的物品规则仍优先用配置面；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 只记流体 / 能量搬通的面。
+- `factory`：工厂实例与编排。`Factory` 持仓库插头与机器库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` / `MachineService` 是指令入口，`MachineActions` 管机器规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
+- `io`：执行层。`MachineRunner` 遍历机器、做睡眠、读观测门禁；`GroupRunner` 按规则调搬运；`RuleResolver` 负责取面与 handler：玩家配的面 > 路由表 > 扫面；物品先试无向 handler，无向不可用（缺失或只读）时逐面探测，命令里显式配了 `face` 的物品规则仍优先用配置面；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 只记流体 / 能量搬通的面。
 
-调用链：`ServerTick → FactoryRuntime → LineRunner → GroupRunner → IoTransfer → Storage / ResourceAdapter`。
+调用链：`ServerTick → FactoryRuntime → MachineRunner → GroupRunner → IoTransfer → MEStorage / ResourceAdapter`。
 
 失败原因沿链上抛：`OK`、`NO_ITEM`、`NO_SPACE`、`NO_HANDLER`、`REJECTED`。`REJECTED`（有容量却不收）说明面不对，要踢路由（物品规则没有路由条目，下一轮重新探面）；`NO_SPACE`（满了）是正常状态，保住路由。
 
@@ -96,9 +93,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 上限、间隔、容量一律具名常量，并在解码侧校验。
 - 枚举分支用穷尽 `switch`，不留 `default` 掩盖新增值。
 - 禁止布尔盲参数：不写 `foo(true, false)`，用枚举或具名类型。
-- 物品身份 = 注册名 + 数据组件；`ResourceKey` 的相等 / 哈希与 AE2 `AEItemKey` 对齐（`isSameItemSameComponents` / `hashItemAndComponents`）。
+- 物品身份 = `AEItemKey`（注册名 + 数据组件），相等性直接用它自己的实现，不再自己对齐。
 - `ResourceSpec` 的 `MatchMode` 决定规则是否比较组件；旧档缺 `Mode` 的物品规则按 `IGNORE_COMPONENTS` 读入。
-- 物品规则落盘时，带组件的写 `Stack`（`ItemStack.CODEC` + `HolderLookup.Provider`），无组件仍旧只写 `Kind/Id`；网络 key 统一走 `ResourceKeyCodec` 整栈编解码。
+- 规则落盘时整个 key 交给 `AEKey.toTagGeneric` / `fromTagGeneric`，网络统一走 `AEKey.STREAM_CODEC`（经 `ResourceKeyCodec` 薄包装）。
 
 ### 2.4 其余包
 
@@ -108,9 +105,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 3.1 规模与性能
 
-目标体量：上百台机器、多产线、16 个容器。
+目标体量：上百台机器、16 个容器。
 
-- 睡眠：机器、线两级，100 tick 未搬动才睡；观测按状态退避。
+- 睡眠：机器级，100 tick 未搬动才睡；观测按状态退避。
 - 预算：观测 8 次/tick，标脏 32 次/tick，工作状态 16 次/tick。
 - 复探：PRESENT 100 tick，UNLOADED 40 tick，MISSING 100 → 1200 tick，工作状态 10 tick。
 - IO：默认每 tick 一轮，`/idf diag io` 可调 1–20。
@@ -141,7 +138,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 3.3 便利性
 
-- 指令以产线为主语：`/idf line <线> <动作>`；Tab 按上下文过滤。
+- 指令以机器为主语：`/idf machine <id> input|output add|remove <item|fluid|energy> [face]`；Tab 按上下文过滤。
 - `diag why` 固定六问，`diag watch` 汇总 / 详情，单条回执 60 字内。
 - 表格可展开规则、可搜索；搜索沿用 AE2 语法并接 jecharacters 拼音兼容层。
 - JEI R/U 必须覆盖机器列表、IO 列、仓库、背包；FE 使用独立配料（`idlefactory:fe`）与信息页，R/U / 收藏不得落到红石粉。
@@ -150,7 +147,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 4.1 命名
 
-Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Line、Machine、MachineIoGroup、IO 规则、Observation、Storage、Anchor、Ref、Runner，不用 `Target`。
+Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Machine、MachineIoGroup、IO 规则、Observation、Storage、Anchor、Ref、Runner，不用 `Target`，也不再引入 Line。
 
 ### 4.2 注释
 
@@ -205,7 +202,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 **A. CUA 自测**（用户让你自己测时）：
 
 - 先把游戏窗口最大化，否则界面会错位。
-- 启动 `runClient` → 进世界 → 跑指令链路（`/idf create` → `storage` → `factory connect` → `line ...` → `diag`）→ 操作界面核验 → 查日志 → 截图 → 结论。
+- 启动 `runClient` → 进世界 → 跑指令链路（`/idf create` → `storage bind` → `factory connect` → `machine <id> input/output add` → `diag`）→ 操作界面核验 → 查日志 → 截图 → 结论。
 - **中文输入法会让指令输入失败**：`/` 变成 `、`、字符进候选框，或者看着打了但没提交。用 `Win+Space` 切英文键盘，或把整条指令写进剪贴板用 `Ctrl+V` 粘贴再回车。输入后用 `run/logs/latest.log` 或聊天记录核对指令真的执行了，不要在「以为打进去了」的假设上继续跑。
 - 执行到底，失败先读日志再重试，不许点两下就交差。结束关闭游戏进程。
 
@@ -251,7 +248,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `Machine.java` · `MachineLibrary.java` · `MachineIoGroup.java` · `MachineActions.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceKey.java` · `ResourceSpec.java` · `MatchMode.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `FactoryLineMenu.java` · `FactoryGuiTheme.java` · `FactoryGuiLayer.java` · `FactoryStorageRepo.java` · `FactoryScreen.java` · `FactoryScreenState.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `Machine.java` · `MachineLibrary.java` · `MachineIoGroup.java` · `MachineActions.java` · `IoTransfer.java` · `GroupRunner.java` · `RuleResolver.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryLayout.java` · `FactoryLabels.java` · `FactorySort.java` · `FactorySortButtons.java` · `FactoryGuiTheme.java` · `FactoryGuiLayer.java` · `FactoryStorageRepo.java` · `FactoryScreen.java` · `FactoryScreenState.java` · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -270,8 +267,8 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 新增浮层必须在 `FactoryGuiLayer` 里加枚举项再引用，调用点禁止写 z 魔法数字；浮层被物品/数量盖住、或反过来盖住 tooltip，基本都是层级散落导致的。
 15. 排序键 / 方向 / 范围偏好写入客户端 CLIENT 配置（`config/idlefactory-client.toml`），关闭界面与重启客户端都保留；不写存档、不参与服务端。
-16. 机器失联只进 `FactoryLive.machineMissing`，不写档；产线只存 `machineIds`；只有显式删除机器才删规则。
-17. 左表产线机器行的叉号是“移出产线”，右侧机器库卡片的叉号是“删除机器”；两者语义不能混。
+16. 机器失联只进 `FactoryLive.machineMissing`，不写档；只有显式删除机器才删规则。
+17. 左表机器行的操作是「展开 IO」，右侧机器库卡片的叉号是「删除机器」，两者语义不能混。
 18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `FactoryResourceIconRender`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
     - **派活前把方向写死**：资源类型范围、可选附属的归属、存档兼容策略、包名与命名。方向没定死不要开工；确实要改，先停下来把已改的部分收口到可提交状态再改。
