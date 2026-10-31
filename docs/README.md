@@ -12,6 +12,10 @@
 | [ui/mockup-v1.png](ui/mockup-v1.png) | 第一版设计稿，仅作 v1→v2 的对照 | 历史 |
 | [../README.md](../README.md) | 当前状态、指令、包结构、核心约束 | 现行 |
 
+## 草稿纸
+
+[草稿纸](草稿纸/) 是 Agent 的讨论笔记，**不要求阅读，也不构成实现约束**；只记核心结论、技术约束与待定项。命名 `NN-需求概述.md`；定稿结论同步到 [DECISIONS.md](DECISIONS.md)。
+
 ## 已归档
 
 [**archive/**](archive/README.md) —— 画布时代的全部文档与设计稿（架构草案、GUI 讨论、
