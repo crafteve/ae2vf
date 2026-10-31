@@ -29,7 +29,6 @@ public final class IoTransfer {
     public static IoResult feed(Storage storage, ResourceAdapter adapter) {
         long capacity = adapter.capacity();
         if (capacity <= 0L) {
-            probe("in", adapter.key(), 0L, IoResult.Reason.NO_SPACE);
             return new IoResult(0L, IoResult.Reason.NO_SPACE);
         }
 
@@ -37,20 +36,17 @@ public final class IoTransfer {
         long accepted = adapter.insert(capacity, true);
         if (accepted <= 0L) {
             // 有位置却不收：面不对（面配置不允许这个方向），不是「满了」
-            probe("in", adapter.key(), 0L, IoResult.Reason.REJECTED);
             return new IoResult(0L, IoResult.Reason.REJECTED);
         }
 
         // 1) 只按机器点头的量从仓库扣
         long available = storage.extract(adapter.key(), Math.min(capacity, accepted), true);
         if (available <= 0L) {
-            probe("in", adapter.key(), 0L, IoResult.Reason.NO_ITEM);
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
         long want = Math.min(available, accepted);
         long taken = storage.extract(adapter.key(), want, false);
         if (taken <= 0L) {
-            probe("in", adapter.key(), 0L, IoResult.Reason.NO_ITEM);
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
 
@@ -64,8 +60,6 @@ public final class IoTransfer {
                         refund - refunded, refund, adapter.key().getDisplayName().getString());
             }
         }
-        probe("in", adapter.key(), inserted,
-                inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
         return new IoResult(inserted, inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
     }
 
@@ -80,12 +74,10 @@ public final class IoTransfer {
         // 1) 先问仓库：这个资源收不收、收多少
         long available = adapter.extract(Long.MAX_VALUE, true);
         if (available <= 0L) {
-            probe("out", adapter.key(), 0L, IoResult.Reason.NO_ITEM);
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
         long accepted = storage.insert(adapter.key(), available, true);
         if (accepted <= 0L) {
-            probe("out", adapter.key(), 0L, IoResult.Reason.NO_SPACE);
             return new IoResult(0L, IoResult.Reason.NO_SPACE);
         }
 
@@ -94,7 +86,6 @@ public final class IoTransfer {
         long taken = adapter.extract(want, false);
         if (taken <= 0L) {
             // 模拟说抽得出来、真抽却为零：这个面不对
-            probe("out", adapter.key(), 0L, IoResult.Reason.REJECTED);
             return new IoResult(0L, IoResult.Reason.REJECTED);
         }
 
@@ -104,22 +95,7 @@ public final class IoTransfer {
         if (refund > 0L) {
             adapter.insert(refund, false);
         }
-        probe("out", adapter.key(), inserted,
-                inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
         return new IoResult(inserted, inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
     }
 
-    /**
-     * 探针：每次真正尝试搬运时打一行，确认方向、资源与结果。
-     *
-     * @param direction 方向（in / out）
-     * @param key       资源
-     * @param amount    实际搬动数量
-     * @param result    结果枚举
-     */
-    private static void probe(String direction, appeng.api.stacks.AEKey key,
-            long amount, IoResult.Reason result) {
-        IdleFactory.LOGGER.info("IDF-PROBE io transfer: dir={} key={} amount={} result={}",
-                direction, key.getDisplayName().getString(), amount, result);
-    }
 }

@@ -118,8 +118,6 @@ public final class ContainerStorage implements Storage, MEStorage {
             case FLUID -> insertFluid(key, amount, simulate);
             case ENERGY -> insertEnergy(amount, simulate);
         };
-        IdleFactory.LOGGER.info("IDF-PROBE container insert: key={} amount={} simulate={} result={}",
-                key.getDisplayName().getString(), amount, simulate, inserted);
         return inserted;
     }
 
@@ -133,8 +131,6 @@ public final class ContainerStorage implements Storage, MEStorage {
             case FLUID -> extractFluid(key, amount, simulate);
             case ENERGY -> extractEnergy(amount, simulate);
         };
-        IdleFactory.LOGGER.info("IDF-PROBE container extract: key={} amount={} simulate={} result={}",
-                key.getDisplayName().getString(), amount, simulate, extracted);
         return extracted;
     }
 

@@ -233,14 +233,6 @@ public final class FactoryRuntime {
             factory.refreshStorage(this.storageResolver);
         }
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
-        for (Factory factory : this.manager.all()) {
-            IdleFactory.LOGGER.info("IDF-PROBE factory load: id={} machines={} storage={} online={}",
-                    factory.id().toString().substring(0, 8),
-                    factory.config().machines().size(),
-                    factory.live().storage() == null
-                            ? "none" : factory.live().storage().getClass().getSimpleName(),
-                    factory.live().storageOnline());
-        }
     }
 
     /**

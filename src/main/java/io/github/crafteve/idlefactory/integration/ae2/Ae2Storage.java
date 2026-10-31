@@ -44,8 +44,6 @@ public final class Ae2Storage implements Storage {
         }
         long inserted = this.storage.insert(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
-        IdleFactory.LOGGER.info("IDF-PROBE me insert: key={} amount={} simulate={} result={}",
-                key.getDisplayName().getString(), amount, simulate, inserted);
         return inserted;
     }
 
@@ -57,8 +55,6 @@ public final class Ae2Storage implements Storage {
         }
         long extracted = this.storage.extract(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
-        IdleFactory.LOGGER.info("IDF-PROBE me extract: key={} amount={} simulate={} result={}",
-                key.getDisplayName().getString(), amount, simulate, extracted);
         return extracted;
     }
 

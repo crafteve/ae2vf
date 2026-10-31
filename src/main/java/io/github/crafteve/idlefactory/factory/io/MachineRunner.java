@@ -71,8 +71,6 @@ public final class MachineRunner {
         }
         // 探针：确认遍历的是机器库而不是产线。首轮与每 100 轮打一次，避免刷屏。
         if (this.rounds == 0L || this.rounds % PROBE_INTERVAL == 0L) {
-            IdleFactory.LOGGER.info("IDF-PROBE runner tick: machines={} awake={} moved={}",
-                    machines, awake, moved);
         }
         this.rounds++;
     }
