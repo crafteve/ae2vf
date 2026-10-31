@@ -28,6 +28,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -152,7 +153,7 @@ public final class MachineNode
         boolean changed = false;
         if (this.patternsDirty) {
             this.patternsDirty = false;
-            this.craft.refresh();
+            this.craft.rebuild();
             changed = true;
         }
         if (this.dataDirty) {
@@ -174,7 +175,7 @@ public final class MachineNode
         this.available = next;
         this.icon = this.resolveIcon();
         this.group = this.buildGroup();
-        this.craft.refresh();
+        this.craft.publish();
     }
 
     /**
@@ -233,6 +234,32 @@ public final class MachineNode
     @Nullable
     ServerLevel machineLevel() {
         return this.server.getLevel(this.machine.ref().dimension());
+    }
+
+    /**
+     * 解码样板用的世界：优先机器所在世界，没加载时退回锚点世界。
+     *
+     * <p>处理样板的解码不读世界内容，这里只是满足 AE2 接口；用锚点世界兜底可以避免机器
+     * 未加载时解码直接失败。</p>
+     *
+     * @return 可用的世界
+     */
+    Level decodeLevel() {
+        ServerLevel level = this.machineLevel();
+        if (level != null && level.isLoaded(this.machine.ref().pos())) {
+            return level;
+        }
+        return this.anchorLevel;
+    }
+
+    /** 成功解码的样板数。 */
+    public int decodedPatternCount() {
+        return this.craft.decodedCount();
+    }
+
+    /** 产物白名单大小。 */
+    public int productCount() {
+        return this.craft.products().size();
     }
 
     /** 派单时用的动作源，标记成机器自己发起。 */

@@ -318,20 +318,26 @@ public final class MachineService {
                         + " · 样板: " + provider.patternCount() + "/" + provider.capacity()
                         + " · 余量: " + provider.pendingCount() + " 条",
                 FactoryMessages.PLAIN));
+        FactoryRuntime runtime = FactoryRuntime.get();
+        MachineNode node = runtime == null ? null : runtime.nodeManager().node(ref.id());
         FactoryMessages.send(player, FactoryMessages.text(
-                "  节点: " + describeNode(ref.id()), FactoryMessages.PLAIN));
+                "  节点: " + describeNode(node), FactoryMessages.PLAIN));
+        if (node != null) {
+            FactoryMessages.send(player, FactoryMessages.text(
+                    "  解码样板: " + node.decodedPatternCount()
+                            + " · 产物 key: " + node.productCount(),
+                    FactoryMessages.PLAIN));
+        }
         return 1;
     }
 
     /**
      * 一句话描述虚拟节点状态。
      *
-     * @param machineId 机器 id
+     * @param node 节点；未建时为 {@code null}
      * @return 给玩家看的短句
      */
-    private static String describeNode(UUID machineId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        MachineNode node = runtime == null ? null : runtime.nodeManager().node(machineId);
+    private static String describeNode(@Nullable MachineNode node) {
         if (node == null) {
             return "未建（仓库不是 ME 模式，或锚点解析不出 ME 节点）";
         }

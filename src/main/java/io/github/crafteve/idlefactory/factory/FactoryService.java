@@ -44,6 +44,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -175,10 +176,14 @@ public final class FactoryService {
             err(player, "你还没有工厂，先执行 /idlefactory create");
             return 0;
         }
+        int returned = 0;
+        for (Machine machine : factory.get().config().machines().all()) {
+            returned += returnPatterns(factory.get(), machine, player);
+        }
         runtime.manager().remove(factory.get().id());
         runtime.nodeManager().removeFactory(factory.get().id());
         runtime.markDirty();
-        ok(player, "工厂已删除：" + factory.get().id());
+        ok(player, "工厂已删除：" + factory.get().id() + patternSuffix(returned));
         return 1;
     }
 
@@ -435,6 +440,7 @@ public final class FactoryService {
             return MachineActions.Result.err("这台机器还有 " + rules + " 条 IO 配置，需要确认");
         }
         factory.live().clearMachineMissing(machineId);
+        int returned = returnPatterns(factory, target, null);
         factory.config().machines().remove(machineId);
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
@@ -443,8 +449,10 @@ public final class FactoryService {
             runtime.machineRunner().forget(machineId);
         }
         markDirty();
+        String rulesText = rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : "";
+        String patternText = returned > 0 ? "（退回 " + returned + " 块样板）" : "";
         return MachineActions.Result.ok("已删除机器 [" + target.ref().shortId() + "]"
-                + (rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : ""));
+                + rulesText + patternText);
     }
 
     // ------------------------------------------------------------------
@@ -708,6 +716,7 @@ public final class FactoryService {
         int deleted = 0;
         int skippedRules = 0;
         int skipped = 0;
+        int returned = 0;
         FactoryRuntime runtime = FactoryRuntime.get();
         for (BlockPos targetPos : targets) {
             Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
@@ -721,6 +730,7 @@ public final class FactoryService {
                 continue;
             }
             factory.live().clearMachineMissing(machine.id());
+            returned += returnPatterns(factory, machine, player);
             factory.config().machines().remove(machine.id());
             if (runtime != null) {
                 runtime.nodeManager().removeMachine(machine.id());
@@ -733,7 +743,7 @@ public final class FactoryService {
         if (!chain) {
             String label = machineLabel(level, targets.getFirst());
             if (deleted > 0) {
-                barOk(player, "已删除链接 " + label);
+                barOk(player, "已删除链接 " + label + patternSuffix(returned));
             } else if (skippedRules > 0) {
                 barErr(player, "该机器仍有 IO 配置，请在机器库界面删除 " + label);
             } else {
@@ -749,7 +759,7 @@ public final class FactoryService {
             }
             return 0;
         }
-        String text = "已删除 " + deleted + " 台";
+        String text = "已删除 " + deleted + " 台" + patternSuffix(returned);
         if (skippedRules > 0) {
             text += "，跳过 " + skippedRules + " 台有 IO 配置的机器（请在机器库界面删除）";
         }
@@ -1565,6 +1575,78 @@ public final class FactoryService {
     // ---- 15. 内部工具：背包、文案与回执（countInInventory / msg / markDirty） ----
     // 负责背包装卸、资源与物品文案、聊天与动作栏回执；markDirty 是本文件唯一的档案落盘入口。
     // ------------------------------------------------------------------
+
+    /**
+     * 把一台机器的样板退回玩家。
+     *
+     * <p>样板是玩家的东西，删机器不能吞掉：优先塞接收者（没有接收者就找工厂拥有者）的背包，
+     * 塞不下或不在线就掉在机器坐标；机器所在区块没加载时退回接收者脚下，再不行落到主世界
+     * 出生点，保证不丢。</p>
+     *
+     * @param factory  工厂
+     * @param machine  要被删掉的机器
+     * @param receiver 优先接收者；{@code null} 表示用工厂拥有者
+     * @return 退回去的样板数
+     */
+    private static int returnPatterns(Factory factory, Machine machine,
+            @Nullable ServerPlayer receiver) {
+        List<ItemStack> patterns = machine.provider().takePatterns();
+        if (patterns.isEmpty()) {
+            return 0;
+        }
+        ServerPlayer target = receiver != null ? receiver : onlineOwner(factory);
+        for (ItemStack stack : patterns) {
+            if (target != null) {
+                target.getInventory().add(stack);
+            }
+            if (!stack.isEmpty()) {
+                dropPattern(machine, stack, target);
+            }
+        }
+        return patterns.size();
+    }
+
+    /**
+     * 掉一块样板：机器坐标优先，其次接收者脚下，最后主世界出生点。
+     *
+     * @param machine 机器
+     * @param stack   样板（可能是背包塞不下的剩余）
+     * @param target  在线玩家，可为 {@code null}
+     */
+    private static void dropPattern(Machine machine, ItemStack stack,
+            @Nullable ServerPlayer target) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return;
+        }
+        MinecraftServer server = runtime.server();
+        ServerLevel level = server.getLevel(machine.ref().dimension());
+        if (level != null && level.isLoaded(machine.ref().pos())) {
+            Block.popResource(level, machine.ref().pos(), stack);
+            return;
+        }
+        if (target != null) {
+            Block.popResource(target.serverLevel(), target.blockPosition(), stack);
+            return;
+        }
+        ServerLevel overworld = server.overworld();
+        Block.popResource(overworld, overworld.getSharedSpawnPos(), stack);
+    }
+
+    /** 工厂拥有者；不在线时为 {@code null}。 */
+    @Nullable
+    private static ServerPlayer onlineOwner(Factory factory) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return null;
+        }
+        return runtime.server().getPlayerList().getPlayer(factory.config().owner());
+    }
+
+    /** 回执里的「退回样板」尾巴；没有退回时为空白。 */
+    private static String patternSuffix(int returned) {
+        return returned > 0 ? "，退回 " + returned + " 块样板" : "";
+    }
 
     /** 背包里与样本同物品的总数。 */
     private static int countInInventory(ServerPlayer player, ItemStack template) {
