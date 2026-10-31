@@ -15,9 +15,11 @@ import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
@@ -31,8 +33,20 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.wrapper.InvWrapper;
 
+import appeng.api.config.Actionable;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
+
 /**
- * 把一组方块容器包成工厂的 {@link Storage}，支持物品、流体、FE。
+ * 把一组方块容器包成仓库，支持物品、流体、FE。
+ *
+ * <p>它同时实现 AE2 的 {@link MEStorage} 和工厂内部的 {@link Storage}：P2 迁移期间，IO 层
+ * 还在用工厂自己的资源 key，而 ME 后端已经改成 {@link MEStorage}，两边都要能满足。
+ * {@link MEStorage} 那一侧只在边界做一次 key 换算，真正的搬运仍然走本类自己的槽位逻辑。</p>
  *
  * <p>物品规则：按优先级分组，组内两阶段（先补满已有堆叠、再占空槽），抽取先抽不满的堆。
  * 流体同构：先补已有同种流体的槽，再找空槽。能量没有槽的概念，按容器顺序充放。</p>
@@ -41,7 +55,7 @@ import net.neoforged.neoforge.items.wrapper.InvWrapper;
  *
  * <p>容器每次现查能力，不缓存到字段；一次 insert/extract 调用内会解析一次复用。</p>
  */
-public final class ContainerStorage implements Storage {
+public final class ContainerStorage implements Storage, MEStorage {
     /**
      * 能量面探测用的模拟量。
      *
@@ -127,6 +141,98 @@ public final class ContainerStorage implements Storage {
     @Override
     public boolean supports(ResourceKind kind) {
         return kind != ResourceKind.CHEMICAL;
+    }
+
+    // ------------------------------------------------------------------
+    // MEStorage：AE2 侧入口
+    // ------------------------------------------------------------------
+
+    /** 容器仓库在 AE2 快照里的描述文本。 */
+    @Override
+    public Component getDescription() {
+        return Component.literal("Idle Factory 容器仓库 · " + this.containers.size() + " 个容器");
+    }
+
+    /**
+     * AE2 侧写入：把 key 换算成工厂自己的资源后走同一套槽位逻辑。
+     *
+     * <p>FE 只有装了 Applied Flux 才有 AE key；没装时这条路径本来就不会被调用。</p>
+     */
+    @Override
+    public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0L) {
+            return 0L;
+        }
+        ResourceKey key = toResourceKey(what);
+        if (key == null) {
+            return 0L;
+        }
+        return insert(key, amount, mode == Actionable.SIMULATE);
+    }
+
+    @Override
+    public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+        if (what == null || amount <= 0L) {
+            return 0L;
+        }
+        ResourceKey key = toResourceKey(what);
+        if (key == null) {
+            return 0L;
+        }
+        return extract(key, amount, mode == Actionable.SIMULATE);
+    }
+
+    @Override
+    public void getAvailableStacks(KeyCounter out) {
+        for (Map.Entry<ResourceKey, Long> entry : snapshot().entrySet()) {
+            AEKey aeKey = toAeKey(entry.getKey());
+            if (aeKey != null) {
+                out.add(aeKey, entry.getValue());
+            }
+        }
+    }
+
+    /**
+     * AE key → 工厂资源。
+     *
+     * @param key AE key
+     * @return 工厂资源；不认识的 key 返回 {@code null}
+     */
+    @Nullable
+    private static ResourceKey toResourceKey(AEKey key) {
+        if (key instanceof AEItemKey item) {
+            return ResourceKey.item(item.getReadOnlyStack());
+        }
+        if (key instanceof AEFluidKey fluid) {
+            return ResourceKey.fluid(fluid.getFluid());
+        }
+        if (AppFluxKeys.isFe(key)) {
+            return ResourceKey.ENERGY;
+        }
+        return null;
+    }
+
+    /**
+     * 工厂资源 → AE key。
+     *
+     * @param key 工厂资源
+     * @return AE key；能量在没装 Applied Flux 时为 {@code null}
+     */
+    @Nullable
+    private static AEKey toAeKey(ResourceKey key) {
+        if (key.kind() == ResourceKind.ENERGY) {
+            return AppFluxKeys.feKey();
+        }
+        if (key.kind() == ResourceKind.FLUID) {
+            net.minecraft.world.level.material.Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
+            return fluid == net.minecraft.world.level.material.Fluids.EMPTY
+                    ? null : AEFluidKey.of(new FluidStack(fluid, 1));
+        }
+        if (key.kind() == ResourceKind.ITEM) {
+            net.minecraft.world.item.ItemStack stack = key.toStack();
+            return stack.isEmpty() ? null : AEItemKey.of(stack);
+        }
+        return null;
     }
 
     @Override
