@@ -153,7 +153,8 @@ final class ProviderOverflow {
      * @param node   机器节点
      * @param key    资源
      * @param amount 数量
-     * @return 是否真的掉出去了；区块没加载或数量不为正时返回 {@code false}
+     * @return 是否真的掉出去了；区块没加载、数量不为正，或该资源没有掉落物形态
+     *         （流体 / 能量）时返回 {@code false}，调用方必须把它记进诊断
      */
     static boolean dropAtMachine(MachineNode node, AEKey key, long amount) {
         ServerLevel level = node.machineLevel();
@@ -163,6 +164,10 @@ final class ProviderOverflow {
         }
         List<ItemStack> drops = new ArrayList<>();
         key.addDrops(amount, drops, level, pos);
+        if (drops.isEmpty()) {
+            // 流体 / 能量的 addDrops 是空实现，掉不出去就不能谎报成功
+            return false;
+        }
         for (ItemStack stack : drops) {
             Block.popResource(level, pos, stack);
         }
