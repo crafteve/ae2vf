@@ -161,10 +161,9 @@ public final class MachineNode
     /**
      * 每 tick 一次：冲刷余量，再把攒下的样板变化与存档变化收口。
      *
-     * @param now 当前游戏时间
      * @return 是否改动了要落盘的数据
      */
-    boolean tick(long now) {
+    boolean tick() {
         boolean changed = false;
         if (this.machine.provider().pendingCount() > 0) {
             changed |= ProviderOverflow.flush(this);

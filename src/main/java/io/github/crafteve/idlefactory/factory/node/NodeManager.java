@@ -162,7 +162,7 @@ public final class NodeManager {
         int sweepBudget = MAX_SWEEPS_PER_TICK;
         for (MachineNode node : this.nodes.values()) {
             try {
-                changed |= node.tick(now);
+                changed |= node.tick();
                 if (sweepBudget > 0 && node.returnSweep().isDue(now)) {
                     node.returnSweep().sweep(now);
                     sweepBudget--;
