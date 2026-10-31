@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -327,8 +326,35 @@ public final class MachineService {
                     "  解码样板: " + node.decodedPatternCount()
                             + " · 产物 key: " + node.productCount(),
                     FactoryMessages.PLAIN));
+            long now = runtime == null ? 0L : runtime.server().overworld().getGameTime();
+            FactoryMessages.send(player, FactoryMessages.text(
+                    "  回收: " + describeSweep(node, now), FactoryMessages.PLAIN));
         }
         return 1;
+    }
+
+    /**
+     * 一句话描述产物回收状态；抽不到时把原因点出来。
+     *
+     * @param node 节点
+     * @param now  当前游戏时间
+     * @return 给玩家看的短句
+     */
+    private static String describeSweep(MachineNode node, long now) {
+        StringBuilder text = new StringBuilder();
+        text.append(node.returnSweep().storageFaces()).append("/6 面可抽取");
+        long lastExtract = node.returnSweep().lastExtractTick();
+        if (lastExtract > 0L) {
+            text.append(" · 上次抽到 ").append(Math.max(0L, now - lastExtract)).append(" tick 前");
+        } else {
+            text.append(" · 还没抽到过");
+        }
+        text.append(" · 退避档 ").append(node.returnSweep().idleStep());
+        if (node.isAvailable() && node.returnSweep().storageFaces() == 0
+                && node.productCount() > 0) {
+            text.append("（六面都没有可抽取的存储，产物抽不回来）");
+        }
+        return text.toString();
     }
 
     /**

@@ -13,7 +13,11 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.storage.MEStorage;
 import appeng.helpers.patternprovider.PatternProviderTarget;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 
 /**
  * 待发送余量：一份样板已经被 CPU 交过来、但机器这一刻收不下的零头。
@@ -27,7 +31,7 @@ import net.minecraft.core.Direction;
  */
 final class ProviderOverflow {
     private ProviderOverflow() {
-        // 纯静态工具类
+        // 纯静态工具类。
     }
 
     /**
@@ -49,7 +53,7 @@ final class ProviderOverflow {
         }
         long returned = returnToNetwork(node, key, amount);
         long left = amount - returned;
-        if (left > 0L && !node.dropAtMachine(key, left)) {
+        if (left > 0L && !dropAtMachine(node, key, left)) {
             node.report("余量队列已满，退回网络失败：" + key.getDisplayName().getString());
             return;
         }
@@ -127,7 +131,7 @@ final class ProviderOverflow {
             if (network != null) {
                 left -= network.insert(key, left, Actionable.MODULATE, node.actionSource());
             }
-            if (left > 0L && !node.dropAtMachine(key, left)) {
+            if (left > 0L && !dropAtMachine(node, key, left)) {
                 failed++;
             }
         }
@@ -135,6 +139,28 @@ final class ProviderOverflow {
         node.markDataChanged();
         node.report("拆除机器：退回 " + entries.size() + " 条余量"
                 + (failed > 0 ? "（" + failed + " 条无处可放，已记日志）" : ""));
+    }
+
+    /**
+     * 把一份退不回去的资源掉在机器坐标，作为最后的兜底。
+     *
+     * @param node   机器节点
+     * @param key    资源
+     * @param amount 数量
+     * @return 是否真的掉出去了；区块没加载或数量不为正时返回 {@code false}
+     */
+    static boolean dropAtMachine(MachineNode node, AEKey key, long amount) {
+        ServerLevel level = node.machineLevel();
+        BlockPos pos = node.machine().ref().pos();
+        if (level == null || amount <= 0L || !level.isLoaded(pos)) {
+            return false;
+        }
+        List<ItemStack> drops = new ArrayList<>();
+        key.addDrops(amount, drops, level, pos);
+        for (ItemStack stack : drops) {
+            Block.popResource(level, pos, stack);
+        }
+        return true;
     }
 
     /**

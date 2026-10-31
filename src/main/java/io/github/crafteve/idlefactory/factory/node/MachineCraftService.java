@@ -64,7 +64,7 @@ final class MachineCraftService implements ICraftingProvider {
         if (faces == null) {
             return false;
         }
-        // 已经往机器里塞过东西之后不能再报失败：CPU 会把同一份输入再推给下一家，造成复制
+        // 已经往机器里塞过东西之后不能再报失败：CPU 会把同一份输入再推给下一家，造成复制。
         boolean[] committed = {false};
         try {
             if (provider.blocking().isOn() && faces.blockingHit(this.patternInputs)) {
@@ -104,6 +104,7 @@ final class MachineCraftService implements ICraftingProvider {
                 }
             });
             committed[0] = true;
+            this.node.returnSweep().activate(this.node.gameTime());
             return true;
         } catch (RuntimeException e) {
             this.node.logThrottled(this.node.gameTime(), "派单异常：" + e);

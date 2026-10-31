@@ -276,7 +276,7 @@ public final class MachineProvider {
                 used++;
             }
         }
-        // 容量必须大于已放数量，否则最后一个槽永远没有空位、终端再也放不进样板
+        // 容量必须大于已放数量，否则最后一个槽永远没有空位、终端再也放不进样板。
         int stored = tag.getInt(TAG_CAPACITY);
         int capacity = Math.max(stored, used + 1);
         provider.resize(Math.max(DEFAULT_CAPACITY, Math.min(MAX_CAPACITY, capacity)));
