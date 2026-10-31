@@ -39,3 +39,7 @@ run/
 repo/
 !**/src/**/repo/
 .tmp/
+# 临时脚本与文本（.tmp_ 前缀），历史上被别的项目误放进来过
+.tmp_*
+# DSH 会话的 IM 归档目录
+.dsh-im/
