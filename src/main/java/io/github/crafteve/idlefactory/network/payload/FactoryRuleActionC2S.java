@@ -9,7 +9,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.line.IoSide;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.line.LineActions;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;

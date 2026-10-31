@@ -5,7 +5,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.line.IoSide;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
 
 /**
  * 工厂界面的几何与命中。

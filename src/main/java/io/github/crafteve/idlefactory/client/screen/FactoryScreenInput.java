@@ -334,8 +334,8 @@ final class FactoryScreenInput {
             FactoryIoDetailLayout.Card card, double mouseX, double mouseY, int button) {
         FactoryEditController editController = this.screen.editController();
         var side = card.input()
-                ? io.github.crafteve.idlefactory.factory.line.IoSide.INPUT
-                : io.github.crafteve.idlefactory.factory.line.IoSide.OUTPUT;
+                ? io.github.crafteve.idlefactory.factory.io.IoSide.INPUT
+                : io.github.crafteve.idlefactory.factory.io.IoSide.OUTPUT;
         if (card.empty() || editController == null) {
             return true;
         }
@@ -400,7 +400,7 @@ final class FactoryScreenInput {
             FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
             if (entry != null && entry.ruleIndex() < hit.stack().inputs().size()) {
                 editController.beginRuleDrag(hit.stack(),
-                        io.github.crafteve.idlefactory.factory.line.IoSide.INPUT,
+                        io.github.crafteve.idlefactory.factory.io.IoSide.INPUT,
                         hit.stack().inputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
@@ -415,7 +415,7 @@ final class FactoryScreenInput {
             FactoryRuleStrip.Entry entry = FactoryRuleStrip.hitRule(strip, mouseX, mouseY);
             if (entry != null && entry.ruleIndex() < hit.stack().outputs().size()) {
                 editController.beginRuleDrag(hit.stack(),
-                        io.github.crafteve.idlefactory.factory.line.IoSide.OUTPUT,
+                        io.github.crafteve.idlefactory.factory.io.IoSide.OUTPUT,
                         hit.stack().outputs().get(entry.ruleIndex()), mouseX, mouseY);
                 return true;
             }
