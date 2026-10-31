@@ -270,8 +270,7 @@ public final class NodeManager {
             MachineNode node;
             try {
                 node = new MachineNode(this.server, spec.factoryId(), spec.machine(),
-                        spec.anchor(), spec.anchorLevel(), spec.available(), this.dataChanged,
-                        this.notice);
+                        spec.anchor(), spec.anchorLevel(), spec.available(), this.notice);
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 构造机器节点失败 [{}]：{}",
                         spec.machine().ref().shortId(), e.toString());

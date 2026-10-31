@@ -48,7 +48,6 @@ public final class MachineNode
     private final Machine machine;
     private final IGridNode anchor;
     private final ServerLevel anchorLevel;
-    private final Runnable dataChanged;
     private final Consumer<NodeManager.Notice> notice;
     private final MachineCraftService craft;
     private final MachinePatternInventory patternInventory;
@@ -73,20 +72,19 @@ public final class MachineNode
      * @param anchor      工厂 ME 锚点节点
      * @param anchorLevel 锚点所在维度，虚拟节点只借它做构造参数
      * @param available   机器方块此刻是否在线
-     * @param dataChanged 存档数据变化回调，由运行时转成 {@code markDirty}
      * @param notice      节点告警出口
      */
     MachineNode(MinecraftServer server, UUID factoryId, Machine machine, IGridNode anchor,
-            ServerLevel anchorLevel, boolean available, Runnable dataChanged,
-            Consumer<NodeManager.Notice> notice) {
+            ServerLevel anchorLevel, boolean available, Consumer<NodeManager.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
         this.machine = machine;
         this.anchor = anchor;
         this.anchorLevel = anchorLevel;
         this.available = available;
-        this.dataChanged = dataChanged;
         this.notice = notice;
+        // 建节点时机器上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
+        this.patternsDirty = true;
 
         this.craft = new MachineCraftService(this);
         this.patternInventory = new MachinePatternInventory(this);
@@ -401,6 +399,6 @@ public final class MachineNode
 
     @Override
     public void onSaveChanges(MachineNode owner, IGridNode node) {
-        this.dataChanged.run();
+        // 节点自己不带 NBT（重启按机器记录重建），这里没有要落的盘；存档走 dataChanged 汇总。
     }
 }
