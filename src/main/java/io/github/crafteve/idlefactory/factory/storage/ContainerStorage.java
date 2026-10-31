@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -96,12 +97,15 @@ public final class ContainerStorage implements Storage {
         if (amount <= 0L) {
             return 0L;
         }
-        return switch (key.kind()) {
+        long inserted = switch (key.kind()) {
             case ITEM -> insertItem(key, amount, simulate);
             case FLUID -> insertFluid(key, amount, simulate);
             case ENERGY -> insertEnergy(amount, simulate);
             case CHEMICAL -> 0L;
         };
+        IdleFactory.LOGGER.info("IDF-PROBE container insert: key={} amount={} simulate={} result={}",
+                key.describe(), amount, simulate, inserted);
+        return inserted;
     }
 
     @Override
@@ -109,12 +113,15 @@ public final class ContainerStorage implements Storage {
         if (amount <= 0L) {
             return 0L;
         }
-        return switch (key.kind()) {
+        long extracted = switch (key.kind()) {
             case ITEM -> extractItem(key, amount, simulate);
             case FLUID -> extractFluid(key, amount, simulate);
             case ENERGY -> extractEnergy(amount, simulate);
             case CHEMICAL -> 0L;
         };
+        IdleFactory.LOGGER.info("IDF-PROBE container extract: key={} amount={} simulate={} result={}",
+                key.describe(), amount, simulate, extracted);
+        return extracted;
     }
 
     @Override

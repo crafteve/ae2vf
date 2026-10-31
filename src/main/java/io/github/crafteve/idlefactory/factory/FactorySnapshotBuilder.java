@@ -293,9 +293,7 @@ public final class FactorySnapshotBuilder {
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
 
-            DiagStats.GroupStats stats = FactoryRefs.lineOf(factory, ref.id())
-                    .map(line -> factory.live().stats().line(line.id()).groupOrNull(ref.id()))
-                    .orElse(null);
+            DiagStats.MachineStats stats = factory.live().stats().machineOrNull(ref.id());
             List<Long> inputRates = new ArrayList<>(inputs.size());
             for (ResourceSpec spec : inputs) {
                 inputRates.add(stats == null ? 0L

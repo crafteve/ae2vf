@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -9,13 +10,13 @@ import org.jetbrains.annotations.Nullable;
 /**
  * IO 执行器的睡眠状态。
  *
- * <p>只有运行时，不写存档。服务器停止、产线启停、配置变更都会清掉。</p>
+ * <p>只有运行时，不写存档。服务器停止、配置变更都会清掉。</p>
  *
- * <ul>
- *   <li>组连续 {@link #SLEEP_AFTER_TICKS} tick 没搬动 → 组睡眠；</li>
- *   <li>一条产线的组全睡 → 产线睡眠；</li>
- *   <li>睡眠单位每 {@link #WAKE_INTERVAL} tick 醒一次。</li>
- * </ul>
+ * <p>P1 删除产线后睡眠只剩一级：每台机器连续 {@link #SLEEP_AFTER_TICKS} tick 没搬动就睡，
+ * 睡着的机器每 {@link #WAKE_INTERVAL} tick 醒一次。原来那层「整条线的机器都睡 → 线也睡」的
+ * 状态随产线一起删除。</p>
+ *
+ * <p>键是机器 id（全局唯一，由维度 + 坐标推导），所以一张表就能覆盖所有工厂。</p>
  *
  * <p>睡眠按 tick 算而不是按轮数：IO 间隔可调，按轮数会在 1 tick 时过于敏感。</p>
  */
@@ -25,112 +26,79 @@ public final class RunnerState {
     /** 睡眠后多久醒一次（tick）。 */
     public static final long WAKE_INTERVAL = 200L;
 
-    private final Map<UUID, LineState> lines = new HashMap<>();
+    private final Map<UUID, MachineState> machines = new HashMap<>();
 
     /**
-     * 取产线状态，没有就建。
+     * 取一台机器的状态，没有就建。
      *
-     * @param lineId 产线 id
-     * @return 产线状态
+     * @param machineId 机器 id
+     * @return 机器状态
      */
-    public LineState line(UUID lineId) {
-        return this.lines.computeIfAbsent(lineId, id -> new LineState());
+    public MachineState machine(UUID machineId) {
+        return this.machines.computeIfAbsent(machineId, id -> new MachineState());
     }
 
     /**
      * 只看一眼状态，不创建。
      *
-     * @param lineId 产线 id
+     * @param machineId 机器 id
      * @return 状态；还没跑过时为 {@code null}
      */
     @Nullable
-    public LineState peek(UUID lineId) {
-        return this.lines.get(lineId);
+    public MachineState peek(UUID machineId) {
+        return this.machines.get(machineId);
     }
 
     /**
-     * 唤醒整条产线。
+     * 唤醒一台机器。
      *
-     * @param lineId 产线 id
+     * @param machineId 机器 id
      */
-    public void wakeLine(UUID lineId) {
-        LineState line = this.lines.get(lineId);
-        if (line == null) {
+    public void wake(UUID machineId) {
+        MachineState state = this.machines.get(machineId);
+        if (state == null) {
             return;
         }
-        line.sleeping = false;
-        line.sleepSince = -1L;
-        for (GroupState group : line.groups.values()) {
-            group.sleeping = false;
-            group.idleSince = -1L;
-        }
+        state.sleeping = false;
+        state.sleepSince = -1L;
+        state.idleSince = -1L;
     }
 
     /**
-     * 唤醒一个组（并顺带唤醒所在产线）。
+     * 丢掉一台机器的状态（删机器时）。
      *
-     * @param lineId  产线 id
-     * @param groupId 组 id
+     * @param machineId 机器 id
      */
-    public void wakeGroup(UUID lineId, UUID groupId) {
-        LineState line = this.lines.get(lineId);
-        if (line == null) {
-            return;
-        }
-        line.sleeping = false;
-        line.sleepSince = -1L;
-        GroupState group = line.groups.get(groupId);
-        if (group != null) {
-            group.sleeping = false;
-            group.idleSince = -1L;
-        }
-    }
-
-    /**
-     * 丢掉一条产线的状态（删产线时）。
-     *
-     * @param lineId 产线 id
-     */
-    public void forget(UUID lineId) {
-        this.lines.remove(lineId);
+    public void forget(UUID machineId) {
+        this.machines.remove(machineId);
     }
 
     /** 清空全部状态（服务器停止时）。 */
     public void clear() {
-        this.lines.clear();
+        this.machines.clear();
     }
 
-    /** 一条产线的睡眠状态。 */
-    public static final class LineState {
-        /** 整条产线是否睡眠。 */
+    /** 已登记状态的机器数（诊断用）。 */
+    public int size() {
+        return this.machines.size();
+    }
+
+    /** 已登记状态的机器 id（只读快照，遍历时用）。 */
+    public Set<UUID> ids() {
+        return Set.copyOf(this.machines.keySet());
+    }
+
+    /** 一台机器的睡眠状态。 */
+    public static final class MachineState {
+        /** 本轮没搬动是从什么时候开始的；{@code -1} 表示还没开始计时。 */
+        public long idleSince = -1L;
+        /** 是否睡眠。 */
         public boolean sleeping;
         /** 进入睡眠的时间；{@code -1} 表示没在睡。 */
         public long sleepSince = -1L;
         /** 下次唤醒时间（game time）。 */
         public long wakeAt;
-        /** 组状态。 */
-        public final Map<UUID, GroupState> groups = new HashMap<>();
-
-        /**
-         * 取组状态，没有就建。
-         *
-         * @param groupId 组 id
-         * @return 组状态
-         */
-        public GroupState group(UUID groupId) {
-            return this.groups.computeIfAbsent(groupId, id -> new GroupState());
-        }
-    }
-
-    /** 一个组的睡眠状态。 */
-    public static final class GroupState {
-        /** 本轮没搬动是从什么时候开始的；{@code -1} 表示还没开始计时。 */
-        public long idleSince = -1L;
-        /** 是否睡眠。 */
-        public boolean sleeping;
-        /** 下次唤醒时间（game time）。 */
-        public long wakeAt;
-        /** 这个组的面路由表。 */
+        /** 这台机器的面路由表。 */
         public final RouteTable routes = new RouteTable();
     }
 }

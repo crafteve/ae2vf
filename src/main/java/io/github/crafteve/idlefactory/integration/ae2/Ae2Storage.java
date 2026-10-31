@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.integration.ae2;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
@@ -41,8 +42,11 @@ public final class Ae2Storage implements Storage {
         if (aeKey == null || amount <= 0L) {
             return 0L;
         }
-        return this.storage.insert(aeKey, amount,
+        long inserted = this.storage.insert(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
+        IdleFactory.LOGGER.info("IDF-PROBE me insert: key={} amount={} simulate={} result={}",
+                key.describe(), amount, simulate, inserted);
+        return inserted;
     }
 
     @Override
@@ -51,8 +55,11 @@ public final class Ae2Storage implements Storage {
         if (aeKey == null || amount <= 0L) {
             return 0L;
         }
-        return this.storage.extract(aeKey, amount,
+        long extracted = this.storage.extract(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
+        IdleFactory.LOGGER.info("IDF-PROBE me extract: key={} amount={} simulate={} result={}",
+                key.describe(), amount, simulate, extracted);
+        return extracted;
     }
 
     @Override

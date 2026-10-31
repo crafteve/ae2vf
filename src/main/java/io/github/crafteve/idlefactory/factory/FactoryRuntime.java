@@ -11,8 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
-import io.github.crafteve.idlefactory.factory.io.LineRunner;
-import io.github.crafteve.idlefactory.factory.line.PassiveLine;
+import io.github.crafteve.idlefactory.factory.io.MachineRunner;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -67,7 +66,7 @@ public final class FactoryRuntime {
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
-    private final LineRunner lineRunner = new LineRunner();
+    private final MachineRunner machineRunner = new MachineRunner();
     /**
      * 全服占用索引：统一 id → 认领。
      *
@@ -118,7 +117,7 @@ public final class FactoryRuntime {
             return;
         }
         runtime.save();
-        runtime.lineRunner.clear();
+        runtime.machineRunner.clear();
         DiagService.clearWatches();
         runtime.storageResolver = null;
         runtime.observations = null;
@@ -157,8 +156,8 @@ public final class FactoryRuntime {
     }
 
     /** IO 执行器。 */
-    public LineRunner lineRunner() {
-        return this.lineRunner;
+    public MachineRunner machineRunner() {
+        return this.machineRunner;
     }
 
     /** 观测服务；服务端未就绪时为 {@code null}。 */
@@ -234,6 +233,14 @@ public final class FactoryRuntime {
             factory.refreshStorage(this.storageResolver);
         }
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
+        for (Factory factory : this.manager.all()) {
+            IdleFactory.LOGGER.info("IDF-PROBE factory load: id={} machines={} storage={} online={}",
+                    factory.id().toString().substring(0, 8),
+                    factory.config().machines().size(),
+                    factory.live().storage() == null
+                            ? "none" : factory.live().storage().getClass().getSimpleName(),
+                    factory.live().storageOnline());
+        }
     }
 
     /**
@@ -264,7 +271,7 @@ public final class FactoryRuntime {
 
         if (this.tickCounter % this.ioInterval == 0) {
             long start = System.nanoTime();
-            this.lineRunner.tick(this.server, this.manager, this.observations);
+            this.machineRunner.tick(this.server, this.manager, this.observations);
             DiagService.recordIoCost(System.nanoTime() - start);
         }
 
@@ -338,7 +345,7 @@ public final class FactoryRuntime {
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, null, ref.id(), null, "机器已恢复"));
-                        this.wakeLines(factory, ref.id());
+                        this.wakeMachine(factory, ref.id());
                         if (wasMissing) {
                             this.restoredNotices.merge(factory.id(), 1, Integer::sum);
                         }
@@ -429,12 +436,8 @@ public final class FactoryRuntime {
         }
     }
 
-    private void wakeLines(Factory factory, UUID machineId) {
-        for (PassiveLine line : factory.config().lines().all()) {
-            if (line.containsMachine(machineId)) {
-                this.lineRunner.wake(line.id());
-            }
-        }
+    private void wakeMachine(Factory factory, UUID machineId) {
+        this.machineRunner.wake(machineId);
     }
 
     /**

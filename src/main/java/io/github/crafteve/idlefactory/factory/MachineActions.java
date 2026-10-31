@@ -256,8 +256,8 @@ public final class MachineActions {
         }
         FactoryRefs.lineOf(factory, machineId).ifPresent(line -> {
             if (runtime != null) {
-                runtime.lineRunner().forgetRoutes(line.id(), machineId);
-                runtime.lineRunner().wakeGroup(line.id(), machineId);
+                runtime.machineRunner().forgetRoutes(machineId);
+                runtime.machineRunner().wake(machineId);
             }
         });
     }

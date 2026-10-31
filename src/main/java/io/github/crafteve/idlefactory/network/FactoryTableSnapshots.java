@@ -9,6 +9,7 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.diag.DiagRender;
 import io.github.crafteve.idlefactory.factory.line.PassiveLine;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
@@ -51,7 +52,7 @@ public final class FactoryTableSnapshots {
                 FactorySnapshotBuilder.health(owner, machines);
         Map<UUID, Long> sleepRemaining = new HashMap<>();
         for (PassiveLine line : owner.config().lines().all()) {
-            long until = runtime.lineRunner().sleepUntil(line.id());
+            long until = DiagRender.lineSleepUntil(runtime, line, now);
             if (until > now) {
                 sleepRemaining.put(line.id(), until - now);
             }

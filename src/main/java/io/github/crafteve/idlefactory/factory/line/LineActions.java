@@ -129,7 +129,7 @@ public final class LineActions {
         PassiveLine line = found.get();
         String label = "[" + line.shortId() + "] " + line.name();
         factory.config().lines().remove(lineId);
-        forgetLine(lineId);
+        forgetLine(line);
         markDirty();
         return Result.ok("已删除产线 " + label + " · 机器和规则留在机器库", lineId);
     }
@@ -149,7 +149,7 @@ public final class LineActions {
         }
         PassiveLine line = found.get();
         line.setRunning(running);
-        wakeLine(line.id());
+        wakeLine(line);
         markDirty();
         return Result.ok("产线 [" + line.shortId() + "] " + line.name()
                 + " → " + (running ? "运行" : "停止"), lineId);
@@ -188,7 +188,7 @@ public final class LineActions {
         if (!target.addMachine(machineId)) {
             return Result.err("这台机器已经在产线 " + target.name() + " 里了");
         }
-        wakeLine(target.id());
+        wakeLine(target);
         markDirty();
         return Result.ok("已把机器 [" + machine.ref().shortId() + "] 加入产线 " + target.name(),
                 target.id());
@@ -243,10 +243,9 @@ public final class LineActions {
                 from.addMachine(machineId);
                 return Result.err("目标产线已有这台机器");
             }
-            forgetRoutes(from.id(), machineId);
-            forgetRoutes(target.id(), machineId);
-            wakeLine(from.id());
-            wakeLine(target.id());
+            forgetRoutes(machineId);
+            wakeLine(from);
+            wakeLine(target);
             markDirty();
             return Result.ok("已把机器 [" + machine.ref().shortId() + "] 从产线 " + from.name()
                     + " 移到 " + target.name() + "（IO 规则保留）", target.id());
@@ -258,7 +257,7 @@ public final class LineActions {
         // 加入已有组时把规则对齐：目标组有规则就让新机器继承，目标组空着就让全组套用新机器的规则。
         // 这样「拖一台进运行中的组」不会留下一个没规则、签名不一致的成员。
         syncRulesOnJoin(factory, target, machineId);
-        wakeLine(target.id());
+        wakeLine(target);
         markDirty();
         return Result.ok("已把机器 [" + machine.ref().shortId() + "] 加入产线 " + target.name(),
                 target.id());
@@ -331,7 +330,7 @@ public final class LineActions {
         if (!line.removeMachine(machineId)) {
             return Result.err("机器不在产线 " + line.name() + " 里");
         }
-        wakeLine(line.id());
+        wakeLine(line);
         markDirty();
         return Result.ok("已把机器 [" + machineFound.get().ref().shortId() + "] 移出产线 "
                 + line.name() + " · 机器和规则留在机器库", lineId);
@@ -382,24 +381,37 @@ public final class LineActions {
         }
     }
 
-    private static void wakeLine(UUID lineId) {
+    /**
+     * 唤醒一条产线里的所有机器。
+     *
+     * <p>P1 起执行器按机器睡眠，没有线级睡眠；「唤醒一条线」退化成逐台唤醒。</p>
+     *
+     * @param line 产线
+     */
+    private static void wakeLine(PassiveLine line) {
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.lineRunner().wake(lineId);
+        if (runtime == null) {
+            return;
+        }
+        for (UUID machineId : line.machineIds()) {
+            runtime.machineRunner().wake(machineId);
         }
     }
 
-    private static void forgetRoutes(UUID lineId, UUID machineId) {
+    private static void forgetRoutes(UUID machineId) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
-            runtime.lineRunner().forgetRoutes(lineId, machineId);
+            runtime.machineRunner().forgetRoutes(machineId);
         }
     }
 
-    private static void forgetLine(UUID lineId) {
+    private static void forgetLine(PassiveLine line) {
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            runtime.lineRunner().forget(lineId);
+        if (runtime == null) {
+            return;
+        }
+        for (UUID machineId : line.machineIds()) {
+            runtime.machineRunner().forget(machineId);
         }
     }
 }

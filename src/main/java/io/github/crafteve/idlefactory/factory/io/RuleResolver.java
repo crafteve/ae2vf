@@ -4,6 +4,7 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
@@ -74,13 +75,30 @@ public final class RuleResolver {
             if (route.isPresent()) {
                 Resolved direct = build(level, pos, spec, caps, route.get().face());
                 if (direct != null) {
+                    probe(spec, input, direct);
                     return direct;
                 }
                 // 记录的面已经没有 handler（能力没了 / 方块换了）：踢掉重扫
                 routes.clear(spec, input);
             }
         }
-        return sweep(level, pos, spec, input, caps);
+        Resolved swept = sweep(level, pos, spec, input, caps);
+        probe(spec, input, swept);
+        return swept;
+    }
+
+    /**
+     * 探针：一条规则最终用了哪个面、什么匹配模式。
+     *
+     * @param spec   规则
+     * @param input  是否输入方向
+     * @param result 解析结果；没有可用 handler 时为 {@code null}
+     */
+    private static void probe(ResourceSpec spec, boolean input, @Nullable Resolved result) {
+        IdleFactory.LOGGER.info("IDF-PROBE rule resolve: side={} key={} mode={} face={} kind={}",
+                input ? "in" : "out", spec.describe(), spec.mode(),
+                result == null ? "none" : String.valueOf(result.face()),
+                result == null ? "none" : result.adapter().getClass().getSimpleName());
     }
 
     /**

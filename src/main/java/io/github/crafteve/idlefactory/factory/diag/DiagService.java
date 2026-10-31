@@ -133,10 +133,7 @@ public final class DiagService {
                         + " · 本 tick 探测 " + stats.probesLastTick()
                         + " · 待消化 " + stats.dirtyPending()
                         + " · 面表冻结 " + observations.frozenFacesCount()));
-        int routes = 0;
-        for (PassiveLine line : factory.config().lines().all()) {
-            routes += runtime.lineRunner().routeCount(line.id());
-        }
+        int routes = runtime.machineRunner().totalRouteCount();
         FactoryMessages.send(player, FactoryMessages.info("面路由 " + routes + " 条（搬通过的面）"));
 
         long now = observations.currentTick();
@@ -191,7 +188,7 @@ public final class DiagService {
 
     private static Component statusRow(Factory factory, PassiveLine line, long now,
             FactoryRuntime runtime) {
-        DiagStats.LineStats stats = factory.live().stats().line(line.id());
+        DiagStats stats = factory.live().stats();
         MutableComponent row = Component.empty()
                 .append(DiagRender.levelTag(line.running()
                         ? DiagEvent.Level.OK : DiagEvent.Level.IDLE))
@@ -202,7 +199,7 @@ public final class DiagService {
                         line.running() ? FactoryMessages.OK : FactoryMessages.INFO))
                 .append(FactoryMessages.text(" · " + line.machineCount() + " 组 · "
                         + stats.totalRate() + "/s", FactoryMessages.INFO));
-        long sleepUntil = runtime.lineRunner().sleepUntil(line.id());
+        long sleepUntil = DiagRender.lineSleepUntil(runtime, line, now);
         if (sleepUntil > now) {
             row.append(FactoryMessages.text(" · 睡眠 " + seconds(sleepUntil - now) + "s",
                     FactoryMessages.DIM));
@@ -228,7 +225,7 @@ public final class DiagService {
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        long sleepUntil = runtime.lineRunner().sleepUntil(line.id());
+        long sleepUntil = DiagRender.lineSleepUntil(runtime, line, now);
 
         MutableComponent header = Component.empty()
                 .append(FactoryMessages.text("── ", FactoryMessages.DIM))
@@ -569,8 +566,8 @@ public final class DiagService {
                 continue;
             }
             watch.nextPush = now + watch.intervalTicks;
-            long sleepUntil = runtime.lineRunner().sleepUntil(line.get().id());
-            long sleepSince = runtime.lineRunner().sleepSince(line.get().id());
+            long sleepUntil = DiagRender.lineSleepUntil(runtime, line.get(), now);
+            long sleepSince = DiagRender.lineSleepSince(runtime, line.get(), now);
             if (watch.detail) {
                 for (Component row : DiagRender.watchDetail(server, factory.get(), line.get(),
                         now, sleepUntil, sleepSince)) {
