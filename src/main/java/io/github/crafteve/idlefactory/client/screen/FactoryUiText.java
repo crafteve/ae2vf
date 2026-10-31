@@ -3,8 +3,8 @@ package io.github.crafteve.idlefactory.client.screen;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.client.Minecraft;
@@ -17,6 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.neoforged.fml.ModList;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 界面专用的文本与资源形态辅助。
@@ -101,16 +102,16 @@ final class FactoryUiText {
      * @param key       资源
      * @return 多行文本
      */
-    static String resourceTooltip(Minecraft minecraft, ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
+    static String resourceTooltip(Minecraft minecraft, AEKey key) {
+        if (AeKeySupport.isEnergy(key)) {
             return "FE";
         }
         if (minecraft == null) {
-            return key.id().toString();
+            return key.getId().toString();
         }
         ItemStack stack = resourceStack(key);
         if (stack.isEmpty()) {
-            return key.id().toString();
+            return key.getId().toString();
         }
         StringBuilder text = new StringBuilder();
         for (Component line : stack.getTooltipLines(
@@ -132,13 +133,13 @@ final class FactoryUiText {
      * @param key 资源
      * @return 标签 id 列表
      */
-    static List<String> resourceTags(ResourceKey key) {
+    static List<String> resourceTags(AEKey key) {
         List<String> tags = new ArrayList<>();
-        switch (key.kind()) {
+        switch (AeKeySupport.kind(key)) {
             case ITEM -> resourceStack(key).getTags()
                     .forEach(tag -> tags.add(tag.location().toString()));
             case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
+                var fluid = BuiltInRegistries.FLUID.get(key.getId());
                 BuiltInRegistries.FLUID.wrapAsHolder(fluid).tags()
                         .forEach(tag -> tags.add(tag.location().toString()));
             }
@@ -158,11 +159,11 @@ final class FactoryUiText {
      * @param key 资源
      * @return 物品栈；化学品等没有物品形态时为空
      */
-    static ItemStack resourceStack(ResourceKey key) {
-        return switch (key.kind()) {
-            case ITEM -> key.toStack();
+    static ItemStack resourceStack(AEKey key) {
+        return switch (AeKeySupport.kind(key)) {
+            case ITEM -> AeKeySupport.toStack(key);
             case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
+                var fluid = BuiltInRegistries.FLUID.get(key.getId());
                 Item bucket = fluid.getBucket();
                 yield bucket == Items.AIR ? new ItemStack(Items.BUCKET) : new ItemStack(bucket);
             }
@@ -177,7 +178,7 @@ final class FactoryUiText {
      * @param key 资源
      * @return 名称
      */
-    static String resourceName(ResourceKey key) {
+    static String resourceName(AEKey key) {
         return FactoryLabels.name(key);
     }
 
@@ -200,7 +201,7 @@ final class FactoryUiText {
      * @param key 资源
      * @return 物品栈
      */
-    static ItemStack iconStack(ResourceKey key) {
+    static ItemStack iconStack(AEKey key) {
         return FactoryLabels.icon(key);
     }
 }

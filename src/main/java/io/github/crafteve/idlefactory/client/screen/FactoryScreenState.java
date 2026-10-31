@@ -13,13 +13,14 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 工厂界面的客户端状态与派生视图。
@@ -96,7 +97,7 @@ final class FactoryScreenState {
     /** 左表逐台铺开后的行。 */
     List<FactoryMachineStack> tableStacks = List.of();
     /** 资源 → 搜索字段缓存；tooltip/tag 读取较重，避免每次过滤重复解析。 */
-    final Map<ResourceKey, FactorySearchQuery.Fields> storageSearchFields = new HashMap<>();
+    final Map<AEKey, FactorySearchQuery.Fields> storageSearchFields = new HashMap<>();
 
     /** 跨界面保留的搜索词；关闭界面时写入。 */
     static String rememberedSearch = "";
@@ -193,7 +194,7 @@ final class FactoryScreenState {
             this.storageRepo.configure(entry ->
                     (this.searchQuery.isEmpty()
                             || this.searchQuery.matches(storageSearchFields(entry.key())))
-                            && scope.accepts(entry.key().kind()),
+                            && scope.accepts(AeKeySupport.kind(entry.key())),
                     comparator);
         }
 
@@ -285,11 +286,11 @@ final class FactoryScreenState {
      * @param key 资源
      * @return 搜索字段
      */
-    FactorySearchQuery.Fields storageSearchFields(ResourceKey key) {
+    FactorySearchQuery.Fields storageSearchFields(AEKey key) {
         return this.storageSearchFields.computeIfAbsent(key, k -> {
-            String namespace = k.id().getNamespace();
+            String namespace = k.getId().getNamespace();
             return new FactorySearchQuery.Fields(FactoryUiText.resourceName(k),
-                    k.id().toString(), namespace, FactoryUiText.modName(namespace),
+                    k.getId().toString(), namespace, FactoryUiText.modName(namespace),
                     FactoryUiText.resourceTooltip(Minecraft.getInstance(), k),
                     FactoryUiText.resourceTags(k));
         });
@@ -357,7 +358,7 @@ final class FactoryScreenState {
         int width = 4;
         for (int i = 0; i < Math.min(3, rules.size()); i++) {
             String rate = FactoryLabels.rateText(i < rates.size() ? rates.get(i) : 0L,
-                    rules.get(i).key().kind());
+                    AeKeySupport.kind(rules.get(i).key()));
             width += FactoryLayout.CELL + 2 + this.font.width(rate) + 6;
         }
         // 末尾空槽是拖放目标，列宽必须给它留位置。

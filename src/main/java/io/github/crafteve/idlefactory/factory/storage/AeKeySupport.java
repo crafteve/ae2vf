@@ -16,6 +16,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * {@link AEKey} 的通用辅助：构造、模糊匹配、显示名、日志摘要与图标栈。
@@ -164,6 +165,25 @@ public final class AeKeySupport {
     /** 是否是 Applied Flux 提供的 FE key（没装附属时恒为 {@code false}）。 */
     public static boolean isEnergy(@Nullable AEKey key) {
         return key != null && AppFluxKeys.isFe(key);
+    }
+
+    /**
+     * 资源归属的能力大类，供界面分组、图标选择与速率单位使用。
+     *
+     * <p>资源身份本身由 {@link AEKey} 决定，这个分类只回答「它算哪一类」，不参与相等性。
+     * 复用观测层的 {@link CapabilityKind}，避免再维护一个平行的资源类型枚举。</p>
+     *
+     * @param key 资源 key
+     * @return 能力大类；未知类型按物品处理
+     */
+    public static CapabilityKind kind(@Nullable AEKey key) {
+        if (isEnergy(key)) {
+            return CapabilityKind.ENERGY;
+        }
+        if (key instanceof AEFluidKey) {
+            return CapabilityKind.FLUID;
+        }
+        return CapabilityKind.ITEM;
     }
 
     /**

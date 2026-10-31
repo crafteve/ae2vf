@@ -11,6 +11,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.Direction;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * 一个方块位置的能力快照，按面组织。

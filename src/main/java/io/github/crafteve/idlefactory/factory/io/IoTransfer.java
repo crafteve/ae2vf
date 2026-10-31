@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.stacks.AEKey;
 
 /**
  * IO 的唯一写路径：feed（仓库 → 机器）和 pull（机器 → 仓库）。
@@ -60,7 +61,7 @@ public final class IoTransfer {
             long refunded = storage.insert(adapter.key(), refund, false);
             if (refunded < refund) {
                 IdleFactory.LOGGER.warn("IdleFactory IO refund failed: {} of {} {} could not go back",
-                        refund - refunded, refund, adapter.key().describe());
+                        refund - refunded, refund, adapter.key().getDisplayName().getString());
             }
         }
         probe("in", adapter.key(), inserted,
@@ -116,9 +117,9 @@ public final class IoTransfer {
      * @param amount    实际搬动数量
      * @param result    结果枚举
      */
-    private static void probe(String direction, io.github.crafteve.idlefactory.factory.resource.ResourceKey key,
+    private static void probe(String direction, appeng.api.stacks.AEKey key,
             long amount, IoResult.Reason result) {
         IdleFactory.LOGGER.info("IDF-PROBE io transfer: dir={} key={} amount={} result={}",
-                direction, key.describe(), amount, result);
+                direction, key.getDisplayName().getString(), amount, result);
     }
 }

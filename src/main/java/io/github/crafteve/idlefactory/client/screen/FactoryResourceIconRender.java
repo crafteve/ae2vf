@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 import net.minecraft.client.Minecraft;
@@ -15,6 +15,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 仓库格、规则图标共用的资源图标绘制。
@@ -42,8 +43,8 @@ public final class FactoryResourceIconRender {
      * @param x        左上角 x
      * @param y        左上角 y
      */
-    public static void draw(GuiGraphics graphics, Font font, ResourceKey key, int x, int y) {
-        switch (key.kind()) {
+    public static void draw(GuiGraphics graphics, Font font, AEKey key, int x, int y) {
+        switch (AeKeySupport.kind(key)) {
             case ITEM -> drawItem(graphics, font, key, x, y);
             case FLUID -> {
                 if (!drawFluid(graphics, key, x, y)) {
@@ -59,15 +60,15 @@ public final class FactoryResourceIconRender {
         }
     }
 
-    private static void drawItem(GuiGraphics graphics, Font font, ResourceKey key, int x, int y) {
+    private static void drawItem(GuiGraphics graphics, Font font, AEKey key, int x, int y) {
         ItemStack stack = FactoryLabels.icon(key);
         graphics.renderItem(stack, x, y);
         // 数量由调用方自己画（支持 1.2k 这类长数字），这里只借装饰层画耐久/冷却。
         graphics.renderItemDecorations(font, stack, x, y, "");
     }
 
-    private static boolean drawFluid(GuiGraphics graphics, ResourceKey key, int x, int y) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
+    private static boolean drawFluid(GuiGraphics graphics, AEKey key, int x, int y) {
+        Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
         if (fluid == Fluids.EMPTY) {
             return false;
         }

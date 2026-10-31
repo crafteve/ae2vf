@@ -5,8 +5,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;
@@ -16,6 +16,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.Direction;
 import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
+import appeng.api.stacks.AEItemKey;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 工厂界面的输入层：鼠标点击/拖动/滚轮、键盘、仓库手势和 IO 卡片操作。
@@ -65,7 +67,7 @@ final class FactoryScreenInput {
      * @param key     资源；空格为 {@code null}
      * @param gesture 手势
      */
-    private void sendStorageGesture(@Nullable ResourceKey key, Gesture gesture) {
+    private void sendStorageGesture(@Nullable AEKey key, Gesture gesture) {
         PacketDistributor.sendToServer(new FactoryStorageActionC2S(
                 this.screen.getMenu().containerId, key, gesture));
     }
@@ -164,9 +166,9 @@ final class FactoryScreenInput {
             // 仓库格不能走原版 Slot 逻辑：非物品资源、空格且手上为空时直接吞掉；
             // 其余情况只发手势，背包扣减与 carried 由服务端决定。
             FactoryStorageS2C.Entry entry = storageEntryAt(mouseX, mouseY);
-            ResourceKey key = entry == null ? null : entry.key();
+            AEKey key = entry == null ? null : entry.key();
             if (button == 0 || button == 1) {
-                if (key != null && key.kind() != ResourceKind.ITEM) {
+                if (key != null && !(key instanceof AEItemKey)) {
                     return true;
                 }
                 if (key == null && this.screen.getMenu().getCarried().isEmpty()) {
@@ -503,7 +505,7 @@ final class FactoryScreenInput {
                 && mouseY >= l.gridY
                 && mouseY < l.gridY + l.gridRows * FactoryLayout.CELL) {
             FactoryStorageS2C.Entry entry = storageEntryAt(mouseX, mouseY);
-            if (entry != null && entry.key().kind() == ResourceKind.ITEM) {
+            if (entry != null && (entry.key() instanceof AEItemKey)) {
                 sendStorageGesture(entry.key(),
                         scrollY > 0 ? Gesture.SCROLL_UP : Gesture.SCROLL_DOWN);
                 return true;

@@ -10,13 +10,14 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
@@ -50,7 +51,7 @@ public final class GroupRunner {
      * @param outputReasons 逐输出规则的本轮原因
      */
     public record GroupRun(long fed, long pulled,
-            Map<ResourceKey, Long> fedByKey, Map<ResourceKey, Long> pulledByKey,
+            Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
             Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
             IoResult.Reason lastReason, boolean inputFull,
             IoResult.Reason inputReason, IoResult.Reason outputReason,
@@ -126,8 +127,8 @@ public final class GroupRunner {
             @Nullable ItemVariantIndex variants, long now) {
         long fed = 0L;
         long pulled = 0L;
-        Map<ResourceKey, Long> fedByKey = new LinkedHashMap<>();
-        Map<ResourceKey, Long> pulledByKey = new LinkedHashMap<>();
+        Map<AEKey, Long> fedByKey = new LinkedHashMap<>();
+        Map<AEKey, Long> pulledByKey = new LinkedHashMap<>();
         Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
         Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
         Map<RuleKey, IoResult.Reason> inputReasons = new LinkedHashMap<>();
@@ -295,7 +296,7 @@ public final class GroupRunner {
             RuleResolver.Resolved resolved, long generation) {
         // 物品规则不记路由：无向句柄可能只读（Mekanism），模糊变体也可能落在不同面；
         // 每次按当前物品重新探面，避免把某一条变体或某一侧钉死。
-        if (routes == null || spec.face() != null || spec.key().kind() == ResourceKind.ITEM) {
+        if (routes == null || spec.face() != null || (spec.key() instanceof AEItemKey)) {
             return;
         }
         routes.remember(spec, input, new RouteTable.Route(resolved.face()), generation);

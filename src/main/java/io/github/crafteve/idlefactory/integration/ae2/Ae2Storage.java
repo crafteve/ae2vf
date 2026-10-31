@@ -4,8 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
@@ -37,7 +37,7 @@ public final class Ae2Storage implements Storage {
     }
 
     @Override
-    public long insert(ResourceKey key, long amount, boolean simulate) {
+    public long insert(AEKey key, long amount, boolean simulate) {
         AEKey aeKey = Ae2Keys.toAe(key);
         if (aeKey == null || amount <= 0L) {
             return 0L;
@@ -45,12 +45,12 @@ public final class Ae2Storage implements Storage {
         long inserted = this.storage.insert(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
         IdleFactory.LOGGER.info("IDF-PROBE me insert: key={} amount={} simulate={} result={}",
-                key.describe(), amount, simulate, inserted);
+                key.getDisplayName().getString(), amount, simulate, inserted);
         return inserted;
     }
 
     @Override
-    public long extract(ResourceKey key, long amount, boolean simulate) {
+    public long extract(AEKey key, long amount, boolean simulate) {
         AEKey aeKey = Ae2Keys.toAe(key);
         if (aeKey == null || amount <= 0L) {
             return 0L;
@@ -58,17 +58,16 @@ public final class Ae2Storage implements Storage {
         long extracted = this.storage.extract(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
         IdleFactory.LOGGER.info("IDF-PROBE me extract: key={} amount={} simulate={} result={}",
-                key.describe(), amount, simulate, extracted);
+                key.getDisplayName().getString(), amount, simulate, extracted);
         return extracted;
     }
 
     @Override
-    public boolean supports(ResourceKind kind) {
+    public boolean supports(CapabilityKind kind) {
         return switch (kind) {
             case ITEM, FLUID -> true;
             // 装了 Applied Flux 还不够，得等 FE key 真正接上才算支持
             case ENERGY -> AppFluxKeys.feKey() != null;
-            case CHEMICAL -> false;
         };
     }
 
@@ -80,12 +79,12 @@ public final class Ae2Storage implements Storage {
     }
 
     @Override
-    public Map<ResourceKey, Long> snapshot() {
+    public Map<AEKey, Long> snapshot() {
         KeyCounter counter = new KeyCounter();
         this.storage.getAvailableStacks(counter);
-        Map<ResourceKey, Long> result = new LinkedHashMap<>();
+        Map<AEKey, Long> result = new LinkedHashMap<>();
         for (var entry : counter) {
-            ResourceKey key = Ae2Keys.toResource(entry.getKey());
+            AEKey key = Ae2Keys.toResource(entry.getKey());
             if (key != null) {
                 result.merge(key, entry.getLongValue(), Long::sum);
             }

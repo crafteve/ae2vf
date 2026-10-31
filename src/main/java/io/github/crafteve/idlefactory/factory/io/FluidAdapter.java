@@ -1,10 +1,11 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 import net.minecraft.world.level.material.Fluid;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 机器的流体接口，单位 mB。
@@ -23,8 +24,8 @@ public final class FluidAdapter implements ResourceAdapter {
     }
 
     @Override
-    public ResourceKey key() {
-        return ResourceKey.fluid(this.fluid);
+    public AEKey key() {
+        return AeKeySupport.fluid(this.fluid);
     }
 
     @Override

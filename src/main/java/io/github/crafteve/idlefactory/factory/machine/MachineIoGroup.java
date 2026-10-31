@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.HolderLookup;
@@ -53,7 +53,7 @@ public final class MachineIoGroup {
      *
      * <p>签名用来判断两台机器能不能并成界面上的同一组。这里用集合而不是「排序后的列表」，
      * 是因为集合相等与规则登记顺序无关；同时 {@code Set.hashCode} 能直接当分组键，
-     * 不需要再给 {@code ResourceKey} 定义一套排序键（物品组件没有天然顺序，按 hash 排会碰撞）。
+     * 不需要再给 {@code AEKey} 定义一套排序键（物品组件没有天然顺序，按 hash 排会碰撞）。
      * 同一侧同一资源只允许一条规则，所以集合不会丢掉规则数量。</p>
      *
      * @return 签名；没有规则时两侧都是空集
@@ -112,7 +112,7 @@ public final class MachineIoGroup {
      * @param key 资源
      * @return 是否真的移除了
      */
-    public boolean removeInput(ResourceKey key) {
+    public boolean removeInput(AEKey key) {
         return this.inputs.removeIf(spec -> spec.key().equals(key));
     }
 
@@ -136,7 +136,7 @@ public final class MachineIoGroup {
      * @param key 资源
      * @return 是否真的移除了
      */
-    public boolean removeOutput(ResourceKey key) {
+    public boolean removeOutput(AEKey key) {
         return this.outputs.removeIf(spec -> spec.key().equals(key));
     }
 
@@ -147,7 +147,7 @@ public final class MachineIoGroup {
      * @param replacement 新规则；key 必须与原规则一致
      * @return 是否找到并替换
      */
-    public boolean replaceInput(ResourceKey key, ResourceSpec replacement) {
+    public boolean replaceInput(AEKey key, ResourceSpec replacement) {
         return replace(this.inputs, key, replacement);
     }
 
@@ -158,11 +158,11 @@ public final class MachineIoGroup {
      * @param replacement 新规则；key 必须与原规则一致
      * @return 是否找到并替换
      */
-    public boolean replaceOutput(ResourceKey key, ResourceSpec replacement) {
+    public boolean replaceOutput(AEKey key, ResourceSpec replacement) {
         return replace(this.outputs, key, replacement);
     }
 
-    private static boolean replace(List<ResourceSpec> specs, ResourceKey key,
+    private static boolean replace(List<ResourceSpec> specs, AEKey key,
             ResourceSpec replacement) {
         if (!replacement.key().equals(key)) {
             return false;
@@ -177,7 +177,7 @@ public final class MachineIoGroup {
     }
 
     @Nullable
-    private static ResourceSpec find(List<ResourceSpec> specs, ResourceKey key) {
+    private static ResourceSpec find(List<ResourceSpec> specs, AEKey key) {
         for (ResourceSpec spec : specs) {
             if (spec.key().equals(key)) {
                 return spec;

@@ -7,7 +7,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.Direction;
@@ -41,7 +41,7 @@ public final class RouteTable {
     public record Route(@Nullable Direction face) {
     }
 
-    private record Key(boolean input, ResourceKey key, MatchMode mode) {
+    private record Key(boolean input, AEKey key, MatchMode mode) {
     }
 
     private record Entry(Route route, long generation) {

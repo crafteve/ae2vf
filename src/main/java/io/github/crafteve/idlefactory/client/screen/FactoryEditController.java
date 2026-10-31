@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
@@ -22,6 +22,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 工作台编辑态的总控：确认浮层、底部反馈和拖拽。
@@ -52,10 +53,10 @@ public final class FactoryEditController implements FactoryScreenInteraction {
 
     /** 从仓库拖出的资源；与规则拖拽互斥。 */
     @Nullable
-    private ResourceKey dragResourceKey;
+    private AEKey dragResourceKey;
     /** 左键/右键在仓库格上按下但还没确定是点击还是拖拽。 */
     @Nullable
-    private ResourceKey pendingStorageKey;
+    private AEKey pendingStorageKey;
     private int pendingStorageButton;
     private boolean pendingStorageShift;
     private boolean dragActive;
@@ -278,7 +279,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
 
     private void sendPendingStorageGesture() {
         if (this.pendingStorageKey == null
-                || this.pendingStorageKey.kind() != io.github.crafteve.idlefactory.factory.resource.ResourceKind.ITEM) {
+                || !(this.pendingStorageKey instanceof AEItemKey)) {
             return;
         }
         FactoryStorageActionC2S.Gesture gesture;
@@ -345,7 +346,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
      * @param mode   匹配模式，可为 {@code null}
      */
     private void sendRuleAction(FactoryRuleActionC2S.Action action, FactoryMachineStack stack,
-            IoSide side, ResourceKey key, @Nullable Direction face, @Nullable MatchMode mode) {
+            IoSide side, AEKey key, @Nullable Direction face, @Nullable MatchMode mode) {
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(
                 this.screen.getMenu().containerId, action, stack.anchorId(), side, key, face,
                 mode == null ? MatchMode.EXACT : mode));

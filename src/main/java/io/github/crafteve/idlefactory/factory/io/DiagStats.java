@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 /**
  * 一个工厂的诊断数据：事件环形缓冲 + 每台机器的搬运统计 + 工厂级资源速率。
@@ -29,13 +29,13 @@ public final class DiagStats {
     /** 每台机器的统计。 */
     private final Map<UUID, MachineStats> machines = new HashMap<>();
     /** 本秒窗口内的补料量，按资源。 */
-    private final Map<ResourceKey, Long> inWindow = new HashMap<>();
+    private final Map<AEKey, Long> inWindow = new HashMap<>();
     /** 本秒窗口内的抽取量，按资源。 */
-    private final Map<ResourceKey, Long> outWindow = new HashMap<>();
+    private final Map<AEKey, Long> outWindow = new HashMap<>();
     /** 上一秒的补料速率，按资源。 */
-    private final Map<ResourceKey, Long> rateIn = new HashMap<>();
+    private final Map<AEKey, Long> rateIn = new HashMap<>();
     /** 上一秒的抽取速率，按资源。 */
-    private final Map<ResourceKey, Long> rateOut = new HashMap<>();
+    private final Map<AEKey, Long> rateOut = new HashMap<>();
     /** 整个工厂最后一次成功搬运的时间。 */
     private long lastMoveTick;
 
@@ -121,12 +121,12 @@ public final class DiagStats {
     }
 
     /** 上一秒的补料速率，按资源。 */
-    public Map<ResourceKey, Long> rateIn() {
+    public Map<AEKey, Long> rateIn() {
         return Map.copyOf(this.rateIn);
     }
 
     /** 上一秒的抽取速率，按资源。 */
-    public Map<ResourceKey, Long> rateOut() {
+    public Map<AEKey, Long> rateOut() {
         return Map.copyOf(this.rateOut);
     }
 
@@ -179,11 +179,11 @@ public final class DiagStats {
      * @param pulled  按资源拆分的抽取量
      * @param tick    时间
      */
-    private void addFactoryMoved(Map<ResourceKey, Long> fed, Map<ResourceKey, Long> pulled, long tick) {
-        for (Map.Entry<ResourceKey, Long> entry : fed.entrySet()) {
+    private void addFactoryMoved(Map<AEKey, Long> fed, Map<AEKey, Long> pulled, long tick) {
+        for (Map.Entry<AEKey, Long> entry : fed.entrySet()) {
             this.inWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
         }
-        for (Map.Entry<ResourceKey, Long> entry : pulled.entrySet()) {
+        for (Map.Entry<AEKey, Long> entry : pulled.entrySet()) {
             this.outWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
         }
         this.lastMoveTick = tick;
@@ -220,7 +220,7 @@ public final class DiagStats {
          * @param pulledByRule 按规则拆分的抽取量
          * @param tick         时间
          */
-        public void addMoved(Map<ResourceKey, Long> fed, Map<ResourceKey, Long> pulled,
+        public void addMoved(Map<AEKey, Long> fed, Map<AEKey, Long> pulled,
                 Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule, long tick) {
             this.owner.addFactoryMoved(fed, pulled, tick);
             this.lastMoveTick = tick;

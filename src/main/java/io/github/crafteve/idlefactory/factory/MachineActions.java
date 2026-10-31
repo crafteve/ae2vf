@@ -10,12 +10,13 @@ import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.material.Fluids;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 机器 IO 规则的写操作层：指令和界面共用。
@@ -77,7 +78,7 @@ public final class MachineActions {
      * @param mode      匹配模式；非物品会被规范化成精确
      * @return 结果
      */
-    public static Result addRule(Factory factory, UUID machineId, IoSide side, ResourceKey key,
+    public static Result addRule(Factory factory, UUID machineId, IoSide side, AEKey key,
             @Nullable Direction face, MatchMode mode) {
         Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
@@ -93,7 +94,7 @@ public final class MachineActions {
             return Result.err(sideName(side) + "已达上限 " + MAX_RULES_PER_SIDE + " 条");
         }
         if (find(rules, key) != null) {
-            return Result.err(sideName(side) + "里已经有 " + key.describe());
+            return Result.err(sideName(side) + "里已经有 " + key.getDisplayName().getString());
         }
         ResourceSpec spec = new ResourceSpec(key, face, 0L, mode);
         boolean added = side == IoSide.INPUT ? io.addInput(spec) : io.addOutput(spec);
@@ -115,7 +116,7 @@ public final class MachineActions {
      * @param mode      新匹配模式；{@code null} 表示保留原值
      * @return 结果
      */
-    public static Result updateRule(Factory factory, UUID machineId, IoSide side, ResourceKey key,
+    public static Result updateRule(Factory factory, UUID machineId, IoSide side, AEKey key,
             @Nullable Direction face, @Nullable MatchMode mode) {
         Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
@@ -124,7 +125,7 @@ public final class MachineActions {
         MachineIoGroup io = ioFound.get();
         ResourceSpec current = find(rules(io, side), key);
         if (current == null) {
-            return Result.err(sideName(side) + "里没有 " + key.describe());
+            return Result.err(sideName(side) + "里没有 " + key.getDisplayName().getString());
         }
         ResourceSpec replacement = new ResourceSpec(key, face, current.amount(),
                 mode == null ? current.mode() : mode);
@@ -132,7 +133,7 @@ public final class MachineActions {
                 ? io.replaceInput(key, replacement)
                 : io.replaceOutput(key, replacement);
         if (!replaced) {
-            return Result.err(sideName(side) + "里没有 " + key.describe());
+            return Result.err(sideName(side) + "里没有 " + key.getDisplayName().getString());
         }
         afterRuleChange(machineId);
         return Result.ok("已更新" + sideName(side) + "：" + replacement.describe());
@@ -147,7 +148,7 @@ public final class MachineActions {
      * @param key       规则 key
      * @return 结果
      */
-    public static Result removeRule(Factory factory, UUID machineId, IoSide side, ResourceKey key) {
+    public static Result removeRule(Factory factory, UUID machineId, IoSide side, AEKey key) {
         Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
         if (ioFound.isEmpty()) {
             return Result.err("找不到机器");
@@ -155,10 +156,10 @@ public final class MachineActions {
         MachineIoGroup io = ioFound.get();
         boolean ok = side == IoSide.INPUT ? io.removeInput(key) : io.removeOutput(key);
         if (!ok) {
-            return Result.err(sideName(side) + "里没有 " + key.describe());
+            return Result.err(sideName(side) + "里没有 " + key.getDisplayName().getString());
         }
         afterRuleChange(machineId);
-        return Result.ok("已移除" + sideName(side) + "：" + key.describe());
+        return Result.ok("已移除" + sideName(side) + "：" + key.getDisplayName().getString());
     }
 
     private static Optional<MachineIoGroup> requireIo(Factory factory, UUID machineId) {
@@ -170,7 +171,7 @@ public final class MachineActions {
     }
 
     @Nullable
-    private static ResourceSpec find(List<ResourceSpec> rules, ResourceKey key) {
+    private static ResourceSpec find(List<ResourceSpec> rules, AEKey key) {
         for (ResourceSpec spec : rules) {
             if (spec.key().equals(key)) {
                 return spec;
@@ -184,16 +185,15 @@ public final class MachineActions {
     }
 
     @Nullable
-    private static String validateResource(@Nullable ResourceKey key) {
+    private static String validateResource(@Nullable AEKey key) {
         if (key == null) {
             return "资源为空";
         }
-        return switch (key.kind()) {
-            case ITEM -> key.toStack().isEmpty() ? "未知物品：" + key.id() : null;
-            case FLUID -> BuiltInRegistries.FLUID.get(key.id()) == Fluids.EMPTY
-                    ? "未知流体：" + key.id() : null;
-            case ENERGY -> ResourceKey.ENERGY.equals(key) ? null : "能量规则只能使用 idlefactory:fe";
-            case CHEMICAL -> "化学品规则暂不支持";
+        return switch (AeKeySupport.kind(key)) {
+            case ITEM -> AeKeySupport.toStack(key).isEmpty() ? "未知物品：" + key.getId() : null;
+            case FLUID -> BuiltInRegistries.FLUID.get(key.getId()) == Fluids.EMPTY
+                    ? "未知流体：" + key.getId() : null;
+            case ENERGY -> AeKeySupport.energy().equals(key) ? null : "能量规则只能使用 idlefactory:fe";
         };
     }
 

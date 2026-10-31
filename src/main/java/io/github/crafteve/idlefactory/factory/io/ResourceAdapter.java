@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 /**
  * 机器侧的一个资源接口。
@@ -10,7 +10,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
  */
 public interface ResourceAdapter {
     /** 这个适配器对应的资源。 */
-    ResourceKey key();
+    AEKey key();
 
     /** 机器现在还能收多少。 */
     long capacity();

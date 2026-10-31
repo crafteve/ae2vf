@@ -6,7 +6,7 @@ import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 import io.netty.buffer.Unpooled;
@@ -44,7 +44,7 @@ public final class FactoryStorageSnapshots {
      * @param containerId 菜单容器 id
      */
     public static void send(ServerPlayer player, Factory factory, int containerId) {
-        Map<ResourceKey, Long> snapshot;
+        Map<AEKey, Long> snapshot;
         try {
             snapshot = factory.live().storage().snapshot();
         } catch (RuntimeException e) {
@@ -53,8 +53,8 @@ public final class FactoryStorageSnapshots {
             PacketDistributor.sendToPlayer(player, FactoryStorageS2C.empty(containerId));
             return;
         }
-        List<Map.Entry<ResourceKey, Long>> sorted = new ArrayList<>(snapshot.entrySet());
-        sorted.sort(Map.Entry.<ResourceKey, Long>comparingByValue().reversed());
+        List<Map.Entry<AEKey, Long>> sorted = new ArrayList<>(snapshot.entrySet());
+        sorted.sort(Map.Entry.<AEKey, Long>comparingByValue().reversed());
         int limit = Math.min(sorted.size(), MAX_ENTRIES);
         boolean truncated = sorted.size() > MAX_ENTRIES;
 
@@ -64,7 +64,7 @@ public final class FactoryStorageSnapshots {
         int bytes = 0;
         int part = 0;
         for (int i = 0; i < limit; i++) {
-            Map.Entry<ResourceKey, Long> entry = sorted.get(i);
+            Map.Entry<AEKey, Long> entry = sorted.get(i);
             int size = encodedSize(probe, entry.getKey(), entry.getValue());
             if (size < 0) {
                 truncated = true;
@@ -89,14 +89,14 @@ public final class FactoryStorageSnapshots {
      *
      * @return 字节数；该条无法序列化时返回 {@code -1}（调用方跳过）
      */
-    private static int encodedSize(RegistryFriendlyByteBuf probe, ResourceKey key, long count) {
+    private static int encodedSize(RegistryFriendlyByteBuf probe, AEKey key, long count) {
         probe.clear();
         try {
             ResourceKeyCodec.write(probe, key);
             probe.writeLong(count);
             return probe.readableBytes();
         } catch (RuntimeException e) {
-            IdleFactory.LOGGER.warn("IdleFactory: 仓库条目无法编码，已跳过 {}", key.describe(), e);
+            IdleFactory.LOGGER.warn("IdleFactory: 仓库条目无法编码，已跳过 {}", key.getDisplayName().getString(), e);
             return -1;
         }
     }

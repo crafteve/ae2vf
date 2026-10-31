@@ -10,6 +10,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 展开 IO 面板的绘制层：段头、配置卡、空卡、滚动条。
@@ -171,7 +172,7 @@ final class FactoryIoDetailRender {
         FactoryResourceIconRender.draw(graphics, font, spec.key(), slotX + 1, slotY + 1);
 
         int textX = card.x() + FactoryLayout.IO_CARD_TEXT_X;
-        String rateText = FactoryLabels.rateText(rate, spec.key().kind());
+        String rateText = FactoryLabels.rateText(rate, AeKeySupport.kind(spec.key()));
         int rateX = card.x() + card.width() - 4 - font.width(rateText);
         int nameWidth = Math.max(0, rateX - textX - 4);
         graphics.drawString(font,

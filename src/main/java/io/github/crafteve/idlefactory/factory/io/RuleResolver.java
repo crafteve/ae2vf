@@ -20,6 +20,7 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 把一条规则解析成「用哪个面、哪个能力句柄」。
@@ -109,16 +110,16 @@ public final class RuleResolver {
     @Nullable
     private static Resolved build(ServerLevel level, BlockPos pos, ResourceSpec spec,
             @Nullable LevelCapabilityCache caps, @Nullable Direction face) {
-        return switch (spec.key().kind()) {
+        return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> {
-                ItemStack sample = spec.key().toStack();
+                ItemStack sample = AeKeySupport.toStack(spec.key());
                 IItemHandler handler = item(level, pos, caps, face);
                 yield handler == null || sample.isEmpty()
                         ? null
                         : new Resolved(new ItemAdapter(handler, sample), face);
             }
             case FLUID -> {
-                Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
+                Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
                 IFluidHandler handler = fluid(level, pos, caps, face);
                 yield handler == null || fluid == Fluids.EMPTY
                         ? null
@@ -128,7 +129,6 @@ public final class RuleResolver {
                 IEnergyStorage handler = energy(level, pos, caps, face);
                 yield handler == null ? null : new Resolved(new EnergyAdapter(handler), face);
             }
-            case CHEMICAL -> null;
         };
     }
 
@@ -142,11 +142,10 @@ public final class RuleResolver {
         if (configured != null) {
             return build(level, pos, spec, caps, configured);
         }
-        return switch (spec.key().kind()) {
+        return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> sweepItem(level, pos, spec, input, caps);
             case FLUID -> sweepFluid(level, pos, spec, input, caps);
             case ENERGY -> sweepEnergy(level, pos, spec, input, caps);
-            case CHEMICAL -> null;
         };
     }
 
@@ -161,7 +160,7 @@ public final class RuleResolver {
     @Nullable
     private static Resolved sweepItem(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
             @Nullable LevelCapabilityCache caps) {
-        ItemStack sample = spec.key().toStack();
+        ItemStack sample = AeKeySupport.toStack(spec.key());
         if (sample.isEmpty()) {
             return null;
         }
@@ -239,7 +238,7 @@ public final class RuleResolver {
     @Nullable
     private static Resolved sweepFluid(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
             @Nullable LevelCapabilityCache caps) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
+        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
             return null;
         }

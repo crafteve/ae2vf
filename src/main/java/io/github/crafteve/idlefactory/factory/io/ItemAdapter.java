@@ -3,11 +3,12 @@ package io.github.crafteve.idlefactory.factory.io;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 机器的物品接口。
@@ -37,8 +38,8 @@ public final class ItemAdapter implements ResourceAdapter {
     }
 
     @Override
-    public ResourceKey key() {
-        return ResourceKey.item(this.sample);
+    public AEKey key() {
+        return AeKeySupport.item(this.sample);
     }
 
     /**

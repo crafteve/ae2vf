@@ -2,10 +2,11 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.Direction;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * IO 配置卡内部控件的几何与命中。
@@ -170,7 +171,7 @@ final class FactoryIoCardControls {
      * @return 显示时为 {@code true}
      */
     static boolean matchVisible(ResourceSpec spec) {
-        return spec.key().kind() == ResourceKind.ITEM;
+        return (spec.key() instanceof AEItemKey);
     }
 
     /**

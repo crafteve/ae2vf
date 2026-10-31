@@ -2,8 +2,8 @@ package io.github.crafteve.idlefactory.factory.storage;
 
 import java.util.Map;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * 工厂眼中的「仓库」。
@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
  *
  * <p>所有实现都必须是<b>事务安全</b>的：{@code simulate} 为 {@code true} 时不得产生任何副作用。</p>
  *
- * <p>物品的 {@link ResourceKey} 带完整数据组件，数量按精确变体计：同名不同组件的物品是两条
+ * <p>物品的 {@link AEKey} 带完整数据组件，数量按精确变体计：同名不同组件的物品是两条
  * 独立记录，不会在快照里合并。</p>
  */
 public interface Storage {
@@ -25,7 +25,7 @@ public interface Storage {
      * @param simulate 为 {@code true} 时只回报能收多少，不产生副作用
      * @return 实际收下的数量（{@code 0..amount}）
      */
-    long insert(ResourceKey key, long amount, boolean simulate);
+    long insert(AEKey key, long amount, boolean simulate);
 
     /**
      * 从仓库里拿东西。
@@ -35,7 +35,7 @@ public interface Storage {
      * @param simulate 为 {@code true} 时只回报能拿多少，不产生副作用
      * @return 实际拿出的数量（{@code 0..amount}）
      */
-    long extract(ResourceKey key, long amount, boolean simulate);
+    long extract(AEKey key, long amount, boolean simulate);
 
     /**
      * 这个仓库后端支不支持某类资源。
@@ -43,7 +43,7 @@ public interface Storage {
      * @param kind 类型
      * @return 支持时为 {@code true}
      */
-    boolean supports(ResourceKind kind);
+    boolean supports(CapabilityKind kind);
 
     /** 仓库当前是否完全没有内容（只用于界面展示，不参与搬运判断）。 */
     boolean isEmpty();
@@ -53,5 +53,5 @@ public interface Storage {
      *
      * @return 资源 → 数量
      */
-    Map<ResourceKey, Long> snapshot();
+    Map<AEKey, Long> snapshot();
 }

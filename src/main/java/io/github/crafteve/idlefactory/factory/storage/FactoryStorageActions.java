@@ -6,8 +6,8 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryStorageSnapshots;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;
@@ -16,6 +16,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 服务端仓库动作。
@@ -37,7 +39,7 @@ public final class FactoryStorageActions {
      * @param gesture 手势
      */
     public static void handle(ServerPlayer player, FactoryMenu menu,
-            @Nullable ResourceKey key, Gesture gesture) {
+            @Nullable AEKey key, Gesture gesture) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return;
@@ -51,7 +53,7 @@ public final class FactoryStorageActions {
             message(player, "仓库未连接");
             return;
         }
-        if (key != null && key.kind() != ResourceKind.ITEM) {
+        if (key != null && !(key instanceof AEItemKey)) {
             message(player, "当前仅物品支持直接存取");
             return;
         }
@@ -100,7 +102,7 @@ public final class FactoryStorageActions {
             return false;
         }
         Storage storage = factory.live().storage();
-        ResourceKey key = ResourceKey.item(stack);
+        AEKey key = AeKeySupport.item(stack);
         long accepted = storage.insert(key, stack.getCount(), true);
         if (accepted <= 0L) {
             return false;
@@ -118,7 +120,7 @@ public final class FactoryStorageActions {
     }
 
     private static boolean takeToCarried(FactoryMenu menu, Storage storage,
-            @Nullable ResourceKey key, int amount) {
+            @Nullable AEKey key, int amount) {
         if (key == null || !menu.getCarried().isEmpty()) {
             return false;
         }
@@ -146,7 +148,7 @@ public final class FactoryStorageActions {
         if (carried.isEmpty()) {
             return false;
         }
-        ResourceKey key = ResourceKey.item(carried);
+        AEKey key = AeKeySupport.item(carried);
         int request = Math.min(amount, carried.getCount());
         long accepted = storage.insert(key, request, true);
         if (accepted <= 0L) {
@@ -162,7 +164,7 @@ public final class FactoryStorageActions {
     }
 
     private static boolean takeToInventory(ServerPlayer player, Storage storage,
-            @Nullable ResourceKey key, int amount) {
+            @Nullable AEKey key, int amount) {
         if (key == null) {
             return false;
         }
@@ -193,13 +195,13 @@ public final class FactoryStorageActions {
     }
 
     private static boolean putOneFromInventory(ServerPlayer player, Storage storage,
-            @Nullable ResourceKey key) {
+            @Nullable AEKey key) {
         if (key == null) {
             return false;
         }
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack stack = player.getInventory().getItem(i);
-            if (stack.isEmpty() || !ResourceKey.item(stack).equals(key)) {
+            if (stack.isEmpty() || !AeKeySupport.item(stack).equals(key)) {
                 continue;
             }
             long accepted = storage.insert(key, 1L, true);
@@ -217,13 +219,13 @@ public final class FactoryStorageActions {
     }
 
     private static boolean putFromInventory(ServerPlayer player, Storage storage,
-            @Nullable ResourceKey key) {
+            @Nullable AEKey key) {
         if (key == null) {
             return false;
         }
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             ItemStack stack = player.getInventory().getItem(i);
-            if (stack.isEmpty() || !ResourceKey.item(stack).equals(key)) {
+            if (stack.isEmpty() || !AeKeySupport.item(stack).equals(key)) {
                 continue;
             }
             long accepted = storage.insert(key, stack.getCount(), true);
@@ -250,11 +252,11 @@ public final class FactoryStorageActions {
         return factory.orElse(null);
     }
 
-    private static ItemStack template(ResourceKey key) {
-        if (key.kind() != ResourceKind.ITEM) {
+    private static ItemStack template(AEKey key) {
+        if (!(key instanceof AEItemKey)) {
             return ItemStack.EMPTY;
         }
-        return key.toStack();
+        return AeKeySupport.toStack(key);
     }
 
     private static void message(ServerPlayer player, String text) {

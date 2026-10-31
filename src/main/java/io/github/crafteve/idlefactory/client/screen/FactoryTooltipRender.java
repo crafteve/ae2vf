@@ -7,13 +7,15 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.inventory.Slot;
+import appeng.api.stacks.AEItemKey;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 全部悬停提示：搜索语法、排序按钮、仓库格、机器库、行尾移出/展开按钮、IO 卡片和规则列。
@@ -90,7 +92,7 @@ final class FactoryTooltipRender {
             if (index >= 0 && index < state.filteredStorageEntries.size()) {
                 FactoryStorageS2C.Entry entry = state.filteredStorageEntries.get(index);
                 // 仓库格同样不做自定义摘要：物品走原版 tooltip，流体/能量只保留名称。
-                if (entry.key().kind() == ResourceKind.ITEM) {
+                if ((entry.key() instanceof AEItemKey)) {
                     graphics.renderTooltip(this.context.font(),
                             FactoryUiText.iconStack(entry.key()), mouseX, mouseY);
                 } else {
@@ -264,7 +266,7 @@ final class FactoryTooltipRender {
         }
         lines.add(Component.empty()
                 .append(FactoryLabels.colored("速率：", tt.label()))
-                .append(FactoryLabels.rate(rate, spec.key().kind(), effective,
+                .append(FactoryLabels.rate(rate, AeKeySupport.kind(spec.key()), effective,
                         this.context.theme())));
         lines.add(FactoryLabels.state(effective, card.input(), this.context.theme()));
         lines.add(FactoryLabels.colored("拖回仓库删除", tt.label()));
@@ -305,7 +307,7 @@ final class FactoryTooltipRender {
                     .append(FactoryLabels.colored(" · ", tt.label()))
                     .append(FactoryLabels.coloredBold(FactoryUiText.faceName(spec), tt.face()))
                     .append(FactoryLabels.colored(" · ", tt.label()))
-                    .append(FactoryLabels.rate(rate, spec.key().kind(), effective,
+                    .append(FactoryLabels.rate(rate, AeKeySupport.kind(spec.key()), effective,
                             this.context.theme())));
         }
         if (rules.size() > shown) {

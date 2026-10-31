@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.integration.jei;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryResourceIconRender;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 import mezz.jei.api.ingredients.IIngredientRenderer;
 
@@ -11,6 +11,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.TooltipFlag;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * FE 配料的 JEI 绘制。
@@ -30,7 +31,7 @@ final class FeIngredientRenderer implements IIngredientRenderer<FeIngredient> {
     @Override
     public void render(GuiGraphics graphics, FeIngredient ingredient) {
         FactoryResourceIconRender.draw(graphics, Minecraft.getInstance().font,
-                ResourceKey.ENERGY, 0, 0);
+                AeKeySupport.energy(), 0, 0);
     }
 
     /**

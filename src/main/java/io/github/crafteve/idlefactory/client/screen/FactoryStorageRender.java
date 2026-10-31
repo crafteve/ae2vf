@@ -1,10 +1,11 @@
 package io.github.crafteve.idlefactory.client.screen;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 import net.minecraft.client.gui.GuiGraphics;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 仓库格的绘制：悬停底图、1px 描边、资源图标与右下角数量。
@@ -127,7 +128,7 @@ final class FactoryStorageRender {
     private void drawStorageEntry(GuiGraphics graphics, FactoryStorageS2C.Entry entry,
             int x, int y) {
         drawResourceIcon(graphics, entry.key(), x + 1, y + 1);
-        drawCount(graphics, entry.count(), entry.key().kind(),
+        drawCount(graphics, entry.count(), AeKeySupport.kind(entry.key()),
                 x + FactoryLayout.CELL - 1, y + FactoryLayout.CELL - 1);
     }
 
@@ -139,7 +140,7 @@ final class FactoryStorageRender {
      * @param x        左上角 x
      * @param y        左上角 y
      */
-    private void drawResourceIcon(GuiGraphics graphics, ResourceKey key, int x, int y) {
+    private void drawResourceIcon(GuiGraphics graphics, AEKey key, int x, int y) {
         FactoryResourceIconRender.draw(graphics, this.context.font(), key, x, y);
     }
 
@@ -155,7 +156,7 @@ final class FactoryStorageRender {
      * @param right    格子右边缘
      * @param bottom   格子下边缘
      */
-    private void drawCount(GuiGraphics graphics, long count, ResourceKind kind,
+    private void drawCount(GuiGraphics graphics, long count, CapabilityKind kind,
             int right, int bottom) {
         String text = FactoryLabels.gridCount(count, kind);
         float scale = 0.666F;

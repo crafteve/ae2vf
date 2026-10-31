@@ -6,11 +6,12 @@ import java.util.List;
 import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
 import net.minecraft.resources.ResourceLocation;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 模糊物品规则的变体索引。
@@ -32,7 +33,7 @@ public final class ItemVariantIndex {
     /** 一次重建最多读多少个仓库 key。 */
     public static final int MAX_KEYS = 2048;
 
-    private final Map<ResourceLocation, List<ResourceKey>> byItem = new HashMap<>();
+    private final Map<ResourceLocation, List<AEKey>> byItem = new HashMap<>();
     private final Map<ResourceLocation, Integer> rotation = new HashMap<>();
     private long refreshedAt = Long.MIN_VALUE;
 
@@ -45,9 +46,9 @@ public final class ItemVariantIndex {
      * @param limit   最多返回几个
      * @return 候选 key；仓库里没有该物品时为空表
      */
-    public List<ResourceKey> candidates(Storage storage, ResourceLocation itemId, long now, int limit) {
+    public List<AEKey> candidates(Storage storage, ResourceLocation itemId, long now, int limit) {
         refresh(storage, now);
-        List<ResourceKey> all = this.byItem.get(itemId);
+        List<AEKey> all = this.byItem.get(itemId);
         if (all == null || all.isEmpty() || limit <= 0) {
             return List.of();
         }
@@ -55,7 +56,7 @@ public final class ItemVariantIndex {
             return all;
         }
         int start = Math.floorMod(this.rotation.merge(itemId, 1, Integer::sum), all.size());
-        List<ResourceKey> result = new ArrayList<>(limit);
+        List<AEKey> result = new ArrayList<>(limit);
         for (int i = 0; i < limit; i++) {
             result.add(all.get((start + i) % all.size()));
         }
@@ -75,7 +76,7 @@ public final class ItemVariantIndex {
         }
         this.refreshedAt = now;
         this.byItem.clear();
-        Map<ResourceKey, Long> snapshot;
+        Map<AEKey, Long> snapshot;
         try {
             snapshot = storage.snapshot();
         } catch (RuntimeException e) {
@@ -83,15 +84,15 @@ public final class ItemVariantIndex {
             return;
         }
         int keys = 0;
-        for (ResourceKey key : snapshot.keySet()) {
-            if (key.kind() != ResourceKind.ITEM) {
+        for (AEKey key : snapshot.keySet()) {
+            if (!(key instanceof AEItemKey)) {
                 continue;
             }
             if (++keys > MAX_KEYS) {
                 IdleFactory.LOGGER.debug("IdleFactory: 模糊变体索引达到 {} 条上限，后续条目被忽略", MAX_KEYS);
                 break;
             }
-            List<ResourceKey> list = this.byItem.computeIfAbsent(key.id(), id -> new ArrayList<>());
+            List<AEKey> list = this.byItem.computeIfAbsent(key.getId(), id -> new ArrayList<>());
             if (list.size() < MAX_VARIANTS_PER_ID) {
                 list.add(key);
             }

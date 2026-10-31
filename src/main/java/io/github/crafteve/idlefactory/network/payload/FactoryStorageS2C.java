@@ -5,7 +5,7 @@ import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
 import io.netty.handler.codec.DecoderException;
@@ -98,7 +98,7 @@ public record FactoryStorageS2C(int containerId, boolean online, boolean truncat
         }
         List<Entry> entries = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            ResourceKey key = ResourceKeyCodec.read(buf);
+            AEKey key = ResourceKeyCodec.read(buf);
             long amount = buf.readLong();
             if (amount < 0L) {
                 throw new DecoderException("negative storage count: " + amount);
@@ -114,6 +114,6 @@ public record FactoryStorageS2C(int containerId, boolean online, boolean truncat
      * @param key   资源
      * @param count 数量
      */
-    public record Entry(ResourceKey key, long count) {
+    public record Entry(AEKey key, long count) {
     }
 }

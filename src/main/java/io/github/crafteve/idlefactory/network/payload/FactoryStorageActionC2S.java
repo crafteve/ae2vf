@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.network.payload;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.storage.FactoryStorageActions;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
@@ -28,7 +28,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param key         资源；空气格为 {@code null}
  * @param gesture     手势
  */
-public record FactoryStorageActionC2S(int containerId, @Nullable ResourceKey key,
+public record FactoryStorageActionC2S(int containerId, @Nullable AEKey key,
         Gesture gesture) implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:factory_storage_action}。 */
@@ -75,7 +75,7 @@ public record FactoryStorageActionC2S(int containerId, @Nullable ResourceKey key
 
     private static FactoryStorageActionC2S read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
-        ResourceKey key = null;
+        AEKey key = null;
         if (buf.readBoolean()) {
             key = ResourceKeyCodec.read(buf);
         }

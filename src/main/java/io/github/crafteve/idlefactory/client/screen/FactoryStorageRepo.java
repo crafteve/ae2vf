@@ -9,13 +9,13 @@ import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 /**
  * 客户端仓库视图。
  *
- * <p>模仿 AE2 Repo 的工作方式：服务端每次给完整快照，这里按 {@link ResourceKey} 维护稳定身份，
+ * <p>模仿 AE2 Repo 的工作方式：服务端每次给完整快照，这里按 {@link AEKey} 维护稳定身份，
  * 只在快照之间做差异，不把点击命中和搜索直接绑在原始列表下标上。这样仓库数量刷新时，选中格、
  * 过滤结果和滚动位置不会因为服务端重排而乱跳。</p>
  *
@@ -26,7 +26,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
  * {@code MEStorageMenu}，而本项目的仓库后端可能是容器组。</p>
  */
 public final class FactoryStorageRepo {
-    private final Map<ResourceKey, FactoryStorageS2C.Entry> byKey = new LinkedHashMap<>();
+    private final Map<AEKey, FactoryStorageS2C.Entry> byKey = new LinkedHashMap<>();
     private List<FactoryStorageS2C.Entry> all = List.of();
     private List<FactoryStorageS2C.Entry> view = List.of();
     /** 搜索过滤；{@code null} 表示不过滤。 */
@@ -44,13 +44,13 @@ public final class FactoryStorageRepo {
      * 不改这份稳定顺序。</p>
      */
     public void replace(List<FactoryStorageS2C.Entry> entries) {
-        Map<ResourceKey, FactoryStorageS2C.Entry> incoming = new LinkedHashMap<>();
+        Map<AEKey, FactoryStorageS2C.Entry> incoming = new LinkedHashMap<>();
         for (FactoryStorageS2C.Entry entry : entries) {
             incoming.put(entry.key(), entry);
         }
 
-        Map<ResourceKey, FactoryStorageS2C.Entry> ordered = new LinkedHashMap<>();
-        for (ResourceKey key : this.byKey.keySet()) {
+        Map<AEKey, FactoryStorageS2C.Entry> ordered = new LinkedHashMap<>();
+        for (AEKey key : this.byKey.keySet()) {
             FactoryStorageS2C.Entry entry = incoming.remove(key);
             if (entry != null) {
                 ordered.put(key, entry);
@@ -107,12 +107,12 @@ public final class FactoryStorageRepo {
     }
 
     /** 某资源是否还在仓库里。 */
-    public boolean contains(ResourceKey key) {
+    public boolean contains(AEKey key) {
         return this.byKey.containsKey(key);
     }
 
     /** 某资源在当前可见视图中的下标；不存在返回 -1。 */
-    public int indexOf(ResourceKey key) {
+    public int indexOf(AEKey key) {
         for (int i = 0; i < this.view.size(); i++) {
             if (this.view.get(i).key().equals(key)) {
                 return i;

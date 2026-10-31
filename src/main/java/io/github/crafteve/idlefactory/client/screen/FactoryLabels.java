@@ -5,8 +5,8 @@ import java.util.Locale;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.IoResult;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -17,6 +17,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import appeng.api.stacks.AEFluidKey;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 左表与 IO 详情共用的文案/图标解析。
@@ -63,11 +66,11 @@ final class FactoryLabels {
      * @param key 资源
      * @return 图标；未知资源用屏障
      */
-    static ItemStack icon(ResourceKey key) {
-        return switch (key.kind()) {
-            case ITEM -> key.toStack().isEmpty() ? new ItemStack(Items.BARRIER) : key.toStack();
+    static ItemStack icon(AEKey key) {
+        return switch (AeKeySupport.kind(key)) {
+            case ITEM -> AeKeySupport.toStack(key).isEmpty() ? new ItemStack(Items.BARRIER) : AeKeySupport.toStack(key);
             case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.id());
+                var fluid = BuiltInRegistries.FLUID.get(key.getId());
                 Item bucket = fluid.getBucket();
                 yield new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
             }
@@ -82,21 +85,21 @@ final class FactoryLabels {
      * @param key 资源
      * @return 名称；查不到时退回注册名
      */
-    static String name(ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
+    static String name(AEKey key) {
+        if (AeKeySupport.isEnergy(key)) {
             return "FE";
         }
-        if (key.kind() == ResourceKind.FLUID) {
-            var fluid = BuiltInRegistries.FLUID.get(key.id());
+        if ((key instanceof AEFluidKey)) {
+            var fluid = BuiltInRegistries.FLUID.get(key.getId());
             Item bucket = fluid.getBucket();
-            return bucket == Items.AIR ? key.id().toString()
+            return bucket == Items.AIR ? key.getId().toString()
                     : new ItemStack(bucket).getHoverName().getString();
         }
-        if (key.kind() == ResourceKind.ITEM) {
-            ItemStack stack = key.toStack();
-            return stack.isEmpty() ? key.id().toString() : stack.getHoverName().getString();
+        if ((key instanceof AEItemKey)) {
+            ItemStack stack = AeKeySupport.toStack(key);
+            return stack.isEmpty() ? key.getId().toString() : stack.getHoverName().getString();
         }
-        return key.id().toString();
+        return key.getId().toString();
     }
 
     /**
@@ -136,8 +139,8 @@ final class FactoryLabels {
      * @param kind  资源类型
      * @return 例如 {@code 12}、{@code 28M}、{@code 281T}、{@code 1.5B}、{@code 281kB}
      */
-    static String gridCount(long value, ResourceKind kind) {
-        return kind == ResourceKind.FLUID ? compactFluid(value) : compactCount(value);
+    static String gridCount(long value, CapabilityKind kind) {
+        return kind == CapabilityKind.FLUID ? compactFluid(value) : compactCount(value);
     }
 
     private static final String[] COMPACT_UNITS = {"E", "P", "T", "G", "M", "k"};
@@ -206,7 +209,7 @@ final class FactoryLabels {
      * @param kind 资源类型
      * @return 带单位的一行
      */
-    static String rateText(long rate, ResourceKind kind) {
+    static String rateText(long rate, CapabilityKind kind) {
         return switch (kind) {
             case FLUID -> fluid(rate) + "/s";
             case ENERGY -> count(rate) + " FE/s";
@@ -474,7 +477,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return 文本组件
      */
-    static Component rate(long rate, ResourceKind kind, IoResult.Reason reason,
+    static Component rate(long rate, CapabilityKind kind, IoResult.Reason reason,
             FactoryGuiTheme theme) {
         int color = rateColorTooltip(rate, reason, theme);
         return coloredBold(rateText(rate, kind), color);

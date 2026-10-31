@@ -10,6 +10,7 @@ import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 输入/输出紧凑列的排版、绘制与命中。
@@ -71,7 +72,7 @@ final class FactoryRuleStrip {
         for (int i = 0; i < limit; i++) {
             ResourceSpec spec = rules.get(i);
             long rate = i < rates.size() ? rates.get(i) : 0L;
-            String rateText = FactoryLabels.rateText(rate, spec.key().kind());
+            String rateText = FactoryLabels.rateText(rate, AeKeySupport.kind(spec.key()));
             int entryWidth = FactoryLayout.CELL + 2 + font.width(rateText) + 6;
             if (!entries.isEmpty() && cursor + entryWidth + reserve > x + maxWidth) {
                 break;
@@ -116,7 +117,7 @@ final class FactoryRuleStrip {
                     : FactoryLabels.effectiveReason(rate, reason);
             int rateColor = inactive ? theme.statusIdle()
                     : FactoryLabels.rateColorUi(rate, effective, theme);
-            String rateText = FactoryLabels.rateText(rate, spec.key().kind());
+            String rateText = FactoryLabels.rateText(rate, AeKeySupport.kind(spec.key()));
             FactoryNineSlice.slot(graphics, entry.x(), entry.y(),
                     FactoryLayout.CELL, FactoryLayout.CELL);
             FactoryResourceIconRender.draw(graphics, font, spec.key(), entry.x() + 1, entry.y() + 1);

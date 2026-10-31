@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
@@ -611,7 +611,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      * @param stack 物品图标；能量没有物品形态，固定为空
      * @param area  可点击区域
      */
-    public record JeiTarget(ResourceKind kind, ItemStack stack, Rect2i area) {
+    public record JeiTarget(CapabilityKind kind, ItemStack stack, Rect2i area) {
     }
 
     /**

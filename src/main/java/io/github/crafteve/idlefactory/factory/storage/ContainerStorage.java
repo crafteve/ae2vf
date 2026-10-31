@@ -14,8 +14,8 @@ import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -41,6 +41,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 把一组方块容器包成仓库，支持物品、流体、FE。
@@ -108,40 +109,38 @@ public final class ContainerStorage implements Storage, MEStorage {
     }
 
     @Override
-    public long insert(ResourceKey key, long amount, boolean simulate) {
+    public long insert(AEKey key, long amount, boolean simulate) {
         if (amount <= 0L) {
             return 0L;
         }
-        long inserted = switch (key.kind()) {
+        long inserted = switch (AeKeySupport.kind(key)) {
             case ITEM -> insertItem(key, amount, simulate);
             case FLUID -> insertFluid(key, amount, simulate);
             case ENERGY -> insertEnergy(amount, simulate);
-            case CHEMICAL -> 0L;
         };
         IdleFactory.LOGGER.info("IDF-PROBE container insert: key={} amount={} simulate={} result={}",
-                key.describe(), amount, simulate, inserted);
+                key.getDisplayName().getString(), amount, simulate, inserted);
         return inserted;
     }
 
     @Override
-    public long extract(ResourceKey key, long amount, boolean simulate) {
+    public long extract(AEKey key, long amount, boolean simulate) {
         if (amount <= 0L) {
             return 0L;
         }
-        long extracted = switch (key.kind()) {
+        long extracted = switch (AeKeySupport.kind(key)) {
             case ITEM -> extractItem(key, amount, simulate);
             case FLUID -> extractFluid(key, amount, simulate);
             case ENERGY -> extractEnergy(amount, simulate);
-            case CHEMICAL -> 0L;
         };
         IdleFactory.LOGGER.info("IDF-PROBE container extract: key={} amount={} simulate={} result={}",
-                key.describe(), amount, simulate, extracted);
+                key.getDisplayName().getString(), amount, simulate, extracted);
         return extracted;
     }
 
     @Override
-    public boolean supports(ResourceKind kind) {
-        return kind != ResourceKind.CHEMICAL;
+    public boolean supports(CapabilityKind kind) {
+        return true;
     }
 
     // ------------------------------------------------------------------
@@ -164,7 +163,7 @@ public final class ContainerStorage implements Storage, MEStorage {
         if (what == null || amount <= 0L) {
             return 0L;
         }
-        ResourceKey key = toResourceKey(what);
+        AEKey key = toResourceKey(what);
         if (key == null) {
             return 0L;
         }
@@ -176,7 +175,7 @@ public final class ContainerStorage implements Storage, MEStorage {
         if (what == null || amount <= 0L) {
             return 0L;
         }
-        ResourceKey key = toResourceKey(what);
+        AEKey key = toResourceKey(what);
         if (key == null) {
             return 0L;
         }
@@ -185,7 +184,7 @@ public final class ContainerStorage implements Storage, MEStorage {
 
     @Override
     public void getAvailableStacks(KeyCounter out) {
-        for (Map.Entry<ResourceKey, Long> entry : snapshot().entrySet()) {
+        for (Map.Entry<AEKey, Long> entry : snapshot().entrySet()) {
             AEKey aeKey = toAeKey(entry.getKey());
             if (aeKey != null) {
                 out.add(aeKey, entry.getValue());
@@ -200,15 +199,15 @@ public final class ContainerStorage implements Storage, MEStorage {
      * @return 工厂资源；不认识的 key 返回 {@code null}
      */
     @Nullable
-    private static ResourceKey toResourceKey(AEKey key) {
+    private static AEKey toResourceKey(AEKey key) {
         if (key instanceof AEItemKey item) {
-            return ResourceKey.item(item.getReadOnlyStack());
+            return AeKeySupport.item(item.getReadOnlyStack());
         }
         if (key instanceof AEFluidKey fluid) {
-            return ResourceKey.fluid(fluid.getFluid());
+            return AeKeySupport.fluid(fluid.getFluid());
         }
         if (AppFluxKeys.isFe(key)) {
-            return ResourceKey.ENERGY;
+            return AeKeySupport.energy();
         }
         return null;
     }
@@ -220,17 +219,17 @@ public final class ContainerStorage implements Storage, MEStorage {
      * @return AE key；能量在没装 Applied Flux 时为 {@code null}
      */
     @Nullable
-    private static AEKey toAeKey(ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
+    private static AEKey toAeKey(AEKey key) {
+        if (AeKeySupport.isEnergy(key)) {
             return AppFluxKeys.feKey();
         }
-        if (key.kind() == ResourceKind.FLUID) {
-            net.minecraft.world.level.material.Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
+        if ((key instanceof AEFluidKey)) {
+            net.minecraft.world.level.material.Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
             return fluid == net.minecraft.world.level.material.Fluids.EMPTY
                     ? null : AEFluidKey.of(new FluidStack(fluid, 1));
         }
-        if (key.kind() == ResourceKind.ITEM) {
-            net.minecraft.world.item.ItemStack stack = key.toStack();
+        if ((key instanceof AEItemKey)) {
+            net.minecraft.world.item.ItemStack stack = AeKeySupport.toStack(key);
             return stack.isEmpty() ? null : AEItemKey.of(stack);
         }
         return null;
@@ -247,15 +246,15 @@ public final class ContainerStorage implements Storage, MEStorage {
     }
 
     @Override
-    public Map<ResourceKey, Long> snapshot() {
-        Map<ResourceKey, Long> result = new LinkedHashMap<>();
+    public Map<AEKey, Long> snapshot() {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
         for (ContainerRef ref : this.containers) {
             IItemHandler items = itemHandler(this.server, ref);
             if (items != null) {
                 for (int slot = 0; slot < items.getSlots(); slot++) {
                     ItemStack stack = items.getStackInSlot(slot);
                     if (!stack.isEmpty()) {
-                        ResourceKey key = ResourceKey.item(stack);
+                        AEKey key = AeKeySupport.item(stack);
                         result.merge(key, (long) stack.getCount(), Long::sum);
                     }
                 }
@@ -265,13 +264,13 @@ public final class ContainerStorage implements Storage, MEStorage {
                 for (int tank = 0; tank < fluids.getTanks(); tank++) {
                     FluidStack fluid = fluids.getFluidInTank(tank);
                     if (!fluid.isEmpty()) {
-                        result.merge(ResourceKey.fluid(fluid), (long) fluid.getAmount(), Long::sum);
+                        result.merge(AeKeySupport.fluid(fluid), (long) fluid.getAmount(), Long::sum);
                     }
                 }
             }
             IEnergyStorage energy = energyHandler(this.server, ref);
             if (energy != null && energy.getEnergyStored() > 0) {
-                result.merge(ResourceKey.ENERGY, (long) energy.getEnergyStored(), Long::sum);
+                result.merge(AeKeySupport.energy(), (long) energy.getEnergyStored(), Long::sum);
             }
         }
         return result;
@@ -281,7 +280,7 @@ public final class ContainerStorage implements Storage, MEStorage {
     // 物品
     // ------------------------------------------------------------------
 
-    private long insertItem(ResourceKey key, long amount, boolean simulate) {
+    private long insertItem(AEKey key, long amount, boolean simulate) {
         ItemStack stack = itemSample(key);
         if (stack.isEmpty()) {
             return 0L;
@@ -353,7 +352,7 @@ public final class ContainerStorage implements Storage, MEStorage {
         return remaining;
     }
 
-    private long extractItem(ResourceKey key, long amount, boolean simulate) {
+    private long extractItem(AEKey key, long amount, boolean simulate) {
         ItemStack stack = itemSample(key);
         if (stack.isEmpty()) {
             return 0L;
@@ -427,8 +426,8 @@ public final class ContainerStorage implements Storage, MEStorage {
     // 流体
     // ------------------------------------------------------------------
 
-    private long insertFluid(ResourceKey key, long amount, boolean simulate) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
+    private long insertFluid(AEKey key, long amount, boolean simulate) {
+        Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
         if (fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
             return 0L;
         }
@@ -495,8 +494,8 @@ public final class ContainerStorage implements Storage, MEStorage {
         return remaining;
     }
 
-    private long extractFluid(ResourceKey key, long amount, boolean simulate) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(key.id());
+    private long extractFluid(AEKey key, long amount, boolean simulate) {
+        Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
         if (fluid == net.minecraft.world.level.material.Fluids.EMPTY) {
             return 0L;
         }
@@ -708,7 +707,7 @@ public final class ContainerStorage implements Storage, MEStorage {
             return null;
         }
         FluidStack probe = new FluidStack(fluid, 1);
-        for (Direction side : faceCandidates(observations, ref, ResourceKind.FLUID)) {
+        for (Direction side : faceCandidates(observations, ref, CapabilityKind.FLUID)) {
             IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, ref.pos(), side);
             if (handler == null) {
                 continue;
@@ -776,7 +775,7 @@ public final class ContainerStorage implements Storage, MEStorage {
         if (level == null) {
             return null;
         }
-        for (Direction side : faceCandidates(observations, ref, ResourceKind.ENERGY)) {
+        for (Direction side : faceCandidates(observations, ref, CapabilityKind.ENERGY)) {
             IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, ref.pos(), side);
             if (handler == null) {
                 continue;
@@ -798,7 +797,7 @@ public final class ContainerStorage implements Storage, MEStorage {
      * 一次没探到就断定「这个容器不搬流体」。</p>
      */
     private static EnumSet<Direction> faceCandidates(@Nullable ObservationService observations,
-            ContainerRef ref, ResourceKind kind) {
+            ContainerRef ref, CapabilityKind kind) {
         if (observations == null) {
             return EnumSet.allOf(Direction.class);
         }
@@ -816,13 +815,12 @@ public final class ContainerStorage implements Storage, MEStorage {
             case ITEM -> CapabilityKind.ITEM;
             case FLUID -> CapabilityKind.FLUID;
             case ENERGY -> CapabilityKind.ENERGY;
-            case CHEMICAL -> null;
         };
         return capability == null ? EnumSet.allOf(Direction.class) : table.facesFor(capability);
     }
 
-    private static ItemStack itemSample(ResourceKey key) {
-        return key.toStack();
+    private static ItemStack itemSample(AEKey key) {
+        return AeKeySupport.toStack(key);
     }
 
     private static IFluidHandler.FluidAction action(boolean simulate) {

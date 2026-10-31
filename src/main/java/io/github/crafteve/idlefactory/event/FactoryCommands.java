@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
@@ -51,6 +51,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 工厂指令入口。
@@ -219,12 +220,12 @@ public final class FactoryCommands {
                 .then(Commands.literal("remove")
                         .then(Commands.literal("item")
                                 .then(Commands.argument("item", ItemArgument.item(event.getBuildContext()))
-                                        .suggests(configuredItems(input, ResourceKind.ITEM))
+                                        .suggests(configuredItems(input, CapabilityKind.ITEM))
                                         .executes(audit("machine." + side + ".remove",
                                                 context -> removeSpec(context, input)))))
                         .then(Commands.literal("fluid")
                                 .then(Commands.argument("fluid", ResourceLocationArgument.id())
-                                        .suggests(configuredItems(input, ResourceKind.FLUID))
+                                        .suggests(configuredItems(input, CapabilityKind.FLUID))
                                         .executes(audit("machine." + side + ".remove",
                                                 context -> removeFluidSpec(context, input)))))
                         .then(Commands.literal("energy")
@@ -366,7 +367,7 @@ public final class FactoryCommands {
     }
 
     /** 这台机器已经配过的同类资源（{@code remove} 用）。 */
-    private static SuggestionProvider<CommandSourceStack> configuredItems(boolean input, ResourceKind kind) {
+    private static SuggestionProvider<CommandSourceStack> configuredItems(boolean input, CapabilityKind kind) {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             MachineRef machine = machineFrom(context, factory);
@@ -374,8 +375,8 @@ public final class FactoryCommands {
                 factory.config().machines().byId(machine.id()).ifPresent(entry -> {
                     var io = entry.io();
                     for (ResourceSpec spec : input ? io.inputs() : io.outputs()) {
-                        if (spec.key().kind() == kind) {
-                            builder.suggest(spec.key().id().toString());
+                        if (AeKeySupport.kind(spec.key()) == kind) {
+                            builder.suggest(spec.key().getId().toString());
                         }
                     }
                 });

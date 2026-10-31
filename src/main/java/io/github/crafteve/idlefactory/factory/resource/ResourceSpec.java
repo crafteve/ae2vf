@@ -5,78 +5,87 @@ import java.util.Objects;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.IdleFactory;
-
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
 
 /**
  * 一条输入/输出规则：搬什么、走哪个面、搬多少、怎么匹配组件。
+ *
+ * <p>资源身份直接用 AE2 的 {@link AEKey}：物品是 {@link AEItemKey}（带完整数据组件），
+ * 流体是 AE2 的流体 key。装了 Applied Flux 时能量 key 也是普通 {@code AEKey}，
+ * 所以本类不再有「类型枚举」字段，类型判断一律用 {@code instanceof}。</p>
  *
  * <p>{@code amount <= 0} 表示「塞满」：机器能收多少就搬多少。命令目前不暴露数量参数，
  * 所以存量规则都是塞满；字段先留着，等需要限量时再用。</p>
  *
  * <p>面只认绝对六向；{@code face == null} 表示不限面。</p>
  *
- * <p>匹配模式只对物品有意义：没有组件的规则默认 {@link MatchMode#IGNORE_COMPONENTS}，
- * 带组件的规则默认 {@link MatchMode#EXACT}，但两者都可以显式切换。旧存档没有 {@code Mode}
- * 字段的物品规则按模糊读入，保持老版本「按 id 搬」的语义；带组件快照却没有 {@code Mode}
- * 的旧规则按精确读入，避免丢掉玩家明确写下来的组件。</p>
+ * <p>匹配模式只对物品有意义：没有自定义组件的规则默认 {@link MatchMode#IGNORE_COMPONENTS}，
+ * 带组件快照的规则默认 {@link MatchMode#EXACT}，两者都可以显式切换。</p>
  *
  * @param key    资源
  * @param face   面；{@code null} 表示不限
  * @param amount 每轮上限；{@code <= 0} 表示塞满
- * @param mode   物品匹配模式；流体/能量固定精确
+ * @param mode   物品匹配模式；非物品固定精确
  */
-public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amount, MatchMode mode) {
+public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, MatchMode mode) {
     /** 不限面的字符串表示。 */
     public static final String ANY = "any";
 
-    private static final String TAG_KIND = "Kind";
-    private static final String TAG_ID = "Id";
+    private static final String TAG_KEY = "Key";
     private static final String TAG_FACE = "Face";
     private static final String TAG_AMOUNT = "Amount";
     private static final String TAG_MODE = "Mode";
-    private static final String TAG_STACK = "Stack";
 
     /**
-     * 不带模式的便捷构造：由 key 是否带组件推导默认模式。
+     * 不带模式的便捷构造：由 key 是否带自定义组件推导默认模式。
      *
      * @param key    资源
      * @param face   面
      * @param amount 每轮上限
      */
-    public ResourceSpec(ResourceKey key, @Nullable Direction face, long amount) {
+    public ResourceSpec(AEKey key, @Nullable Direction face, long amount) {
         this(key, face, amount, defaultMode(key));
     }
 
     /**
      * 规范化模式与 key 的关系。
      *
-     * <p>流体/能量没有组件语义，一律精确；物品保留调用方给出的模式，未给出时按 key 是否
-     * 带组件取默认。带组件的 key 也可以显式使用 {@link MatchMode#IGNORE_COMPONENTS}，
-     * 表示只按注册名匹配所有变体。</p>
+     * <p>非物品没有组件语义，一律精确；物品保留调用方给出的模式，未给出时按 key 是否
+     * 带自定义组件取默认。带组件的 key 也可以显式使用
+     * {@link MatchMode#IGNORE_COMPONENTS}，表示只按注册名匹配所有变体。</p>
      */
     public ResourceSpec {
         Objects.requireNonNull(key, "key");
-        if (key.kind() != ResourceKind.ITEM) {
+        if (!(key instanceof AEItemKey)) {
             mode = MatchMode.EXACT;
         } else if (mode == null) {
             mode = defaultMode(key);
         }
     }
 
-    private static MatchMode defaultMode(ResourceKey key) {
-        if (key.kind() != ResourceKind.ITEM) {
+    /**
+     * 由物品是否带自定义组件推导默认匹配模式。
+     *
+     * <p>和默认组件比较，相同就不算自定义——这样「普通铁锭」按模糊匹配、附魔改名的铁锭
+     * 按精确匹配，行为和旧版 {@code ResourceKey} 一致。</p>
+     *
+     * @param key 资源
+     * @return 默认匹配模式
+     */
+    private static MatchMode defaultMode(AEKey key) {
+        if (!(key instanceof AEItemKey itemKey)) {
             return MatchMode.EXACT;
         }
-        return key.hasComponents() ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
+        ItemStack stack = itemKey.getReadOnlyStack();
+        boolean custom = !ItemStack.isSameItemSameComponents(stack, new ItemStack(stack.getItem()));
+        return custom ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
     }
 
     /** 是否「塞满」。 */
@@ -98,30 +107,26 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
         return this.mode == MatchMode.IGNORE_COMPONENTS;
     }
 
-    /** 给界面和日志用的一行：{@code fluid:minecraft:water[north]}；模糊规则追加 {@code [模糊]}。 */
+    /** 给界面和日志用的一行：{@code 水桶[north]}；模糊规则追加 {@code [模糊]}。 */
     public String describe() {
         String match = this.mode == MatchMode.IGNORE_COMPONENTS ? " [模糊]" : "";
-        return this.key.describe() + match + "[" + faceName() + "]";
+        return this.key.getDisplayName().getString() + match + "[" + faceName() + "]";
     }
 
     /**
      * 序列化成 NBT。
      *
-     * <p>只有带组件的物品规则才写 {@code Stack}；普通物品/流体/能量仍然只写
-     * {@code Kind + Id}，和旧档结构一致。{@code Mode} 会一直写，读档时缺省视为模糊。</p>
+     * <p>整个 key 交给 AE2 的 {@link AEKey#toTagGeneric} 编码，不再自己拆类型 + 注册名 +
+     * 组件快照。{@code Mode} 只对物品写；读档时缺省按模糊。</p>
      *
-     * @param registries 注册表访问，组件里的附魔/药水需要它才能编码
+     * @param registries 注册表访问，组件里的附魔 / 药水需要它才能编码
      * @return 新标签
      */
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
-        tag.putString(TAG_KIND, this.key.kind().name());
-        tag.putString(TAG_ID, this.key.id().toString());
-        if (this.key.kind() == ResourceKind.ITEM) {
+        tag.put(TAG_KEY, this.key.toTagGeneric(registries));
+        if (this.key instanceof AEItemKey) {
             tag.putString(TAG_MODE, this.mode.name());
-        }
-        if (this.key.hasComponents()) {
-            tag.put(TAG_STACK, encodeStack(registries, this.key.toStack()));
         }
         if (this.face != null) {
             tag.putString(TAG_FACE, this.face.getName());
@@ -133,53 +138,42 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
     /**
      * 从 NBT 读回来。
      *
-     * <p>只认新格式；旧版只有 {@code Item/Face}，读不出来就丢弃这条规则——当前阶段不兼容旧存档。
-     * 有 {@code Stack} 的规则读取 {@code Mode}；旧档缺 {@code Mode} 时按精确读入。没有
-     * {@code Mode} 的无组件物品规则按模糊读入。</p>
+     * <p>只认新格式；key 解码失败就丢弃这条规则——当前阶段不兼容旧存档。</p>
      *
      * @param tag        存档标签
      * @param registries 注册表访问
-     * @return 规则；格式不对或组件解码失败时返回 {@code null}
+     * @return 规则；格式不对或 key 解码失败时返回 {@code null}
      */
     @Nullable
     public static ResourceSpec load(CompoundTag tag, HolderLookup.Provider registries) {
-        String kindName = tag.getString(TAG_KIND);
-        if (kindName.isEmpty()) {
+        if (!tag.contains(TAG_KEY, Tag.TAG_COMPOUND)) {
             return null;
         }
-        ResourceKind kind;
+        AEKey key;
         try {
-            kind = ResourceKind.valueOf(kindName.toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
+            key = AEKey.fromTagGeneric(registries, tag.getCompound(TAG_KEY));
+        } catch (RuntimeException e) {
+            // 注册表里没有这个 id（模组被移除）或组件解码失败
             return null;
         }
-        ResourceLocation id = ResourceLocation.tryParse(tag.getString(TAG_ID));
-        if (id == null) {
+        if (key == null) {
             return null;
         }
         Direction face = tag.contains(TAG_FACE) ? Direction.byName(tag.getString(TAG_FACE)) : null;
         long amount = tag.getLong(TAG_AMOUNT);
-
-        if (kind == ResourceKind.ITEM && tag.contains(TAG_STACK, Tag.TAG_COMPOUND)) {
-            ItemStack stack = decodeStack(registries, tag.getCompound(TAG_STACK));
-            if (stack == null || stack.isEmpty()) {
-                IdleFactory.LOGGER.warn("IdleFactory: 物品规则组件解码失败，丢弃规则 {}", id);
-                return null;
-            }
-            return new ResourceSpec(ResourceKey.item(stack), face, amount,
-                    readMode(tag, MatchMode.EXACT));
-        }
-
-        MatchMode mode = readMode(tag, kind);
-        return new ResourceSpec(ResourceKey.of(kind, id), face, amount, mode);
+        return new ResourceSpec(key, face, amount, readMode(tag, key));
     }
 
-    private static MatchMode readMode(CompoundTag tag, ResourceKind kind) {
-        return readMode(tag, kind == ResourceKind.ITEM
-                ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT);
-    }
-
-    private static MatchMode readMode(CompoundTag tag, MatchMode fallback) {
+    /**
+     * 读匹配模式。
+     *
+     * @param tag 存档标签
+     * @param key 已解码的资源
+     * @return 模式；缺字段时物品按模糊、其他按精确
+     */
+    private static MatchMode readMode(CompoundTag tag, AEKey key) {
+        MatchMode fallback = key instanceof AEItemKey
+                ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
         if (!tag.contains(TAG_MODE)) {
             return fallback;
         }
@@ -188,16 +182,5 @@ public record ResourceSpec(ResourceKey key, @Nullable Direction face, long amoun
         } catch (IllegalArgumentException e) {
             return fallback;
         }
-    }
-
-    private static Tag encodeStack(HolderLookup.Provider registries, ItemStack stack) {
-        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
-        return ItemStack.CODEC.encodeStart(ops, stack).getOrThrow();
-    }
-
-    @Nullable
-    private static ItemStack decodeStack(HolderLookup.Provider registries, CompoundTag tag) {
-        RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
-        return ItemStack.CODEC.parse(ops, tag).result().orElse(null);
     }
 }

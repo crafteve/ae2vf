@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -20,6 +20,7 @@ import mezz.jei.api.runtime.IJeiRuntime;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * JEI 的 R/U 查询入口。
@@ -84,7 +85,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
         if (target == null) {
             return Optional.empty();
         }
-        if (target.kind() == ResourceKind.ENERGY) {
+        if (target.kind() == CapabilityKind.ENERGY) {
             // FE 没有物品形态；用独立配料，R/U 与收藏都落在 FE 上，而不是红石粉。
             return runtime.getIngredientManager()
                     .createClickableIngredient(FeIngredient.TYPE, FeIngredient.INSTANCE,

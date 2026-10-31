@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.network.payload;
 
+import appeng.api.stacks.AEKey;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -225,7 +226,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         int count = readCount(buf, MAX_RULES_PER_SIDE, "rules");
         List<ResourceSpec> rules = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            ResourceKey key = ResourceKeyCodec.read(buf);
+            AEKey key = ResourceKeyCodec.read(buf);
             MatchMode mode = readEnum(buf, MatchMode.values(), "match mode");
             Direction face = null;
             if (buf.readBoolean()) {

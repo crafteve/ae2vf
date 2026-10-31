@@ -6,7 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
@@ -14,6 +14,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 把一条物品规则展开成「一个变体一个适配器」。
@@ -69,14 +70,14 @@ public final class ItemCandidates {
             if (variants == null) {
                 return new Candidates(List.of(), false);
             }
-            for (ResourceKey key : variants.candidates(storage, spec.key().id(), now, limit)) {
-                ItemStack sample = key.toStack();
+            for (AEKey key : variants.candidates(storage, spec.key().getId(), now, limit)) {
+                ItemStack sample = AeKeySupport.toStack(key);
                 if (!sample.isEmpty()) {
                     result.add(new ItemAdapter(base.handler(), sample));
                 }
             }
         } else {
-            Item item = BuiltInRegistries.ITEM.get(spec.key().id());
+            Item item = BuiltInRegistries.ITEM.get(spec.key().getId());
             if (item == Items.AIR) {
                 return new Candidates(List.of(), false);
             }

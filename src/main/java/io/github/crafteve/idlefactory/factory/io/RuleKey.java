@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.factory.io;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 import net.minecraft.core.Direction;
 
@@ -18,5 +18,5 @@ import net.minecraft.core.Direction;
  * @param face  面；{@code null} 表示 any
  * @param mode  物品匹配模式
  */
-public record RuleKey(boolean input, ResourceKey key, @Nullable Direction face, MatchMode mode) {
+public record RuleKey(boolean input, AEKey key, @Nullable Direction face, MatchMode mode) {
 }

@@ -1,8 +1,9 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 
 import net.neoforged.neoforge.energy.IEnergyStorage;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 机器的能量接口，单位 FE。
@@ -18,8 +19,8 @@ public final class EnergyAdapter implements ResourceAdapter {
     }
 
     @Override
-    public ResourceKey key() {
-        return ResourceKey.ENERGY;
+    public AEKey key() {
+        return AeKeySupport.energy();
     }
 
     @Override

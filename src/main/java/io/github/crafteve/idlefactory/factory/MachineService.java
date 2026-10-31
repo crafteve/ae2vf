@@ -9,7 +9,7 @@ import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 
 import net.minecraft.core.Direction;
@@ -23,6 +23,7 @@ import net.minecraft.world.level.material.Fluids;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 机器指令的逻辑层：{@code /idf machine ...} 的读写动作。
@@ -120,7 +121,7 @@ public final class MachineService {
      */
     public static int inputAdd(ServerPlayer player, String machineRef, ItemStack item,
             @Nullable String face) throws CommandSyntaxException {
-        return add(player, machineRef, ResourceKey.item(item), face, IoSide.INPUT);
+        return add(player, machineRef, AeKeySupport.item(item), face, IoSide.INPUT);
     }
 
     /**
@@ -147,7 +148,7 @@ public final class MachineService {
      */
     public static int inputAddEnergy(ServerPlayer player, String machineRef,
             @Nullable String face) throws CommandSyntaxException {
-        return add(player, machineRef, ResourceKey.ENERGY, face, IoSide.INPUT);
+        return add(player, machineRef, AeKeySupport.energy(), face, IoSide.INPUT);
     }
 
     /**
@@ -159,7 +160,7 @@ public final class MachineService {
      * @return 命令结果
      */
     public static int inputRemove(ServerPlayer player, String machineRef, ItemStack item) {
-        return remove(player, machineRef, ResourceKey.item(item), IoSide.INPUT);
+        return remove(player, machineRef, AeKeySupport.item(item), IoSide.INPUT);
     }
 
     /**
@@ -183,7 +184,7 @@ public final class MachineService {
      * @return 命令结果
      */
     public static int inputRemoveEnergy(ServerPlayer player, String machineRef) {
-        return remove(player, machineRef, ResourceKey.ENERGY, IoSide.INPUT);
+        return remove(player, machineRef, AeKeySupport.energy(), IoSide.INPUT);
     }
 
     /**
@@ -197,7 +198,7 @@ public final class MachineService {
      */
     public static int outputAdd(ServerPlayer player, String machineRef, ItemStack item,
             @Nullable String face) throws CommandSyntaxException {
-        return add(player, machineRef, ResourceKey.item(item), face, IoSide.OUTPUT);
+        return add(player, machineRef, AeKeySupport.item(item), face, IoSide.OUTPUT);
     }
 
     /**
@@ -224,7 +225,7 @@ public final class MachineService {
      */
     public static int outputAddEnergy(ServerPlayer player, String machineRef,
             @Nullable String face) throws CommandSyntaxException {
-        return add(player, machineRef, ResourceKey.ENERGY, face, IoSide.OUTPUT);
+        return add(player, machineRef, AeKeySupport.energy(), face, IoSide.OUTPUT);
     }
 
     /**
@@ -236,7 +237,7 @@ public final class MachineService {
      * @return 命令结果
      */
     public static int outputRemove(ServerPlayer player, String machineRef, ItemStack item) {
-        return remove(player, machineRef, ResourceKey.item(item), IoSide.OUTPUT);
+        return remove(player, machineRef, AeKeySupport.item(item), IoSide.OUTPUT);
     }
 
     /**
@@ -260,10 +261,10 @@ public final class MachineService {
      * @return 命令结果
      */
     public static int outputRemoveEnergy(ServerPlayer player, String machineRef) {
-        return remove(player, machineRef, ResourceKey.ENERGY, IoSide.OUTPUT);
+        return remove(player, machineRef, AeKeySupport.energy(), IoSide.OUTPUT);
     }
 
-    private static int add(ServerPlayer player, String machineRef, ResourceKey key,
+    private static int add(ServerPlayer player, String machineRef, AEKey key,
             @Nullable String face, IoSide side) throws CommandSyntaxException {
         Factory factory = requireFactory(player);
         if (factory == null) {
@@ -278,7 +279,7 @@ public final class MachineService {
                 parseFace(face), null));
     }
 
-    private static int remove(ServerPlayer player, String machineRef, ResourceKey key, IoSide side) {
+    private static int remove(ServerPlayer player, String machineRef, AEKey key, IoSide side) {
         Factory factory = requireFactory(player);
         if (factory == null) {
             return 0;
@@ -331,14 +332,14 @@ public final class MachineService {
         return direction;
     }
 
-    private static ResourceKey parseFluid(String fluidId) throws CommandSyntaxException {
+    private static AEKey parseFluid(String fluidId) throws CommandSyntaxException {
         ResourceLocation id = ResourceLocation.tryParse(fluidId);
         Fluid fluid = id == null ? Fluids.EMPTY : BuiltInRegistries.FLUID.get(id);
         if (fluid == Fluids.EMPTY) {
             throw new SimpleCommandExceptionType(Component.literal(
                     "未知流体：" + fluidId)).create();
         }
-        return ResourceKey.fluid(fluid);
+        return AeKeySupport.fluid(fluid);
     }
 
     private static String describeSpecs(java.util.List<ResourceSpec> specs) {

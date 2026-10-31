@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
@@ -48,6 +48,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 工厂行政窗口：创建 / 删除 / 绑定仓库 / 机器库 / 仓库调试。
@@ -1333,16 +1334,16 @@ public final class FactoryService {
         }
 
         Storage storage = factory.live().storage();
-        Map<ResourceKey, Long> snapshot = storage.snapshot();
+        Map<AEKey, Long> snapshot = storage.snapshot();
         if (snapshot.isEmpty()) {
             info(player, "仓库是空的");
             return 1;
         }
-        List<Map.Entry<ResourceKey, Long>> entries = new ArrayList<>(snapshot.entrySet());
-        entries.sort(Map.Entry.<ResourceKey, Long>comparingByValue().reversed());
+        List<Map.Entry<AEKey, Long>> entries = new ArrayList<>(snapshot.entrySet());
+        entries.sort(Map.Entry.<AEKey, Long>comparingByValue().reversed());
         int shown = Math.min(entries.size(), INFO_LIMIT);
         for (int i = 0; i < shown; i++) {
-            Map.Entry<ResourceKey, Long> entry = entries.get(i);
+            Map.Entry<AEKey, Long> entry = entries.get(i);
             msg(player, "  " + describeResource(entry.getKey()) + " x " + entry.getValue());
         }
         if (entries.size() > shown) {
@@ -1369,7 +1370,7 @@ public final class FactoryService {
         if (storage == null) {
             return 0;
         }
-        long extracted = storage.extract(ResourceKey.item(sample), count, false);
+        long extracted = storage.extract(AeKeySupport.item(sample), count, false);
         if (extracted <= 0) {
             err(player, "仓库里没有 " + itemId(sample));
             return 0;
@@ -1408,7 +1409,7 @@ public final class FactoryService {
         template.setCount(1);
 
         if (player.isCreative()) {
-            long inserted = storage.insert(ResourceKey.item(template), count, false);
+            long inserted = storage.insert(AeKeySupport.item(template), count, false);
             if (inserted <= 0) {
                 err(player, "仓库收不下 " + itemId(sample));
                 return 0;
@@ -1423,12 +1424,12 @@ public final class FactoryService {
             return 0;
         }
         int want = Math.min(count, available);
-        long accepted = storage.insert(ResourceKey.item(template), want, true);
+        long accepted = storage.insert(AeKeySupport.item(template), want, true);
         if (accepted <= 0) {
             err(player, "仓库收不下 " + itemId(sample));
             return 0;
         }
-        long inserted = storage.insert(ResourceKey.item(template), accepted, false);
+        long inserted = storage.insert(AeKeySupport.item(template), accepted, false);
         int removed = removeFromInventory(player, template, (int) inserted);
         ok(player, "存入 " + removed + " 个 " + itemId(sample));
         return removed > 0 ? 1 : 0;
@@ -1592,11 +1593,11 @@ public final class FactoryService {
     }
 
     /** 仓库条目的一行显示，按类型补单位。 */
-    private static String describeResource(ResourceKey key) {
-        return switch (key.kind()) {
-            case FLUID -> key.describe() + "（mB）";
-            case ENERGY -> key.describe() + "（FE）";
-            default -> key.describe();
+    private static String describeResource(AEKey key) {
+        return switch (AeKeySupport.kind(key)) {
+            case FLUID -> key.getDisplayName().getString() + "（mB）";
+            case ENERGY -> key.getDisplayName().getString() + "（FE）";
+            default -> key.getDisplayName().getString();
         };
     }
 

@@ -11,7 +11,7 @@ import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
+import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
 import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
@@ -42,7 +42,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param mode        匹配模式；删除时忽略
  */
 public record FactoryRuleActionC2S(int containerId, Action action, UUID machineId,
-        IoSide side, ResourceKey key, @Nullable Direction face,
+        IoSide side, AEKey key, @Nullable Direction face,
         MatchMode mode) implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:factory_rule_action}。 */
@@ -135,7 +135,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             throw new DecoderException("invalid io side: " + sideOrdinal);
         }
         IoSide side = IoSide.values()[sideOrdinal];
-        ResourceKey key = ResourceKeyCodec.read(buf);
+        AEKey key = ResourceKeyCodec.read(buf);
         Direction face = null;
         if (buf.readBoolean()) {
             int faceOrdinal = buf.readUnsignedByte();

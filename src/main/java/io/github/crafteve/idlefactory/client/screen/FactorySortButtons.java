@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.client.screen;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -60,11 +60,11 @@ final class FactorySortButtons {
          * @param kind 资源类型
          * @return 属于时为 {@code true}
          */
-        boolean accepts(ResourceKind kind) {
+        boolean accepts(CapabilityKind kind) {
             return switch (this) {
                 case ALL -> true;
-                case ITEMS -> kind == ResourceKind.ITEM;
-                case FLUIDS -> kind != ResourceKind.ITEM;
+                case ITEMS -> kind == CapabilityKind.ITEM;
+                case FLUIDS -> kind != CapabilityKind.ITEM;
             };
         }
     }

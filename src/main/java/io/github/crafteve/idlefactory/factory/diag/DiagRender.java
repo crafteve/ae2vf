@@ -13,13 +13,14 @@ import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 诊断结果的聊天栏渲染。
@@ -155,7 +156,7 @@ public final class DiagRender {
     public static Component watchSummary(Factory factory, MachineRef machine, long now,
             long sleepUntil, long sleepSince) {
         DiagStats stats = factory.live().stats();
-        List<Map.Entry<ResourceKey, Long>> rates = topRates(stats, 2);
+        List<Map.Entry<AEKey, Long>> rates = topRates(stats, 2);
 
         MutableComponent row = Component.empty()
                 .append(FactoryMessages.text(machine.shortId() + " · ", FactoryMessages.INFO))
@@ -252,26 +253,26 @@ public final class DiagRender {
         return "睡 " + slept + "s（醒于 " + remain + "s）";
     }
 
-    private static List<Map.Entry<ResourceKey, Long>> allRates(DiagStats stats) {
-        Map<ResourceKey, Long> merged = new HashMap<>();
-        for (Map.Entry<ResourceKey, Long> entry : stats.rateIn().entrySet()) {
+    private static List<Map.Entry<AEKey, Long>> allRates(DiagStats stats) {
+        Map<AEKey, Long> merged = new HashMap<>();
+        for (Map.Entry<AEKey, Long> entry : stats.rateIn().entrySet()) {
             merged.merge(entry.getKey(), entry.getValue(), Long::sum);
         }
-        for (Map.Entry<ResourceKey, Long> entry : stats.rateOut().entrySet()) {
+        for (Map.Entry<AEKey, Long> entry : stats.rateOut().entrySet()) {
             merged.merge(entry.getKey(), entry.getValue(), Long::sum);
         }
-        List<Map.Entry<ResourceKey, Long>> list = new ArrayList<>(merged.entrySet());
-        list.sort(Map.Entry.<ResourceKey, Long>comparingByValue().reversed());
+        List<Map.Entry<AEKey, Long>> list = new ArrayList<>(merged.entrySet());
+        list.sort(Map.Entry.<AEKey, Long>comparingByValue().reversed());
         return list;
     }
 
-    private static List<Map.Entry<ResourceKey, Long>> topRates(DiagStats stats, int limit) {
-        List<Map.Entry<ResourceKey, Long>> all = allRates(stats);
+    private static List<Map.Entry<AEKey, Long>> topRates(DiagStats stats, int limit) {
+        List<Map.Entry<AEKey, Long>> all = allRates(stats);
         return all.size() <= limit ? all : all.subList(0, limit);
     }
 
-    private static Component rateText(ResourceKey key, long rate) {
-        String unit = switch (key.kind()) {
+    private static Component rateText(AEKey key, long rate) {
+        String unit = switch (AeKeySupport.kind(key)) {
             case FLUID -> " mB/s";
             case ENERGY -> " FE/s";
             default -> "/s";
@@ -280,15 +281,15 @@ public final class DiagRender {
                 FactoryMessages.PLAIN);
     }
 
-    private static String ratesText(Map<ResourceKey, Long> rates) {
+    private static String ratesText(Map<AEKey, Long> rates) {
         if (rates.isEmpty()) {
             return "空";
         }
-        List<Map.Entry<ResourceKey, Long>> list = new ArrayList<>(rates.entrySet());
-        list.sort(Map.Entry.<ResourceKey, Long>comparingByValue().reversed());
+        List<Map.Entry<AEKey, Long>> list = new ArrayList<>(rates.entrySet());
+        list.sort(Map.Entry.<AEKey, Long>comparingByValue().reversed());
         StringBuilder builder = new StringBuilder();
         int shown = 0;
-        for (Map.Entry<ResourceKey, Long> entry : list) {
+        for (Map.Entry<AEKey, Long> entry : list) {
             if (shown >= 3) {
                 builder.append(" +").append(list.size() - shown);
                 break;
@@ -303,19 +304,19 @@ public final class DiagRender {
         return builder.toString();
     }
 
-    private static String unitSuffix(ResourceKey key) {
-        return switch (key.kind()) {
+    private static String unitSuffix(AEKey key) {
+        return switch (AeKeySupport.kind(key)) {
             case FLUID -> "mB/s";
             case ENERGY -> "FE/s";
             default -> "/s";
         };
     }
 
-    private static String resourceName(ResourceKey key) {
-        if (key.kind() == ResourceKind.ENERGY) {
+    private static String resourceName(AEKey key) {
+        if (AeKeySupport.isEnergy(key)) {
             return "电";
         }
-        String id = key.id().toString();
+        String id = key.getId().toString();
         return id.startsWith("minecraft:") ? id.substring("minecraft:".length()) : id;
     }
 

@@ -9,9 +9,11 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineView;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.TotalState;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
+import appeng.api.stacks.AEFluidKey;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 仓库与机器库的排序规则。
@@ -133,7 +135,7 @@ final class FactorySort {
      */
     @Nullable
     static Comparator<FactoryStorageS2C.Entry> storage(StorageKey key, boolean descending,
-            Function<ResourceKey, String> nameOf, Function<ResourceKey, String> modOf) {
+            Function<AEKey, String> nameOf, Function<AEKey, String> modOf) {
         if (key == StorageKey.DEFAULT) {
             return null;
         }
@@ -147,16 +149,16 @@ final class FactorySort {
                             String.CASE_INSENSITIVE_ORDER)
                     .thenComparing(entry -> nameOf.apply(entry.key()),
                             String.CASE_INSENSITIVE_ORDER);
-            case REGISTRY -> Comparator.comparing(entry -> entry.key().id().toString());
+            case REGISTRY -> Comparator.comparing(entry -> entry.key().getId().toString());
             case KIND -> Comparator
                     .comparingInt((FactoryStorageS2C.Entry entry) ->
-                            entry.key().kind().ordinal())
+                            AeKeySupport.kind(entry.key()).ordinal())
                     .thenComparing(entry -> nameOf.apply(entry.key()),
                             String.CASE_INSENSITIVE_ORDER);
         };
         // 兜底键不随方向翻转：数量相同或同名时，顺序仍然确定。
         Comparator<FactoryStorageS2C.Entry> tie =
-                Comparator.comparing(entry -> entry.key().id().toString());
+                Comparator.comparing(entry -> entry.key().getId().toString());
         return descending ? primary.reversed().thenComparing(tie) : primary.thenComparing(tie);
     }
 
@@ -170,7 +172,7 @@ final class FactorySort {
      * @return 排序用数量
      */
     private static double sortAmount(FactoryStorageS2C.Entry entry) {
-        return entry.key().kind() == ResourceKind.FLUID
+        return (entry.key() instanceof AEFluidKey)
                 ? entry.count() / 1000.0D
                 : entry.count();
     }

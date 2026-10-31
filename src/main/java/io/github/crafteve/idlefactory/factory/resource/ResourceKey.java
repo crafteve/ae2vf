@@ -15,6 +15,8 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
+import appeng.api.stacks.AEItemKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * 一个资源的身份：类型 + 注册名；物品额外带一份数据组件快照。
@@ -31,10 +33,10 @@ import net.neoforged.neoforge.fluids.FluidStack;
  */
 public final class ResourceKey {
     /** 能量的固定 key。 */
-    public static final ResourceKey ENERGY = new ResourceKey(ResourceKind.ENERGY,
+    public static final ResourceKey ENERGY = new ResourceKey(CapabilityKind.ENERGY,
             ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "fe"), null);
 
-    private final ResourceKind kind;
+    private final CapabilityKind kind;
     private final ResourceLocation id;
     /** 仅物品使用；找不到注册名（旧档里的未知 id）时为 {@code null}。 */
     @Nullable
@@ -44,7 +46,7 @@ public final class ResourceKey {
     /** 是否偏离物品默认组件；构造时算好，日志/描述会频繁读。 */
     private final boolean customComponents;
 
-    private ResourceKey(ResourceKind kind, ResourceLocation id, @Nullable ItemStack stack) {
+    private ResourceKey(CapabilityKind kind, ResourceLocation id, @Nullable ItemStack stack) {
         this.kind = kind;
         this.id = id;
         this.stack = stack;
@@ -67,7 +69,7 @@ public final class ResourceKey {
             throw new IllegalArgumentException("空的 ItemStack 没有资源身份");
         }
         ItemStack copy = stack.copyWithCount(1);
-        return new ResourceKey(ResourceKind.ITEM,
+        return new ResourceKey(CapabilityKind.ITEM,
                 BuiltInRegistries.ITEM.getKey(copy.getItem()), copy);
     }
 
@@ -83,9 +85,9 @@ public final class ResourceKey {
     public static ResourceKey item(ResourceLocation id) {
         Item item = BuiltInRegistries.ITEM.get(id);
         if (item == Items.AIR) {
-            return new ResourceKey(ResourceKind.ITEM, id, null);
+            return new ResourceKey(CapabilityKind.ITEM, id, null);
         }
-        return new ResourceKey(ResourceKind.ITEM, id, new ItemStack(item));
+        return new ResourceKey(CapabilityKind.ITEM, id, new ItemStack(item));
     }
 
     /**
@@ -95,8 +97,8 @@ public final class ResourceKey {
      * @param id   注册名
      * @return key；物品会解析成无组件栈
      */
-    public static ResourceKey of(ResourceKind kind, ResourceLocation id) {
-        return kind == ResourceKind.ITEM ? item(id) : new ResourceKey(kind, id, null);
+    public static ResourceKey of(CapabilityKind kind, ResourceLocation id) {
+        return kind == CapabilityKind.ITEM ? item(id) : new ResourceKey(kind, id, null);
     }
 
     /**
@@ -106,7 +108,7 @@ public final class ResourceKey {
      * @return key
      */
     public static ResourceKey fluid(FluidStack stack) {
-        return new ResourceKey(ResourceKind.FLUID,
+        return new ResourceKey(CapabilityKind.FLUID,
                 BuiltInRegistries.FLUID.getKey(stack.getFluid()), null);
     }
 
@@ -121,7 +123,7 @@ public final class ResourceKey {
         if (fluid == Fluids.EMPTY) {
             return null;
         }
-        return new ResourceKey(ResourceKind.FLUID, BuiltInRegistries.FLUID.getKey(fluid), null);
+        return new ResourceKey(CapabilityKind.FLUID, BuiltInRegistries.FLUID.getKey(fluid), null);
     }
 
     /**
@@ -131,11 +133,11 @@ public final class ResourceKey {
      * @return key
      */
     public static ResourceKey fluid(ResourceLocation id) {
-        return new ResourceKey(ResourceKind.FLUID, id, null);
+        return new ResourceKey(CapabilityKind.FLUID, id, null);
     }
 
     /** 类型。 */
-    public ResourceKind kind() {
+    public CapabilityKind kind() {
         return this.kind;
     }
 
@@ -186,7 +188,7 @@ public final class ResourceKey {
      * @return 一行描述
      */
     public String describe() {
-        if (this.kind == ResourceKind.ITEM && hasComponents()) {
+        if (this.kind == CapabilityKind.ITEM && hasComponents()) {
             return "item:" + this.id + "#" + Integer.toHexString(this.hash);
         }
         return this.kind.name().toLowerCase(Locale.ROOT) + ":" + this.id;
@@ -203,7 +205,7 @@ public final class ResourceKey {
         if (this.kind != other.kind || !this.id.equals(other.id)) {
             return false;
         }
-        if (this.kind != ResourceKind.ITEM) {
+        if (this.kind != CapabilityKind.ITEM) {
             return true;
         }
         if (this.stack == null || other.stack == null) {

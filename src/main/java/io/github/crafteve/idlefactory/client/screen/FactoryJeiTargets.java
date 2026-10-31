@@ -5,14 +5,15 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 把鼠标下的槽位/规则/机器转成 JEI 目标。
@@ -54,7 +55,7 @@ final class FactoryJeiTargets {
                     && FactoryScreenGeometry.inside(mouseX, mouseY,
                             this.context.leftPos() + slot.x, this.context.topPos() + slot.y,
                             16, 16)) {
-                return new FactoryScreen.JeiTarget(ResourceKind.ITEM, slot.getItem(),
+                return new FactoryScreen.JeiTarget(CapabilityKind.ITEM, slot.getItem(),
                         new Rect2i(this.context.leftPos() + slot.x - 1,
                                 this.context.topPos() + slot.y - 1, FactoryLayout.CELL,
                                 FactoryLayout.CELL));
@@ -88,7 +89,7 @@ final class FactoryJeiTargets {
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
                     ItemStack icon = FactoryLabels.blockStack(stack.blockId());
                     if (!icon.isEmpty()) {
-                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, icon,
+                        return new FactoryScreen.JeiTarget(CapabilityKind.ITEM, icon,
                                 new Rect2i(iconX, iconY, FactoryLayout.CELL,
                                         FactoryLayout.CELL));
                     }
@@ -135,7 +136,7 @@ final class FactoryJeiTargets {
                         FactoryLayout.CELL, FactoryLayout.CELL)) {
                     ItemStack stackIcon = FactoryLabels.blockStack(anchor.blockId());
                     if (!stackIcon.isEmpty()) {
-                        return new FactoryScreen.JeiTarget(ResourceKind.ITEM, stackIcon,
+                        return new FactoryScreen.JeiTarget(CapabilityKind.ITEM, stackIcon,
                                 new Rect2i(iconX, y + 4, FactoryLayout.CELL,
                                         FactoryLayout.CELL));
                     }
@@ -174,10 +175,10 @@ final class FactoryJeiTargets {
                 : null;
     }
 
-    private FactoryScreen.JeiTarget resourceTarget(ResourceKey key, Rect2i area) {
-        ResourceKind kind = key.kind();
+    private FactoryScreen.JeiTarget resourceTarget(AEKey key, Rect2i area) {
+        CapabilityKind kind = AeKeySupport.kind(key);
         return new FactoryScreen.JeiTarget(kind,
-                kind == ResourceKind.ENERGY ? ItemStack.EMPTY
+                kind == CapabilityKind.ENERGY ? ItemStack.EMPTY
                         : FactoryUiText.iconStack(key), area);
     }
 
@@ -193,7 +194,7 @@ final class FactoryJeiTargets {
         while (shown < limit) {
             String rate = FactoryLabels.rateText(
                     shown < rates.size() ? rates.get(shown) : 0L,
-                    rules.get(shown).key().kind());
+                    AeKeySupport.kind(rules.get(shown).key()));
             int entryWidth = FactoryLayout.CELL + 2 + this.context.font().width(rate) + 6;
             if (shown > 0 && cursor + entryWidth > x + maxWidth) {
                 break;

@@ -16,8 +16,8 @@ import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.Storage;
 
@@ -34,6 +34,8 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import appeng.api.stacks.AEItemKey;
 
 /**
  * 机器体检：回答「这台机器为什么不动」。
@@ -157,27 +159,19 @@ public final class DiagChecks {
 
     private static DiagEvent.Level checkInput(ServerLevel level, Storage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
-        return switch (spec.key().kind()) {
+        return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> checkItemInput(level, storage, online, machine, spec, problems);
             case FLUID -> checkFluidInput(level, storage, online, machine, spec, problems);
             case ENERGY -> checkEnergyInput(level, storage, online, machine, spec, problems);
-            case CHEMICAL -> {
-                problems.add("暂不支持化学品");
-                yield DiagEvent.Level.ERROR;
-            }
         };
     }
 
     private static CheckResult checkOutput(ServerLevel level, Storage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
-        return switch (spec.key().kind()) {
+        return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> checkItemOutput(level, storage, online, machine, spec, problems);
             case FLUID -> checkFluidOutput(level, storage, online, machine, spec, problems);
             case ENERGY -> checkEnergyOutput(level, storage, online, machine, spec, problems);
-            case CHEMICAL -> {
-                problems.add("暂不支持化学品");
-                yield new CheckResult(DiagEvent.Level.ERROR, false);
-            }
         };
     }
 
@@ -189,7 +183,7 @@ public final class DiagChecks {
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
-            problems.add("物品 id 无法解析：" + spec.key().id());
+            problems.add("物品 id 无法解析：" + spec.key().getId());
             return DiagEvent.Level.ERROR;
         }
         IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, machine.pos(), spec.face());
@@ -197,7 +191,7 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有物品能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(ResourceKind.ITEM)) {
+        if (online && !storage.supports(CapabilityKind.ITEM)) {
             problems.add("仓库不支持物品");
             return DiagEvent.Level.WARN;
         }
@@ -219,7 +213,7 @@ public final class DiagChecks {
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
-            problems.add("物品 id 无法解析：" + spec.key().id());
+            problems.add("物品 id 无法解析：" + spec.key().getId());
             return new CheckResult(DiagEvent.Level.ERROR, false);
         }
         IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, machine.pos(), spec.face());
@@ -243,9 +237,9 @@ public final class DiagChecks {
 
     private static DiagEvent.Level checkFluidInput(ServerLevel level, Storage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
+        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
-            problems.add("流体 id 无法解析：" + spec.key().id());
+            problems.add("流体 id 无法解析：" + spec.key().getId());
             return DiagEvent.Level.ERROR;
         }
         IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, machine.pos(), spec.face());
@@ -253,7 +247,7 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有流体能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(ResourceKind.FLUID)) {
+        if (online && !storage.supports(CapabilityKind.FLUID)) {
             problems.add("仓库不支持流体");
             return DiagEvent.Level.WARN;
         }
@@ -272,9 +266,9 @@ public final class DiagChecks {
 
     private static CheckResult checkFluidOutput(ServerLevel level, Storage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
-        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().id());
+        Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
-            problems.add("流体 id 无法解析：" + spec.key().id());
+            problems.add("流体 id 无法解析：" + spec.key().getId());
             return new CheckResult(DiagEvent.Level.ERROR, false);
         }
         IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, machine.pos(), spec.face());
@@ -303,11 +297,11 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有能量能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(ResourceKind.ENERGY)) {
+        if (online && !storage.supports(CapabilityKind.ENERGY)) {
             problems.add("仓库不支持 FE");
             return DiagEvent.Level.WARN;
         }
-        if (online && storage.extract(ResourceKey.ENERGY, 1000L, true) <= 0L) {
+        if (online && storage.extract(AeKeySupport.energy(), 1000L, true) <= 0L) {
             problems.add("仓库没有 FE");
             return DiagEvent.Level.WARN;
         }
@@ -352,7 +346,7 @@ public final class DiagChecks {
         if (handler.getEnergyStored() <= 0) {
             return new CheckResult(DiagEvent.Level.OK, true);
         }
-        if (online && storage.insert(ResourceKey.ENERGY, 1000L, true) <= 0L) {
+        if (online && storage.insert(AeKeySupport.energy(), 1000L, true) <= 0L) {
             problems.add("仓库不收 FE");
             return new CheckResult(DiagEvent.Level.WARN, false);
         }
@@ -384,8 +378,8 @@ public final class DiagChecks {
         return spec.face() == null ? "面 any " : "面 " + spec.face().getName() + " ";
     }
 
-    private static ItemStack itemSample(ResourceKey key) {
-        return key.toStack();
+    private static ItemStack itemSample(AEKey key) {
+        return AeKeySupport.toStack(key);
     }
 
     /**
@@ -398,8 +392,8 @@ public final class DiagChecks {
         if (!spec.fuzzy()) {
             return storage.extract(spec.key(), 1L, true) > 0L;
         }
-        for (ResourceKey key : storage.snapshot().keySet()) {
-            if (key.kind() == ResourceKind.ITEM && key.id().equals(spec.key().id())) {
+        for (AEKey key : storage.snapshot().keySet()) {
+            if ((key instanceof AEItemKey) && key.getId().equals(spec.key().getId())) {
                 return true;
             }
         }
@@ -417,7 +411,7 @@ public final class DiagChecks {
         }
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack inSlot = handler.getStackInSlot(slot);
-            if (!inSlot.isEmpty() && ResourceKey.item(inSlot).id().equals(spec.key().id())) {
+            if (!inSlot.isEmpty() && AeKeySupport.id(AeKeySupport.item(inSlot)).equals(spec.key().getId())) {
                 return true;
             }
         }
@@ -469,8 +463,8 @@ public final class DiagChecks {
         return false;
     }
 
-    private static String shortName(ResourceKey key) {
-        String id = key.id().toString();
+    private static String shortName(AEKey key) {
+        String id = key.getId().toString();
         return id.startsWith("minecraft:") ? id.substring("minecraft:".length()) : id;
     }
 

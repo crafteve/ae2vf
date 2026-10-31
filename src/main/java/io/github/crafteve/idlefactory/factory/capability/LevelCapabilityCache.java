@@ -18,6 +18,7 @@ import net.neoforged.neoforge.capabilities.ICapabilityInvalidationListener;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * 每个维度一份的能力句柄缓存：{@code (pos, 种类, 面) → handler}。
