@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import appeng.api.stacks.AEKey;
 
 import net.minecraft.core.Direction;

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.resource;
+package io.github.crafteve.idlefactory.factory.machine;
 
 import java.util.Locale;
 import java.util.Objects;

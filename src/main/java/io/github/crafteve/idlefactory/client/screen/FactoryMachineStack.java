@@ -13,7 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.resources.ResourceLocation;
 

@@ -4,10 +4,10 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;

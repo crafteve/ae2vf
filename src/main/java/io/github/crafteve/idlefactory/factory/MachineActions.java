@@ -9,9 +9,9 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;

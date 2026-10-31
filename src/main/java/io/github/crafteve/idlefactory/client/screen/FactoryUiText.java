@@ -5,7 +5,7 @@ import java.util.List;
 
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

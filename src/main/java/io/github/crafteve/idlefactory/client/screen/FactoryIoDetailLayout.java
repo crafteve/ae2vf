@@ -6,7 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.client.gui.Font;
 

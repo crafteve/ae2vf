@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.resource;
+package io.github.crafteve.idlefactory.factory.machine;
 
 /**
  * 一条 IO 规则匹配物品时是否比较数据组件。

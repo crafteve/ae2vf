@@ -6,9 +6,9 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.core.Direction;
 

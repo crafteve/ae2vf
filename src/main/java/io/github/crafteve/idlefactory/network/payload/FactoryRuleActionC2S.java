@@ -10,7 +10,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.MachineActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.resource.MatchMode;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;

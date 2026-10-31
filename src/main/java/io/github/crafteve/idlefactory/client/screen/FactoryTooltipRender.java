@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 
 import net.minecraft.client.gui.GuiGraphics;

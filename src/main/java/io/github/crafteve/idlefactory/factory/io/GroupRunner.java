@@ -12,7 +12,7 @@ import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
@@ -28,7 +28,7 @@ import appeng.api.stacks.AEItemKey;
  * <p>搬成功就记住这个面；{@link IoResult.Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
  * 玩家改规则、方块被换、能力失效都会让路由整体作废（观测层的面表代数 +1）。</p>
  *
- * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.resource.MatchMode#IGNORE_COMPONENTS}
+ * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.machine.MatchMode#IGNORE_COMPONENTS}
  * 会把一条规则展开成多个「一个变体一个适配器」，每个变体走一遍 {@link IoTransfer} 的事务逻辑；
  * 候选变体来自 {@link ItemVariantIndex}（输入）或机器库存（输出）。每 tick 有单规则与单组的
  * 变体预算，防止变体爆炸时一次打满；规则处理顺序按 tick 轮转，避免后面的规则被饿死。</p>

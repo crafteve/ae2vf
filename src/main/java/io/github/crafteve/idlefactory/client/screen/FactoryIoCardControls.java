@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.client.screen;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.core.Direction;
 import appeng.api.stacks.AEItemKey;
