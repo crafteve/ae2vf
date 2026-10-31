@@ -107,10 +107,19 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
         return this.mode == MatchMode.IGNORE_COMPONENTS;
     }
 
-    /** 给界面和日志用的一行：{@code 水桶[north]}；模糊规则追加 {@code [模糊]}。 */
+    /**
+     * 给界面、日志和指令用的一行：{@code 铁锭[minecraft:iron_ingot][any]}。
+     *
+     * <p>带资源 id 是为了排查：同名不同组件的物品显示名一样，只有 id 加组件标记才能看出
+     * 它们是两个不同的 key。模糊规则追加 {@code [模糊]}，带自定义组件的物品追加
+     * {@code [组件]}。</p>
+     */
     public String describe() {
         String match = this.mode == MatchMode.IGNORE_COMPONENTS ? " [模糊]" : "";
-        return this.key.getDisplayName().getString() + match + "[" + faceName() + "]";
+        String components = this.key instanceof AEItemKey itemKey
+                && !itemKey.getReadOnlyStack().getComponents().isEmpty() ? " [组件]" : "";
+        return this.key.getDisplayName().getString()
+                + "[" + this.key.getId() + "]" + components + match + "[" + faceName() + "]";
     }
 
     /**
