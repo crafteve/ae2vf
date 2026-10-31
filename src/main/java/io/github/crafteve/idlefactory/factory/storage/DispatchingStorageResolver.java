@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
 import org.jetbrains.annotations.Nullable;
+import appeng.api.storage.MEStorage;
 
 /**
  * 按地址类型分发到具体解析器。
@@ -23,7 +24,7 @@ public final class DispatchingStorageResolver implements StorageResolver {
 
     @Override
     @Nullable
-    public Storage resolve(StorageAnchor anchor) {
+    public MEStorage resolve(StorageAnchor anchor) {
         if (anchor instanceof MeAnchor) {
             return this.ae2.resolve(anchor);
         }

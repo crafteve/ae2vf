@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.storage.EmptyStorage;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
@@ -23,7 +23,7 @@ import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
  */
 public final class FactoryLive {
     /** 当前仓库；离线时是空仓库，永远非 null。 */
-    private Storage storage = EmptyStorage.INSTANCE;
+    private MEStorage storage = EmptyStorage.INSTANCE;
     /** 上一次解析是否成功拿到仓库。 */
     private boolean storageOnline;
     /** 上一次解析的异常摘要；正常时为 {@code null}。 */
@@ -40,7 +40,7 @@ public final class FactoryLive {
     }
 
     /** 当前仓库，永远非 null。 */
-    public Storage storage() {
+    public MEStorage storage() {
         return this.storage;
     }
 
@@ -116,7 +116,7 @@ public final class FactoryLive {
             this.storageError = "仓库解析器未就绪";
             return wasOnline;
         }
-        Storage resolved;
+        MEStorage resolved;
         try {
             resolved = resolver.resolve(anchor);
             this.storageError = null;

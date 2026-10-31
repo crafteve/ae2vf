@@ -25,7 +25,7 @@ import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
@@ -1333,8 +1333,8 @@ public final class FactoryService {
             return 1;
         }
 
-        Storage storage = factory.live().storage();
-        Map<AEKey, Long> snapshot = storage.snapshot();
+        MEStorage storage = factory.live().storage();
+        Map<AEKey, Long> snapshot = AeKeySupport.snapshot(storage);
         if (snapshot.isEmpty()) {
             info(player, "仓库是空的");
             return 1;
@@ -1366,11 +1366,11 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Storage storage = requireOnlineStorage(player, factory);
+        MEStorage storage = requireOnlineStorage(player, factory);
         if (storage == null) {
             return 0;
         }
-        long extracted = storage.extract(AeKeySupport.item(sample), count, false);
+        long extracted = AeKeySupport.extract(storage, AeKeySupport.item(sample), count, false);
         if (extracted <= 0) {
             err(player, "仓库里没有 " + itemId(sample));
             return 0;
@@ -1401,7 +1401,7 @@ public final class FactoryService {
         if (factory == null) {
             return 0;
         }
-        Storage storage = requireOnlineStorage(player, factory);
+        MEStorage storage = requireOnlineStorage(player, factory);
         if (storage == null) {
             return 0;
         }
@@ -1409,7 +1409,7 @@ public final class FactoryService {
         template.setCount(1);
 
         if (player.isCreative()) {
-            long inserted = storage.insert(AeKeySupport.item(template), count, false);
+            long inserted = AeKeySupport.insert(storage, AeKeySupport.item(template), count, false);
             if (inserted <= 0) {
                 err(player, "仓库收不下 " + itemId(sample));
                 return 0;
@@ -1424,12 +1424,12 @@ public final class FactoryService {
             return 0;
         }
         int want = Math.min(count, available);
-        long accepted = storage.insert(AeKeySupport.item(template), want, true);
+        long accepted = AeKeySupport.insert(storage, AeKeySupport.item(template), want, true);
         if (accepted <= 0) {
             err(player, "仓库收不下 " + itemId(sample));
             return 0;
         }
-        long inserted = storage.insert(AeKeySupport.item(template), accepted, false);
+        long inserted = AeKeySupport.insert(storage, AeKeySupport.item(template), accepted, false);
         int removed = removeFromInventory(player, template, (int) inserted);
         ok(player, "存入 " + removed + " 个 " + itemId(sample));
         return removed > 0 ? 1 : 0;
@@ -1471,7 +1471,7 @@ public final class FactoryService {
      * @return 可用仓库；不可用时为 {@code null}
      */
     @Nullable
-    private static Storage requireOnlineStorage(ServerPlayer player, Factory factory) {
+    private static MEStorage requireOnlineStorage(ServerPlayer player, Factory factory) {
         factory.refreshStorage(storageResolver());
         if (factory.config().storageAnchor() == null) {
             err(player, "你还没有绑定仓库：用存储链接杖右键 ME 网络方块，或对准箱子执行 /idf storage bind");

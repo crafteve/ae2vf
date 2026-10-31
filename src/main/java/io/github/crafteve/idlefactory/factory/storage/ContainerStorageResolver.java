@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 import net.minecraft.server.MinecraftServer;
+import appeng.api.storage.MEStorage;
 
 /**
  * 容器仓库解析器：地址 → 一组可用的容器 → {@link ContainerStorage}。
@@ -42,7 +43,7 @@ public final class ContainerStorageResolver implements StorageResolver {
 
     @Override
     @Nullable
-    public Storage resolve(StorageAnchor anchor) {
+    public MEStorage resolve(StorageAnchor anchor) {
         if (!(anchor instanceof ContainerAnchor containerAnchor) || containerAnchor.isEmpty()) {
             return null;
         }

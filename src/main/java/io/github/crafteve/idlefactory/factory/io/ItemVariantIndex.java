@@ -8,16 +8,17 @@ import java.util.Map;
 import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 
 import net.minecraft.resources.ResourceLocation;
 import appeng.api.stacks.AEItemKey;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 模糊物品规则的变体索引。
  *
  * <p>仓库只认精确 key，所以「同 id 的所有变体」必须先枚举出来。这里按工厂缓存一份
- * {@code 物品注册名 → 精确 key 列表}，由 {@link Storage#snapshot()} 构建，TTL 到期才重建，
+ * {@code 物品注册名 → 精确 key 列表}，由 {@link MEStorage#snapshot()} 构建，TTL 到期才重建，
  * 避免每条模糊规则每 tick 都扫一遍仓库。</p>
  *
  * <p>只用于输入侧（仓库 → 机器）：输出侧的候选直接来自机器库存，不需要索引。</p>
@@ -46,7 +47,7 @@ public final class ItemVariantIndex {
      * @param limit   最多返回几个
      * @return 候选 key；仓库里没有该物品时为空表
      */
-    public List<AEKey> candidates(Storage storage, ResourceLocation itemId, long now, int limit) {
+    public List<AEKey> candidates(MEStorage storage, ResourceLocation itemId, long now, int limit) {
         refresh(storage, now);
         List<AEKey> all = this.byItem.get(itemId);
         if (all == null || all.isEmpty() || limit <= 0) {
@@ -70,7 +71,7 @@ public final class ItemVariantIndex {
         this.refreshedAt = Long.MIN_VALUE;
     }
 
-    private void refresh(Storage storage, long now) {
+    private void refresh(MEStorage storage, long now) {
         if (this.refreshedAt != Long.MIN_VALUE && now - this.refreshedAt < TTL_TICKS) {
             return;
         }
@@ -78,7 +79,7 @@ public final class ItemVariantIndex {
         this.byItem.clear();
         Map<AEKey, Long> snapshot;
         try {
-            snapshot = storage.snapshot();
+            snapshot = AeKeySupport.snapshot(storage);
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("IdleFactory: 模糊变体索引构建失败", e);
             return;

@@ -15,6 +15,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.connection.ConnectionType;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * 仓库快照回包的唯一出口。
@@ -46,7 +47,7 @@ public final class FactoryStorageSnapshots {
     public static void send(ServerPlayer player, Factory factory, int containerId) {
         Map<AEKey, Long> snapshot;
         try {
-            snapshot = factory.live().storage().snapshot();
+            snapshot = AeKeySupport.snapshot(factory.live().storage());
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("IdleFactory storage snapshot failed: factory={}",
                     factory.id(), e);

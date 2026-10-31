@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.factory.storage;
 
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,7 +17,11 @@ import net.neoforged.neoforge.fluids.FluidStack;
 
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.config.Actionable;
+import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
@@ -184,6 +190,81 @@ public final class AeKeySupport {
             return CapabilityKind.FLUID;
         }
         return CapabilityKind.ITEM;
+    }
+
+    /**
+     * 搬运时统一使用的动作来源。
+     *
+     * <p>工厂没有玩家、也没有安全终端，所有存储操作都以中性身份发起，后端不需要关心
+     * 「谁在搬」。</p>
+     */
+    public static final IActionSource SOURCE = IActionSource.empty();
+
+    /**
+     * 把仓库库存读成普通 Map，供快照与界面使用。
+     *
+     * <p>AE2 的接口只给 {@link KeyCounter}，这里转一次是为了让上层的不可变快照逻辑保持
+     * 简单；返回的是可变副本，调用方可以放心改。</p>
+     *
+     * @param storage 仓库
+     * @return 资源 → 数量
+     */
+    public static Map<AEKey, Long> snapshot(MEStorage storage) {
+        KeyCounter counter = new KeyCounter();
+        storage.getAvailableStacks(counter);
+        Map<AEKey, Long> out = new HashMap<>(counter.size() * 2);
+        for (AEKey key : counter.keySet()) {
+            out.put(key, counter.get(key));
+        }
+        return out;
+    }
+
+    /**
+     * 仓库里是否有一类资源。
+     *
+     * <p>用库存实况判断，而不是问后端「你支持不支持」：装了对应附属、且仓库里真有货，
+     * 才算这一类可用。没装 Applied Flux 时 FE 必然为空，自然返回 {@code false}。</p>
+     *
+     * @param storage 仓库
+     * @param kind    能力大类
+     * @return 有这类资源时为 {@code true}
+     */
+    public static boolean hasAny(MEStorage storage, CapabilityKind kind) {
+        for (AEKey key : snapshot(storage).keySet()) {
+            if (kind(key) == kind) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 封装一次「模拟 / 提交」的写入。
+     *
+     * <p>搬运层长期用布尔语义（模拟还是提交），而 AE2 接口要求 {@link Actionable} 加
+     * 动作来源。转换只在这一处发生，调用方保持简洁。</p>
+     *
+     * @param storage  仓库
+     * @param key      资源
+     * @param amount   数量
+     * @param simulate 为 {@code true} 时只模拟
+     * @return 实际收下的数量
+     */
+    public static long insert(MEStorage storage, AEKey key, long amount, boolean simulate) {
+        return storage.insert(key, amount, simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
+    }
+
+    /**
+     * 封装一次「模拟 / 提交」的取出。
+     *
+     * @param storage  仓库
+     * @param key      资源
+     * @param amount   数量
+     * @param simulate 为 {@code true} 时只模拟
+     * @return 实际拿出的数量
+     */
+    public static long extract(MEStorage storage, AEKey key, long amount, boolean simulate) {
+        return storage.extract(key, amount, simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
     }
 
     /**

@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -59,7 +59,7 @@ public final class MachineRunner {
             if (!factory.live().storageOnline()) {
                 continue;
             }
-            Storage storage = factory.live().storage();
+            MEStorage storage = factory.live().storage();
             for (Machine machine : factory.config().machines().all()) {
                 machines++;
                 if (this.state.peek(machine.id()) != null
@@ -92,7 +92,7 @@ public final class MachineRunner {
      *
      * @return 本轮搬动的数量
      */
-    private long tickMachine(MinecraftServer server, Factory factory, Storage storage,
+    private long tickMachine(MinecraftServer server, Factory factory, MEStorage storage,
             Machine machine, long now, @Nullable ObservationService observations) {
         RunnerState.MachineState machineState = this.state.machine(machine.id());
         if (machineState.sleeping) {

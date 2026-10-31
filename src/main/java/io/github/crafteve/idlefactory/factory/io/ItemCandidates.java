@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
@@ -56,7 +56,7 @@ public final class ItemCandidates {
      * @param budget   组级剩余预算，单元素数组，调用后扣减
      * @return 候选；空且 {@code budgetStarved=false} 表示仓库/机器当前确实没有可搬的变体
      */
-    public static Candidates of(Storage storage, ItemAdapter base, ResourceSpec spec,
+    public static Candidates of(MEStorage storage, ItemAdapter base, ResourceSpec spec,
             boolean input, @Nullable ItemVariantIndex variants, long now, int[] budget) {
         if (spec.mode() == MatchMode.EXACT) {
             return new Candidates(List.of(base), false);

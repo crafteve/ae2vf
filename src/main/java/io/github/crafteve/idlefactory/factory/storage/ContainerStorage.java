@@ -46,7 +46,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 /**
  * 把一组方块容器包成仓库，支持物品、流体、FE。
  *
- * <p>它同时实现 AE2 的 {@link MEStorage} 和工厂内部的 {@link Storage}：P2 迁移期间，IO 层
+ * <p>它同时实现 AE2 的 {@link MEStorage} 和工厂内部的 {@link MEStorage}：P2 迁移期间，IO 层
  * 还在用工厂自己的资源 key，而 ME 后端已经改成 {@link MEStorage}，两边都要能满足。
  * {@link MEStorage} 那一侧只在边界做一次 key 换算，真正的搬运仍然走本类自己的槽位逻辑。</p>
  *
@@ -57,7 +57,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  *
  * <p>容器每次现查能力，不缓存到字段；一次 insert/extract 调用内会解析一次复用。</p>
  */
-public final class ContainerStorage implements Storage, MEStorage {
+public final class ContainerStorage implements MEStorage {
     /**
      * 能量面探测用的模拟量。
      *
@@ -108,7 +108,6 @@ public final class ContainerStorage implements Storage, MEStorage {
         return this.containers.size();
     }
 
-    @Override
     public long insert(AEKey key, long amount, boolean simulate) {
         if (amount <= 0L) {
             return 0L;
@@ -121,7 +120,6 @@ public final class ContainerStorage implements Storage, MEStorage {
         return inserted;
     }
 
-    @Override
     public long extract(AEKey key, long amount, boolean simulate) {
         if (amount <= 0L) {
             return 0L;
@@ -134,7 +132,6 @@ public final class ContainerStorage implements Storage, MEStorage {
         return extracted;
     }
 
-    @Override
     public boolean supports(CapabilityKind kind) {
         return true;
     }
@@ -231,7 +228,6 @@ public final class ContainerStorage implements Storage, MEStorage {
         return null;
     }
 
-    @Override
     public boolean isEmpty() {
         for (ContainerRef ref : this.containers) {
             if (!isEmptyContainer(ref)) {
@@ -241,7 +237,6 @@ public final class ContainerStorage implements Storage, MEStorage {
         return true;
     }
 
-    @Override
     public Map<AEKey, Long> snapshot() {
         Map<AEKey, Long> result = new LinkedHashMap<>();
         for (ContainerRef ref : this.containers) {

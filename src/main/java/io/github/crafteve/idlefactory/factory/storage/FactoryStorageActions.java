@@ -18,6 +18,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.storage.MEStorage;
 
 /**
  * 服务端仓库动作。
@@ -57,7 +58,7 @@ public final class FactoryStorageActions {
             message(player, "当前仅物品支持直接存取");
             return;
         }
-        Storage storage = factory.live().storage();
+        MEStorage storage = factory.live().storage();
         boolean changed = switch (gesture) {
             case LEFT -> menu.getCarried().isEmpty()
                     ? takeToCarried(menu, storage, key, Integer.MAX_VALUE)
@@ -101,13 +102,13 @@ public final class FactoryStorageActions {
         if (!factory.live().storageOnline()) {
             return false;
         }
-        Storage storage = factory.live().storage();
+        MEStorage storage = factory.live().storage();
         AEKey key = AeKeySupport.item(stack);
-        long accepted = storage.insert(key, stack.getCount(), true);
+        long accepted = AeKeySupport.insert(storage, key, stack.getCount(), true);
         if (accepted <= 0L) {
             return false;
         }
-        long inserted = storage.insert(key, accepted, false);
+        long inserted = AeKeySupport.insert(storage, key, accepted, false);
         if (inserted <= 0L) {
             return false;
         }
@@ -119,7 +120,7 @@ public final class FactoryStorageActions {
         return true;
     }
 
-    private static boolean takeToCarried(FactoryMenu menu, Storage storage,
+    private static boolean takeToCarried(FactoryMenu menu, MEStorage storage,
             @Nullable AEKey key, int amount) {
         if (key == null || !menu.getCarried().isEmpty()) {
             return false;
@@ -131,11 +132,11 @@ public final class FactoryStorageActions {
         int request = amount < 0
                 ? Math.max(1, template.getMaxStackSize() / 2)
                 : Math.min(amount, template.getMaxStackSize());
-        long available = storage.extract(key, request, true);
+        long available = AeKeySupport.extract(storage, key, request, true);
         if (available <= 0L) {
             return false;
         }
-        long extracted = storage.extract(key, available, false);
+        long extracted = AeKeySupport.extract(storage, key, available, false);
         if (extracted <= 0L) {
             return false;
         }
@@ -143,18 +144,18 @@ public final class FactoryStorageActions {
         return true;
     }
 
-    private static boolean putCarried(FactoryMenu menu, Storage storage, int amount) {
+    private static boolean putCarried(FactoryMenu menu, MEStorage storage, int amount) {
         ItemStack carried = menu.getCarried();
         if (carried.isEmpty()) {
             return false;
         }
         AEKey key = AeKeySupport.item(carried);
         int request = Math.min(amount, carried.getCount());
-        long accepted = storage.insert(key, request, true);
+        long accepted = AeKeySupport.insert(storage, key, request, true);
         if (accepted <= 0L) {
             return false;
         }
-        long inserted = storage.insert(key, accepted, false);
+        long inserted = AeKeySupport.insert(storage, key, accepted, false);
         if (inserted <= 0L) {
             return false;
         }
@@ -163,7 +164,7 @@ public final class FactoryStorageActions {
         return true;
     }
 
-    private static boolean takeToInventory(ServerPlayer player, Storage storage,
+    private static boolean takeToInventory(ServerPlayer player, MEStorage storage,
             @Nullable AEKey key, int amount) {
         if (key == null) {
             return false;
@@ -173,11 +174,11 @@ public final class FactoryStorageActions {
             return false;
         }
         int request = Math.min(amount, template.getMaxStackSize());
-        long available = storage.extract(key, request, true);
+        long available = AeKeySupport.extract(storage, key, request, true);
         if (available <= 0L) {
             return false;
         }
-        long extracted = storage.extract(key, available, false);
+        long extracted = AeKeySupport.extract(storage, key, available, false);
         if (extracted <= 0L) {
             return false;
         }
@@ -186,7 +187,7 @@ public final class FactoryStorageActions {
         player.getInventory().add(stack);
         if (!stack.isEmpty()) {
             // 背包只收下一部分时，剩余原路回仓库；仓库也拒收就掉在玩家脚下，不静默消失。
-            long returned = storage.insert(key, stack.getCount(), false);
+            long returned = AeKeySupport.insert(storage, key, stack.getCount(), false);
             if (returned < stack.getCount()) {
                 player.drop(stack.copyWithCount(stack.getCount() - (int) returned), false);
             }
@@ -194,7 +195,7 @@ public final class FactoryStorageActions {
         return true;
     }
 
-    private static boolean putOneFromInventory(ServerPlayer player, Storage storage,
+    private static boolean putOneFromInventory(ServerPlayer player, MEStorage storage,
             @Nullable AEKey key) {
         if (key == null) {
             return false;
@@ -204,11 +205,11 @@ public final class FactoryStorageActions {
             if (stack.isEmpty() || !AeKeySupport.item(stack).equals(key)) {
                 continue;
             }
-            long accepted = storage.insert(key, 1L, true);
+            long accepted = AeKeySupport.insert(storage, key, 1L, true);
             if (accepted <= 0L) {
                 return false;
             }
-            long inserted = storage.insert(key, accepted, false);
+            long inserted = AeKeySupport.insert(storage, key, accepted, false);
             if (inserted <= 0L) {
                 return false;
             }
@@ -218,7 +219,7 @@ public final class FactoryStorageActions {
         return false;
     }
 
-    private static boolean putFromInventory(ServerPlayer player, Storage storage,
+    private static boolean putFromInventory(ServerPlayer player, MEStorage storage,
             @Nullable AEKey key) {
         if (key == null) {
             return false;
@@ -228,11 +229,11 @@ public final class FactoryStorageActions {
             if (stack.isEmpty() || !AeKeySupport.item(stack).equals(key)) {
                 continue;
             }
-            long accepted = storage.insert(key, stack.getCount(), true);
+            long accepted = AeKeySupport.insert(storage, key, stack.getCount(), true);
             if (accepted <= 0L) {
                 return false;
             }
-            long inserted = storage.insert(key, accepted, false);
+            long inserted = AeKeySupport.insert(storage, key, accepted, false);
             if (inserted <= 0L) {
                 return false;
             }

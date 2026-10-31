@@ -9,6 +9,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import appeng.api.storage.MEStorage;
 
 /**
  * 工厂工作台菜单。
@@ -20,7 +21,7 @@ import net.minecraft.world.item.ItemStack;
  * 摆了也只影响客户端渲染。</p>
  *
  * <p>为什么不再继承（或持有）AE2 的 {@code MEStorageMenu}：仓库后端可能是箱子组，没有 ME 网络；
- * 走我们自己的 {@code Storage} 抽象，AE2 和容器是同一条路。</p>
+ * 走我们自己的 {@code MEStorage} 抽象，AE2 和容器是同一条路。</p>
  */
 public class FactoryMenu extends AbstractContainerMenu {
     /** 玩家背包槽位数（3×9 主背包 + 1×9 快捷栏）。 */

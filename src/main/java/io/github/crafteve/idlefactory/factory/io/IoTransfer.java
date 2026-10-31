@@ -1,8 +1,9 @@
 package io.github.crafteve.idlefactory.factory.io;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 import appeng.api.stacks.AEKey;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**
  * IO 的唯一写路径：feed（仓库 → 机器）和 pull（机器 → 仓库）。
@@ -26,7 +27,7 @@ public final class IoTransfer {
      * @param adapter 机器侧资源接口
      * @return 本次结果
      */
-    public static IoResult feed(Storage storage, ResourceAdapter adapter) {
+    public static IoResult feed(MEStorage storage, ResourceAdapter adapter) {
         long capacity = adapter.capacity();
         if (capacity <= 0L) {
             return new IoResult(0L, IoResult.Reason.NO_SPACE);
@@ -40,12 +41,12 @@ public final class IoTransfer {
         }
 
         // 1) 只按机器点头的量从仓库扣
-        long available = storage.extract(adapter.key(), Math.min(capacity, accepted), true);
+        long available = AeKeySupport.extract(storage, adapter.key(), Math.min(capacity, accepted), true);
         if (available <= 0L) {
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
         long want = Math.min(available, accepted);
-        long taken = storage.extract(adapter.key(), want, false);
+        long taken = AeKeySupport.extract(storage, adapter.key(), want, false);
         if (taken <= 0L) {
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
@@ -54,7 +55,7 @@ public final class IoTransfer {
         long inserted = adapter.insert(taken, false);
         long refund = taken - inserted;
         if (refund > 0L) {
-            long refunded = storage.insert(adapter.key(), refund, false);
+            long refunded = AeKeySupport.insert(storage, adapter.key(), refund, false);
             if (refunded < refund) {
                 IdleFactory.LOGGER.warn("IdleFactory IO refund failed: {} of {} {} could not go back",
                         refund - refunded, refund, adapter.key().getDisplayName().getString());
@@ -70,13 +71,13 @@ public final class IoTransfer {
      * @param adapter 机器侧资源接口
      * @return 本次结果
      */
-    public static IoResult pull(Storage storage, ResourceAdapter adapter) {
+    public static IoResult pull(MEStorage storage, ResourceAdapter adapter) {
         // 1) 先问仓库：这个资源收不收、收多少
         long available = adapter.extract(Long.MAX_VALUE, true);
         if (available <= 0L) {
             return new IoResult(0L, IoResult.Reason.NO_ITEM);
         }
-        long accepted = storage.insert(adapter.key(), available, true);
+        long accepted = AeKeySupport.insert(storage, adapter.key(), available, true);
         if (accepted <= 0L) {
             return new IoResult(0L, IoResult.Reason.NO_SPACE);
         }
@@ -90,7 +91,7 @@ public final class IoTransfer {
         }
 
         // 3) 真塞；塞不进的退回机器
-        long inserted = storage.insert(adapter.key(), taken, false);
+        long inserted = AeKeySupport.insert(storage, adapter.key(), taken, false);
         long refund = taken - inserted;
         if (refund > 0L) {
             adapter.insert(refund, false);

@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -74,7 +74,7 @@ public final class DiagChecks {
      */
     public static List<GroupCheck> checkAll(MinecraftServer server, Factory factory) {
         List<GroupCheck> result = new ArrayList<>();
-        Storage storage = factory.live().storage();
+        MEStorage storage = factory.live().storage();
         boolean online = factory.live().storageOnline();
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
@@ -103,7 +103,7 @@ public final class DiagChecks {
                 entry.ref(), entry.io(), runtime == null ? null : runtime.observations());
     }
 
-    private static GroupCheck checkGroup(MinecraftServer server, Storage storage, boolean online,
+    private static GroupCheck checkGroup(MinecraftServer server, MEStorage storage, boolean online,
             MachineRef machine, MachineIoGroup group, @Nullable ObservationService observations) {
         ServerLevel level = server.getLevel(machine.dimension());
         if (level == null) {
@@ -157,7 +157,7 @@ public final class DiagChecks {
         return simple(machine.id(), DiagEvent.Level.OK, "就绪");
     }
 
-    private static DiagEvent.Level checkInput(ServerLevel level, Storage storage, boolean online,
+    private static DiagEvent.Level checkInput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> checkItemInput(level, storage, online, machine, spec, problems);
@@ -166,7 +166,7 @@ public final class DiagChecks {
         };
     }
 
-    private static CheckResult checkOutput(ServerLevel level, Storage storage, boolean online,
+    private static CheckResult checkOutput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         return switch (AeKeySupport.kind(spec.key())) {
             case ITEM -> checkItemOutput(level, storage, online, machine, spec, problems);
@@ -179,7 +179,7 @@ public final class DiagChecks {
     // 物品
     // ------------------------------------------------------------------
 
-    private static DiagEvent.Level checkItemInput(ServerLevel level, Storage storage, boolean online,
+    private static DiagEvent.Level checkItemInput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
@@ -191,7 +191,7 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有物品能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(CapabilityKind.ITEM)) {
+        if (online && !AeKeySupport.hasAny(storage, CapabilityKind.ITEM)) {
             problems.add("仓库不支持物品");
             return DiagEvent.Level.WARN;
         }
@@ -209,7 +209,7 @@ public final class DiagChecks {
         return DiagEvent.Level.OK;
     }
 
-    private static CheckResult checkItemOutput(ServerLevel level, Storage storage, boolean online,
+    private static CheckResult checkItemOutput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
@@ -224,7 +224,7 @@ public final class DiagChecks {
         if (!containsItem(handler, spec)) {
             return new CheckResult(DiagEvent.Level.OK, true);
         }
-        if (online && storage.insert(spec.key(), 1L, true) <= 0L) {
+        if (online && AeKeySupport.insert(storage, spec.key(), 1L, true) <= 0L) {
             problems.add("仓库不收 " + shortName(spec.key()));
             return new CheckResult(DiagEvent.Level.WARN, false);
         }
@@ -235,7 +235,7 @@ public final class DiagChecks {
     // 流体
     // ------------------------------------------------------------------
 
-    private static DiagEvent.Level checkFluidInput(ServerLevel level, Storage storage, boolean online,
+    private static DiagEvent.Level checkFluidInput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
@@ -247,11 +247,11 @@ public final class DiagChecks {
             problems.add(faceLabel(spec) + "没有流体能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(CapabilityKind.FLUID)) {
+        if (online && !AeKeySupport.hasAny(storage, CapabilityKind.FLUID)) {
             problems.add("仓库不支持流体");
             return DiagEvent.Level.WARN;
         }
-        if (online && storage.extract(spec.key(), 1L, true) <= 0L) {
+        if (online && AeKeySupport.extract(storage, spec.key(), 1L, true) <= 0L) {
             problems.add("仓库没有 " + fluidName(fluid));
             return DiagEvent.Level.WARN;
         }
@@ -264,7 +264,7 @@ public final class DiagChecks {
         return DiagEvent.Level.OK;
     }
 
-    private static CheckResult checkFluidOutput(ServerLevel level, Storage storage, boolean online,
+    private static CheckResult checkFluidOutput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
@@ -279,7 +279,7 @@ public final class DiagChecks {
         if (!fluidContains(handler, fluid)) {
             return new CheckResult(DiagEvent.Level.OK, true);
         }
-        if (online && storage.insert(spec.key(), 1L, true) <= 0L) {
+        if (online && AeKeySupport.insert(storage, spec.key(), 1L, true) <= 0L) {
             problems.add("仓库不收 " + fluidName(fluid));
             return new CheckResult(DiagEvent.Level.WARN, false);
         }
@@ -290,18 +290,18 @@ public final class DiagChecks {
     // 能量
     // ------------------------------------------------------------------
 
-    private static DiagEvent.Level checkEnergyInput(ServerLevel level, Storage storage, boolean online,
+    private static DiagEvent.Level checkEnergyInput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         IEnergyStorage handler = energyReceiver(level, machine.pos(), spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有能量能力");
             return DiagEvent.Level.ERROR;
         }
-        if (online && !storage.supports(CapabilityKind.ENERGY)) {
+        if (online && !AeKeySupport.hasAny(storage, CapabilityKind.ENERGY)) {
             problems.add("仓库不支持 FE");
             return DiagEvent.Level.WARN;
         }
-        if (online && storage.extract(AeKeySupport.energy(), 1000L, true) <= 0L) {
+        if (online && AeKeySupport.extract(storage, AeKeySupport.energy(), 1000L, true) <= 0L) {
             problems.add("仓库没有 FE");
             return DiagEvent.Level.WARN;
         }
@@ -336,7 +336,7 @@ public final class DiagChecks {
         return level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null);
     }
 
-    private static CheckResult checkEnergyOutput(ServerLevel level, Storage storage, boolean online,
+    private static CheckResult checkEnergyOutput(ServerLevel level, MEStorage storage, boolean online,
             MachineRef machine, ResourceSpec spec, List<String> problems) {
         IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, machine.pos(), spec.face());
         if (handler == null) {
@@ -346,7 +346,7 @@ public final class DiagChecks {
         if (handler.getEnergyStored() <= 0) {
             return new CheckResult(DiagEvent.Level.OK, true);
         }
-        if (online && storage.insert(AeKeySupport.energy(), 1000L, true) <= 0L) {
+        if (online && AeKeySupport.insert(storage, AeKeySupport.energy(), 1000L, true) <= 0L) {
             problems.add("仓库不收 FE");
             return new CheckResult(DiagEvent.Level.WARN, false);
         }
@@ -388,11 +388,11 @@ public final class DiagChecks {
      * <p>精确规则直接模拟抽 1 个；模糊规则要扫快照看同 id 的任意变体，避免把「只有带组件
      * 变体」误报成缺料。</p>
      */
-    private static boolean hasItem(Storage storage, ResourceSpec spec) {
+    private static boolean hasItem(MEStorage storage, ResourceSpec spec) {
         if (!spec.fuzzy()) {
-            return storage.extract(spec.key(), 1L, true) > 0L;
+            return AeKeySupport.extract(storage, spec.key(), 1L, true) > 0L;
         }
-        for (AEKey key : storage.snapshot().keySet()) {
+        for (AEKey key : AeKeySupport.snapshot(storage).keySet()) {
             if ((key instanceof AEItemKey) && key.getId().equals(spec.key().getId())) {
                 return true;
             }

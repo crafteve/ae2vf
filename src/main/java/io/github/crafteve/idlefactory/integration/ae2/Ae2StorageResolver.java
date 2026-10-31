@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.integration.ae2;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
@@ -31,7 +31,7 @@ public final class Ae2StorageResolver implements StorageResolver {
 
     @Override
     @Nullable
-    public Storage resolve(StorageAnchor anchor) {
+    public MEStorage resolve(StorageAnchor anchor) {
         if (!(anchor instanceof MeAnchor me)) {
             return null;
         }

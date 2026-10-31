@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.Storage;
+import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -122,7 +122,7 @@ public final class GroupRunner {
      * @param now        当前服务端 tick，给变体索引算 TTL 与规则轮转
      * @return 本轮结果
      */
-    public static GroupRun run(Storage storage, ServerLevel level, BlockPos pos, MachineIoGroup group,
+    public static GroupRun run(MEStorage storage, ServerLevel level, BlockPos pos, MachineIoGroup group,
             @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation,
             @Nullable ItemVariantIndex variants, long now) {
         long fed = 0L;
@@ -279,7 +279,7 @@ public final class GroupRunner {
      * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
      * 取仓库变体索引、输出侧扫机器库存。</p>
      */
-    private static Adapters ruleAdapters(Storage storage, RuleResolver.Resolved resolved,
+    private static Adapters ruleAdapters(MEStorage storage, RuleResolver.Resolved resolved,
             ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
             int[] budget) {
         if (!(resolved.adapter() instanceof ItemAdapter base)) {
