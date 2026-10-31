@@ -7,10 +7,10 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -66,7 +66,7 @@ public final class Observation {
     private ResourceLocation lastBlockId;
     @Nullable
     private ResourceLocation beTypeId;
-    private final EnumSet<ResourceKind> presence = EnumSet.noneOf(ResourceKind.class);
+    private final EnumSet<CapabilityKind> presence = EnumSet.noneOf(CapabilityKind.class);
     private boolean legacyContainer;
     private long observedAtTick = -1L;
     private long missingSince = -1L;
@@ -153,7 +153,7 @@ public final class Observation {
     }
 
     /** 无向查询报告的能力（只读）。 */
-    public Set<ResourceKind> presence() {
+    public Set<CapabilityKind> presence() {
         return Collections.unmodifiableSet(this.presence);
     }
 

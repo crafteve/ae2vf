@@ -9,7 +9,6 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -40,7 +39,7 @@ import net.neoforged.neoforge.items.IItemHandler;
  */
 public final class LevelCapabilityCache {
     /** 缓存键：位置 + 能力种类 + 面（{@code null} 表示无向）。 */
-    private record Key(BlockPos pos, ResourceKind kind, @Nullable Direction face) {
+    private record Key(BlockPos pos, CapabilityKind kind, @Nullable Direction face) {
     }
 
     private final ServerLevel level;
@@ -75,7 +74,7 @@ public final class LevelCapabilityCache {
      */
     @Nullable
     public IItemHandler item(BlockPos pos, @Nullable Direction face) {
-        return (IItemHandler) get(pos, ResourceKind.ITEM, face);
+        return (IItemHandler) get(pos, CapabilityKind.ITEM, face);
     }
 
     /**
@@ -87,7 +86,7 @@ public final class LevelCapabilityCache {
      */
     @Nullable
     public IFluidHandler fluid(BlockPos pos, @Nullable Direction face) {
-        return (IFluidHandler) get(pos, ResourceKind.FLUID, face);
+        return (IFluidHandler) get(pos, CapabilityKind.FLUID, face);
     }
 
     /**
@@ -99,7 +98,7 @@ public final class LevelCapabilityCache {
      */
     @Nullable
     public IEnergyStorage energy(BlockPos pos, @Nullable Direction face) {
-        return (IEnergyStorage) get(pos, ResourceKind.ENERGY, face);
+        return (IEnergyStorage) get(pos, CapabilityKind.ENERGY, face);
     }
 
     /**
@@ -125,7 +124,7 @@ public final class LevelCapabilityCache {
     }
 
     @Nullable
-    private Object get(BlockPos pos, ResourceKind kind, @Nullable Direction face) {
+    private Object get(BlockPos pos, CapabilityKind kind, @Nullable Direction face) {
         Key key = new Key(pos.immutable(), kind, face);
         if (this.handlers.containsKey(key)) {
             return this.handlers.get(key);
@@ -135,7 +134,6 @@ public final class LevelCapabilityCache {
             case ITEM -> this.level.getCapability(Capabilities.ItemHandler.BLOCK, key.pos(), face);
             case FLUID -> this.level.getCapability(Capabilities.FluidHandler.BLOCK, key.pos(), face);
             case ENERGY -> this.level.getCapability(Capabilities.EnergyStorage.BLOCK, key.pos(), face);
-            case CHEMICAL -> null;
         };
         this.handlers.put(key, handler);
         return handler;

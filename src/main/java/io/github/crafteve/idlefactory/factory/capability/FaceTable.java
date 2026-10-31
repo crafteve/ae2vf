@@ -10,8 +10,6 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
-
 import net.minecraft.core.Direction;
 
 /**
@@ -26,14 +24,14 @@ import net.minecraft.core.Direction;
  * @param byFace  面 → 该面提供的能力；没有能力的面不会出现在表里
  * @param unsided 无向查询报告的能力
  */
-public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
-                        Set<ResourceKind> unsided) {
+public record FaceTable(Map<Direction, Set<CapabilityKind>> byFace,
+                        Set<CapabilityKind> unsided) {
 
     /** 什么都没有。 */
     public static final FaceTable EMPTY = new FaceTable(Map.of(), Set.of());
 
     public FaceTable {
-        Map<Direction, Set<ResourceKind>> copy = new EnumMap<>(Direction.class);
+        Map<Direction, Set<CapabilityKind>> copy = new EnumMap<>(Direction.class);
         byFace.forEach((face, kinds) -> copy.put(face, immutable(kinds)));
         byFace = Collections.unmodifiableMap(copy);
         unsided = immutable(unsided);
@@ -54,7 +52,7 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
      * @param face 面；{@code null} 表示无向
      * @return 能力集合（只读，空集表示没有）
      */
-    public Set<ResourceKind> at(@Nullable Direction face) {
+    public Set<CapabilityKind> at(@Nullable Direction face) {
         if (face == null) {
             return this.unsided;
         }
@@ -67,9 +65,9 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
      * @param kind 资源类型
      * @return 面集合；可能为空
      */
-    public EnumSet<Direction> facesFor(ResourceKind kind) {
+    public EnumSet<Direction> facesFor(CapabilityKind kind) {
         EnumSet<Direction> result = EnumSet.noneOf(Direction.class);
-        for (Map.Entry<Direction, Set<ResourceKind>> entry : this.byFace.entrySet()) {
+        for (Map.Entry<Direction, Set<CapabilityKind>> entry : this.byFace.entrySet()) {
             if (entry.getValue().contains(kind)) {
                 result.add(entry.getKey());
             }
@@ -83,7 +81,7 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
      * @param kind 资源类型
      * @return 有则为 {@code true}
      */
-    public boolean hasUnsided(ResourceKind kind) {
+    public boolean hasUnsided(CapabilityKind kind) {
         return this.unsided.contains(kind);
     }
 
@@ -92,8 +90,8 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
      *
      * @return 只读集合
      */
-    public Set<ResourceKind> union() {
-        EnumSet<ResourceKind> all = EnumSet.noneOf(ResourceKind.class);
+    public Set<CapabilityKind> union() {
+        EnumSet<CapabilityKind> all = EnumSet.noneOf(CapabilityKind.class);
         this.byFace.values().forEach(all::addAll);
         return Collections.unmodifiableSet(all);
     }
@@ -113,12 +111,12 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
      * @param kinds 能力集合
      * @return 摘要文本；空集合返回 {@code none}
      */
-    public static String describe(Collection<ResourceKind> kinds) {
+    public static String describe(Collection<CapabilityKind> kinds) {
         if (kinds.isEmpty()) {
             return "none";
         }
         StringBuilder builder = new StringBuilder();
-        for (ResourceKind kind : kinds) {
+        for (CapabilityKind kind : kinds) {
             if (builder.length() > 0) {
                 builder.append('+');
             }
@@ -127,8 +125,8 @@ public record FaceTable(Map<Direction, Set<ResourceKind>> byFace,
         return builder.toString();
     }
 
-    private static Set<ResourceKind> immutable(Collection<ResourceKind> kinds) {
-        EnumSet<ResourceKind> set = EnumSet.noneOf(ResourceKind.class);
+    private static Set<CapabilityKind> immutable(Collection<CapabilityKind> kinds) {
+        EnumSet<CapabilityKind> set = EnumSet.noneOf(CapabilityKind.class);
         set.addAll(kinds);
         return Collections.unmodifiableSet(set);
     }

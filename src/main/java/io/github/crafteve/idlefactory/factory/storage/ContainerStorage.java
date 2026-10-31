@@ -9,6 +9,7 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -811,7 +812,13 @@ public final class ContainerStorage implements Storage, MEStorage {
         if (!table.any()) {
             return EnumSet.allOf(Direction.class);
         }
-        return table.facesFor(kind);
+        CapabilityKind capability = switch (kind) {
+            case ITEM -> CapabilityKind.ITEM;
+            case FLUID -> CapabilityKind.FLUID;
+            case ENERGY -> CapabilityKind.ENERGY;
+            case CHEMICAL -> null;
+        };
+        return capability == null ? EnumSet.allOf(Direction.class) : table.facesFor(capability);
     }
 
     private static ItemStack itemSample(ResourceKey key) {

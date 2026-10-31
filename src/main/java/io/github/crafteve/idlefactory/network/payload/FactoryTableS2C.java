@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
 import io.github.crafteve.idlefactory.factory.resource.MatchMode;
 import io.github.crafteve.idlefactory.factory.resource.ResourceKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.resource.ResourceSpec;
 import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
@@ -141,7 +141,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         ResourceLocation blockId = readNullableResourceLocation(buf);
         ResourceLocation groupBlockId = readNullableResourceLocation(buf);
         ResourceLocation beTypeId = readNullableResourceLocation(buf);
-        Set<ResourceKind> presence = readKinds(buf.readUnsignedByte());
+        Set<CapabilityKind> presence = readKinds(buf.readUnsignedByte());
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
         List<Long> inputRates = readRates(buf, inputs.size());
@@ -237,17 +237,17 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         return rules;
     }
 
-    private static int kindMask(Set<ResourceKind> kinds) {
+    private static int kindMask(Set<CapabilityKind> kinds) {
         int mask = 0;
-        for (ResourceKind kind : kinds) {
+        for (CapabilityKind kind : kinds) {
             mask |= 1 << kind.ordinal();
         }
         return mask;
     }
 
-    private static Set<ResourceKind> readKinds(int mask) {
-        EnumSet<ResourceKind> kinds = EnumSet.noneOf(ResourceKind.class);
-        for (ResourceKind kind : ResourceKind.values()) {
+    private static Set<CapabilityKind> readKinds(int mask) {
+        EnumSet<CapabilityKind> kinds = EnumSet.noneOf(CapabilityKind.class);
+        for (CapabilityKind kind : CapabilityKind.values()) {
             if ((mask & (1 << kind.ordinal())) != 0) {
                 kinds.add(kind);
             }

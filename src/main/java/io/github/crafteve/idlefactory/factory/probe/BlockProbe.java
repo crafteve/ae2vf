@@ -8,9 +8,9 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.resource.ResourceKind;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -61,11 +61,11 @@ public final class BlockProbe {
     public record Presence(Health health,
                            @Nullable ResourceLocation blockId,
                            @Nullable ResourceLocation beTypeId,
-                           Set<ResourceKind> kinds,
+                           Set<CapabilityKind> kinds,
                            boolean legacyContainer) {
 
         public Presence {
-            EnumSet<ResourceKind> copy = EnumSet.noneOf(ResourceKind.class);
+            EnumSet<CapabilityKind> copy = EnumSet.noneOf(CapabilityKind.class);
             copy.addAll(kinds);
             kinds = Collections.unmodifiableSet(copy);
         }
@@ -115,7 +115,7 @@ public final class BlockProbe {
         }
 
         ResourceLocation beTypeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType());
-        EnumSet<ResourceKind> kinds = capabilities(level, pos, null);
+        EnumSet<CapabilityKind> kinds = capabilities(level, pos, null);
         boolean legacy = blockEntity instanceof Container;
         Health health = kinds.isEmpty() && !legacy ? Health.MISSING : Health.PRESENT;
         return new Presence(health, blockId, beTypeId, kinds, legacy);
@@ -169,9 +169,9 @@ public final class BlockProbe {
      * @return 面表；没有任何能力时是 {@link FaceTable#EMPTY}
      */
     public static FaceTable faces(ServerLevel level, BlockPos pos) {
-        Map<Direction, Set<ResourceKind>> byFace = new EnumMap<>(Direction.class);
+        Map<Direction, Set<CapabilityKind>> byFace = new EnumMap<>(Direction.class);
         for (Direction face : Direction.values()) {
-            EnumSet<ResourceKind> kinds = capabilities(level, pos, face);
+            EnumSet<CapabilityKind> kinds = capabilities(level, pos, face);
             if (!kinds.isEmpty()) {
                 byFace.put(face, kinds);
             }
@@ -180,16 +180,16 @@ public final class BlockProbe {
         return table.any() ? table : FaceTable.EMPTY;
     }
 
-    private static EnumSet<ResourceKind> capabilities(Level level, BlockPos pos, @Nullable Direction face) {
-        EnumSet<ResourceKind> kinds = EnumSet.noneOf(ResourceKind.class);
+    private static EnumSet<CapabilityKind> capabilities(Level level, BlockPos pos, @Nullable Direction face) {
+        EnumSet<CapabilityKind> kinds = EnumSet.noneOf(CapabilityKind.class);
         if (level.getCapability(Capabilities.ItemHandler.BLOCK, pos, face) != null) {
-            kinds.add(ResourceKind.ITEM);
+            kinds.add(CapabilityKind.ITEM);
         }
         if (level.getCapability(Capabilities.FluidHandler.BLOCK, pos, face) != null) {
-            kinds.add(ResourceKind.FLUID);
+            kinds.add(CapabilityKind.FLUID);
         }
         if (level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, face) != null) {
-            kinds.add(ResourceKind.ENERGY);
+            kinds.add(CapabilityKind.ENERGY);
         }
         return kinds;
     }

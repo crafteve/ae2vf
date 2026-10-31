@@ -6,6 +6,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
@@ -94,7 +95,7 @@ public final class FactorySnapshotBuilder {
      */
     public record MachineView(MachineRef ref, boolean machineMissing, Health health,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
-            @Nullable ResourceLocation beTypeId, Set<ResourceKind> presence, int ruleCount,
+            @Nullable ResourceLocation beTypeId, Set<CapabilityKind> presence, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
