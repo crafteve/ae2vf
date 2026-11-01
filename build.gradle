@@ -150,6 +150,9 @@ dependencies {
     // Mekanism：只用于本地运行期测试流体机器，不做编译依赖
     localRuntime("maven.modrinth:mekanism:${mekanism_version}")
 
+    // EMI：只用于本地运行期测试。AE2 1.21 起不再内置 JEI 配方转移，只内置 EMI。
+    localRuntime("maven.modrinth:emi:${emi_version}")
+
     // Applied Flux：可选 FE 存储附属，编译期依赖 + 默认本地运行期。
     // 加 -PwithoutAppFlux 可从运行期移除，用来验证「没装附属也能启动」。
     compileOnly("maven.modrinth:appflux:${appflux_version}")
