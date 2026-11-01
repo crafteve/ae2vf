@@ -96,7 +96,7 @@ public final class FactoryTerminalMenus {
         if (locator == null) {
             return false;
         }
-        player.closeContainer();
+        // 不先 closeContainer：那会让客户端有一帧「没有界面」，鼠标被拉回屏幕中心。
         return MenuOpener.open(menuType(next), player, locator);
     }
 

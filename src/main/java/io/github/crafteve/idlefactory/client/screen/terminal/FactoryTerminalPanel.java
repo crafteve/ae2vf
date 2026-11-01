@@ -16,14 +16,12 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSwitchC2S;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 工厂终端左面板的基类：生命周期、绘制、输入与滚动的统一骨架。
@@ -58,6 +56,15 @@ public abstract class FactoryTerminalPanel {
     protected FactoryTerminalPanel(int containerId, String switchLabel) {
         this.containerId = containerId;
         this.switchLabel = switchLabel;
+    }
+
+    /**
+     * 模式切换按钮的文字；屏幕用它创建 AE2 按钮。
+     *
+     * @return 按钮文字
+     */
+    public final String switchLabel() {
+        return this.switchLabel;
     }
 
     /**
@@ -134,9 +141,9 @@ public abstract class FactoryTerminalPanel {
      * @return 命中时为 {@code true}
      */
     public final boolean isMouseOver(double mouseX, double mouseY) {
-        // 最右侧一条留给 AE2 的竖向按钮栏：它画在面板底上，但点击必须交给终端自己处理。
-        return mouseX >= this.left
-                && mouseX < this.right() - FactoryTerminalGeometry.TOOLBAR_RESERVE
+        // 最左侧一条是 AE2 的竖向按钮栏：它画在面板底上，但点击必须交给终端自己处理。
+        return mouseX >= this.left + FactoryTerminalGeometry.TOOLBAR_RESERVE
+                && mouseX < this.right()
                 && mouseY >= this.top && mouseY < this.bottom();
     }
 
@@ -149,55 +156,14 @@ public abstract class FactoryTerminalPanel {
      */
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
         FactoryNineSlice.panel(graphics, this.left, this.top, this.width, this.height);
-        FactoryNineSlice.header(graphics, this.left + 3, this.top + 3,
-                this.width - 6, FactoryTerminalGeometry.HEADER_HEIGHT - 2);
-        graphics.drawString(this.font, this.title(), this.left + 6, this.top + 6,
+        int headerLeft = this.left + FactoryTerminalGeometry.TOOLBAR_RESERVE;
+        FactoryNineSlice.header(graphics, headerLeft, this.top + 3,
+                this.right() - headerLeft - 3, FactoryTerminalGeometry.HEADER_HEIGHT - 2);
+        graphics.drawString(this.font, this.title(), headerLeft + 3, this.top + 6,
                 FactoryTerminalGeometry.TEXT_COLOR, false);
-        graphics.drawString(this.font, this.subtitle(), this.left + 6,
+        graphics.drawString(this.font, this.subtitle(), headerLeft + 3,
                 this.top + FactoryTerminalGeometry.HEADER_HEIGHT + 3,
                 FactoryTerminalGeometry.TEXT_MUTED, false);
-        // 模式切换按钮放在标题右侧：两个视图各自只需要一个「去另一边」的入口。
-        int buttonWidth = this.switchButtonWidth();
-        int buttonLeft = this.switchButtonLeft();
-        FactoryNineSlice.button(graphics, buttonLeft, this.top + 3, buttonWidth,
-                FactoryTerminalGeometry.HEADER_HEIGHT - 4);
-        graphics.drawString(this.font, this.switchLabel,
-                buttonLeft + (buttonWidth - this.font.width(this.switchLabel)) / 2,
-                this.top + 5, FactoryTerminalGeometry.TEXT_COLOR, false);
-    }
-
-    /**
-     * 模式切换按钮宽度。
-     *
-     * @return 宽度
-     */
-    private int switchButtonWidth() {
-        return Math.max(24, this.font.width(this.switchLabel) + 8);
-    }
-
-    /**
-     * 模式切换按钮左边界；避开终端按钮栏占用的右侧一条。
-     *
-     * @return 左边界
-     */
-    private int switchButtonLeft() {
-        return this.right() - FactoryTerminalGeometry.TOOLBAR_RESERVE
-                - FactoryTerminalGeometry.CONTENT_PADDING - this.switchButtonWidth();
-    }
-
-    /**
-     * 鼠标是否点在模式切换按钮上。
-     *
-     * @param mouseX 鼠标 x
-     * @param mouseY 鼠标 y
-     * @return 命中时为 {@code true}
-     */
-    protected final boolean inSwitchButton(double mouseX, double mouseY) {
-        int buttonLeft = this.switchButtonLeft();
-        int buttonTop = this.top + 3;
-        return mouseX >= buttonLeft && mouseX < buttonLeft + this.switchButtonWidth()
-                && mouseY >= buttonTop
-                && mouseY < buttonTop + FactoryTerminalGeometry.HEADER_HEIGHT - 4;
     }
 
     /**
@@ -228,10 +194,6 @@ public abstract class FactoryTerminalPanel {
      * @return 是否消费该事件
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.inSwitchButton(mouseX, mouseY)) {
-            PacketDistributor.sendToServer(new FactoryTerminalSwitchC2S(this.containerId));
-            return true;
-        }
         return false;
     }
 

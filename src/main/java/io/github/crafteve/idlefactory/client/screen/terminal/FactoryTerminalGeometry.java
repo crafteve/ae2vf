@@ -12,8 +12,12 @@ public final class FactoryTerminalGeometry {
     public static final int PANEL_WIDTH = 195;
     /** 右侧 AE 终端宽度；必须与 AE2 终端样式图一致。 */
     public static final int TERMINAL_WIDTH = 195;
-    /** AE2 竖向按钮栏在终端左侧占用的宽度。 */
+    /** AE2 竖向按钮栏在窗口左侧占用的宽度。 */
     public static final int TOOLBAR_RESERVE = 24;
+    /** AE2 按钮栏里单个按钮的宽度。 */
+    private static final int TOOLBAR_BUTTON_WIDTH = 20;
+    /** 按钮栏到窗口左边缘的留白。 */
+    private static final int TOOLBAR_INSET = 4;
     /** 面板内容区左右内边距。 */
     public static final int CONTENT_PADDING = 4;
     /** 面板头部高度。 */
@@ -74,6 +78,15 @@ public final class FactoryTerminalGeometry {
      */
     public static int contentRight(int terminalLeft) {
         return contentLeft(terminalLeft) + contentWidth();
+    }
+
+    /**
+     * AE2 竖向按钮栏相对终端原点的 x 偏移：把按钮栏从终端左边缘挪到整个窗口最左。
+     *
+     * @return 负偏移
+     */
+    public static int toolbarOffsetX() {
+        return -(PANEL_WIDTH - TOOLBAR_INSET - 2 - TOOLBAR_BUTTON_WIDTH);
     }
 
     /**

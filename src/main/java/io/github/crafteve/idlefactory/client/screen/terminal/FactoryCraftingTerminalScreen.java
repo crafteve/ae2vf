@@ -4,6 +4,7 @@ import java.util.List;
 
 import appeng.client.gui.me.items.CraftingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.widgets.AE2Button;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
@@ -11,6 +12,7 @@ import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSwitchC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
@@ -19,6 +21,7 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 合成视图的屏幕：右半是 AE2 合成终端，左半是工厂被动 IO 面板。
@@ -58,6 +61,23 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         }
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
+        FactoryTerminalToolbar.moveToWindowLeft(this);
+        this.addSwitchButton();
+    }
+
+    /**
+     * 模式切换按钮走 AE2 按钮控件，位置在左面板标题右侧。
+     */
+    private void addSwitchButton() {
+        String label = this.panel.switchLabel();
+        int buttonWidth = Math.max(28, this.font.width(label) + 8);
+        AE2Button button = new AE2Button(Component.literal(label),
+                pressed -> PacketDistributor.sendToServer(new FactoryTerminalSwitchC2S(this.menu.containerId)));
+        button.setX(this.panel.left() + this.panel.width() - buttonWidth - 4);
+        button.setY(this.panel.top() + 2);
+        button.setWidth(buttonWidth);
+        button.setHeight(12);
+        this.addRenderableWidget(button);
     }
 
     @Override
@@ -75,8 +95,8 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
-            this.panel.mouseClicked(mouseX, mouseY, button);
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && this.panel.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);

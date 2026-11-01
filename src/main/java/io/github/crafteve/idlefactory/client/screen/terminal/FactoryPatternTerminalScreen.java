@@ -4,6 +4,7 @@ import java.util.List;
 
 import appeng.client.gui.me.items.PatternEncodingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.widgets.AE2Button;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
@@ -13,6 +14,7 @@ import io.github.crafteve.idlefactory.menu.FactoryPatternSlots;
 import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSwitchC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
@@ -22,6 +24,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 样板视图的屏幕：右半是 AE2 样板编码终端，左半是主动目标面板。
@@ -60,8 +63,25 @@ public final class FactoryPatternTerminalScreen
         }
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
+        FactoryTerminalToolbar.moveToWindowLeft(this);
+        this.addSwitchButton();
         this.positionPatternSlots();
         this.updatePatternSlotState();
+    }
+
+    /**
+     * 模式切换按钮走 AE2 按钮控件，位置在左面板标题右侧。
+     */
+    private void addSwitchButton() {
+        String label = this.panel.switchLabel();
+        int buttonWidth = Math.max(28, this.font.width(label) + 8);
+        AE2Button button = new AE2Button(Component.literal(label),
+                pressed -> PacketDistributor.sendToServer(new FactoryTerminalSwitchC2S(this.menu.containerId)));
+        button.setX(this.panel.left() + this.panel.width() - buttonWidth - 4);
+        button.setY(this.panel.top() + 2);
+        button.setWidth(buttonWidth);
+        button.setHeight(12);
+        this.addRenderableWidget(button);
     }
 
     /**
@@ -109,8 +129,8 @@ public final class FactoryPatternTerminalScreen
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         // 样板格是真实槽位，点在格子上时必须交给容器菜单，否则会被面板吞掉。
         if (this.panel.isMouseOver(mouseX, mouseY)
-                && !this.panel.inPatternGrid(mouseX, mouseY)) {
-            this.panel.mouseClicked(mouseX, mouseY, button);
+                && !this.panel.inPatternGrid(mouseX, mouseY)
+                && this.panel.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
