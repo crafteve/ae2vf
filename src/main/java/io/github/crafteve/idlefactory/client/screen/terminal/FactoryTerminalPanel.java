@@ -134,7 +134,9 @@ public abstract class FactoryTerminalPanel {
      * @return 命中时为 {@code true}
      */
     public final boolean isMouseOver(double mouseX, double mouseY) {
-        return mouseX >= this.left && mouseX < this.right()
+        // 最右侧一条留给 AE2 的竖向按钮栏：它画在面板底上，但点击必须交给终端自己处理。
+        return mouseX >= this.left
+                && mouseX < this.right() - FactoryTerminalGeometry.TOOLBAR_RESERVE
                 && mouseY >= this.top && mouseY < this.bottom();
     }
 
