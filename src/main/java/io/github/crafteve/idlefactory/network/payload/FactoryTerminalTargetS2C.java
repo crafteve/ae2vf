@@ -82,6 +82,9 @@ public record FactoryTerminalTargetS2C(int containerId, FactoryTerminalTargetKin
         int capacity = buf.readVarInt();
         int used = buf.readVarInt();
         int page = buf.readVarInt();
+        if (page < 0) {
+            throw new DecoderException("invalid pattern page: " + page);
+        }
         return new FactoryTerminalTargetS2C(containerId, kind, key, name, modeOrdinal, online,
                 capacity, used, page);
     }

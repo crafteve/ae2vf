@@ -62,7 +62,7 @@ public record FactoryTerminalSelectC2S(int containerId, String key,
                     || !FactoryTerminalMenus.isFactoryMenu(menu, payload.containerId())) {
                 return;
             }
-            if (menu.selectTarget(player, payload.key(), payload.page())) {
+            if (menu.selectTarget(payload.key(), payload.page())) {
                 FactoryTerminalSnapshots.sendDetail(player, payload.containerId(), payload.key(),
                     menu.page());
             }

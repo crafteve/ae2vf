@@ -69,12 +69,11 @@ public final class FactoryPatternTerminalMenu extends PatternEncodingTermMenu {
     /**
      * 选中一个目标并翻到指定页；由 C2S 负载调用，服务端重新按键解析。
      *
-     * @param player 玩家
-     * @param key    目标键
-     * @param page   页号；越界会被夹回第一页 / 最后一页
+     * @param key  目标键
+     * @param page 页号；越界会被夹回第一页 / 最后一页
      * @return 是否命中一个存在的目标
      */
-    public boolean selectTarget(ServerPlayer player, String key, int page) {
+    public boolean selectTarget(String key, int page) {
         if (this.targets == null) {
             return false;
         }
