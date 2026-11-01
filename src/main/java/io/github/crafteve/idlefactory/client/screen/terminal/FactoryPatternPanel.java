@@ -200,10 +200,14 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         if (!this.hasSelection()) {
             return false;
         }
-        int left = this.patternSlotX(0);
-        int top = this.patternSlotY(0);
-        return mouseX >= left && mouseX < left + CELL * 3
-                && mouseY >= top && mouseY < top + CELL * 3;
+        for (int i = 0; i < FactoryPatternSlotView.PAGE_SIZE; i++) {
+            int x = this.patternSlotX(i);
+            int y = this.patternSlotY(i);
+            if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void renderTargets(GuiGraphics graphics, int mouseX, int mouseY) {
