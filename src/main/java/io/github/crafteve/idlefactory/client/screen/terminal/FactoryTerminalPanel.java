@@ -148,22 +148,19 @@ public abstract class FactoryTerminalPanel {
     }
 
     /**
-     * 画面板底与标题条；屏幕的 {@code drawBG} 在画 AE 终端前调用。
+     * 画面板底与标题；屏幕的 {@code drawBG} 在画 AE 终端前调用。
+     *
+     * <p>底板直接用 AE2 的通用背景，和右侧终端同一张贴图；标题按 AE2 终端的
+     * {@code dialog_title} 位置（left 8 / top 6）只画一次，不再叠凸起顶栏框。</p>
      *
      * @param graphics 绘制器
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
-        FactoryNineSlice.panel(graphics, this.left, this.top, this.width, this.height);
-        int headerLeft = this.left + 3;
-        FactoryNineSlice.header(graphics, headerLeft, this.top + 3,
-                this.right() - headerLeft - 3, FactoryTerminalGeometry.HEADER_HEIGHT - 2);
-        graphics.drawString(this.font, this.title(), headerLeft + 3, this.top + 6,
+        FactoryNineSlice.terminalPanel(graphics, this.left, this.top, this.width, this.height);
+        graphics.drawString(this.font, this.title(), this.left + 8, this.top + 6,
                 FactoryTerminalGeometry.TEXT_COLOR, false);
-        graphics.drawString(this.font, this.subtitle(), headerLeft + 3,
-                this.top + FactoryTerminalGeometry.HEADER_HEIGHT + 3,
-                FactoryTerminalGeometry.TEXT_MUTED, false);
     }
 
     /**

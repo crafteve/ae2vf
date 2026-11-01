@@ -32,6 +32,18 @@ public final class FactoryNineSlice {
                 x, y, width, height);
     }
 
+    /**
+     * 画终端左面板底：直接用 AE2 的通用背景。
+     *
+     * <p>左面板与右侧 AE2 终端并排，只有用同一张 {@code guis/background.png} 才能让底部
+     * 的「白 + 阴影 + 深」和右侧终端逐像素一致；自己生成的面板贴图立体方向相反，接缝处会露馅。</p>
+     */
+    public static void terminalPanel(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, FactoryGuiTextures.AE2_BACKGROUND,
+                FactoryGuiTextures.AE2_BACKGROUND_SIZE,
+                FactoryGuiTextures.AE2_BACKGROUND_BORDER, x, y, width, height);
+    }
+
     /** 画凹槽格子。 */
     public static void slot(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, FactoryGuiTextures.SLOT, FactoryGuiTextures.SLOT_SIZE, 1, x, y, width, height);
@@ -103,6 +115,39 @@ public final class FactoryNineSlice {
     /** 画一张固定尺寸的小图标（不做九宫格拉伸）。 */
     public static void icon(GuiGraphics graphics, ResourceLocation texture, int x, int y, int size) {
         graphics.blit(texture, x, y, size, size, 0.0F, 0.0F, size, size, size, size);
+    }
+
+    /**
+     * 画 AE2 搜索框。
+     *
+     * <p>切法与 AE2 的 {@code AETextField.renderWidget} 一致：左端 1px、中间拉伸、右端 1px，
+     * 每段高 12。贴图纵向三段分别是普通 / 不可编辑 / 聚焦，左右搜索框都只用普通段，
+     * 保证外观完全相同。</p>
+     *
+     * @param graphics 绘制器
+     * @param x        左边界
+     * @param y        上边界
+     * @param width    宽度
+     */
+    public static void ae2TextField(GuiGraphics graphics, int x, int y, int width) {
+        int segment = FactoryGuiTextures.AE2_TEXT_FIELD_SEGMENT;
+        int size = FactoryGuiTextures.AE2_TEXT_FIELD_SIZE;
+        if (width <= 0) {
+            return;
+        }
+        int inner = width - 2;
+        if (inner <= 0) {
+            // 太窄时整段拉伸，避免算出负宽度。
+            graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x, y, width, segment,
+                    0.0F, 0.0F, width, segment, size, size);
+            return;
+        }
+        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x, y, 1, segment,
+                0.0F, 0.0F, 1, segment, size, size);
+        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x + 1, y, inner, segment,
+                1.0F, 0.0F, inner, segment, size, size);
+        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x + width - 1, y, 1, segment,
+                size - 1.0F, 0.0F, 1, segment, size, size);
     }
 
     /**

@@ -109,37 +109,29 @@ final class FactoryIoPanelRender {
         }
     }
 
-    private void renderHeader(GuiGraphics graphics) {
-        graphics.drawString(this.panel.font, "被动 IO", this.left() + 5,
-                this.top() + 5, FactoryTerminalGeometry.TEXT_COLOR, false);
-        int width = 88;
-        int x = this.right() - width - 4;
-        int y = this.top() + 2;
-        FactoryNineSlice.field(graphics, x, y, width, FactoryTerminalGeometry.SEARCH_HEIGHT);
-        this.drawMagnifier(graphics, x + 2, y + 3);
-        String text = this.panel.searchText.isEmpty() && !this.panel.searchFocused
-                ? "搜索" : this.panel.searchText;
-        int color = this.panel.searchText.isEmpty() && !this.panel.searchFocused
-                ? this.panel.theme.textDim() : this.panel.theme.textPrimary();
-        graphics.drawString(this.panel.font, text, x + 10, y + 3, color, false);
-        if (this.panel.searchFocused && (Util.getMillis() / 500L) % 2L == 0L) {
-            int caretX = x + 10 + this.panel.font.width(this.panel.searchText);
-            graphics.fill(caretX, y + 2, caretX + 1, y + 10, this.panel.theme.textPrimary());
-        }
-    }
-
     /**
-     * 画 5×5 的放大镜，避免为搜索框再引一张贴图。
+     * 画顶栏搜索框。
+     *
+     * <p>底板、尺寸、位置和文字色全部照 AE2 终端的搜索框来：同一张
+     * {@code text_field.png}、同一个 89×12 尺寸、同一组调色板颜色。标题由
+     * {@link FactoryTerminalPanel#renderBackground} 统一画一次，这里不再重复，
+     * 否则两处各画一遍会错开 1px 变成虚影。</p>
      *
      * @param graphics 绘制器
-     * @param x        左边界
-     * @param y        上边界
      */
-    private void drawMagnifier(GuiGraphics graphics, int x, int y) {
-        int color = this.panel.theme.textDim();
-        graphics.renderOutline(x, y, 5, 5, color);
-        graphics.fill(x + 4, y + 4, x + 7, y + 5, color);
-        graphics.fill(x + 5, y + 5, x + 7, y + 6, color);
+    private void renderHeader(GuiGraphics graphics) {
+        int x = this.left() + FactoryTerminalGeometry.SEARCH_LEFT;
+        int y = this.top() + FactoryTerminalGeometry.SEARCH_TOP;
+        FactoryNineSlice.ae2TextField(graphics, x, y, FactoryTerminalGeometry.SEARCH_WIDTH);
+        boolean empty = this.panel.searchText.isEmpty() && !this.panel.searchFocused;
+        String text = empty ? "搜索" : this.panel.searchText;
+        int color = empty ? FactoryTerminalGeometry.SEARCH_PLACEHOLDER
+                : FactoryTerminalGeometry.SEARCH_TEXT;
+        graphics.drawString(this.panel.font, text, x + 2, y + 2, color, false);
+        if (this.panel.searchFocused && (Util.getMillis() / 500L) % 2L == 0L) {
+            int caretX = x + 2 + this.panel.font.width(this.panel.searchText);
+            graphics.fill(caretX, y + 2, caretX + 1, y + 10, FactoryTerminalGeometry.SEARCH_TEXT);
+        }
     }
 
     private void drawMachine(GuiGraphics graphics, MachineRow row, int mouseX, int mouseY) {
@@ -308,10 +300,10 @@ final class FactoryIoPanelRender {
     }
 
     boolean inSearch(double mouseX, double mouseY) {
-        int x = this.right() - 88 - 4;
-        int y = this.top() + 2;
-        return mouseX >= x && mouseX < x + 88 && mouseY >= y
-                && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
+        int x = this.left() + FactoryTerminalGeometry.SEARCH_LEFT;
+        int y = this.top() + FactoryTerminalGeometry.SEARCH_TOP;
+        return mouseX >= x && mouseX < x + FactoryTerminalGeometry.SEARCH_WIDTH
+                && mouseY >= y && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
     }
 
     boolean inList(double mouseX, double mouseY) {
@@ -361,10 +353,6 @@ final class FactoryIoPanelRender {
 
     private int top() {
         return this.panel.top();
-    }
-
-    private int right() {
-        return this.panel.left() + this.panel.width();
     }
 
     int contentLeft() {

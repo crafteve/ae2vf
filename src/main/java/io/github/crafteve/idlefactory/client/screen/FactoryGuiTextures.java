@@ -103,6 +103,24 @@ public final class FactoryGuiTextures {
     /** 4×4 状态灯：空闲。 */
     public static final ResourceLocation STATUS_LAMP_IDLE = id("status_lamp_idle");
 
+    /**
+     * AE2 通用面板底：256×256，九宫格边框 4。
+     *
+     * <p>直接复用 AE2 的 {@code guis/background.png}，不再自己生成面板贴图：左面板要和右侧
+     * AE2 终端并排，只有用同一张底图才能保证上/左的深+白、下/右的白+阴影+深逐像素一致。</p>
+     */
+    public static final ResourceLocation AE2_BACKGROUND =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/background.png");
+
+    /**
+     * AE2 搜索框：128×128，纵向三段各 12 高（普通 / 不可编辑 / 聚焦）。
+     *
+     * <p>直接复用 AE2 的 {@code guis/text_field.png}，切法与 AE2 的 {@code AETextField}
+     * 完全相同，左右搜索框才会长得一样。</p>
+     */
+    public static final ResourceLocation AE2_TEXT_FIELD =
+            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/text_field.png");
+
     /** 面板贴图的边长（正方形，生成脚本里写死 10）。 */
     public static final int PANEL_SIZE = 10;
     /** 面板贴图的九宫格边框。 */
@@ -143,6 +161,14 @@ public final class FactoryGuiTextures {
     public static final int SORT_BUTTON_SIZE = 6;
     /** 排序图标边长。 */
     public static final int SORT_ICON_SIZE = 12;
+    /** AE2 通用面板底边长（正方形）。 */
+    public static final int AE2_BACKGROUND_SIZE = 256;
+    /** AE2 通用面板底九宫格边框；上/左 2px、下/右 4px，取大的 4 让底部阴影完整。 */
+    public static final int AE2_BACKGROUND_BORDER = 4;
+    /** AE2 搜索框贴图边长（正方形）。 */
+    public static final int AE2_TEXT_FIELD_SIZE = 128;
+    /** AE2 搜索框纵向每段高度。 */
+    public static final int AE2_TEXT_FIELD_SEGMENT = 12;
 
     private FactoryGuiTextures() {
         // 纯常量持有类

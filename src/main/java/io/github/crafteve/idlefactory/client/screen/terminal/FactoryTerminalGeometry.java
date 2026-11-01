@@ -14,10 +14,6 @@ public final class FactoryTerminalGeometry {
     public static final int TERMINAL_WIDTH = 195;
     /** AE2 竖向按钮栏在窗口左侧占用的宽度。 */
     public static final int TOOLBAR_RESERVE = 24;
-    /** 工具栏按钮边长；AE2 的按钮底图是 16×16。 */
-    private static final int TOOLBAR_BUTTON = 16;
-    /** 按钮栏到窗口左边缘的留白。 */
-    private static final int TOOLBAR_INSET = 2;
     /** 面板内容区左右内边距。 */
     public static final int CONTENT_PADDING = 4;
     /** 面板头部高度。 */
@@ -28,8 +24,18 @@ public final class FactoryTerminalGeometry {
     public static final int ICON_SIZE = 12;
     /** 搜索框高度。 */
     public static final int SEARCH_HEIGHT = 12;
-    /** 普通文本颜色；与 AE2 终端浅色底一致。 */
-    public static final int TEXT_COLOR = 0xFF404040;
+    /** 搜索框左边界（相对面板左上角）；与 AE2 终端样式里的 {@code widgets.search.left} 对齐。 */
+    public static final int SEARCH_LEFT = 80;
+    /** 搜索框上边界（相对面板左上角）；与 AE2 终端样式里的 {@code widgets.search.top} 对齐。 */
+    public static final int SEARCH_TOP = 4;
+    /** 搜索框宽度；与 AE2 终端样式里的 {@code widgets.search.width} 一致。 */
+    public static final int SEARCH_WIDTH = 89;
+    /** 搜索框占位文字颜色；取自 AE2 调色板的 {@code TEXTFIELD_PLACEHOLDER}。 */
+    public static final int SEARCH_PLACEHOLDER = 0xFFDEDFE3;
+    /** 搜索框输入文字颜色；取自 AE2 调色板的 {@code TEXTFIELD_TEXT}。 */
+    public static final int SEARCH_TEXT = 0xFFF2F2F2;
+    /** 普通文本颜色；与 AE2 终端的 {@code DEFAULT_TEXT_COLOR} 一致。 */
+    public static final int TEXT_COLOR = 0xFF413F54;
     /** 次要文本颜色。 */
     public static final int TEXT_MUTED = 0xFF707070;
     /** 选中行底色。 */
@@ -93,12 +99,16 @@ public final class FactoryTerminalGeometry {
     }
 
     /**
-     * AE2 竖向按钮栏相对终端原点的 x 偏移：把按钮栏放到左面板外侧的窗口最左一条。
+     * AE2 竖向按钮栏相对终端原点的 x 偏移：把按钮栏放到左面板外侧，并让按钮贴住面板左边框。
+     *
+     * <p>AE2 的 {@code VerticalButtonBar.updateBeforeRender} 把按钮右边缘放在
+     * {@code position.x - 2}，所以 position.x 取 {@code -PANEL_WIDTH + 2} 时按钮右边缘正好
+     * 落在面板左边缘上，中间不再留出会透出世界背景的竖缝。</p>
      *
      * @return 负偏移
      */
     public static int toolbarOffsetX() {
-        return -(PANEL_WIDTH + TOOLBAR_RESERVE) + TOOLBAR_INSET + 2 + TOOLBAR_BUTTON;
+        return -PANEL_WIDTH + 2;
     }
 
     /**
