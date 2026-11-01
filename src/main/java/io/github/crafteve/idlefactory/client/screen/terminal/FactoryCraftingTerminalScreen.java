@@ -49,7 +49,7 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         this.panel = new FactoryIoPanel(menu.containerId);
         this.panel.setFocusSink(() -> this.setFocused(null));
         // 切换按钮走 AE2 的左侧按钮栏，和排序/设置按钮同一条，不再单独画。
-        this.addToLeftToolbar(new FactoryTerminalViewButton(Icon.BACKGROUND_ENCODED_PATTERN, "样板视图",
+        this.addToLeftToolbar(new FactoryTerminalViewButton(Icon.PATTERN_TERMINAL_VISIBLE, "样板视图",
                 pressed -> PacketDistributor.sendToServer(
                         new FactoryTerminalSwitchC2S(menu.containerId))));
     }

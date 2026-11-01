@@ -10,7 +10,9 @@ import net.minecraft.network.chat.Component;
 /**
  * 左侧按钮栏里的视图切换按钮：AE2 图标按钮，和排序 / 设置按钮同一条。
  *
- * <p>图标由调用方给：合成视图显示「去样板」，样板视图显示「去合成」。</p>
+ * <p>尺寸保持 {@link IconButton} 默认的 16×16：按钮底图是 16×16 的
+ * {@code TOOLBAR_BUTTON_BACKGROUND}，改大只会让底图和图标错位。图标必须是 16×16 的
+ * 工具栏字形，不能拿 {@code BACKGROUND_*} 这类整格底图当图标。</p>
  */
 final class FactoryTerminalViewButton extends IconButton {
     /** 按钮图标。 */
@@ -24,8 +26,6 @@ final class FactoryTerminalViewButton extends IconButton {
     FactoryTerminalViewButton(Icon icon, String tooltip, Button.OnPress onPress) {
         super(onPress);
         this.icon = icon;
-        this.setWidth(20);
-        this.setHeight(20);
         this.setTooltip(Tooltip.create(Component.literal(tooltip)));
     }
 
