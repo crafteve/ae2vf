@@ -6,7 +6,6 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.client.gui.Icon;
-import appeng.core.definitions.AEParts;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
@@ -58,14 +57,8 @@ final class FactoryIoPanelRender {
             int inputY, int inputLines, int outputY, int outputLines, int endY) {
     }
 
-    /** 输入标识：AE2 的输入总线物品图标（蓝色向下箭头）。 */
-    @Nullable
-    private static ItemStack importIcon;
-    /** 输出标识：AE2 的输出总线物品图标（黄色向上箭头）。 */
-    @Nullable
-    private static ItemStack exportIcon;
-    /** 是否已经尝试取过总线图标；失败也记住，避免每帧重试。 */
-    private static boolean iconsResolved;
+    /** 机器图标的缩放：参考图的机器贴图比 16×16 小一圈。 */
+    private static final float MACHINE_ICON_SCALE = 0.75F;
 
     private final FactoryIoPanel panel;
 
@@ -188,17 +181,21 @@ final class FactoryIoPanelRender {
             graphics.fill(x, row.headerY(), x + width, row.headerY() + MACHINE_H,
                     FactoryTerminalGeometry.ROW_HOVER);
         }
-        // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景；三者按 16px 行高垂直居中。
+        // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景；图标按参考图缩小到 12×12。
         ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         if (!icon.isEmpty()) {
-            graphics.renderItem(icon, x, row.headerY());
+            graphics.pose().pushPose();
+            graphics.pose().translate(x, row.headerY() + 2, 0);
+            graphics.pose().scale(MACHINE_ICON_SCALE, MACHINE_ICON_SCALE, 1.0F);
+            graphics.renderItem(icon, 0, 0);
+            graphics.pose().popPose();
         }
         FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 6,
+        FactoryNineSlice.icon(graphics, status.lamp(), x + 14, row.headerY() + 6,
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
         graphics.drawString(this.panel.font,
-                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 30),
-                x + 25, row.headerY() + 4, this.panel.theme.textPrimary(), false);
+                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 24),
+                x + 20, row.headerY() + 4, this.panel.theme.textPrimary(), false);
         this.drawGroup(graphics, row, true, mouseX, mouseY);
         this.drawGroup(graphics, row, false, mouseX, mouseY);
     }
@@ -239,11 +236,11 @@ final class FactoryIoPanelRender {
     }
 
     /**
-     * 画输入 / 输出方向标识：直接用 AE2 的输入 / 输出总线物品图标。
+     * 画输入 / 输出方向标识：直接用 AE2 的读写权限图标。
      *
-     * <p>「蓝色向下箭头 + 总线方块」是 AE2 的 Import Bus 物品图标，「黄色向上箭头」是
-     * Export Bus；用物品图标而不是 states.png 里的白色箭头，语义和 AE2 自己的总线界面
-     * 一致。拿不到物品时退回白色方向箭头，界面不空着。</p>
+     * <p>{@code Icon.ACCESS_WRITE}（蓝色向上箭头 + 白色方块）表示写入机器，即输入；
+     * {@code Icon.ACCESS_READ}（橙色向下箭头）表示从机器读取，即输出。两个图标都在
+     * {@code states.png} 里，和 AE2 自己的存储总线界面用的是同一套。</p>
      *
      * @param graphics 绘制器
      * @param input    {@code true} 画输入图标，{@code false} 画输出图标
@@ -251,33 +248,10 @@ final class FactoryIoPanelRender {
      * @param y        上边界
      */
     private void drawSideMarker(GuiGraphics graphics, boolean input, int x, int y) {
-        resolveIcons();
-        ItemStack icon = input ? importIcon : exportIcon;
-        if (icon != null && !icon.isEmpty()) {
-            graphics.renderItem(icon, x, y);
-            return;
-        }
-        Icon marker = input ? Icon.ARROW_DOWN : Icon.ARROW_UP;
+        Icon marker = input ? Icon.ACCESS_WRITE : Icon.ACCESS_READ;
         graphics.blit(Icon.TEXTURE, x, y, marker.width, marker.height,
                 marker.x, marker.y, marker.width, marker.height,
                 Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
-    }
-
-    /**
-     * 取 AE2 的输入 / 输出总线物品图标；只取一次，失败也记住，避免每帧重试。
-     */
-    private static void resolveIcons() {
-        if (iconsResolved) {
-            return;
-        }
-        iconsResolved = true;
-        try {
-            importIcon = AEParts.IMPORT_BUS.stack();
-            exportIcon = AEParts.EXPORT_BUS.stack();
-        } catch (RuntimeException e) {
-            importIcon = null;
-            exportIcon = null;
-        }
     }
 
     private void drawPopup(GuiGraphics graphics) {
