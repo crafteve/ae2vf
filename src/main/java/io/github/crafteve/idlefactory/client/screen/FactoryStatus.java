@@ -120,7 +120,7 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      * @param theme   当前主题
      * @return 状态展示
      */
-    static FactoryStatus of(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
+    public static FactoryStatus of(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
         return of(kindOf(machine), machine, theme);
     }
 
