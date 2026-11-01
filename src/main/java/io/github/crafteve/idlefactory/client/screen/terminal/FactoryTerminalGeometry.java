@@ -24,6 +24,20 @@ public final class FactoryTerminalGeometry {
     public static final int ICON_SIZE = 12;
     /** 搜索框高度。 */
     public static final int SEARCH_HEIGHT = 12;
+    /** 输入/输出标识边长；直接用 AE2 的 16×16 方向箭头。 */
+    public static final int MARKER_SIZE = 16;
+    /** 输入/输出标识左边界（相对内容区左边界）。 */
+    public static final int MARKER_LEFT = 2;
+    /** 槽位行左边界（相对内容区左边界），要给左侧标识留出 16px 和 4px 间距。 */
+    public static final int SLOT_LEFT = 22;
+    /** 槽位块边长；含 1px 网格边，相邻两块拼成 2px 网格线。 */
+    public static final int SLOT_BLOCK = 18;
+    /** 槽位内部边长；物品图标正好 16×16 满格。 */
+    public static final int SLOT_INNER = 16;
+    /** 槽位列数。 */
+    public static final int SLOT_COLS = 9;
+    /** 工作区顶部内阴影高度。 */
+    public static final int WORK_SHADOW_HEIGHT = 2;
     /** 搜索框左边界（相对面板左上角）；与 AE2 终端样式里的 {@code widgets.search.left} 对齐。 */
     public static final int SEARCH_LEFT = 80;
     /** 搜索框上边界（相对面板左上角）；与 AE2 终端样式里的 {@code widgets.search.top} 对齐。 */

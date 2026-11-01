@@ -49,6 +49,17 @@ public final class FactoryNineSlice {
         slice(graphics, FactoryGuiTextures.SLOT, FactoryGuiTextures.SLOT_SIZE, 1, x, y, width, height);
     }
 
+    /**
+     * 画终端槽位：浅底 + 四边深网格线。
+     *
+     * <p>相邻槽位各带 1px 边，拼起来就是 2px 网格线；不要再用带亮边的 {@link #slot}，
+     * 那个是浅色面板上的内凹格，放到深色工作区里会亮得刺眼。</p>
+     */
+    public static void terminalSlot(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, FactoryGuiTextures.TERMINAL_SLOT,
+                FactoryGuiTextures.TERMINAL_SLOT_SIZE, 1, x, y, width, height);
+    }
+
     /** 画凸起按钮。 */
     public static void button(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, FactoryGuiTextures.BUTTON, FactoryGuiTextures.BUTTON_SIZE, 1, x, y, width, height);

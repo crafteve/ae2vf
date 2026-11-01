@@ -5,6 +5,8 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import appeng.client.gui.Icon;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
@@ -31,10 +33,10 @@ import net.minecraft.world.item.ItemStack;
 final class FactoryIoPanelRender {
     /** 机器标题行高。 */
     static final int MACHINE_H = 14;
-    /** 槽位边长。 */
-    static final int SLOT = 18;
+    /** 槽位块边长；含 1px 网格边，相邻两块拼成 2px 网格线。 */
+    static final int SLOT = FactoryTerminalGeometry.SLOT_BLOCK;
     /** 一行槽位数。 */
-    static final int COLS = 9;
+    static final int COLS = FactoryTerminalGeometry.SLOT_COLS;
     /** 输入 / 输出行之间的间距。 */
     static final int GROUP_GAP = 2;
     /** 机器之间的间距。 */
@@ -71,14 +73,15 @@ final class FactoryIoPanelRender {
      */
     void render(GuiGraphics graphics, int mouseX, int mouseY) {
         this.renderHeader(graphics);
+        this.drawWorkArea(graphics);
         if (!this.panel.hasFactory) {
-            graphics.drawString(this.panel.font, "还没有工厂", this.contentLeft(),
-                    this.listTop(), this.panel.theme.textDim(), false);
+            graphics.drawString(this.panel.font, "还没有工厂", this.contentLeft() + 4,
+                    this.listTop() + 4, this.panel.theme.textDim(), false);
             return;
         }
         if (this.panel.visible.isEmpty()) {
-            graphics.drawString(this.panel.font, "机器库为空", this.contentLeft(),
-                    this.listTop(), this.panel.theme.textDim(), false);
+            graphics.drawString(this.panel.font, "机器库为空", this.contentLeft() + 4,
+                    this.listTop() + 4, this.panel.theme.textDim(), false);
             return;
         }
         graphics.enableScissor(this.contentLeft(), this.listTop(),
@@ -134,23 +137,52 @@ final class FactoryIoPanelRender {
         }
     }
 
+    /**
+     * 画工作区底板：深灰蓝底 + 1px 白边框 + 顶部 2px 内阴影。
+     *
+     * <p>底板铺满内容区，把机器列表和右侧的空白一起框住；不画的话槽位行右侧会露出
+     * 面板浅色底，看起来像一条缝。</p>
+     *
+     * @param graphics 绘制器
+     */
+    private void drawWorkArea(GuiGraphics graphics) {
+        int x = this.contentLeft();
+        int y = this.listTop();
+        int width = this.contentWidth();
+        int height = this.listBottom() - y;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_BG, x, y, width, height);
+        // 1px 白边框；四边分开画，避免整块刷白。
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y + height - 1,
+                width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, 1, height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 1, y, 1,
+                height);
+        // 顶部内阴影，和参考图一样压暗 2px。
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_SHADOW, x + 1, y + 1,
+                width - 2, FactoryTerminalGeometry.WORK_SHADOW_HEIGHT);
+    }
+
     private void drawMachine(GuiGraphics graphics, MachineRow row, int mouseX, int mouseY) {
         FactorySnapshotBuilder.MachineView machine = row.machine();
-        int x = this.contentLeft();
-        int width = this.contentWidth();
+        int x = this.contentLeft() + FactoryTerminalGeometry.MARKER_LEFT;
+        int width = this.contentWidth() - FactoryTerminalGeometry.MARKER_LEFT;
         boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= row.headerY()
                 && mouseY < row.headerY() + MACHINE_H;
         if (hovered) {
             graphics.fill(x, row.headerY(), x + width, row.headerY() + MACHINE_H,
                     FactoryTerminalGeometry.ROW_HOVER);
         }
-        FactoryNineSlice.slot(graphics, x, row.headerY() - 1, 16, 16);
+        // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景。
         ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         if (!icon.isEmpty()) {
             graphics.renderItem(icon, x, row.headerY() - 1);
         }
         FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 3,
+        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 5,
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
         graphics.drawString(this.panel.font,
                 trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 30),
@@ -165,15 +197,15 @@ final class FactoryIoPanelRender {
         int x = this.contentLeft();
         int y = input ? row.inputY() : row.outputY();
         int lines = input ? row.inputLines() : row.outputLines();
-        int color = input ? this.panel.theme.accent() : this.panel.theme.statusWarn();
-        // 输入 / 输出标识：整组左侧一条竖条，和槽位行同高。
-        graphics.fill(x, y, x + 3, y + lines * SLOT, color);
+        // 输入 / 输出标识：AE2 的 16×16 方向箭头，垂直居中于整组槽位行。
+        this.drawSideMarker(graphics, input, x + FactoryTerminalGeometry.MARKER_LEFT,
+                y + (lines * SLOT - FactoryTerminalGeometry.MARKER_SIZE) / 2);
         for (int line = 0; line < lines; line++) {
             for (int col = 0; col < COLS; col++) {
                 int index = line * COLS + col;
-                int slotX = x + 6 + col * SLOT;
+                int slotX = x + FactoryTerminalGeometry.SLOT_LEFT + col * SLOT;
                 int slotY = y + line * SLOT;
-                FactoryNineSlice.slot(graphics, slotX, slotY, SLOT, SLOT);
+                FactoryNineSlice.terminalSlot(graphics, slotX, slotY, SLOT, SLOT);
                 if (index > rules.size()) {
                     continue;
                 }
@@ -184,7 +216,7 @@ final class FactoryIoPanelRender {
                             FactoryTerminalGeometry.ROW_HOVER);
                 }
                 if (index == rules.size()) {
-                    graphics.drawString(this.panel.font, "+", slotX + 5, slotY + 5,
+                    graphics.drawString(this.panel.font, "+", slotX + 6, slotY + 5,
                             hover ? this.panel.theme.accent() : this.panel.theme.textDim(), false);
                 } else {
                     FactoryResourceIconRender.draw(graphics, this.panel.font,
@@ -192,6 +224,24 @@ final class FactoryIoPanelRender {
                 }
             }
         }
+    }
+
+    /**
+     * 画输入 / 输出方向标识：直接用 AE2 的 16×16 方向箭头。
+     *
+     * <p>输入用向下箭头（物料进入机器），输出用向上箭头（物料离开机器），和 AE2
+     * 输入 / 输出总线上的箭头语义一致，不再用色条区分。</p>
+     *
+     * @param graphics 绘制器
+     * @param input    {@code true} 画输入箭头，{@code false} 画输出箭头
+     * @param x        左边界
+     * @param y        上边界
+     */
+    private void drawSideMarker(GuiGraphics graphics, boolean input, int x, int y) {
+        Icon marker = input ? Icon.ARROW_DOWN : Icon.ARROW_UP;
+        graphics.blit(Icon.TEXTURE, x, y, marker.width, marker.height,
+                marker.x, marker.y, marker.width, marker.height,
+                Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
     }
 
     private void drawPopup(GuiGraphics graphics) {
@@ -245,7 +295,8 @@ final class FactoryIoPanelRender {
                         if (index > rules.size()) {
                             continue;
                         }
-                        int slotX = this.contentLeft() + 6 + col * SLOT;
+                        int slotX = this.contentLeft() + FactoryTerminalGeometry.SLOT_LEFT
+                                + col * SLOT;
                         int slotY = y + line * SLOT;
                         if (mouseX >= slotX && mouseX < slotX + SLOT && mouseY >= slotY
                                 && mouseY < slotY + SLOT) {
@@ -421,7 +472,7 @@ final class FactoryIoPanelRender {
     List<FactoryTerminalDropArea> dropAreas() {
         List<FactoryTerminalDropArea> areas = new ArrayList<>();
         for (MachineRow row : this.machineRows()) {
-            int x = this.contentLeft() + 7;
+            int x = this.contentLeft() + FactoryTerminalGeometry.SLOT_LEFT;
             int width = COLS * SLOT;
             areas.add(new FactoryTerminalDropArea(new Rect2i(x, row.inputY(), width,
                     row.inputLines() * SLOT), IoSide.INPUT));

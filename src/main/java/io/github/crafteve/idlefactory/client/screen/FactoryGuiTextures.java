@@ -18,6 +18,12 @@ public final class FactoryGuiTextures {
     public static final ResourceLocation PANEL = id("panel");
     /** 凹槽格子：九宫格，边框 1。 */
     public static final ResourceLocation SLOT = id("slot");
+    /** 终端槽位：4×4 九宫格，浅底 + 四边深网格线，没有亮边。 */
+    public static final ResourceLocation TERMINAL_SLOT = id("terminal_slot");
+    /** 终端工作区底：1×1 深灰蓝，拉伸使用。 */
+    public static final ResourceLocation WORK_BG = id("work_bg");
+    /** 终端工作区内阴影：1×1，拉伸使用。 */
+    public static final ResourceLocation WORK_SHADOW = id("work_shadow");
     /** 仓库悬停格：18×18 固定贴图。 */
     public static final ResourceLocation SLOT_HOVER = id("slot_hover");
     /** 凸起按钮：九宫格，边框 1。 */
@@ -127,6 +133,8 @@ public final class FactoryGuiTextures {
     public static final int PANEL_BORDER = 3;
     /** 凹槽贴图的边长（4×4）。 */
     public static final int SLOT_SIZE = 4;
+    /** 终端槽位贴图的边长（4×4）。 */
+    public static final int TERMINAL_SLOT_SIZE = 4;
     /** 仓库悬停格边长。 */
     public static final int SLOT_HOVER_SIZE = 18;
     /** 按钮贴图的边长（6×6）。 */

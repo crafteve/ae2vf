@@ -37,6 +37,10 @@ SLOT_DARK = (0x87, 0x8F, 0xA5)
 SLOT_LIGHT = (0xF2, 0xF2, 0xF2)
 SLOT_HOVER_BG = (0xA6, 0xC4, 0xE6)
 
+# 终端工作区（对齐 AE2 样板管理终端：深色工作区 + 浅色槽位）
+WORK_BG = (0x9A, 0x9F, 0xB4)
+WORK_SHADOW = (0x69, 0x6D, 0x88)
+
 # 按钮
 BUTTON_BG = (0xD8, 0xD9, 0xDF)
 BUTTON_DARK = (0x87, 0x8F, 0xA5)
@@ -137,6 +141,20 @@ def slot(width: int = 4, height: int = 4, border: int = 1) -> Image.Image:
     rect(img, width - 1, 0, 1, height, SLOT_LIGHT)
     # 左下角跟随左/上暗边，右上角跟随下/右亮边
     img.load()[0, height - 1] = SLOT_DARK
+    return img
+
+
+def terminal_slot(width: int = 4, height: int = 4, border: int = 1) -> Image.Image:
+    """终端槽位：浅灰蓝底 + 四边深灰蓝网格线，没有亮边。
+
+    相邻两个槽位各带 1px 边，拼起来正好是 2px 网格线，和 AE2 样板管理终端的
+    「深色工作区 + 浅色槽位」一致。
+    """
+    img = Image.new("RGBA", (width, height), SLOT_BG)
+    rect(img, 0, 0, width, 1, SLOT_DARK)
+    rect(img, 0, height - 1, width, 1, SLOT_DARK)
+    rect(img, 0, 0, 1, height, SLOT_DARK)
+    rect(img, width - 1, 0, 1, height, SLOT_DARK)
     return img
 
 
@@ -456,6 +474,9 @@ SPECS = {
     # 文件名 -> (生成函数, 说明)
     "panel": (panel, "面板底：九宫格 border=3"),
     "slot": (slot, "凹槽格子：九宫格 border=1"),
+    "terminal_slot": (terminal_slot, "终端槽位：4×4 九宫格 border=1，浅底深网格线"),
+    "work_bg": (lambda: solid(WORK_BG), "终端工作区底：1×1"),
+    "work_shadow": (lambda: solid(WORK_SHADOW), "终端工作区内阴影：1×1"),
     "slot_hover": (slot_hover, "仓库悬停格：18×18 浅蓝底"),
     "button": (button, "凸起按钮：九宫格 border=1"),
     "button_match": (match_button, "黄色匹配按钮：九宫格 border=1"),
