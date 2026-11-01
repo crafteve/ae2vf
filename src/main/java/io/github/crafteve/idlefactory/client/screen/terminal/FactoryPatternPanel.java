@@ -5,7 +5,10 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import appeng.api.stacks.AEKey;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalTargetKind;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalTargets;
 import io.github.crafteve.idlefactory.menu.FactoryPatternSlotView;
@@ -55,7 +58,7 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
      * @param containerId 所属菜单容器 id
      */
     public FactoryPatternPanel(int containerId) {
-        super(containerId);
+        super(containerId, "合成");
     }
 
     @Override
@@ -110,6 +113,9 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         int row = this.targetRowAt(mouseY);
         if (row >= 0) {
             int index = this.firstRow + row;
@@ -262,6 +268,33 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         int color = this.feedbackOk ? this.theme.statusRun() : this.theme.error();
         graphics.drawString(this.font, this.trim(this.feedback, this.contentWidth() - 4),
                 this.contentLeft() + 2, this.bottom() - 12, color, false);
+    }
+
+    @Override
+    public FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
+        int row = this.targetRowAt(mouseY);
+        if (row < 0) {
+            return null;
+        }
+        int index = this.firstRow + row;
+        if (index >= this.targets.size()
+                || mouseX >= this.contentLeft() + FactoryTerminalGeometry.ICON_SIZE) {
+            return null;
+        }
+        FactoryTerminalTargetsS2C.Entry entry = this.targets.get(index);
+        return this.itemTarget(entry.icon(), this.contentLeft(),
+                this.listTop() + row * TARGET_ROW);
+    }
+
+    @Override
+    public boolean dropJeiKey(AEKey key, double mouseX, double mouseY) {
+        // 样板槽是真实槽位，JEI 拖拽走 AE2 自己的槽位交互，不需要额外区域。
+        return false;
+    }
+
+    @Override
+    public List<FactoryTerminalDropArea> jeiDropAreas() {
+        return List.of();
     }
 
     private int contentLeft() {

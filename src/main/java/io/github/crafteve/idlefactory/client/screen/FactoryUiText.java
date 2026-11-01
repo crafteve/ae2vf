@@ -201,7 +201,7 @@ public final class FactoryUiText {
      * @param key 资源
      * @return 物品栈
      */
-    static ItemStack iconStack(AEKey key) {
+    public static ItemStack iconStack(AEKey key) {
         return FactoryLabels.icon(key);
     }
 }

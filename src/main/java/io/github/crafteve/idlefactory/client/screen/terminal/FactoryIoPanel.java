@@ -7,9 +7,11 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactorySort;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
@@ -27,6 +29,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -77,7 +80,7 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
      * @param containerId 所属菜单容器 id
      */
     public FactoryIoPanel(int containerId) {
-        super(containerId);
+        super(containerId, "样板");
     }
 
     @Override
@@ -124,6 +127,9 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
         if (this.inSearch(mouseX, mouseY)) {
             this.focusSearch(true);
             return true;
@@ -470,6 +476,95 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         int color = this.feedbackOk ? this.theme.statusRun() : this.theme.error();
         graphics.drawString(this.font, trim(this.feedback, this.contentWidth() - 4),
                 this.contentLeft() + 2, this.bottom() - 12, color, false);
+    }
+
+    @Override
+    public FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
+        int x = this.contentLeft();
+        if (this.inMachineList(mouseX, mouseY)) {
+            int row = this.machineRowAt(mouseY);
+            int index = this.firstRow + row;
+            if (index >= 0 && index < this.visible.size()
+                    && mouseX < x + FactoryTerminalGeometry.ICON_SIZE) {
+                return this.itemTarget(
+                        FactoryLabels.blockStack(this.visible.get(index).blockId()),
+                        x, this.machinesTop() + row * MACHINE_ROW);
+            }
+        }
+        FactorySnapshotBuilder.MachineView machine = this.selected();
+        if (machine == null) {
+            return null;
+        }
+        int top = this.rulesTop();
+        int sectionHeight = (this.machinesBottom() - top) / 2;
+        FactoryScreen.JeiTarget input = this.ruleTargetAt(machine.inputs(), x, top,
+                sectionHeight, mouseX, mouseY);
+        if (input != null) {
+            return input;
+        }
+        return this.ruleTargetAt(machine.outputs(), x, top + sectionHeight, sectionHeight,
+                mouseX, mouseY);
+    }
+
+    @Override
+    public boolean dropJeiKey(AEKey key, double mouseX, double mouseY) {
+        FactorySnapshotBuilder.MachineView machine = this.selected();
+        if (machine == null) {
+            return false;
+        }
+        for (FactoryTerminalDropArea area : this.jeiDropAreas()) {
+            if (mouseX >= area.area().getX() && mouseX < area.area().getX() + area.area().getWidth()
+                    && mouseY >= area.area().getY()
+                    && mouseY < area.area().getY() + area.area().getHeight()) {
+                PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
+                        FactoryRuleActionC2S.Action.ADD, machine.ref().id(), area.side(), key, null,
+                        MatchMode.IGNORE_COMPONENTS));
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public List<FactoryTerminalDropArea> jeiDropAreas() {
+        if (this.selected() == null) {
+            return List.of();
+        }
+        int x = this.contentLeft();
+        int width = this.contentWidth();
+        int top = this.rulesTop();
+        int sectionHeight = (this.machinesBottom() - top) / 2;
+        return List.of(
+                new FactoryTerminalDropArea(new Rect2i(x, top, width, sectionHeight),
+                        IoSide.INPUT),
+                new FactoryTerminalDropArea(
+                        new Rect2i(x, top + sectionHeight, width, sectionHeight), IoSide.OUTPUT));
+    }
+
+    /**
+     * 规则图标命中：只认 16×16 图标区域。
+     *
+     * @param rules         规则列表
+     * @param x             区域左边界
+     * @param y             区域上边界
+     * @param sectionHeight 区域高度
+     * @param mouseX        鼠标 x
+     * @param mouseY        鼠标 y
+     * @return 目标；没命中时为 {@code null}
+     */
+    @Nullable
+    private FactoryScreen.JeiTarget ruleTargetAt(List<ResourceSpec> rules, int x, int y,
+            int sectionHeight, double mouseX, double mouseY) {
+        int maxRows = Math.max(0, (sectionHeight - SECTION_HEADER) / RULE_ROW);
+        int limit = Math.min(maxRows, rules.size());
+        for (int i = 0; i < limit; i++) {
+            int rowY = y + SECTION_HEADER + i * RULE_ROW;
+            if (mouseX >= x + 1 && mouseX < x + 1 + FactoryTerminalGeometry.ICON_SIZE
+                    && mouseY >= rowY && mouseY < rowY + FactoryTerminalGeometry.ICON_SIZE) {
+                return this.resourceTarget(rules.get(i).key(), x + 1, rowY);
+            }
+        }
+        return null;
     }
 
     private int contentLeft() {

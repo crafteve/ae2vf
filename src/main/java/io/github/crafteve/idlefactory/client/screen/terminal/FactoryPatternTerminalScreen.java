@@ -4,6 +4,9 @@ import java.util.List;
 
 import appeng.client.gui.me.items.PatternEncodingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.api.stacks.AEKey;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import appeng.menu.slot.AppEngSlot;
 
 import io.github.crafteve.idlefactory.menu.FactoryPatternSlots;
@@ -12,6 +15,8 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
+
+import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -27,7 +32,7 @@ import net.minecraft.world.inventory.Slot;
  */
 public final class FactoryPatternTerminalScreen
         extends PatternEncodingTermScreen<FactoryPatternTerminalMenu>
-        implements FactoryTerminalDisplay {
+        implements FactoryTerminalDisplay, FactoryTerminalJeiSource {
     /** 左面板。 */
     private final FactoryPatternPanel panel;
 
@@ -183,5 +188,20 @@ public final class FactoryPatternTerminalScreen
     @Override
     public void acceptTargetDetail(FactoryTerminalTargetS2C payload) {
         this.panel.acceptTargetDetail(payload);
+    }
+    @Override
+    @Nullable
+    public FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
+        return this.panel.jeiTargetAt(mouseX, mouseY);
+    }
+
+    @Override
+    public boolean dropJeiKey(AEKey key, double mouseX, double mouseY) {
+        return this.panel.dropJeiKey(key, mouseX, mouseY);
+    }
+
+    @Override
+    public List<FactoryTerminalDropArea> jeiDropAreas() {
+        return this.panel.jeiDropAreas();
     }
 }

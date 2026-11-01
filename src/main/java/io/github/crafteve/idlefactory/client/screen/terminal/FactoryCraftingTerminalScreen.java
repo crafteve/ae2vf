@@ -1,13 +1,20 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.List;
+
 import appeng.client.gui.me.items.CraftingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.api.stacks.AEKey;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 
 import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
+
+import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -22,7 +29,7 @@ import net.minecraft.world.entity.player.Inventory;
  * 这样槽位、搜索框、滚动条、按钮栏与升级面板一次对齐，没有事后补丁。</p>
  */
 public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<FactoryCraftingTerminalMenu>
-        implements FactoryTerminalDisplay {
+        implements FactoryTerminalDisplay, FactoryTerminalJeiSource {
     /** 左面板。 */
     private final FactoryIoPanel panel;
 
@@ -148,5 +155,20 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
     @Override
     public void acceptTargetDetail(FactoryTerminalTargetS2C payload) {
         // 合成视图没有主动目标。
+    }
+    @Override
+    @Nullable
+    public FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
+        return this.panel.jeiTargetAt(mouseX, mouseY);
+    }
+
+    @Override
+    public boolean dropJeiKey(AEKey key, double mouseX, double mouseY) {
+        return this.panel.dropJeiKey(key, mouseX, mouseY);
+    }
+
+    @Override
+    public List<FactoryTerminalDropArea> jeiDropAreas() {
+        return this.panel.jeiDropAreas();
     }
 }
