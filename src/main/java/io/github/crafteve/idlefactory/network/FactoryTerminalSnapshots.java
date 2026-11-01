@@ -69,11 +69,23 @@ public final class FactoryTerminalSnapshots {
      * @param key         目标键
      */
     public static void sendDetail(ServerPlayer player, int containerId, String key) {
+        sendDetail(player, containerId, key, 0);
+    }
+
+    /**
+     * 发一个目标的详情；键不存在时什么都不发。
+     *
+     * @param player      目标玩家
+     * @param containerId 菜单容器 id
+     * @param key         目标键
+     * @param page        当前样板页
+     */
+    public static void sendDetail(ServerPlayer player, int containerId, String key, int page) {
         FactoryRuntime runtime = FactoryRuntime.get();
         Optional<Factory> factory = runtime == null
                 ? Optional.empty() : runtime.manager().byOwner(player.getUUID());
         if (factory.isPresent()) {
-            sendDetail(player, containerId, key, factory.get());
+            sendDetail(player, containerId, key, factory.get(), page);
         }
     }
 
@@ -86,6 +98,20 @@ public final class FactoryTerminalSnapshots {
      * @param factory     拥有者工厂
      */
     public static void sendDetail(ServerPlayer player, int containerId, String key, Factory factory) {
+        sendDetail(player, containerId, key, factory, 0);
+    }
+
+    /**
+     * 发一个目标的详情；键不存在时什么都不发。
+     *
+     * @param player      目标玩家
+     * @param containerId 菜单容器 id
+     * @param key         目标键
+     * @param factory     拥有者工厂
+     * @param page        当前样板页
+     */
+    public static void sendDetail(ServerPlayer player, int containerId, String key, Factory factory,
+            int page) {
         FactoryTerminalTargets.Detail detail =
                 new FactoryTerminalTargets(factory, player).detail(key);
         if (detail == null) {
@@ -94,7 +120,7 @@ public final class FactoryTerminalSnapshots {
         int mode = detail.mode() == null ? -1 : detail.mode().ordinal();
         PacketDistributor.sendToPlayer(player, new FactoryTerminalTargetS2C(containerId,
                 detail.kind(), detail.key(), detail.name(), mode, detail.online(),
-                detail.capacity(), detail.used()));
+                detail.capacity(), detail.used(), page));
     }
 
     /**

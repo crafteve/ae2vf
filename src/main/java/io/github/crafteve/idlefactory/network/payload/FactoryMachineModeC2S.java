@@ -8,6 +8,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineMode;
+import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
 import io.github.crafteve.idlefactory.network.FactoryTerminalSnapshots;
@@ -80,8 +81,10 @@ public record FactoryMachineModeC2S(int containerId, UUID machineId,
             }
             runtime.nodeManager().refreshPatterns(machine.id());
             FactoryTableSnapshots.send(player, payload.containerId());
+            int page = player.containerMenu instanceof FactoryPatternTerminalMenu pattern
+                    ? pattern.page() : 0;
             FactoryTerminalSnapshots.sendDetail(player, payload.containerId(),
-                    FactoryTerminalSnapshots.machineKey(machine.id()), optional.get());
+                    FactoryTerminalSnapshots.machineKey(machine.id()), optional.get(), page);
             PacketDistributor.sendToPlayer(player, new FactoryEditFeedbackS2C(
                     payload.containerId(), true,
                     "已切换为" + (payload.mode() == MachineMode.ACTIVE ? "主动" : "被动") + "模式",

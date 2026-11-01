@@ -1,8 +1,12 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.List;
+
 import appeng.client.gui.me.items.PatternEncodingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.menu.slot.AppEngSlot;
 
+import io.github.crafteve.idlefactory.menu.FactoryPatternSlots;
 import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
@@ -12,6 +16,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 
 /**
  * 样板视图的屏幕：右半是 AE2 样板编码终端，左半是主动目标面板。
@@ -50,6 +55,36 @@ public final class FactoryPatternTerminalScreen
         }
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
+        this.positionPatternSlots();
+        this.updatePatternSlotState();
+    }
+
+    /**
+     * 没选目标时禁用 9 个样板槽：空槽还能点开会让人以为能往里放。
+     */
+    private void updatePatternSlotState() {
+        boolean enabled = this.panel.hasSelection();
+        for (Slot slot : this.menu.getSlots(FactoryPatternSlots.PATTERN_SLOT)) {
+            if (slot instanceof AppEngSlot appEngSlot) {
+                appEngSlot.setSlotEnabled(enabled);
+            }
+        }
+    }
+
+    /**
+     * 把菜单里的 9 个样板槽摆到左面板的 3×3 格子上。
+     *
+     * <p>槽位坐标是相对 {@code leftPos} 的，而左面板在 {@code leftPos} 左边，所以这里会得到
+     * 负的 x；渲染时 {@code AbstractContainerScreen} 统一加上 {@code leftPos}，位置正好落回
+     * 面板内。</p>
+     */
+    private void positionPatternSlots() {
+        List<Slot> slots = this.menu.getSlots(FactoryPatternSlots.PATTERN_SLOT);
+        for (int i = 0; i < slots.size(); i++) {
+            Slot slot = slots.get(i);
+            slot.x = this.panel.patternSlotX(i) - this.leftPos;
+            slot.y = this.panel.patternSlotY(i) - this.topPos;
+        }
     }
 
     @Override
@@ -122,6 +157,7 @@ public final class FactoryPatternTerminalScreen
     public void containerTick() {
         super.containerTick();
         this.panel.tick();
+        this.updatePatternSlotState();
     }
 
     @Override

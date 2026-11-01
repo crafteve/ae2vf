@@ -20,9 +20,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param containerId 菜单容器 id
  * @param key         目标稳定键
+ * @param page        样板页
  */
-public record FactoryTerminalSelectC2S(int containerId,
-        String key) implements CustomPacketPayload {
+public record FactoryTerminalSelectC2S(int containerId, String key,
+        int page) implements CustomPacketPayload {
     /** 键长度上限，与列表包一致。 */
     public static final int MAX_KEY = 128;
 
@@ -36,8 +37,10 @@ public record FactoryTerminalSelectC2S(int containerId,
                     (buf, payload) -> {
                         buf.writeVarInt(payload.containerId());
                         buf.writeUtf(payload.key(), MAX_KEY);
+                        buf.writeVarInt(payload.page());
                     },
-                    buf -> new FactoryTerminalSelectC2S(buf.readVarInt(), buf.readUtf(MAX_KEY)));
+                    buf -> new FactoryTerminalSelectC2S(buf.readVarInt(), buf.readUtf(MAX_KEY),
+                            buf.readVarInt()));
 
     @Override
     public Type<FactoryTerminalSelectC2S> type() {
@@ -59,8 +62,9 @@ public record FactoryTerminalSelectC2S(int containerId,
                     || !FactoryTerminalMenus.isFactoryMenu(menu, payload.containerId())) {
                 return;
             }
-            if (menu.selectTarget(player, payload.key())) {
-                FactoryTerminalSnapshots.sendDetail(player, payload.containerId(), payload.key());
+            if (menu.selectTarget(player, payload.key(), payload.page())) {
+                FactoryTerminalSnapshots.sendDetail(player, payload.containerId(), payload.key(),
+                    menu.page());
             }
         });
     }

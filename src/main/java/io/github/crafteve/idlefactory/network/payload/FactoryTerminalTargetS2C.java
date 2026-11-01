@@ -26,10 +26,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param online      目标是否在线
  * @param capacity    样板槽数
  * @param used        已放样板数
+ * @param page        当前样板页
  */
 public record FactoryTerminalTargetS2C(int containerId, FactoryTerminalTargetKind kind, String key,
         String name, int modeOrdinal, boolean online, int capacity,
-        int used) implements CustomPacketPayload {
+        int used, int page) implements CustomPacketPayload {
     /** 名字 / 键长度上限，与列表包一致。 */
     public static final int MAX_TEXT = 128;
 
@@ -65,6 +66,7 @@ public record FactoryTerminalTargetS2C(int containerId, FactoryTerminalTargetKin
         buf.writeBoolean(payload.online());
         buf.writeVarInt(payload.capacity());
         buf.writeVarInt(payload.used());
+        buf.writeVarInt(payload.page());
     }
 
     private static FactoryTerminalTargetS2C read(RegistryFriendlyByteBuf buf) {
@@ -79,7 +81,8 @@ public record FactoryTerminalTargetS2C(int containerId, FactoryTerminalTargetKin
         boolean online = buf.readBoolean();
         int capacity = buf.readVarInt();
         int used = buf.readVarInt();
+        int page = buf.readVarInt();
         return new FactoryTerminalTargetS2C(containerId, kind, key, name, modeOrdinal, online,
-                capacity, used);
+                capacity, used, page);
     }
 }
