@@ -28,6 +28,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -65,6 +66,12 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     int firstRow;
     /** 展开区的像素滚动。 */
     int detailScroll;
+    /** 中键配置框当前针对的规则命中；没打开时为 {@link FactoryIoPanelRender.Hit#NONE}。 */
+    int popupHit = FactoryIoPanelRender.Hit.NONE;
+    /** 配置框左上角 x。 */
+    int popupX;
+    /** 配置框左上角 y。 */
+    int popupY;
     /** 搜索原文。 */
     String searchText = "";
     /** 解析后的搜索条件。 */
@@ -102,7 +109,7 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
 
     @Override
     protected String subtitle() {
-        return "选择机器后编辑输入 / 输出规则";
+        return "";
     }
 
     @Override
@@ -114,6 +121,11 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
         super.renderBackground(graphics, mouseX, mouseY);
         this.render.render(graphics, mouseX, mouseY);
+    }
+
+    @Override
+    public void renderForeground(GuiGraphics graphics, int mouseX, int mouseY) {
+        this.render.renderForeground(graphics, mouseX, mouseY);
     }
 
     @Override
@@ -139,12 +151,17 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (this.render.inSearch(mouseX, mouseY)) {
-            this.focusSearch(true);
+        if (this.popupHit != FactoryIoPanelRender.Hit.NONE) {
+            int action = this.render.popupHit(mouseX, mouseY);
+            if (action >= 0) {
+                this.applyPopup(action);
+            } else {
+                this.popupHit = FactoryIoPanelRender.Hit.NONE;
+            }
             return true;
         }
-        if (this.render.inSort(mouseX, mouseY)) {
-            this.cycleSort(button == 1);
+        if (this.render.inSearch(mouseX, mouseY)) {
+            this.focusSearch(true);
             return true;
         }
         this.focusSearch(false);
@@ -158,9 +175,9 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             }
             return true;
         }
-        int hit = this.render.detailHit(mouseX, mouseY);
+        int hit = this.render.slotHit(mouseX, mouseY);
         if (hit != FactoryIoPanelRender.Hit.NONE) {
-            this.onDetailHit(hit);
+            this.onSlotClick(hit, mouseX, mouseY, button);
             return true;
         }
         int row = this.render.rowAt(mouseX, mouseY);
@@ -175,20 +192,111 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     }
 
     /**
-     * 处理展开区里的点击。
+     * 标记格点击：左键空位加规则，右键删规则，中键开配置框。
      *
-     * @param hit {@link FactoryIoPanelRender.Hit} 常量或规则下标
+     * @param hit    方格命中
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @param button 按键
      */
-    private void onDetailHit(int hit) {
-        if (hit == FactoryIoPanelRender.Hit.ADD_INPUT
-                || hit == FactoryIoPanelRender.Hit.EMPTY_INPUT) {
-            this.addRule(IoSide.INPUT);
-        } else if (hit == FactoryIoPanelRender.Hit.ADD_OUTPUT
+    private void onSlotClick(int hit, double mouseX, double mouseY, int button) {
+        if (hit == FactoryIoPanelRender.Hit.EMPTY_INPUT
                 || hit == FactoryIoPanelRender.Hit.EMPTY_OUTPUT) {
-            this.addRule(IoSide.OUTPUT);
-        } else {
-            this.removeRule(hit);
+            if (button == 0) {
+                this.addRule(hit == FactoryIoPanelRender.Hit.EMPTY_INPUT
+                        ? IoSide.INPUT : IoSide.OUTPUT);
+            }
+            return;
         }
+        if (button == 1) {
+            this.removeRule(hit);
+            return;
+        }
+        if (button == 2) {
+            this.popupHit = hit;
+            this.popupX = (int) Math.min(mouseX + 8,
+                    this.panelRight() - FactoryIoPanelRender.POPUP_W - 2);
+            this.popupY = (int) Math.min(mouseY - 20, this.bottom()
+                    - FactoryIoPanelRender.POPUP_ROW * 3 - 8);
+        }
+    }
+
+    /**
+     * 配置框选项：0 切面，1 切精准/模糊，2 删除。
+     *
+     * @param action 选项下标
+     */
+    private void applyPopup(int action) {
+        int hit = this.popupHit;
+        this.popupHit = FactoryIoPanelRender.Hit.NONE;
+        ResourceSpec rule = this.ruleOf(hit);
+        if (rule == null) {
+            return;
+        }
+        if (action == 2) {
+            this.removeRule(hit);
+            return;
+        }
+        boolean input = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE;
+        int index = input ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
+                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
+        UUID machineId = this.selected().ref().id();
+        PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
+                FactoryRuleActionC2S.Action.REMOVE, machineId,
+                input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), null, MatchMode.IGNORE_COMPONENTS));
+        if (action == 0) {
+            PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
+                    FactoryRuleActionC2S.Action.ADD, machineId,
+                    input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), nextFace(rule.face()),
+                    rule.mode()));
+        } else {
+            MatchMode mode = rule.mode() == MatchMode.IGNORE_COMPONENTS
+                    ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
+            PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
+                    FactoryRuleActionC2S.Action.ADD, machineId,
+                    input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), rule.face(), mode));
+        }
+        this.feedback = "已更新规则 #" + (index + 1);
+        this.feedbackOk = true;
+        this.feedbackUntil = Util.getMillis() + FEEDBACK_MILLIS;
+    }
+
+    @Nullable
+    private ResourceSpec ruleOf(int hit) {
+        FactorySnapshotBuilder.MachineView machine = this.selected();
+        if (machine == null) {
+            return null;
+        }
+        boolean input = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE;
+        int index = input ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
+                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
+        List<ResourceSpec> rules = input ? machine.inputs() : machine.outputs();
+        return index >= 0 && index < rules.size() ? rules.get(index) : null;
+    }
+
+    /**
+     * 循环到下一个面：不限面 → 下 → 上 → 北 → 南 → 西 → 东。
+     *
+     * @param face 当前面
+     * @return 下一个面
+     */
+    @Nullable
+    private static Direction nextFace(@Nullable Direction face) {
+        if (face == null) {
+            return Direction.DOWN;
+        }
+        return switch (face) {
+            case DOWN -> Direction.UP;
+            case UP -> Direction.NORTH;
+            case NORTH -> Direction.SOUTH;
+            case SOUTH -> Direction.WEST;
+            case WEST -> Direction.EAST;
+            case EAST -> null;
+        };
+    }
+
+    private int panelRight() {
+        return this.left() + this.width();
     }
 
     @Override
@@ -265,6 +373,27 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             }
         }
         return null;
+    }
+
+    /** 配置框是否打开。 */
+    boolean popupOpen() {
+        return this.popupHit != FactoryIoPanelRender.Hit.NONE;
+    }
+
+    /** 配置框针对的规则；规则已被删掉时为 {@code null}。 */
+    @Nullable
+    ResourceSpec popupRule() {
+        return this.ruleOf(this.popupHit);
+    }
+
+    /** 配置框左上角 x。 */
+    int popupX() {
+        return this.popupX;
+    }
+
+    /** 配置框左上角 y。 */
+    int popupY() {
+        return this.popupY;
     }
 
     /**

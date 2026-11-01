@@ -3,13 +3,13 @@ package io.github.crafteve.idlefactory.client.screen.terminal;
 /**
  * 工厂终端左面板与右终端共用的尺寸常量。
  *
- * <p>窗口是「按钮带 + 左 420 管理面板 + 右 195 AE 终端」，总宽 639。左面板按旧工作台
- * 的表格宽度定：一行一台机器，机器 / 状态 / 输入 / 输出四列加展开区，195 放不下。
+ * <p>窗口是「按钮带 + 左 195 管理面板 + 右 195 AE 终端」，总宽 414。左面板按 AE 总线
+ * 的标记格布局定：一行 9 格，信息只走 tooltip。
  * 所有坐标都从终端原点推算，避免屏幕缩放时两块各算一份。</p>
  */
 public final class FactoryTerminalGeometry {
     /** 左管理面板宽度；按旧工作台四列布局定。 */
-    public static final int PANEL_WIDTH = 420;
+    public static final int PANEL_WIDTH = 195;
     /** 右侧 AE 终端宽度；必须与 AE2 终端样式图一致。 */
     public static final int TERMINAL_WIDTH = 195;
     /** AE2 竖向按钮栏在窗口左侧占用的宽度。 */
