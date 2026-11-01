@@ -189,6 +189,23 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         return this.detail != null;
     }
 
+    /**
+     * 鼠标是否落在 3×3 样板格上；屏幕据此把事件让给真实槽位。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 命中格子时为 {@code true}
+     */
+    public boolean inPatternGrid(double mouseX, double mouseY) {
+        if (!this.hasSelection()) {
+            return false;
+        }
+        int left = this.patternSlotX(0);
+        int top = this.patternSlotY(0);
+        return mouseX >= left && mouseX < left + CELL * 3
+                && mouseY >= top && mouseY < top + CELL * 3;
+    }
+
     private void renderTargets(GuiGraphics graphics, int mouseX, int mouseY) {
         int x = this.contentLeft();
         int width = this.contentWidth();

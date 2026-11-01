@@ -84,8 +84,8 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
-            this.panel.mouseReleased(mouseX, mouseY, button);
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && this.panel.mouseReleased(mouseX, mouseY, button)) {
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -94,8 +94,8 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
             double dragY) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
-            this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);

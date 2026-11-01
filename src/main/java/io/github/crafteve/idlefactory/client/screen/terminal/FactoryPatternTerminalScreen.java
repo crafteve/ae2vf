@@ -107,7 +107,9 @@ public final class FactoryPatternTerminalScreen
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
+        // 样板格是真实槽位，点在格子上时必须交给容器菜单，否则会被面板吞掉。
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && !this.panel.inPatternGrid(mouseX, mouseY)) {
             this.panel.mouseClicked(mouseX, mouseY, button);
             return true;
         }
@@ -116,8 +118,9 @@ public final class FactoryPatternTerminalScreen
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
-            this.panel.mouseReleased(mouseX, mouseY, button);
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && !this.panel.inPatternGrid(mouseX, mouseY)
+                && this.panel.mouseReleased(mouseX, mouseY, button)) {
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -126,8 +129,9 @@ public final class FactoryPatternTerminalScreen
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
             double dragY) {
-        if (this.panel.isMouseOver(mouseX, mouseY)) {
-            this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        if (this.panel.isMouseOver(mouseX, mouseY)
+                && !this.panel.inPatternGrid(mouseX, mouseY)
+                && this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
