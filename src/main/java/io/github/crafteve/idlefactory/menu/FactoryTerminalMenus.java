@@ -72,7 +72,11 @@ public final class FactoryTerminalMenus {
             openLegacy(player);
             return true;
         }
-        return MenuOpener.open(menuType(view(player)), player, locator);
+        if (!MenuOpener.open(menuType(view(player)), player, locator)) {
+            // 宿主对不上（例如手持物在发包前被换掉）时退回旧界面，至少不是点了没反应。
+            openLegacy(player);
+        }
+        return true;
     }
 
     /**
@@ -89,10 +93,10 @@ public final class FactoryTerminalMenus {
         View next = view(player) == View.CRAFTING ? View.PATTERN : View.CRAFTING;
         VIEWS.put(player.getUUID(), next);
         MenuHostLocator locator = menu.getLocator();
-        player.closeContainer();
         if (locator == null) {
             return false;
         }
+        player.closeContainer();
         return MenuOpener.open(menuType(next), player, locator);
     }
 
@@ -151,7 +155,11 @@ public final class FactoryTerminalMenus {
         if (hand != null) {
             ItemStack held = player.getItemInHand(hand);
             if (held.getItem() instanceof FactoryTerminalItem) {
-                return MenuLocators.forHand(player, hand);
+                try {
+                    return MenuLocators.forHand(player, hand);
+                } catch (IllegalArgumentException e) {
+                    // 物品不在背包索引里（被别的逻辑换过），退回扫背包。
+                }
             }
         }
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
