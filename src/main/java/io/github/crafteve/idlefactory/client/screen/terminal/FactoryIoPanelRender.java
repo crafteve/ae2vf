@@ -174,24 +174,24 @@ final class FactoryIoPanelRender {
         int y = input ? row.inputY() : row.outputY();
         int lines = input ? row.inputLines() : row.outputLines();
         int color = input ? this.panel.theme.accent() : this.panel.theme.statusWarn();
-        graphics.fill(x + 1, y + 3, x + 4, y + 3 + 5, color);
+        // 输入 / 输出标识：整组左侧一条竖条，和槽位行同高。
+        graphics.fill(x, y, x + 3, y + lines * SLOT, color);
         for (int line = 0; line < lines; line++) {
             for (int col = 0; col < COLS; col++) {
                 int index = line * COLS + col;
-                if (index > rules.size()) {
-                    break;
-                }
-                int slotX = x + 7 + col * SLOT;
+                int slotX = x + 6 + col * SLOT;
                 int slotY = y + line * SLOT;
-                boolean empty = index == rules.size();
+                FactoryNineSlice.slot(graphics, slotX, slotY, SLOT, SLOT);
+                if (index > rules.size()) {
+                    continue;
+                }
                 boolean hover = mouseX >= slotX && mouseX < slotX + SLOT
                         && mouseY >= slotY && mouseY < slotY + SLOT;
-                FactoryNineSlice.slot(graphics, slotX, slotY, SLOT, SLOT);
-                if (hover) {
+                if (hover && index <= rules.size()) {
                     graphics.fill(slotX + 1, slotY + 1, slotX + SLOT - 1, slotY + SLOT - 1,
                             FactoryTerminalGeometry.ROW_HOVER);
                 }
-                if (empty) {
+                if (index == rules.size()) {
                     graphics.drawString(this.panel.font, "+", slotX + 5, slotY + 5,
                             hover ? this.panel.theme.accent() : this.panel.theme.textDim(), false);
                 } else {
@@ -251,9 +251,9 @@ final class FactoryIoPanelRender {
                     for (int col = 0; col < COLS; col++) {
                         int index = line * COLS + col;
                         if (index > rules.size()) {
-                            break;
+                            continue;
                         }
-                        int slotX = this.contentLeft() + 7 + col * SLOT;
+                        int slotX = this.contentLeft() + 6 + col * SLOT;
                         int slotY = y + line * SLOT;
                         if (mouseX >= slotX && mouseX < slotX + SLOT && mouseY >= slotY
                                 && mouseY < slotY + SLOT) {
