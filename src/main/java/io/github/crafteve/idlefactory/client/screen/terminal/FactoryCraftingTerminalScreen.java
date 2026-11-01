@@ -2,9 +2,9 @@ package io.github.crafteve.idlefactory.client.screen.terminal;
 
 import java.util.List;
 
+import appeng.client.gui.Icon;
 import appeng.client.gui.me.items.CraftingTermScreen;
 import appeng.client.gui.style.ScreenStyle;
-import appeng.client.gui.widgets.AE2Button;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
@@ -49,7 +49,7 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         this.panel = new FactoryIoPanel(menu.containerId);
         this.panel.setFocusSink(() -> this.setFocused(null));
         // 切换按钮走 AE2 的左侧按钮栏，和排序/设置按钮同一条，不再单独画。
-        this.addToLeftToolbar(new AE2Button(Component.literal(this.panel.switchLabel()),
+        this.addToLeftToolbar(new FactoryTerminalViewButton(Icon.BACKGROUND_ENCODED_PATTERN, "样板视图",
                 pressed -> PacketDistributor.sendToServer(
                         new FactoryTerminalSwitchC2S(menu.containerId))));
     }
