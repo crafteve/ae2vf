@@ -48,6 +48,10 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         super(menu, inventory, title, style);
         this.panel = new FactoryIoPanel(menu.containerId);
         this.panel.setFocusSink(() -> this.setFocused(null));
+        // 切换按钮走 AE2 的左侧按钮栏，和排序/设置按钮同一条，不再单独画。
+        this.addToLeftToolbar(new AE2Button(Component.literal(this.panel.switchLabel()),
+                pressed -> PacketDistributor.sendToServer(
+                        new FactoryTerminalSwitchC2S(menu.containerId))));
     }
 
     @Override
@@ -63,22 +67,6 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
         FactoryTerminalToolbar.moveToWindowLeft(this);
-        this.addSwitchButton();
-    }
-
-    /**
-     * 模式切换按钮走 AE2 按钮控件，位置在左面板标题右侧。
-     */
-    private void addSwitchButton() {
-        String label = this.panel.switchLabel();
-        int buttonWidth = Math.max(28, this.font.width(label) + 8);
-        AE2Button button = new AE2Button(Component.literal(label),
-                pressed -> PacketDistributor.sendToServer(new FactoryTerminalSwitchC2S(this.menu.containerId)));
-        button.setX(this.panel.left() + this.panel.width() - buttonWidth - 4);
-        button.setY(this.panel.top() + 2);
-        button.setWidth(buttonWidth);
-        button.setHeight(12);
-        this.addRenderableWidget(button);
     }
 
     @Override
