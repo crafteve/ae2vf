@@ -6,6 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.client.gui.Icon;
+import appeng.core.definitions.AEParts;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
@@ -31,14 +32,16 @@ import net.minecraft.world.item.ItemStack;
  * 全在 tooltip。中键槽位弹配置框。</p>
  */
 final class FactoryIoPanelRender {
-    /** 机器标题行高。 */
-    static final int MACHINE_H = 14;
+    /** 机器标题行高；和 16×16 机器图标同高，图标不用再上下各溢 1px。 */
+    static final int MACHINE_H = 16;
     /** 槽位块边长；含 1px 网格边，相邻两块拼成 2px 网格线。 */
     static final int SLOT = FactoryTerminalGeometry.SLOT_BLOCK;
     /** 一行槽位数。 */
     static final int COLS = FactoryTerminalGeometry.SLOT_COLS;
-    /** 输入 / 输出行之间的间距。 */
-    static final int GROUP_GAP = 2;
+    /** 输入 / 输出行之间的间距；0 表示两行直接拼成 2px 网格线，不再留缝。 */
+    static final int GROUP_GAP = 0;
+    /** 列表内容相对工作区顶部的下移量：1px 边框 + 2px 内阴影。 */
+    static final int WORK_CONTENT_TOP = 3;
     /** 机器之间的间距。 */
     static final int MACHINE_GAP = 6;
     /** 配置框宽度。 */
@@ -54,6 +57,15 @@ final class FactoryIoPanelRender {
     private record MachineRow(FactorySnapshotBuilder.MachineView machine, int index, int headerY,
             int inputY, int inputLines, int outputY, int outputLines, int endY) {
     }
+
+    /** 输入标识：AE2 的输入总线物品图标（蓝色向下箭头）。 */
+    @Nullable
+    private static ItemStack importIcon;
+    /** 输出标识：AE2 的输出总线物品图标（黄色向上箭头）。 */
+    @Nullable
+    private static ItemStack exportIcon;
+    /** 是否已经尝试取过总线图标；失败也记住，避免每帧重试。 */
+    private static boolean iconsResolved;
 
     private final FactoryIoPanel panel;
 
@@ -176,17 +188,17 @@ final class FactoryIoPanelRender {
             graphics.fill(x, row.headerY(), x + width, row.headerY() + MACHINE_H,
                     FactoryTerminalGeometry.ROW_HOVER);
         }
-        // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景。
+        // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景；三者按 16px 行高垂直居中。
         ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         if (!icon.isEmpty()) {
-            graphics.renderItem(icon, x, row.headerY() - 1);
+            graphics.renderItem(icon, x, row.headerY());
         }
         FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 5,
+        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 6,
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
         graphics.drawString(this.panel.font,
                 trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 30),
-                x + 25, row.headerY() + 1, this.panel.theme.textPrimary(), false);
+                x + 25, row.headerY() + 4, this.panel.theme.textPrimary(), false);
         this.drawGroup(graphics, row, true, mouseX, mouseY);
         this.drawGroup(graphics, row, false, mouseX, mouseY);
     }
@@ -227,21 +239,45 @@ final class FactoryIoPanelRender {
     }
 
     /**
-     * 画输入 / 输出方向标识：直接用 AE2 的 16×16 方向箭头。
+     * 画输入 / 输出方向标识：直接用 AE2 的输入 / 输出总线物品图标。
      *
-     * <p>输入用向下箭头（物料进入机器），输出用向上箭头（物料离开机器），和 AE2
-     * 输入 / 输出总线上的箭头语义一致，不再用色条区分。</p>
+     * <p>「蓝色向下箭头 + 总线方块」是 AE2 的 Import Bus 物品图标，「黄色向上箭头」是
+     * Export Bus；用物品图标而不是 states.png 里的白色箭头，语义和 AE2 自己的总线界面
+     * 一致。拿不到物品时退回白色方向箭头，界面不空着。</p>
      *
      * @param graphics 绘制器
-     * @param input    {@code true} 画输入箭头，{@code false} 画输出箭头
+     * @param input    {@code true} 画输入图标，{@code false} 画输出图标
      * @param x        左边界
      * @param y        上边界
      */
     private void drawSideMarker(GuiGraphics graphics, boolean input, int x, int y) {
+        resolveIcons();
+        ItemStack icon = input ? importIcon : exportIcon;
+        if (icon != null && !icon.isEmpty()) {
+            graphics.renderItem(icon, x, y);
+            return;
+        }
         Icon marker = input ? Icon.ARROW_DOWN : Icon.ARROW_UP;
         graphics.blit(Icon.TEXTURE, x, y, marker.width, marker.height,
                 marker.x, marker.y, marker.width, marker.height,
                 Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
+    }
+
+    /**
+     * 取 AE2 的输入 / 输出总线物品图标；只取一次，失败也记住，避免每帧重试。
+     */
+    private static void resolveIcons() {
+        if (iconsResolved) {
+            return;
+        }
+        iconsResolved = true;
+        try {
+            importIcon = AEParts.IMPORT_BUS.stack();
+            exportIcon = AEParts.EXPORT_BUS.stack();
+        } catch (RuntimeException e) {
+            importIcon = null;
+            exportIcon = null;
+        }
     }
 
     private void drawPopup(GuiGraphics graphics) {
@@ -380,7 +416,8 @@ final class FactoryIoPanelRender {
 
     private List<MachineRow> machineRows() {
         List<MachineRow> rows = new ArrayList<>();
-        int y = this.listTop() - this.panel.scroll;
+        // 让出工作区顶部的 1px 白边框和 2px 内阴影，机器图标不再压到边框上。
+        int y = this.listTop() + WORK_CONTENT_TOP - this.panel.scroll;
         for (int i = 0; i < this.panel.visible.size(); i++) {
             FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(i);
             int headerY = y;
