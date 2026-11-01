@@ -3,17 +3,21 @@ package io.github.crafteve.idlefactory.client.screen.terminal;
 /**
  * 工厂终端左面板与右终端共用的尺寸常量。
  *
- * <p>窗口是「左 195 管理面板 + 右 195 AE 终端」，总宽 390；AE2 的竖向按钮栏贴在终端
- * 左边缘外侧，会占用左面板最右侧一小条，所以内容区还要再让出这段。所有坐标都从
- * 终端原点推算，避免屏幕缩放时两块各算一份。</p>
+ * <p>窗口是「按钮带 + 左 420 管理面板 + 右 195 AE 终端」，总宽 639。左面板按旧工作台
+ * 的表格宽度定：一行一台机器，机器 / 状态 / 输入 / 输出四列加展开区，195 放不下。
+ * 所有坐标都从终端原点推算，避免屏幕缩放时两块各算一份。</p>
  */
 public final class FactoryTerminalGeometry {
-    /** 左管理面板宽度。 */
-    public static final int PANEL_WIDTH = 195;
+    /** 左管理面板宽度；按旧工作台四列布局定。 */
+    public static final int PANEL_WIDTH = 420;
     /** 右侧 AE 终端宽度；必须与 AE2 终端样式图一致。 */
     public static final int TERMINAL_WIDTH = 195;
     /** AE2 竖向按钮栏在窗口左侧占用的宽度。 */
     public static final int TOOLBAR_RESERVE = 24;
+    /** 工具栏按钮边长；AE2 的按钮底图是 16×16。 */
+    private static final int TOOLBAR_BUTTON = 16;
+    /** 按钮栏到窗口左边缘的留白。 */
+    private static final int TOOLBAR_INSET = 2;
     /** 面板内容区左右内边距。 */
     public static final int CONTENT_PADDING = 4;
     /** 面板头部高度。 */
@@ -77,15 +81,24 @@ public final class FactoryTerminalGeometry {
     }
 
     /**
-     * AE2 竖向按钮栏相对终端原点的 x 偏移：把按钮栏放到左面板外侧、窗口最左的一条。
+     * 居中用的临时宽度：让 AE2 的终端原点右移，使「按钮带 + 面板 + 终端」整体居中。
      *
-     * <p>按钮栏的按钮右边缘落在终端原点左 {@code PANEL_WIDTH + 2} 处，正好占满左面板
-     * 左边那 {@link #TOOLBAR_RESERVE} 像素。</p>
+     * <p>{@code leftPos = (screenWidth - imageWidth) / 2}，把 imageWidth 设成负的
+     * 「按钮带 + 面板 - 终端」就能让原点落在整个窗口的正确位置。</p>
+     *
+     * @return 负的临时宽度
+     */
+    public static int centeringWidth() {
+        return -(TOOLBAR_RESERVE + PANEL_WIDTH - TERMINAL_WIDTH);
+    }
+
+    /**
+     * AE2 竖向按钮栏相对终端原点的 x 偏移：把按钮栏放到左面板外侧的窗口最左一条。
      *
      * @return 负偏移
      */
     public static int toolbarOffsetX() {
-        return -PANEL_WIDTH;
+        return -(PANEL_WIDTH + TOOLBAR_RESERVE) + TOOLBAR_INSET + 2 + TOOLBAR_BUTTON;
     }
 
     /**

@@ -63,6 +63,8 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     UUID selectedId;
     /** 列表第一条可见机器的下标。 */
     int firstRow;
+    /** 展开区的像素滚动。 */
+    int detailScroll;
     /** 搜索原文。 */
     String searchText = "";
     /** 解析后的搜索条件。 */
@@ -145,33 +147,62 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             this.cycleSort(button == 1);
             return true;
         }
-        if (this.render.inMachineList(mouseX, mouseY)) {
-            this.focusSearch(false);
-            int row = this.render.machineRowAt(mouseY);
-            int index = this.firstRow + row;
+        this.focusSearch(false);
+        int chevron = this.render.chevronAt(mouseX, mouseY);
+        if (chevron >= 0) {
+            int index = this.firstRow + chevron;
             if (index >= 0 && index < this.visible.size()) {
-                this.selectedId = this.visible.get(index).ref().id();
+                UUID id = this.visible.get(index).ref().id();
+                this.selectedId = id.equals(this.selectedId) ? null : id;
+                this.detailScroll = 0;
             }
             return true;
         }
-        this.focusSearch(false);
-        int rule = this.render.ruleHit(mouseX, mouseY);
-        if (rule == FactoryIoPanelRender.RuleHit.NONE) {
+        int hit = this.render.detailHit(mouseX, mouseY);
+        if (hit != FactoryIoPanelRender.Hit.NONE) {
+            this.onDetailHit(hit);
             return true;
         }
-        if (rule == FactoryIoPanelRender.RuleHit.ADD_INPUT) {
-            this.addRule(IoSide.INPUT);
-        } else if (rule == FactoryIoPanelRender.RuleHit.ADD_OUTPUT) {
-            this.addRule(IoSide.OUTPUT);
-        } else {
-            this.removeRule(rule);
+        int row = this.render.rowAt(mouseX, mouseY);
+        if (row >= 0) {
+            int index = this.firstRow + row;
+            if (index >= 0 && index < this.visible.size()) {
+                this.selectedId = this.visible.get(index).ref().id();
+                this.detailScroll = 0;
+            }
         }
         return true;
     }
 
+    /**
+     * 处理展开区里的点击。
+     *
+     * @param hit {@link FactoryIoPanelRender.Hit} 常量或规则下标
+     */
+    private void onDetailHit(int hit) {
+        if (hit == FactoryIoPanelRender.Hit.ADD_INPUT
+                || hit == FactoryIoPanelRender.Hit.EMPTY_INPUT) {
+            this.addRule(IoSide.INPUT);
+        } else if (hit == FactoryIoPanelRender.Hit.ADD_OUTPUT
+                || hit == FactoryIoPanelRender.Hit.EMPTY_OUTPUT) {
+            this.addRule(IoSide.OUTPUT);
+        } else {
+            this.removeRule(hit);
+        }
+    }
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
-        if (!this.render.inMachineList(mouseX, mouseY) || deltaY == 0.0D) {
+        if (deltaY == 0.0D || !this.render.inPanel(mouseX, mouseY)) {
+            return true;
+        }
+        if (this.render.inExpandedDetail(mouseX, mouseY)) {
+            FactorySnapshotBuilder.MachineView machine = this.selected();
+            if (machine != null) {
+                int max = this.render.detailMaxScroll(machine);
+                this.detailScroll = Mth.clamp(
+                        this.detailScroll - (int) Math.signum(deltaY) * 12, 0, max);
+            }
             return true;
         }
         int rows = this.render.visibleRows();
@@ -355,8 +386,10 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         if (machine == null) {
             return;
         }
-        IoSide side = hit < FactoryIoPanelRender.RuleHit.OUTPUT_BASE ? IoSide.INPUT : IoSide.OUTPUT;
-        int index = hit % FactoryIoPanelRender.RuleHit.OUTPUT_BASE;
+        IoSide side = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE ? IoSide.INPUT : IoSide.OUTPUT;
+        int index = side == IoSide.INPUT
+                ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
+                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
         List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
         if (index < 0 || index >= rules.size()) {
             return;

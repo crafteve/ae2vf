@@ -24,8 +24,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 被动 IO 面板的 JEI 命中与拖入：机器图标、规则图标、输入 / 输出落点。
  *
- * <p>全部命中区都从 {@link FactoryIoPanelRender} 的几何读，和绘制使用同一套坐标；拖入
- * 直接发规则动作包，服务端重校验后回推机器表。</p>
+ * <p>命中区全部从 {@link FactoryIoPanelRender} 的几何读：机器图标在行内，规则图标在
+ * 展开卡里，落点用展开区的两段区域，和绘制共用同一套坐标。</p>
  */
 final class FactoryIoPanelJei {
     private final FactoryIoPanel panel;
@@ -49,34 +49,41 @@ final class FactoryIoPanelJei {
      */
     @Nullable
     FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
-        int x = this.layout.contentLeft();
-        if (this.layout.inMachineList(mouseX, mouseY)) {
-            int row = this.layout.machineRowAt(mouseY);
-            int index = this.panel.firstRow + row;
-            if (index >= 0 && index < this.panel.visible.size()
-                    && mouseX < x + FactoryTerminalGeometry.ICON_SIZE) {
-                return this.itemTarget(
-                        FactoryLabels.blockStack(this.panel.visible.get(index).blockId()),
-                        x, this.layout.machinesTop() + row * FactoryIoPanelRender.MACHINE_ROW);
+        FactoryIoPanelRender.RowRect row = this.layout.rowAtPoint(mouseX, mouseY);
+        if (row != null) {
+            int iconX = this.layout.contentLeft() + 3;
+            if (mouseX >= iconX && mouseX < iconX + FactoryIoPanelRender.ICON_SLOT) {
+                FactorySnapshotBuilder.MachineView machine =
+                        this.panel.visible.get(row.viewIndex());
+                return this.itemTarget(FactoryLabels.blockStack(machine.blockId()), iconX,
+                        row.y() + 5);
             }
+            return null;
         }
         FactorySnapshotBuilder.MachineView machine = this.panel.selected();
         if (machine == null) {
             return null;
         }
-        int top = this.layout.rulesTop();
-        int sectionHeight = (this.layout.machinesBottom() - top) / 2;
-        FactoryScreen.JeiTarget input = this.ruleTargetAt(machine.inputs(), x, top,
-                sectionHeight, mouseX, mouseY);
-        if (input != null) {
-            return input;
+        for (FactoryIoPanelRender.CardView card : this.layout.cardViews()) {
+            if (card.empty()) {
+                continue;
+            }
+            int iconX = card.x() + 2;
+            if (mouseX >= iconX && mouseX < iconX + FactoryIoPanelRender.ICON_SLOT
+                    && mouseY >= card.y() + 5
+                    && mouseY < card.y() + 5 + FactoryIoPanelRender.ICON_SLOT) {
+                List<ResourceSpec> rules = card.input() ? machine.inputs() : machine.outputs();
+                if (card.ruleIndex() < rules.size()) {
+                    return this.resourceTarget(rules.get(card.ruleIndex()).key(), iconX,
+                            card.y() + 5);
+                }
+            }
         }
-        return this.ruleTargetAt(machine.outputs(), x, top + sectionHeight, sectionHeight,
-                mouseX, mouseY);
+        return null;
     }
 
     /**
-     * 接收 JEI 拖入；命中输入 / 输出区就加一条规则。
+     * 接收 JEI 拖入；命中输入 / 输出段就加一条规则。
      *
      * @param key    资源
      * @param mouseX 屏幕 x
@@ -104,39 +111,16 @@ final class FactoryIoPanelJei {
     /**
      * 当前可接收 JEI 拖拽的区域。
      *
-     * @return 输入 / 输出两个区域；没选机器时为空
+     * @return 输入 / 输出两段；没展开时为空
      */
     List<FactoryTerminalDropArea> jeiDropAreas() {
-        if (this.panel.selected() == null) {
+        List<Rect2i> areas = this.layout.sectionAreas();
+        if (areas.size() < 2) {
             return List.of();
         }
-        int x = this.layout.contentLeft();
-        int width = this.layout.contentWidth();
-        int top = this.layout.rulesTop();
-        int sectionHeight = (this.layout.machinesBottom() - top) / 2;
         return List.of(
-                new FactoryTerminalDropArea(new Rect2i(x, top, width, sectionHeight),
-                        IoSide.INPUT),
-                new FactoryTerminalDropArea(
-                        new Rect2i(x, top + sectionHeight, width, sectionHeight), IoSide.OUTPUT));
-    }
-
-    @Nullable
-    private FactoryScreen.JeiTarget ruleTargetAt(List<ResourceSpec> rules, int x, int y,
-            int sectionHeight, double mouseX, double mouseY) {
-        int maxRows = Math.max(0,
-                (sectionHeight - FactoryIoPanelRender.SECTION_HEADER)
-                        / FactoryIoPanelRender.RULE_ROW);
-        int limit = Math.min(maxRows, rules.size());
-        for (int i = 0; i < limit; i++) {
-            int rowY = y + FactoryIoPanelRender.SECTION_HEADER
-                    + i * FactoryIoPanelRender.RULE_ROW;
-            if (mouseX >= x + 1 && mouseX < x + 1 + FactoryTerminalGeometry.ICON_SIZE
-                    && mouseY >= rowY && mouseY < rowY + FactoryTerminalGeometry.ICON_SIZE) {
-                return this.resourceTarget(rules.get(i).key(), x + 1, rowY);
-            }
-        }
-        return null;
+                new FactoryTerminalDropArea(areas.get(0), IoSide.INPUT),
+                new FactoryTerminalDropArea(areas.get(1), IoSide.OUTPUT));
     }
 
     @Nullable
@@ -145,8 +129,8 @@ final class FactoryIoPanelJei {
             return null;
         }
         return new FactoryScreen.JeiTarget(CapabilityKind.ITEM, stack,
-                new Rect2i(x, y, FactoryTerminalGeometry.ICON_SIZE,
-                        FactoryTerminalGeometry.ICON_SIZE));
+                new Rect2i(x, y, FactoryIoPanelRender.ICON_SLOT,
+                        FactoryIoPanelRender.ICON_SLOT));
     }
 
     private FactoryScreen.JeiTarget resourceTarget(AEKey key, int x, int y) {
@@ -154,7 +138,7 @@ final class FactoryIoPanelJei {
         ItemStack stack = kind == CapabilityKind.ENERGY ? ItemStack.EMPTY
                 : FactoryUiText.iconStack(key);
         return new FactoryScreen.JeiTarget(kind, stack,
-                new Rect2i(x, y, FactoryTerminalGeometry.ICON_SIZE,
-                        FactoryTerminalGeometry.ICON_SIZE));
+                new Rect2i(x, y, FactoryIoPanelRender.ICON_SLOT,
+                        FactoryIoPanelRender.ICON_SLOT));
     }
 }

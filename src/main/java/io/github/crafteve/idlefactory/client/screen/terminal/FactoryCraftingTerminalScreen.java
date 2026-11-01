@@ -59,7 +59,7 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
         // 见类注释：只在 super.init() 期间用负宽度把原点右移到整个窗口的中线。
         int terminalWidth = this.imageWidth;
         try {
-            this.imageWidth = -FactoryTerminalGeometry.TOOLBAR_RESERVE;
+            this.imageWidth = FactoryTerminalGeometry.centeringWidth();
             super.init();
         } finally {
             this.imageWidth = terminalWidth;

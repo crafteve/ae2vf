@@ -59,7 +59,7 @@ public final class FactoryPatternTerminalScreen
     public void init() {
         int terminalWidth = this.imageWidth;
         try {
-            this.imageWidth = -FactoryTerminalGeometry.TOOLBAR_RESERVE;
+            this.imageWidth = FactoryTerminalGeometry.centeringWidth();
             super.init();
         } finally {
             this.imageWidth = terminalWidth;

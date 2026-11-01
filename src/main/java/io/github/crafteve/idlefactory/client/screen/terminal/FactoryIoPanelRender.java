@@ -1,6 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
@@ -9,34 +12,73 @@ import io.github.crafteve.idlefactory.client.screen.FactoryResourceIconRender;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 被动 IO 面板的绘制与几何：搜索框、机器卡片、规则卡片与命中区。
+ * 被动 IO 面板的绘制与几何：搜索行、机器行、行内展开的输入 / 输出规则卡。
  *
- * <p>状态与输入在 {@link FactoryIoPanel}；这里只读它的字段，负责坐标、截断与命中计算，
- * 输入方法复用同一套数字，保证「看到的位置」和「点到的位置」一致。视觉沿用旧工作台：
- * 卡片底、1px 状态条、状态灯、图标槽。</p>
+ * <p>一台机器一行，展开区直接插在该行下面，后面的机器整体下移；规则卡固定 26 高，
+ * 每段末尾一张空卡作为拖入目标，超出可视高度时按像素滚动。绘制与命中用同一套
+ * {@link RowRect} / {@link CardRect} 计算，避免「看到的位置」和「点到的位置」不一致。</p>
  */
 final class FactoryIoPanelRender {
     /** 排序按钮宽度。 */
-    static final int SORT_WIDTH = 38;
-    /** 机器卡片高度。 */
-    static final int MACHINE_ROW = 26;
-    /** 规则行高度。 */
-    static final int RULE_ROW = 16;
-    /** 分区标题高度。 */
-    static final int SECTION_HEADER = 11;
-    /** 移除按钮命中宽度。 */
-    static final int REMOVE_WIDTH = 10;
+    static final int SORT_WIDTH = 46;
+    /** 机器行高度。 */
+    static final int ROW_H = 26;
+    /** 展开区段头高度。 */
+    static final int SECTION_H = 11;
+    /** 规则卡高度。 */
+    static final int CARD_H = 26;
+    /** 行与行之间的间距。 */
+    static final int ROW_GAP = 2;
+    /** 展开区最大高度。 */
+    static final int DETAIL_MAX_H = 176;
+    /** 两段之间的间距。 */
+    static final int SECTION_GAP = 4;
     /** 卡片内图标槽边长。 */
-    private static final int ICON_SLOT = 16;
+    static final int ICON_SLOT = 16;
+    /** 深色段头上的文字颜色。 */
+    private static final int HEADER_TEXT = 0xFFE8ECF5;
+    /** 行内输入 / 输出列最多画几个图标。 */
+    private static final int STRIP_ICONS = 3;
+
+    /** 展开区命中编码。 */
+    static final class Hit {
+        /** 没命中。 */
+        static final int NONE = -1;
+        /** 输入段加号。 */
+        static final int ADD_INPUT = -2;
+        /** 输出段加号。 */
+        static final int ADD_OUTPUT = -3;
+        /** 输入空卡。 */
+        static final int EMPTY_INPUT = -4;
+        /** 输出空卡。 */
+        static final int EMPTY_OUTPUT = -5;
+        /** 输入规则下标偏移。 */
+        static final int INPUT_BASE = 1000;
+        /** 输出规则下标偏移。 */
+        static final int OUTPUT_BASE = 2000;
+
+        private Hit() {
+            // 纯常量持有类
+        }
+    }
+
+    /** 一行的绝对位置。 */
+    record RowRect(int viewIndex, int y, int rowBottom, int detailY, int detailH) {
+    }
+
+    /** 一张展开卡的绝对位置。 */
+    record CardView(int x, int y, int width, boolean input, int ruleIndex, boolean empty) {
+    }
 
     private final FactoryIoPanel panel;
 
@@ -48,7 +90,7 @@ final class FactoryIoPanelRender {
     }
 
     /**
-     * 画搜索框、机器卡片、规则区与反馈。
+     * 画搜索行、机器行与展开区。
      *
      * @param graphics 绘制器
      * @param mouseX   鼠标 x
@@ -56,8 +98,24 @@ final class FactoryIoPanelRender {
      */
     void render(GuiGraphics graphics, int mouseX, int mouseY) {
         this.renderSearch(graphics);
-        this.renderMachineList(graphics, mouseX, mouseY);
-        this.renderRules(graphics, mouseX, mouseY);
+        if (!this.panel.hasFactory) {
+            graphics.drawString(this.panel.font, "还没有工厂", this.contentLeft() + 2,
+                    this.listTop(), this.panel.theme.textDim(), false);
+            return;
+        }
+        if (this.panel.visible.isEmpty()) {
+            graphics.drawString(this.panel.font,
+                    this.panel.machines.isEmpty() ? "机器库为空" : "没有匹配的机器",
+                    this.contentLeft() + 2, this.listTop(), this.panel.theme.textDim(), false);
+            return;
+        }
+        for (RowRect row : this.rowRects()) {
+            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
+            this.drawRow(graphics, machine, row, mouseX, mouseY);
+            if (row.detailH() > 0) {
+                this.drawDetail(graphics, machine, row, mouseX, mouseY);
+            }
+        }
         this.renderFeedback(graphics);
     }
 
@@ -84,150 +142,159 @@ final class FactoryIoPanelRender {
                 this.panel.theme.textPrimary(), false);
     }
 
-    private void renderMachineList(GuiGraphics graphics, int mouseX, int mouseY) {
+    /**
+     * 画一台机器：卡片、状态条、图标、名字、状态、输入/输出列、展开箭头。
+     *
+     * @param graphics 绘制器
+     * @param machine  机器
+     * @param row      行位置
+     * @param mouseX   鼠标 x
+     * @param mouseY   鼠标 y
+     */
+    private void drawRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
+            RowRect row, int mouseX, int mouseY) {
         int x = this.contentLeft();
-        int top = this.machinesTop();
-        int bottom = this.machinesBottom();
-        if (!this.panel.hasFactory) {
-            graphics.drawString(this.panel.font, "还没有工厂", x + 2, top + 2,
-                    this.panel.theme.textDim(), false);
+        int width = this.contentWidth();
+        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= row.y()
+                && mouseY < row.rowBottom();
+        boolean selected = isExpanded(machine);
+        FactoryNineSlice.card(graphics, x, row.y(), width, ROW_H - 1);
+        if (hovered || selected) {
+            graphics.fill(x, row.y(), x + width, row.rowBottom() - 1,
+                    selected ? FactoryTerminalGeometry.ROW_SELECTED
+                            : FactoryTerminalGeometry.ROW_HOVER);
+        }
+        FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
+        FactoryNineSlice.fill(graphics, status.strip(), x + 1, row.y() + 1, 1, ROW_H - 3);
+        FactoryNineSlice.slot(graphics, x + 3, row.y() + 5, ICON_SLOT, ICON_SLOT);
+        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
+        if (!icon.isEmpty()) {
+            graphics.renderItem(icon, x + 3, row.y() + 5);
+        }
+        int nameX = x + 3 + ICON_SLOT + 3;
+        int nameWidth = 150;
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), nameWidth),
+                nameX, row.y() + 4, this.panel.theme.textPrimary(), false);
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, ruleSummary(machine), nameWidth),
+                nameX, row.y() + 14, this.panel.theme.textDim(), false);
+        int statusX = x + 180;
+        FactoryNineSlice.icon(graphics, status.lamp(), statusX, row.y() + 9,
+                FactoryGuiTextures.STATUS_LAMP_SIZE);
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, status.text(), 66), statusX + 6, row.y() + 7,
+                status.color(), false);
+        this.drawStrip(graphics, machine.inputs(), x + 256, row.y() + 5);
+        this.drawStrip(graphics, machine.outputs(), x + 336, row.y() + 5);
+        String chevron = selected ? "▾" : "▸";
+        graphics.drawString(this.panel.font, chevron, x + width - 12, row.y() + 8,
+                this.panel.theme.textPrimary(), false);
+    }
+
+    /**
+     * 画一列的规则图标；超过三个时用 +N 收尾。
+     *
+     * @param graphics 绘制器
+     * @param rules    规则
+     * @param x        左边界
+     * @param y        上边界
+     */
+    private void drawStrip(GuiGraphics graphics, List<ResourceSpec> rules, int x, int y) {
+        if (rules.isEmpty()) {
+            graphics.drawString(this.panel.font, "—", x, y + 4, this.panel.theme.textDim(), false);
             return;
         }
-        if (this.panel.visible.isEmpty()) {
-            graphics.drawString(this.panel.font,
-                    this.panel.machines.isEmpty() ? "机器库为空" : "没有匹配的机器",
-                    x + 2, top + 2, this.panel.theme.textDim(), false);
-            return;
+        int shown = Math.min(STRIP_ICONS, rules.size());
+        for (int i = 0; i < shown; i++) {
+            FactoryResourceIconRender.draw(graphics, this.panel.font, rules.get(i).key(),
+                    x + i * (ICON_SLOT + 1), y);
         }
-        graphics.enableScissor(x, top, x + this.contentWidth(), bottom);
-        int rows = this.visibleRows();
-        for (int row = 0; row < rows; row++) {
-            int index = this.panel.firstRow + row;
-            if (index >= this.panel.visible.size()) {
-                break;
+        if (rules.size() > shown) {
+            graphics.drawString(this.panel.font, "+" + (rules.size() - shown),
+                    x + shown * (ICON_SLOT + 1), y + 4, this.panel.theme.textDim(), false);
+        }
+    }
+
+    /**
+     * 画展开区：两个段头 + 规则卡 + 空卡，按 detailScroll 纵向滚动。
+     *
+     * @param graphics 绘制器
+     * @param machine  机器
+     * @param row      行位置
+     * @param mouseX   鼠标 x
+     * @param mouseY   鼠标 y
+     */
+    private void drawDetail(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
+            RowRect row, int mouseX, int mouseY) {
+        int x = this.contentLeft();
+        int width = this.contentWidth();
+        graphics.enableScissor(x, row.detailY(), x + width, row.detailY() + row.detailH());
+        int y = row.detailY() - this.panel.detailScroll;
+        for (IoSide side : IoSide.values()) {
+            List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
+            this.drawSectionHeader(graphics, side, x, y, width, mouseX, mouseY);
+            y += SECTION_H;
+            for (int i = 0; i < rules.size(); i++) {
+                this.drawRuleCard(graphics, side, i, rules.get(i), x, y, width, mouseX, mouseY);
+                y += CARD_H;
             }
-            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(index);
-            int y = top + row * MACHINE_ROW;
-            boolean hovered = mouseX >= x && mouseX < x + this.contentWidth()
-                    && mouseY >= y && mouseY < y + MACHINE_ROW;
-            boolean selected = machine.ref().id().equals(this.panel.selectedId);
-            this.drawMachineRow(graphics, machine, x, y, hovered, selected);
+            this.drawEmptyCard(graphics, side, x, y, width, mouseX, mouseY);
+            y += CARD_H + SECTION_GAP;
         }
         graphics.disableScissor();
     }
 
-    /**
-     * 画一张机器卡片：卡片底、状态条、图标槽、名字、规则数量、状态灯。
-     *
-     * @param graphics 绘制器
-     * @param machine  机器视图
-     * @param x        左边界
-     * @param y        上边界
-     * @param hovered  是否悬停
-     * @param selected 是否选中
-     */
-    private void drawMachineRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            int x, int y, boolean hovered, boolean selected) {
-        int width = this.contentWidth();
-        FactoryNineSlice.card(graphics, x, y, width, MACHINE_ROW - 1);
-        if (hovered || selected) {
-            graphics.fill(x, y, x + width, y + MACHINE_ROW - 1,
-                    selected ? FactoryTerminalGeometry.ROW_SELECTED : FactoryTerminalGeometry.ROW_HOVER);
-        }
-        FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.fill(graphics, status.strip(), x + 1, y + 1, 1, MACHINE_ROW - 3);
-        FactoryNineSlice.slot(graphics, x + 3, y + 5, ICON_SLOT, ICON_SLOT);
-        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
-        if (!icon.isEmpty()) {
-            graphics.renderItem(icon, x + 3, y + 5);
-        }
-        int textX = x + 3 + ICON_SLOT + 3;
-        int statusWidth = this.panel.font.width(status.text()) + 8;
-        int nameWidth = Math.max(10, width - (textX - x) - statusWidth - 6);
-        graphics.drawString(this.panel.font,
-                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), nameWidth),
-                textX, y + 4, this.panel.theme.textPrimary(), false);
-        String rules = ruleSummary(machine);
-        graphics.drawString(this.panel.font, trim(this.panel.font, rules, nameWidth),
-                textX, y + 14, this.panel.theme.textDim(), false);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + width - statusWidth, y + 7,
-                FactoryGuiTextures.STATUS_LAMP_SIZE);
-        graphics.drawString(this.panel.font, status.text(), x + width - statusWidth + 6, y + 5,
-                status.color(), false);
-    }
-
-    private void renderRules(GuiGraphics graphics, int mouseX, int mouseY) {
-        FactorySnapshotBuilder.MachineView machine = this.panel.selected();
-        if (machine == null) {
-            return;
-        }
-        int x = this.contentLeft();
-        int width = this.contentWidth();
-        int top = this.rulesTop();
-        int sectionHeight = (this.machinesBottom() - top) / 2;
-        this.renderSection(graphics, machine, mouseX, mouseY, x, top, width, sectionHeight,
-                IoSide.INPUT, machine.inputs());
-        this.renderSection(graphics, machine, mouseX, mouseY, x, top + sectionHeight, width,
-                sectionHeight, IoSide.OUTPUT, machine.outputs());
-    }
-
-    private void renderSection(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            int mouseX, int mouseY, int x, int y, int width, int height, IoSide side,
-            List<ResourceSpec> rules) {
-        FactoryNineSlice.ioHeader(graphics, x, y, width, SECTION_HEADER);
+    private void drawSectionHeader(GuiGraphics graphics, IoSide side, int x, int y, int width,
+            int mouseX, int mouseY) {
+        FactoryNineSlice.ioHeader(graphics, x, y, width, SECTION_H);
         graphics.drawString(this.panel.font, side == IoSide.INPUT ? "输入" : "输出", x + 2, y + 2,
-                this.panel.theme.textPrimary(), false);
+                HEADER_TEXT, false);
         boolean addHovered = mouseX >= x + width - 12 && mouseX < x + width
-                && mouseY >= y && mouseY < y + SECTION_HEADER;
-        FactoryNineSlice.button(graphics, x + width - 12, y, 12, SECTION_HEADER);
+                && mouseY >= y && mouseY < y + SECTION_H;
+        FactoryNineSlice.button(graphics, x + width - 12, y, 12, SECTION_H);
         graphics.drawString(this.panel.font, "+", x + width - 9, y + 2,
-                addHovered ? this.panel.theme.accent() : this.panel.theme.textPrimary(), false);
-        int maxRows = Math.max(0, (height - SECTION_HEADER) / RULE_ROW);
-        if (rules.isEmpty()) {
-            graphics.drawString(this.panel.font, "光标拿物品点 +", x + 2, y + SECTION_HEADER + 2,
-                    this.panel.theme.textDim(), false);
-            return;
-        }
-        for (int i = 0; i < Math.min(maxRows, rules.size()); i++) {
-            this.drawRuleRow(graphics, rules.get(i), x, y + SECTION_HEADER + i * RULE_ROW,
-                    width, mouseX, mouseY);
-        }
-        if (rules.size() > maxRows) {
-            graphics.drawString(this.panel.font, "+" + (rules.size() - maxRows), x + 2,
-                    y + height - 10, this.panel.theme.textDim(), false);
-        }
+                addHovered ? this.panel.theme.accent() : HEADER_TEXT, false);
     }
 
-    /**
-     * 画一条规则卡片：图标、名字、面、移除按钮。
-     *
-     * @param graphics 绘制器
-     * @param rule     规则
-     * @param x        左边界
-     * @param y        上边界
-     * @param width    宽度
-     * @param mouseX   鼠标 x
-     * @param mouseY   鼠标 y
-     */
-    private void drawRuleRow(GuiGraphics graphics, ResourceSpec rule, int x, int y, int width,
+    private void drawRuleCard(GuiGraphics graphics, IoSide side, int index, ResourceSpec rule,
+            int x, int y, int width, int mouseX, int mouseY) {
+        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y
+                && mouseY < y + CARD_H;
+        FactoryNineSlice.card(graphics, x, y, width, CARD_H - 1);
+        if (hovered) {
+            graphics.fill(x, y, x + width, y + CARD_H - 1, FactoryTerminalGeometry.ROW_HOVER);
+        }
+        FactoryNineSlice.slot(graphics, x + 2, y + 5, ICON_SLOT, ICON_SLOT);
+        FactoryResourceIconRender.draw(graphics, this.panel.font, rule.key(), x + 2, y + 5);
+        int removeX = x + width - 12;
+        int faceWidth = this.panel.font.width(FactoryLabels.face(rule));
+        int nameWidth = removeX - (x + 22) - faceWidth - 8;
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, FactoryLabels.name(rule.key()), nameWidth), x + 22, y + 9,
+                this.panel.theme.textPrimary(), false);
+        graphics.drawString(this.panel.font, FactoryLabels.face(rule),
+                removeX - 2 - faceWidth, y + 9, this.panel.theme.textFace(), false);
+        graphics.drawString(this.panel.font, "×", removeX + 1, y + 9, this.panel.theme.error(),
+                false);
+        String match = rule.mode() == MatchMode.IGNORE_COMPONENTS ? "模糊" : "精确";
+        graphics.drawString(this.panel.font, match, x + width - 60, y + 9,
+                this.panel.theme.textDim(), false);
+    }
+
+    private void drawEmptyCard(GuiGraphics graphics, IoSide side, int x, int y, int width,
             int mouseX, int mouseY) {
         boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y
-                && mouseY < y + RULE_ROW;
+                && mouseY < y + CARD_H;
+        FactoryNineSlice.card(graphics, x, y, width, CARD_H - 1);
         if (hovered) {
-            graphics.fill(x, y, x + width, y + RULE_ROW, FactoryTerminalGeometry.ROW_HOVER);
+            graphics.fill(x, y, x + width, y + CARD_H - 1, FactoryTerminalGeometry.ROW_HOVER);
         }
-        FactoryNineSlice.slot(graphics, x + 1, y, ICON_SLOT, ICON_SLOT);
-        FactoryResourceIconRender.draw(graphics, this.panel.font, rule.key(), x + 1, y);
-        int removeX = x + width - REMOVE_WIDTH;
-        int faceWidth = this.panel.font.width(FactoryLabels.face(rule));
-        int labelWidth = removeX - (x + 20) - faceWidth - 10;
+        graphics.drawString(this.panel.font, "+", x + 3, y + 9,
+                hovered ? this.panel.theme.accent() : this.panel.theme.textDim(), false);
         graphics.drawString(this.panel.font,
-                trim(this.panel.font, FactoryLabels.name(rule.key()), labelWidth), x + 20,
-                y + 4, this.panel.theme.textPrimary(), false);
-        graphics.drawString(this.panel.font, FactoryLabels.face(rule),
-                removeX - 2 - faceWidth, y + 4, this.panel.theme.textFace(), false);
-        graphics.drawString(this.panel.font, "×", removeX + 1, y + 4, this.panel.theme.error(),
-                false);
+                "拖入资源，或光标拿物品点这里", x + 20, y + 9,
+                this.panel.theme.textDim(), false);
     }
 
     private void renderFeedback(GuiGraphics graphics) {
@@ -239,6 +306,8 @@ final class FactoryIoPanelRender {
                 trim(this.panel.font, this.panel.feedback, this.contentWidth() - 4),
                 this.contentLeft() + 2, this.panel.bottom() - 12, color, false);
     }
+
+    // ---- 几何 ----
 
     int contentLeft() {
         return this.panel.left() + FactoryTerminalGeometry.CONTENT_PADDING;
@@ -256,33 +325,13 @@ final class FactoryIoPanelRender {
         return this.contentWidth() - SORT_WIDTH - 4;
     }
 
-    int machinesTop() {
-        return this.contentTop() + FactoryTerminalGeometry.SEARCH_HEIGHT + 4;
-    }
-
-    int machinesBottom() {
-        if (this.panel.selected() == null) {
-            return this.panel.bottom() - FactoryTerminalGeometry.CONTENT_PADDING;
-        }
-        return this.panel.bottom() - FactoryTerminalGeometry.CONTENT_PADDING - this.rulesHeight();
-    }
-
-    int rulesTop() {
-        return this.machinesBottom() + 2;
-    }
-
-    int rulesHeight() {
-        return Math.min(130, Math.max(74, this.panel.height() / 3));
-    }
-
-    int visibleRows() {
-        return Math.max(1, (this.machinesBottom() - this.machinesTop()) / MACHINE_ROW);
-    }
-
-    int machineRowAt(double mouseY) {
-        return (int) ((mouseY - this.machinesTop()) / MACHINE_ROW);
-    }
-
+    /**
+     * 鼠标是否在搜索框上。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 命中时为 {@code true}
+     */
     boolean inSearch(double mouseX, double mouseY) {
         int x = this.contentLeft();
         int y = this.contentTop();
@@ -290,6 +339,13 @@ final class FactoryIoPanelRender {
                 && mouseY >= y && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
     }
 
+    /**
+     * 鼠标是否在排序按钮上。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 命中时为 {@code true}
+     */
     boolean inSort(double mouseX, double mouseY) {
         int x = this.contentLeft() + this.searchWidth() + 4;
         int y = this.contentTop();
@@ -297,56 +353,294 @@ final class FactoryIoPanelRender {
                 && mouseY >= y && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
     }
 
-    boolean inMachineList(double mouseX, double mouseY) {
-        return mouseX >= this.contentLeft()
-                && mouseX < this.contentLeft() + this.contentWidth()
-                && mouseY >= this.machinesTop() && mouseY < this.machinesBottom();
+    int listTop() {
+        return this.contentTop() + FactoryTerminalGeometry.SEARCH_HEIGHT + 6;
+    }
+
+    int listBottom() {
+        return this.panel.bottom() - FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
     /**
-     * 命中规则区：返回 {@link RuleHit} 的常量或规则下标编码。
+     * 当前可视行及其展开区位置。
+     *
+     * @return 行位置表
+     */
+    List<RowRect> rowRects() {
+        List<RowRect> rows = new ArrayList<>();
+        int y = this.listTop();
+        int bottom = this.listBottom();
+        for (int i = this.panel.firstRow; i < this.panel.visible.size(); i++) {
+            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(i);
+            int detailH = 0;
+            if (isExpanded(machine)) {
+                int max = Math.max(0, bottom - (y + ROW_H + ROW_GAP));
+                detailH = Math.min(Math.min(this.detailContentHeight(machine), DETAIL_MAX_H), max);
+            }
+            if (y + ROW_H > bottom) {
+                break;
+            }
+            rows.add(new RowRect(i, y, y + ROW_H, y + ROW_H, detailH));
+            y += ROW_H + ROW_GAP + detailH;
+        }
+        return rows;
+    }
+
+    /**
+     * 展开区的完整内容高度。
+     *
+     * @param machine 机器
+     * @return 高度
+     */
+    int detailContentHeight(FactorySnapshotBuilder.MachineView machine) {
+        int cards = machine.inputs().size() + 1 + machine.outputs().size() + 1;
+        return cards * CARD_H + 2 * SECTION_H + SECTION_GAP;
+    }
+
+    /**
+     * 展开区可滚动像素。
+     *
+     * @param machine 机器
+     * @return 最大滚动
+     */
+    int detailMaxScroll(FactorySnapshotBuilder.MachineView machine) {
+        for (RowRect row : this.rowRects()) {
+            if (row.detailH() > 0 && this.panel.visible.get(row.viewIndex()) == machine) {
+                return Math.max(0, this.detailContentHeight(machine) - row.detailH());
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 可见机器行数。
+     *
+     * @return 行数
+     */
+    int visibleRows() {
+        return Math.max(1, (this.listBottom() - this.listTop()) / (ROW_H + ROW_GAP));
+    }
+
+    /**
+     * 命中的机器行在可见列表里的下标。
      *
      * @param mouseX 鼠标 x
      * @param mouseY 鼠标 y
-     * @return 命中结果
+     * @return 可见下标；没命中为 {@code -1}
      */
-    int ruleHit(double mouseX, double mouseY) {
-        FactorySnapshotBuilder.MachineView machine = this.panel.selected();
-        if (machine == null) {
-            return RuleHit.NONE;
+    int rowAt(double mouseX, double mouseY) {
+        if (mouseX < this.contentLeft() || mouseX >= this.contentLeft() + this.contentWidth()) {
+            return -1;
         }
-        int x = this.contentLeft();
-        int width = this.contentWidth();
-        int top = this.rulesTop();
-        int sectionHeight = (this.machinesBottom() - top) / 2;
-        int hit = this.sectionHit(mouseX, mouseY, x, top, width, sectionHeight,
-                IoSide.INPUT, machine.inputs(), RuleHit.INPUT_BASE);
-        if (hit != RuleHit.NONE) {
-            return hit;
+        for (RowRect row : this.rowRects()) {
+            if (mouseY >= row.y() && mouseY < row.rowBottom()) {
+                return row.viewIndex() - this.panel.firstRow;
+            }
         }
-        return this.sectionHit(mouseX, mouseY, x, top + sectionHeight, width, sectionHeight,
-                IoSide.OUTPUT, machine.outputs(), RuleHit.OUTPUT_BASE);
+        return -1;
     }
 
-    private int sectionHit(double mouseX, double mouseY, int x, int y, int width, int height,
-            IoSide side, List<ResourceSpec> rules, int base) {
-        if (mouseY < y || mouseY >= y + height) {
-            return RuleHit.NONE;
+    /**
+     * 命中的展开箭头。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 可见下标；没命中为 {@code -1}
+     */
+    int chevronAt(double mouseX, double mouseY) {
+        int width = this.contentWidth();
+        if (mouseX < this.contentLeft() + width - 18
+                || mouseX >= this.contentLeft() + width) {
+            return -1;
         }
-        if (mouseY < y + SECTION_HEADER) {
-            if (mouseX >= x + width - 12 && mouseX < x + width) {
-                return side == IoSide.INPUT ? RuleHit.ADD_INPUT : RuleHit.ADD_OUTPUT;
+        for (RowRect row : this.rowRects()) {
+            if (mouseY >= row.y() && mouseY < row.rowBottom()) {
+                return row.viewIndex() - this.panel.firstRow;
             }
-            return RuleHit.NONE;
         }
-        int index = (int) ((mouseY - y - SECTION_HEADER) / RULE_ROW);
-        if (index < 0 || index >= rules.size()) {
-            return RuleHit.NONE;
+        return -1;
+    }
+
+    /**
+     * 命中展开区里的段头、规则卡或空卡。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return {@link Hit} 常量或规则下标
+     */
+    int detailHit(double mouseX, double mouseY) {
+        int x = this.contentLeft();
+        int width = this.contentWidth();
+        for (RowRect row : this.rowRects()) {
+            if (row.detailH() <= 0 || mouseY < row.detailY()
+                    || mouseY >= row.detailY() + row.detailH()) {
+                continue;
+            }
+            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
+            int y = row.detailY() - this.panel.detailScroll;
+            for (IoSide side : IoSide.values()) {
+                List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
+                if (mouseY >= y && mouseY < y + SECTION_H) {
+                    if (mouseX >= x + width - 12 && mouseX < x + width) {
+                        return side == IoSide.INPUT ? Hit.ADD_INPUT : Hit.ADD_OUTPUT;
+                    }
+                    return Hit.NONE;
+                }
+                y += SECTION_H;
+                for (int i = 0; i < rules.size(); i++) {
+                    if (inCard(mouseX, mouseY, x, y, width)) {
+                        if (mouseX >= x + width - 12) {
+                            return (side == IoSide.INPUT ? Hit.INPUT_BASE : Hit.OUTPUT_BASE) + i;
+                        }
+                        return Hit.NONE;
+                    }
+                    y += CARD_H;
+                }
+                if (inCard(mouseX, mouseY, x, y, width)) {
+                    return side == IoSide.INPUT ? Hit.EMPTY_INPUT : Hit.EMPTY_OUTPUT;
+                }
+                y += CARD_H + SECTION_GAP;
+            }
         }
-        if (mouseX >= x + width - REMOVE_WIDTH && mouseX < x + width) {
-            return base + index;
+        return Hit.NONE;
+    }
+
+    private static boolean inCard(double mouseX, double mouseY, int x, int y, int width) {
+        return mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + CARD_H;
+    }
+
+    /**
+     * 鼠标是否落在列表区。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 命中时为 {@code true}
+     */
+    boolean inPanel(double mouseX, double mouseY) {
+        return mouseX >= this.contentLeft()
+                && mouseX < this.contentLeft() + this.contentWidth()
+                && mouseY >= this.listTop() && mouseY < this.listBottom();
+    }
+
+    /**
+     * 鼠标是否落在展开区。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 命中时为 {@code true}
+     */
+    boolean inExpandedDetail(double mouseX, double mouseY) {
+        for (RowRect row : this.rowRects()) {
+            if (row.detailH() > 0 && mouseY >= row.detailY()
+                    && mouseY < row.detailY() + row.detailH()) {
+                return true;
+            }
         }
-        return RuleHit.NONE;
+        return false;
+    }
+
+    /**
+     * 鼠标下的机器行（不含展开区）。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 行位置或 {@code null}
+     */
+    @Nullable
+    RowRect rowAtPoint(double mouseX, double mouseY) {
+        if (mouseX < this.contentLeft()
+                || mouseX >= this.contentLeft() + this.contentWidth()) {
+            return null;
+        }
+        for (RowRect row : this.rowRects()) {
+            if (mouseY >= row.y() && mouseY < row.rowBottom()) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 当前展开的行。
+     *
+     * @return 行位置或 {@code null}
+     */
+    @Nullable
+    RowRect expandedRow() {
+        for (RowRect row : this.rowRects()) {
+            if (row.detailH() > 0) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 展开区里的卡片位置（含空卡）。
+     *
+     * @return 卡片列表
+     */
+    List<CardView> cardViews() {
+        RowRect row = this.expandedRow();
+        if (row == null) {
+            return List.of();
+        }
+        FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
+        List<CardView> cards = new ArrayList<>();
+        int y = row.detailY() - this.panel.detailScroll;
+        for (IoSide side : IoSide.values()) {
+            List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
+            y += SECTION_H;
+            for (int i = 0; i < rules.size(); i++) {
+                cards.add(new CardView(this.contentLeft(), y, this.contentWidth(),
+                        side == IoSide.INPUT, i, false));
+                y += CARD_H;
+            }
+            cards.add(new CardView(this.contentLeft(), y, this.contentWidth(),
+                    side == IoSide.INPUT, rules.size(), true));
+            y += CARD_H + SECTION_GAP;
+        }
+        return cards;
+    }
+
+    /**
+     * 展开区里输入 / 输出两段的落点区域。
+     *
+     * @return 两段区域；没有展开时为空
+     */
+    List<Rect2i> sectionAreas() {
+        RowRect row = this.expandedRow();
+        if (row == null) {
+            return List.of();
+        }
+        FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
+        int top = row.detailY() - this.panel.detailScroll;
+        int inputHeight = SECTION_H + (machine.inputs().size() + 1) * CARD_H;
+        int outputTop = top + inputHeight + SECTION_GAP;
+        int outputHeight = SECTION_H + (machine.outputs().size() + 1) * CARD_H;
+        int minY = row.detailY();
+        int maxY = row.detailY() + row.detailH();
+        Rect2i input = clip(this.contentLeft(), top, this.contentWidth(), inputHeight,
+                minY, maxY);
+        Rect2i output = clip(this.contentLeft(), outputTop, this.contentWidth(), outputHeight,
+                minY, maxY);
+        return List.of(input, output);
+    }
+
+    private static Rect2i clip(int x, int y, int width, int height, int minY, int maxY) {
+        int top = Math.max(y, minY);
+        int bottom = Math.min(y + height, maxY);
+        return new Rect2i(x, top, width, Math.max(0, bottom - top));
+    }
+
+    /**
+     * 某台机器是否处于展开状态。
+     *
+     * @param machine 机器
+     * @return 是否展开
+     */
+    boolean isExpanded(FactorySnapshotBuilder.MachineView machine) {
+        return machine.ref().id().equals(this.panel.selectedId);
     }
 
     private String sortLabel() {
@@ -358,29 +652,10 @@ final class FactoryIoPanelRender {
         return key + (this.panel.descending ? "↓" : "↑");
     }
 
-    /**
-     * 机器卡片的第二行：规则数量摘要。
-     *
-     * @param machine 机器视图
-     * @return 摘要文字
-     */
     private static String ruleSummary(FactorySnapshotBuilder.MachineView machine) {
-        int inputs = machine.inputs().size();
-        int outputs = machine.outputs().size();
-        if (inputs == 0 && outputs == 0) {
-            return "无规则";
-        }
-        return "输入 " + inputs + " · 输出 " + outputs;
+        return "输入 " + machine.inputs().size() + " · 输出 " + machine.outputs().size();
     }
 
-    /**
-     * 按像素宽度截断文字，末尾加省略号。
-     *
-     * @param font  字体
-     * @param text  原文
-     * @param width 最大宽度
-     * @return 截断后的文字
-     */
     private static String trim(Font font, String text, int width) {
         if (width <= 0) {
             return "";
@@ -399,23 +674,5 @@ final class FactoryIoPanelRender {
             builder.append(c);
         }
         return builder + ellipsis;
-    }
-
-    /** 规则区命中编码。 */
-    static final class RuleHit {
-        /** 没命中。 */
-        static final int NONE = -1;
-        /** 输入区加号。 */
-        static final int ADD_INPUT = -2;
-        /** 输出区加号。 */
-        static final int ADD_OUTPUT = -3;
-        /** 输入规则下标偏移。 */
-        static final int INPUT_BASE = 0;
-        /** 输出规则下标偏移；与输入错开，避免同一 block 被当成两侧下标。 */
-        static final int OUTPUT_BASE = 1000;
-
-        private RuleHit() {
-            // 纯常量持有类
-        }
     }
 }
