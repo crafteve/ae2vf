@@ -141,8 +141,8 @@ public abstract class FactoryTerminalPanel {
      * @return 命中时为 {@code true}
      */
     public final boolean isMouseOver(double mouseX, double mouseY) {
-        // 最左侧一条是 AE2 的竖向按钮栏：它画在面板底上，但点击必须交给终端自己处理。
-        return mouseX >= this.left + FactoryTerminalGeometry.TOOLBAR_RESERVE
+        // 按钮栏在面板外侧，面板本身从 left 开始就是自己的。
+        return mouseX >= this.left
                 && mouseX < this.right()
                 && mouseY >= this.top && mouseY < this.bottom();
     }
@@ -156,7 +156,7 @@ public abstract class FactoryTerminalPanel {
      */
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
         FactoryNineSlice.panel(graphics, this.left, this.top, this.width, this.height);
-        int headerLeft = this.left + FactoryTerminalGeometry.TOOLBAR_RESERVE;
+        int headerLeft = this.left + 3;
         FactoryNineSlice.header(graphics, headerLeft, this.top + 3,
                 this.right() - headerLeft - 3, FactoryTerminalGeometry.HEADER_HEIGHT - 2);
         graphics.drawString(this.font, this.title(), headerLeft + 3, this.top + 6,

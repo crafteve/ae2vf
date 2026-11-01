@@ -201,8 +201,7 @@ final class FactoryIoPanelRender {
     }
 
     int contentLeft() {
-        return this.panel.left() + FactoryTerminalGeometry.TOOLBAR_RESERVE
-                + FactoryTerminalGeometry.CONTENT_PADDING;
+        return this.panel.left() + FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
     int contentTop() {

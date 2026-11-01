@@ -29,9 +29,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 样板视图的屏幕：右半是 AE2 样板编码终端，左半是主动目标面板。
  *
- * <p>右移策略与合成视图相同：{@code super.init()} 期间把 {@code imageWidth} 当作 0，
- * 让 AE2 的终端原点直接落在屏幕中线，随后恢复真实宽度。两个视图必须共用这套定位，
- * 否则切换模式后左右两半会错位。</p>
+ * <p>右移策略与合成视图相同：{@code super.init()} 期间把 {@code imageWidth} 设成
+ * {@code -TOOLBAR_RESERVE}，让终端原点右移半个按钮栏宽度，整个窗口保持居中。
  */
 public final class FactoryPatternTerminalScreen
         extends PatternEncodingTermScreen<FactoryPatternTerminalMenu>
@@ -56,7 +55,7 @@ public final class FactoryPatternTerminalScreen
     public void init() {
         int terminalWidth = this.imageWidth;
         try {
-            this.imageWidth = 0;
+            this.imageWidth = -FactoryTerminalGeometry.TOOLBAR_RESERVE;
             super.init();
         } finally {
             this.imageWidth = terminalWidth;

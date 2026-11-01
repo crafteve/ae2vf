@@ -319,8 +319,7 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     }
 
     private int contentLeft() {
-        return this.left() + FactoryTerminalGeometry.TOOLBAR_RESERVE
-                + FactoryTerminalGeometry.CONTENT_PADDING;
+        return this.left() + FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
     private int contentWidth() {

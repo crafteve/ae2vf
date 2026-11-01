@@ -28,7 +28,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>AE2 的终端控件按「屏幕原点」定位，按钮栏还会每帧按 init 时缓存的绝对原点重排；
  * 所以不能开完界面再平移。做法是在 {@code super.init()} 期间临时把 {@code imageWidth}
- * 设成 0，让 {@code AbstractContainerScreen} 直接把原点算到屏幕中线，随后恢复真实宽度。
+ * 设成 {@code -TOOLBAR_RESERVE}，让 {@code AbstractContainerScreen} 把原点右移半个按钮栏
+ * 宽度，整个「按钮栏 + 面板 + 终端」窗口仍然居中，随后恢复真实宽度。
  * 这样槽位、搜索框、滚动条、按钮栏与升级面板一次对齐，没有事后补丁。</p>
  */
 public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<FactoryCraftingTerminalMenu>
@@ -51,10 +52,10 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
 
     @Override
     public void init() {
-        // 见类注释：只在 super.init() 期间把宽度当作 0，让终端原点落在屏幕中线。
+        // 见类注释：只在 super.init() 期间用负宽度把原点右移到整个窗口的中线。
         int terminalWidth = this.imageWidth;
         try {
-            this.imageWidth = 0;
+            this.imageWidth = -FactoryTerminalGeometry.TOOLBAR_RESERVE;
             super.init();
         } finally {
             this.imageWidth = terminalWidth;
