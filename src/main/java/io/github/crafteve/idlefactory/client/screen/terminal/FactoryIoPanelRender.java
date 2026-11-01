@@ -22,55 +22,35 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 被动 IO 面板的绘制与几何：机器列表 + 行内展开的输入 / 输出标记格。
+ * 被动 IO 面板的绘制与几何：搜索在顶栏，机器按样板管理终端的样式铺开。
  *
- * <p>按 AE 总线的做法，配置只画标记格：输入一组、输出一组，一行 9 格，放满自动加行；
- * 状态、速率、面、精准模式全部放 tooltip，界面不画信息文字。中键点标记格弹配置框。</p>
+ * <p>每台机器一行标题（图标 + 名字），下面固定是输入槽位行和输出槽位行，槽位左边一个
+ * 小圆点区分输入 / 输出；一行 9 格，规则放满自动加行。不展开、不画卡片，状态与速率
+ * 全在 tooltip。中键槽位弹配置框。</p>
  */
 final class FactoryIoPanelRender {
-    /** 机器行高度。 */
-    static final int ROW_H = 22;
-    /** 标记格边长。 */
+    /** 机器标题行高。 */
+    static final int MACHINE_H = 14;
+    /** 槽位边长。 */
     static final int SLOT = 18;
-    /** 一行标记格数量。 */
+    /** 一行槽位数。 */
     static final int COLS = 9;
-    /** 输入 / 输出两组之间的间距。 */
-    static final int GROUP_GAP = 4;
-    /** 行与行之间的间距。 */
-    static final int ROW_GAP = 2;
-    /** 展开区最大高度。 */
-    static final int DETAIL_MAX_H = 150;
+    /** 输入 / 输出行之间的间距。 */
+    static final int GROUP_GAP = 2;
+    /** 机器之间的间距。 */
+    static final int MACHINE_GAP = 6;
     /** 配置框宽度。 */
     static final int POPUP_W = 126;
     /** 配置框行高。 */
     static final int POPUP_ROW = 16;
-    /** 深色标题上的文字颜色。 */
-    private static final int HEADER_TEXT = 0xFFE8ECF5;
 
-    /** 命中编码。 */
-    static final class Hit {
-        /** 没命中。 */
-        static final int NONE = -1;
-        /** 输入空位。 */
-        static final int EMPTY_INPUT = -2;
-        /** 输出空位。 */
-        static final int EMPTY_OUTPUT = -3;
-        /** 输入规则下标偏移。 */
-        static final int INPUT_BASE = 1000;
-        /** 输出规则下标偏移。 */
-        static final int OUTPUT_BASE = 2000;
-
-        private Hit() {
-            // 纯常量持有类
-        }
+    /** 槽位命中。 */
+    record SlotHit(int machineIndex, boolean input, int ruleIndex, boolean empty, int x, int y) {
     }
 
-    /** 一行机器。 */
-    record RowRect(int viewIndex, int y, int rowBottom, int detailY, int detailH) {
-    }
-
-    /** 一个标记格。 */
-    record SlotRect(int x, int y, boolean input, int ruleIndex, boolean empty) {
+    /** 一台机器的纵向布局。 */
+    private record MachineRow(FactorySnapshotBuilder.MachineView machine, int index, int headerY,
+            int inputY, int inputLines, int outputY, int outputLines, int endY) {
     }
 
     private final FactoryIoPanel panel;
@@ -83,32 +63,30 @@ final class FactoryIoPanelRender {
     }
 
     /**
-     * 画搜索框、机器行与展开的标记格。
+     * 画顶栏搜索与机器列表。
      *
      * @param graphics 绘制器
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
     void render(GuiGraphics graphics, int mouseX, int mouseY) {
-        this.renderSearch(graphics);
+        this.renderHeader(graphics);
         if (!this.panel.hasFactory) {
-            graphics.drawString(this.panel.font, "还没有工厂", this.contentLeft() + 2,
+            graphics.drawString(this.panel.font, "还没有工厂", this.contentLeft(),
                     this.listTop(), this.panel.theme.textDim(), false);
             return;
         }
         if (this.panel.visible.isEmpty()) {
-            graphics.drawString(this.panel.font,
-                    this.panel.machines.isEmpty() ? "机器库为空" : "没有匹配的机器",
-                    this.contentLeft() + 2, this.listTop(), this.panel.theme.textDim(), false);
+            graphics.drawString(this.panel.font, "机器库为空", this.contentLeft(),
+                    this.listTop(), this.panel.theme.textDim(), false);
             return;
         }
-        for (RowRect row : this.rowRects()) {
-            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
-            this.drawRow(graphics, machine, row, mouseX, mouseY);
-            if (row.detailH() > 0) {
-                this.drawDetail(graphics, machine, row, mouseX, mouseY);
-            }
+        graphics.enableScissor(this.contentLeft(), this.listTop(),
+                this.contentLeft() + this.contentWidth(), this.listBottom());
+        for (MachineRow row : this.machineRows()) {
+            this.drawMachine(graphics, row, mouseX, mouseY);
         }
+        graphics.disableScissor();
         this.renderFeedback(graphics);
     }
 
@@ -121,7 +99,7 @@ final class FactoryIoPanelRender {
      */
     void renderForeground(GuiGraphics graphics, int mouseX, int mouseY) {
         if (this.panel.popupOpen()) {
-            this.drawPopup(graphics, mouseX, mouseY);
+            this.drawPopup(graphics);
             return;
         }
         List<Component> lines = this.tooltipAt(mouseX, mouseY);
@@ -131,98 +109,100 @@ final class FactoryIoPanelRender {
         }
     }
 
-    private void renderSearch(GuiGraphics graphics) {
-        int x = this.contentLeft();
-        int y = this.contentTop();
-        FactoryNineSlice.field(graphics, x, y, this.contentWidth(),
-                FactoryTerminalGeometry.SEARCH_HEIGHT);
+    private void renderHeader(GuiGraphics graphics) {
+        graphics.drawString(this.panel.font, "被动 IO", this.left() + 5,
+                this.top() + 5, FactoryTerminalGeometry.TEXT_COLOR, false);
+        int width = 88;
+        int x = this.right() - width - 4;
+        int y = this.top() + 2;
+        FactoryNineSlice.field(graphics, x, y, width, FactoryTerminalGeometry.SEARCH_HEIGHT);
+        this.drawMagnifier(graphics, x + 2, y + 3);
         String text = this.panel.searchText.isEmpty() && !this.panel.searchFocused
                 ? "搜索" : this.panel.searchText;
         int color = this.panel.searchText.isEmpty() && !this.panel.searchFocused
                 ? this.panel.theme.textDim() : this.panel.theme.textPrimary();
-        graphics.drawString(this.panel.font, text, x + 3, y + 3, color, false);
+        graphics.drawString(this.panel.font, text, x + 10, y + 3, color, false);
         if (this.panel.searchFocused && (Util.getMillis() / 500L) % 2L == 0L) {
-            int caretX = x + 3 + this.panel.font.width(this.panel.searchText);
+            int caretX = x + 10 + this.panel.font.width(this.panel.searchText);
             graphics.fill(caretX, y + 2, caretX + 1, y + 10, this.panel.theme.textPrimary());
         }
     }
 
-    private void drawRow(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            RowRect row, int mouseX, int mouseY) {
+    /**
+     * 画 5×5 的放大镜，避免为搜索框再引一张贴图。
+     *
+     * @param graphics 绘制器
+     * @param x        左边界
+     * @param y        上边界
+     */
+    private void drawMagnifier(GuiGraphics graphics, int x, int y) {
+        int color = this.panel.theme.textDim();
+        graphics.renderOutline(x, y, 5, 5, color);
+        graphics.fill(x + 4, y + 4, x + 7, y + 5, color);
+        graphics.fill(x + 5, y + 5, x + 7, y + 6, color);
+    }
+
+    private void drawMachine(GuiGraphics graphics, MachineRow row, int mouseX, int mouseY) {
+        FactorySnapshotBuilder.MachineView machine = row.machine();
         int x = this.contentLeft();
         int width = this.contentWidth();
-        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= row.y()
-                && mouseY < row.rowBottom();
-        boolean selected = isExpanded(machine);
-        FactoryNineSlice.card(graphics, x, row.y(), width, ROW_H - 1);
-        if (hovered || selected) {
-            graphics.fill(x, row.y(), x + width, row.rowBottom() - 1,
-                    selected ? FactoryTerminalGeometry.ROW_SELECTED
-                            : FactoryTerminalGeometry.ROW_HOVER);
-        }
-        FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.fill(graphics, status.strip(), x + 1, row.y() + 1, 1, ROW_H - 3);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + 3, row.y() + 9,
-                FactoryGuiTextures.STATUS_LAMP_SIZE);
-        FactoryNineSlice.slot(graphics, x + 10, row.y() + 3, 16, 16);
-        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
-        if (!icon.isEmpty()) {
-            graphics.renderItem(icon, x + 10, row.y() + 3);
-        }
-        graphics.drawString(this.panel.font,
-                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 44),
-                x + 28, row.y() + 7, this.panel.theme.textPrimary(), false);
-        graphics.drawString(this.panel.font, selected ? "▾" : "▸", x + width - 11,
-                row.y() + 7, this.panel.theme.textPrimary(), false);
-    }
-
-    private void drawDetail(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            RowRect row, int mouseX, int mouseY) {
-        int x = this.contentLeft();
-        int width = this.contentWidth();
-        graphics.enableScissor(x, row.detailY(), x + width, row.detailY() + row.detailH());
-        int y = row.detailY() - this.panel.detailScroll;
-        y = this.drawGroup(graphics, machine, IoSide.INPUT, x, y, width, mouseX, mouseY);
-        y += GROUP_GAP;
-        this.drawGroup(graphics, machine, IoSide.OUTPUT, x, y, width, mouseX, mouseY);
-        graphics.disableScissor();
-    }
-
-    private int drawGroup(GuiGraphics graphics, FactorySnapshotBuilder.MachineView machine,
-            IoSide side, int x, int y, int width, int mouseX, int mouseY) {
-        List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
-        int color = side == IoSide.INPUT ? this.panel.theme.accent() : this.panel.theme.statusWarn();
-        graphics.fill(x, y, x + 2, y + this.groupHeight(rules.size()), color);
-        int cells = rules.size() + 1;
-        for (int i = 0; i < cells; i++) {
-            int col = i % COLS;
-            int line = i / COLS;
-            int slotX = x + 4 + col * SLOT;
-            int slotY = y + line * SLOT;
-            boolean empty = i == rules.size();
-            this.drawSlot(graphics, rules, side, i, empty, slotX, slotY, mouseX, mouseY);
-        }
-        return y + this.groupHeight(rules.size());
-    }
-
-    private void drawSlot(GuiGraphics graphics, List<ResourceSpec> rules, IoSide side, int index,
-            boolean empty, int x, int y, int mouseX, int mouseY) {
-        boolean hovered = mouseX >= x && mouseX < x + SLOT && mouseY >= y && mouseY < y + SLOT;
-        FactoryNineSlice.slot(graphics, x, y, SLOT, SLOT);
+        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= row.headerY()
+                && mouseY < row.headerY() + MACHINE_H;
         if (hovered) {
-            graphics.fill(x + 1, y + 1, x + SLOT - 1, y + SLOT - 1,
+            graphics.fill(x, row.headerY(), x + width, row.headerY() + MACHINE_H,
                     FactoryTerminalGeometry.ROW_HOVER);
         }
-        if (empty) {
-            graphics.drawString(this.panel.font, "+", x + 5, y + 5,
-                    hovered ? this.panel.theme.accent() : this.panel.theme.textDim(), false);
-            return;
+        FactoryNineSlice.slot(graphics, x, row.headerY() - 1, 16, 16);
+        ItemStack icon = FactoryLabels.blockStack(machine.blockId());
+        if (!icon.isEmpty()) {
+            graphics.renderItem(icon, x, row.headerY() - 1);
         }
-        FactoryResourceIconRender.draw(graphics, this.panel.font, rules.get(index).key(), x + 1,
-                y + 1);
+        FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
+        FactoryNineSlice.icon(graphics, status.lamp(), x + 18, row.headerY() + 3,
+                FactoryGuiTextures.STATUS_LAMP_SIZE);
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 30),
+                x + 25, row.headerY() + 1, this.panel.theme.textPrimary(), false);
+        this.drawGroup(graphics, row, true, mouseX, mouseY);
+        this.drawGroup(graphics, row, false, mouseX, mouseY);
     }
 
-    private void drawPopup(GuiGraphics graphics, int mouseX, int mouseY) {
+    private void drawGroup(GuiGraphics graphics, MachineRow row, boolean input, int mouseX,
+            int mouseY) {
+        List<ResourceSpec> rules = input ? row.machine().inputs() : row.machine().outputs();
+        int x = this.contentLeft();
+        int y = input ? row.inputY() : row.outputY();
+        int lines = input ? row.inputLines() : row.outputLines();
+        int color = input ? this.panel.theme.accent() : this.panel.theme.statusWarn();
+        graphics.fill(x + 1, y + 3, x + 4, y + 3 + 5, color);
+        for (int line = 0; line < lines; line++) {
+            for (int col = 0; col < COLS; col++) {
+                int index = line * COLS + col;
+                if (index > rules.size()) {
+                    break;
+                }
+                int slotX = x + 7 + col * SLOT;
+                int slotY = y + line * SLOT;
+                boolean empty = index == rules.size();
+                boolean hover = mouseX >= slotX && mouseX < slotX + SLOT
+                        && mouseY >= slotY && mouseY < slotY + SLOT;
+                FactoryNineSlice.slot(graphics, slotX, slotY, SLOT, SLOT);
+                if (hover) {
+                    graphics.fill(slotX + 1, slotY + 1, slotX + SLOT - 1, slotY + SLOT - 1,
+                            FactoryTerminalGeometry.ROW_HOVER);
+                }
+                if (empty) {
+                    graphics.drawString(this.panel.font, "+", slotX + 5, slotY + 5,
+                            hover ? this.panel.theme.accent() : this.panel.theme.textDim(), false);
+                } else {
+                    FactoryResourceIconRender.draw(graphics, this.panel.font,
+                            rules.get(index).key(), slotX + 1, slotY + 1);
+                }
+            }
+        }
+    }
+
+    private void drawPopup(GuiGraphics graphics) {
         ResourceSpec rule = this.panel.popupRule();
         if (rule == null) {
             return;
@@ -231,17 +211,89 @@ final class FactoryIoPanelRender {
         int y = this.panel.popupY();
         graphics.fill(x, y, x + POPUP_W, y + POPUP_ROW * 3 + 6, 0xF0101820);
         graphics.renderOutline(x, y, POPUP_W, POPUP_ROW * 3 + 6, 0xFFE8ECF5);
-        graphics.drawString(this.panel.font, "面：" + FactoryLabels.face(rule), x + 4,
-                y + 4, HEADER_TEXT, false);
+        graphics.drawString(this.panel.font, "面：" + FactoryLabels.face(rule), x + 4, y + 4,
+                0xFFE8ECF5, false);
         graphics.drawString(this.panel.font,
                 "匹配：" + (rule.mode().name().equals("IGNORE_COMPONENTS") ? "模糊" : "精准"),
-                x + 4, y + 4 + POPUP_ROW, HEADER_TEXT, false);
+                x + 4, y + 4 + POPUP_ROW, 0xFFE8ECF5, false);
         graphics.drawString(this.panel.font, "删除", x + 4, y + 4 + POPUP_ROW * 2,
                 this.panel.theme.error(), false);
     }
 
+    private void renderFeedback(GuiGraphics graphics) {
+        if (this.panel.feedback == null || Util.getMillis() > this.panel.feedbackUntil) {
+            return;
+        }
+        int color = this.panel.feedbackOk ? this.panel.theme.statusRun() : this.panel.theme.error();
+        graphics.drawString(this.panel.font,
+                trim(this.panel.font, this.panel.feedback, this.contentWidth() - 4),
+                this.contentLeft(), this.panel.bottom() - 12, color, false);
+    }
+
     // ---- 命中 ----
 
+    /**
+     * 命中的槽位。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 槽位；没命中为 {@code null}
+     */
+    @Nullable
+    SlotHit slotAt(double mouseX, double mouseY) {
+        for (MachineRow row : this.machineRows()) {
+            for (boolean input : new boolean[] { true, false }) {
+                List<ResourceSpec> rules = input ? row.machine().inputs()
+                        : row.machine().outputs();
+                int y = input ? row.inputY() : row.outputY();
+                int lines = input ? row.inputLines() : row.outputLines();
+                for (int line = 0; line < lines; line++) {
+                    for (int col = 0; col < COLS; col++) {
+                        int index = line * COLS + col;
+                        if (index > rules.size()) {
+                            break;
+                        }
+                        int slotX = this.contentLeft() + 7 + col * SLOT;
+                        int slotY = y + line * SLOT;
+                        if (mouseX >= slotX && mouseX < slotX + SLOT && mouseY >= slotY
+                                && mouseY < slotY + SLOT) {
+                            return new SlotHit(row.index(), input, index,
+                                    index == rules.size(), slotX, slotY);
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 命中的机器标题行。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 机器下标；没命中为 {@code -1}
+     */
+    int machineAt(double mouseX, double mouseY) {
+        if (mouseX < this.contentLeft()
+                || mouseX >= this.contentLeft() + this.contentWidth()) {
+            return -1;
+        }
+        for (MachineRow row : this.machineRows()) {
+            if (mouseY >= row.headerY() && mouseY < row.headerY() + MACHINE_H) {
+                return row.index();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * 配置框点击结果。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 选项下标；外面为 {@code -1}
+     */
     int popupHit(double mouseX, double mouseY) {
         if (!this.panel.popupOpen()) {
             return -1;
@@ -255,90 +307,68 @@ final class FactoryIoPanelRender {
         return Math.min(2, (int) ((mouseY - y - 2) / POPUP_ROW));
     }
 
-    /**
-     * 命中的机器行在可见列表里的下标。
-     *
-     * @param mouseX 鼠标 x
-     * @param mouseY 鼠标 y
-     * @return 可见下标；没命中为 {@code -1}
-     */
-    int rowAt(double mouseX, double mouseY) {
-        if (mouseX < this.contentLeft() || mouseX >= this.contentLeft() + this.contentWidth()) {
-            return -1;
-        }
-        for (RowRect row : this.rowRects()) {
-            if (mouseY >= row.y() && mouseY < row.rowBottom()) {
-                return row.viewIndex() - this.panel.firstRow;
-            }
-        }
-        return -1;
+    boolean inSearch(double mouseX, double mouseY) {
+        int x = this.right() - 88 - 4;
+        int y = this.top() + 2;
+        return mouseX >= x && mouseX < x + 88 && mouseY >= y
+                && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
+    }
+
+    boolean inList(double mouseX, double mouseY) {
+        return mouseX >= this.contentLeft()
+                && mouseX < this.contentLeft() + this.contentWidth()
+                && mouseY >= this.listTop() && mouseY < this.listBottom();
     }
 
     /**
-     * 命中的展开箭头。
+     * 列表内容总高，用于滚动夹紧。
      *
-     * @param mouseX 鼠标 x
-     * @param mouseY 鼠标 y
-     * @return 可见下标；没命中为 {@code -1}
+     * @return 高度
      */
-    int chevronAt(double mouseX, double mouseY) {
-        int width = this.contentWidth();
-        if (mouseX < this.contentLeft() + width - 18
-                || mouseX >= this.contentLeft() + width) {
-            return -1;
+    int contentHeight() {
+        List<MachineRow> rows = this.machineRows();
+        if (rows.isEmpty()) {
+            return 0;
         }
-        for (RowRect row : this.rowRects()) {
-            if (mouseY >= row.y() && mouseY < row.rowBottom()) {
-                return row.viewIndex() - this.panel.firstRow;
-            }
-        }
-        return -1;
-    }
-
-    /**
-     * 命中展开区里的标记格。
-     *
-     * @param mouseX 鼠标 x
-     * @param mouseY 鼠标 y
-     * @return {@link Hit} 常量或规则下标
-     */
-    int slotHit(double mouseX, double mouseY) {
-        RowRect row = this.expandedRow();
-        if (row == null || mouseY < row.detailY() || mouseY >= row.detailY() + row.detailH()) {
-            return Hit.NONE;
-        }
-        FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
-        int x = this.contentLeft();
-        int y = row.detailY() - this.panel.detailScroll;
-        for (IoSide side : IoSide.values()) {
-            List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
-            int cells = rules.size() + 1;
-            for (int i = 0; i < cells; i++) {
-                int col = i % COLS;
-                int line = i / COLS;
-                int slotX = x + 4 + col * SLOT;
-                int slotY = y + line * SLOT;
-                if (mouseX >= slotX && mouseX < slotX + SLOT && mouseY >= slotY
-                        && mouseY < slotY + SLOT) {
-                    if (i == rules.size()) {
-                        return side == IoSide.INPUT ? Hit.EMPTY_INPUT : Hit.EMPTY_OUTPUT;
-                    }
-                    return (side == IoSide.INPUT ? Hit.INPUT_BASE : Hit.OUTPUT_BASE) + i;
-                }
-            }
-            y += this.groupHeight(rules.size()) + GROUP_GAP;
-        }
-        return Hit.NONE;
+        return rows.get(rows.size() - 1).endY() - this.listTop() + this.panel.scroll;
     }
 
     // ---- 几何 ----
 
-    int contentLeft() {
-        return this.panel.left() + FactoryTerminalGeometry.CONTENT_PADDING;
+    private List<MachineRow> machineRows() {
+        List<MachineRow> rows = new ArrayList<>();
+        int y = this.listTop() - this.panel.scroll;
+        for (int i = 0; i < this.panel.visible.size(); i++) {
+            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(i);
+            int headerY = y;
+            int inputLines = Math.max(1,
+                    (machine.inputs().size() + 1 + COLS - 1) / COLS);
+            int inputY = headerY + MACHINE_H + 1;
+            int outputLines = Math.max(1,
+                    (machine.outputs().size() + 1 + COLS - 1) / COLS);
+            int outputY = inputY + inputLines * SLOT + GROUP_GAP;
+            int endY = outputY + outputLines * SLOT + MACHINE_GAP;
+            rows.add(new MachineRow(machine, i, headerY, inputY, inputLines, outputY,
+                    outputLines, endY));
+            y = endY;
+        }
+        return rows;
     }
 
-    int contentTop() {
-        return this.panel.top() + FactoryTerminalGeometry.HEADER_HEIGHT + 15;
+    private int left() {
+        return this.panel.left();
+    }
+
+    private int top() {
+        return this.panel.top();
+    }
+
+    private int right() {
+        return this.panel.left() + this.panel.width();
+    }
+
+    int contentLeft() {
+        return this.left() + FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
     int contentWidth() {
@@ -346,162 +376,17 @@ final class FactoryIoPanelRender {
     }
 
     int listTop() {
-        return this.contentTop() + FactoryTerminalGeometry.SEARCH_HEIGHT + 6;
+        return this.top() + FactoryTerminalGeometry.HEADER_HEIGHT + 4;
     }
 
     int listBottom() {
         return this.panel.bottom() - FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
-    List<RowRect> rowRects() {
-        List<RowRect> rows = new ArrayList<>();
-        int y = this.listTop();
-        int bottom = this.listBottom();
-        for (int i = this.panel.firstRow; i < this.panel.visible.size(); i++) {
-            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(i);
-            int detailH = 0;
-            if (isExpanded(machine)) {
-                int needed = this.detailContentHeight(machine);
-                int max = Math.max(0, bottom - (y + ROW_H + ROW_GAP));
-                detailH = Math.min(Math.min(needed, DETAIL_MAX_H), max);
-            }
-            if (y + ROW_H > bottom) {
-                break;
-            }
-            rows.add(new RowRect(i, y, y + ROW_H, y + ROW_H, detailH));
-            y += ROW_H + ROW_GAP + detailH;
-        }
-        return rows;
-    }
-
-    @Nullable
-    RowRect expandedRow() {
-        for (RowRect row : this.rowRects()) {
-            if (row.detailH() > 0) {
-                return row;
-            }
-        }
-        return null;
-    }
-
-    int detailContentHeight(FactorySnapshotBuilder.MachineView machine) {
-        return this.groupHeight(machine.inputs().size()) + GROUP_GAP
-                + this.groupHeight(machine.outputs().size());
-    }
-
-    private int groupHeight(int rules) {
-        int lines = (rules + 1 + COLS - 1) / COLS;
-        return Math.max(1, lines) * SLOT;
-    }
-
-    int detailMaxScroll(FactorySnapshotBuilder.MachineView machine) {
-        RowRect row = this.expandedRow();
-        if (row == null) {
-            return 0;
-        }
-        return Math.max(0, this.detailContentHeight(machine) - row.detailH());
-    }
-
-    int visibleRows() {
-        return Math.max(1, (this.listBottom() - this.listTop()) / (ROW_H + ROW_GAP));
-    }
-
-    boolean inPanel(double mouseX, double mouseY) {
-        return mouseX >= this.contentLeft()
-                && mouseX < this.contentLeft() + this.contentWidth()
-                && mouseY >= this.listTop() && mouseY < this.listBottom();
-    }
-
-    boolean inExpandedDetail(double mouseX, double mouseY) {
-        for (RowRect row : this.rowRects()) {
-            if (row.detailH() > 0 && mouseY >= row.detailY()
-                    && mouseY < row.detailY() + row.detailH()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    boolean inSearch(double mouseX, double mouseY) {
-        int x = this.contentLeft();
-        int y = this.contentTop();
-        return mouseX >= x && mouseX < x + this.contentWidth()
-                && mouseY >= y && mouseY < y + FactoryTerminalGeometry.SEARCH_HEIGHT;
-    }
-
-    /**
-     * 展开区里输入 / 输出两组的落点。
-     *
-     * @return 两个矩形；没展开时为空
-     */
-    List<Rect2i> sectionAreas() {
-        RowRect row = this.expandedRow();
-        if (row == null) {
-            return List.of();
-        }
-        FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
-        int top = row.detailY() - this.panel.detailScroll;
-        int inputHeight = this.groupHeight(machine.inputs().size());
-        int outputTop = top + inputHeight + GROUP_GAP;
-        int outputHeight = this.groupHeight(machine.outputs().size());
-        return List.of(
-                new Rect2i(this.contentLeft() + 4, top, COLS * SLOT, inputHeight),
-                new Rect2i(this.contentLeft() + 4, outputTop, COLS * SLOT, outputHeight));
-    }
-
-    private void renderFeedback(GuiGraphics graphics) {
-        if (this.panel.feedback == null || Util.getMillis() > this.panel.feedbackUntil) {
-            return;
-        }
-        int color = this.panel.feedbackOk ? this.panel.theme.statusRun() : this.panel.theme.error();
-        graphics.drawString(this.panel.font,
-                trim(this.panel.font, this.panel.feedback, this.contentWidth() - 4),
-                this.contentLeft() + 2, this.panel.bottom() - 12, color, false);
-    }
-
-    /**
-     * 某台机器是否展开。
-     *
-     * @param machine 机器
-     * @return 是否展开
-     */
-    boolean isExpanded(FactorySnapshotBuilder.MachineView machine) {
-        return machine.ref().id().equals(this.panel.selectedId);
-    }
-
-    /**
-     * 命中编码对应的标记格位置。
-     *
-     * @param hit 规则命中
-     * @return 格子位置；命中无效时为 {@code null}
-     */
-    @Nullable
-    SlotRect slotOf(int hit) {
-        RowRect row = this.expandedRow();
-        if (row == null || hit < Hit.INPUT_BASE) {
-            return null;
-        }
-        FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(row.viewIndex());
-        boolean input = hit < Hit.OUTPUT_BASE;
-        int index = input ? hit - Hit.INPUT_BASE : hit - Hit.OUTPUT_BASE;
-        List<ResourceSpec> rules = input ? machine.inputs() : machine.outputs();
-        if (index < 0 || index >= rules.size()) {
-            return null;
-        }
-        int y = row.detailY() - this.panel.detailScroll;
-        if (!input) {
-            y += this.groupHeight(machine.inputs().size()) + GROUP_GAP;
-        }
-        int x = this.contentLeft() + 4 + (index % COLS) * SLOT;
-        int slotY = y + (index / COLS) * SLOT;
-        return new SlotRect(x, slotY, input, index, false);
-    }
-
     private List<Component> tooltipAt(double mouseX, double mouseY) {
-        int rowIndex = this.rowAt(mouseX, mouseY);
-        if (rowIndex >= 0) {
-            FactorySnapshotBuilder.MachineView machine =
-                    this.panel.visible.get(this.panel.firstRow + rowIndex);
+        int machineIndex = this.machineAt(mouseX, mouseY);
+        if (machineIndex >= 0 && machineIndex < this.panel.visible.size()) {
+            FactorySnapshotBuilder.MachineView machine = this.panel.visible.get(machineIndex);
             FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
             return List.of(
                     Component.literal(FactoryLabels.blockName(machine.blockId())),
@@ -511,28 +396,51 @@ final class FactoryIoPanelRender {
                     Component.literal(machine.ref().dimension().location() + " "
                             + machine.ref().pos().toShortString()));
         }
-        int hit = this.slotHit(mouseX, mouseY);
-        if (hit >= Hit.INPUT_BASE) {
-            FactorySnapshotBuilder.MachineView machine = this.panel.selected();
-            if (machine == null) {
-                return List.of();
-            }
-            boolean input = hit < Hit.OUTPUT_BASE;
-            int index = input ? hit - Hit.INPUT_BASE : hit - Hit.OUTPUT_BASE;
-            List<ResourceSpec> rules = input ? machine.inputs() : machine.outputs();
-            if (index < 0 || index >= rules.size()) {
-                return List.of();
-            }
-            ResourceSpec rule = rules.get(index);
-            return List.of(
-                    Component.literal((input ? "输入" : "输出") + " · "
-                            + FactoryLabels.name(rule.key())),
-                    Component.literal("面：" + FactoryLabels.face(rule)),
-                    Component.literal("匹配："
-                            + (rule.mode().name().equals("IGNORE_COMPONENTS") ? "模糊" : "精准")),
-                    Component.literal("中键配置"));
+        SlotHit hit = this.slotAt(mouseX, mouseY);
+        if (hit == null || hit.empty()) {
+            return List.of();
         }
-        return List.of();
+        List<ResourceSpec> rules = hit.input() ? this.panel.visible.get(hit.machineIndex()).inputs()
+                : this.panel.visible.get(hit.machineIndex()).outputs();
+        if (hit.ruleIndex() >= rules.size()) {
+            return List.of();
+        }
+        ResourceSpec rule = rules.get(hit.ruleIndex());
+        return List.of(
+                Component.literal((hit.input() ? "输入" : "输出") + " · "
+                        + FactoryLabels.name(rule.key())),
+                Component.literal("面：" + FactoryLabels.face(rule)),
+                Component.literal("匹配："
+                        + (rule.mode().name().equals("IGNORE_COMPONENTS") ? "模糊" : "精准")),
+                Component.literal("中键配置"));
+    }
+
+    /**
+     * 槽位对应的 JEI 目标矩形。
+     *
+     * @param hit 槽位
+     * @return 矩形
+     */
+    Rect2i slotArea(SlotHit hit) {
+        return new Rect2i(hit.x(), hit.y(), SLOT, SLOT);
+    }
+
+    /**
+     * 可接收 JEI 拖入的分组区域：每台机器的输入行、输出行各一块。
+     *
+     * @return 区域
+     */
+    List<FactoryTerminalDropArea> dropAreas() {
+        List<FactoryTerminalDropArea> areas = new ArrayList<>();
+        for (MachineRow row : this.machineRows()) {
+            int x = this.contentLeft() + 7;
+            int width = COLS * SLOT;
+            areas.add(new FactoryTerminalDropArea(new Rect2i(x, row.inputY(), width,
+                    row.inputLines() * SLOT), IoSide.INPUT));
+            areas.add(new FactoryTerminalDropArea(new Rect2i(x, row.outputY(), width,
+                    row.outputLines() * SLOT), IoSide.OUTPUT));
+        }
+        return areas;
     }
 
     private static String trim(Font font, String text, int width) {

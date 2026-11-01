@@ -49,10 +49,13 @@ public final class FactoryPatternTerminalScreen
         super(menu, inventory, title, style);
         this.panel = new FactoryPatternPanel(menu.containerId);
         this.panel.setFocusSink(() -> this.setFocused(null));
-        // 切换按钮走 AE2 的左侧按钮栏，和排序/设置按钮同一条，不再单独画。
-        this.addToLeftToolbar(new FactoryTerminalViewButton(Icon.TAB_CRAFTING, "合成视图",
+        // 切换按钮走 AE2 的左侧按钮栏，和排序/设置按钮同一条；插到栏首。
+        FactoryTerminalViewButton viewButton = new FactoryTerminalViewButton(
+                Icon.TAB_CRAFTING, "合成视图",
                 pressed -> PacketDistributor.sendToServer(
-                        new FactoryTerminalSwitchC2S(menu.containerId))));
+                        new FactoryTerminalSwitchC2S(menu.containerId)));
+        this.addToLeftToolbar(viewButton);
+        FactoryTerminalToolbar.moveToTop(this, viewButton);
     }
 
     @Override

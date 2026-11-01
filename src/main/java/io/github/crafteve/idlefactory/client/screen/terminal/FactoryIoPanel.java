@@ -59,15 +59,14 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     boolean hasFactory;
     /** 仓库是否在线。 */
     boolean storageOnline;
-    /** 当前选中的机器 id。 */
+    /** 当前选中的机器 id；点槽位时同步，供加 / 删规则用。 */
     @Nullable
     UUID selectedId;
-    /** 列表第一条可见机器的下标。 */
-    int firstRow;
-    /** 展开区的像素滚动。 */
-    int detailScroll;
-    /** 中键配置框当前针对的规则命中；没打开时为 {@link FactoryIoPanelRender.Hit#NONE}。 */
-    int popupHit = FactoryIoPanelRender.Hit.NONE;
+    /** 列表像素滚动。 */
+    int scroll;
+    /** 中键配置框针对的槽位；没打开时为 {@code null}。 */
+    @Nullable
+    FactoryIoPanelRender.SlotHit popupSlot;
     /** 配置框左上角 x。 */
     int popupX;
     /** 配置框左上角 y。 */
@@ -151,12 +150,12 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (this.popupHit != FactoryIoPanelRender.Hit.NONE) {
+        if (this.popupSlot != null) {
             int action = this.render.popupHit(mouseX, mouseY);
             if (action >= 0) {
                 this.applyPopup(action);
             } else {
-                this.popupHit = FactoryIoPanelRender.Hit.NONE;
+                this.popupSlot = null;
             }
             return true;
         }
@@ -165,46 +164,32 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             return true;
         }
         this.focusSearch(false);
-        int chevron = this.render.chevronAt(mouseX, mouseY);
-        if (chevron >= 0) {
-            int index = this.firstRow + chevron;
-            if (index >= 0 && index < this.visible.size()) {
-                UUID id = this.visible.get(index).ref().id();
-                this.selectedId = id.equals(this.selectedId) ? null : id;
-                this.detailScroll = 0;
-            }
-            return true;
-        }
-        int hit = this.render.slotHit(mouseX, mouseY);
-        if (hit != FactoryIoPanelRender.Hit.NONE) {
+        FactoryIoPanelRender.SlotHit hit = this.render.slotAt(mouseX, mouseY);
+        if (hit != null) {
+            this.selectedId = this.visible.get(hit.machineIndex()).ref().id();
             this.onSlotClick(hit, mouseX, mouseY, button);
             return true;
         }
-        int row = this.render.rowAt(mouseX, mouseY);
-        if (row >= 0) {
-            int index = this.firstRow + row;
-            if (index >= 0 && index < this.visible.size()) {
-                this.selectedId = this.visible.get(index).ref().id();
-                this.detailScroll = 0;
-            }
+        int machine = this.render.machineAt(mouseX, mouseY);
+        if (machine >= 0 && machine < this.visible.size()) {
+            this.selectedId = this.visible.get(machine).ref().id();
         }
         return true;
     }
 
     /**
-     * 标记格点击：左键空位加规则，右键删规则，中键开配置框。
+     * 槽位点击：左键空位加规则，右键删规则，中键开配置框。
      *
-     * @param hit    方格命中
+     * @param hit    槽位
      * @param mouseX 鼠标 x
      * @param mouseY 鼠标 y
      * @param button 按键
      */
-    private void onSlotClick(int hit, double mouseX, double mouseY, int button) {
-        if (hit == FactoryIoPanelRender.Hit.EMPTY_INPUT
-                || hit == FactoryIoPanelRender.Hit.EMPTY_OUTPUT) {
+    private void onSlotClick(FactoryIoPanelRender.SlotHit hit, double mouseX, double mouseY,
+            int button) {
+        if (hit.empty()) {
             if (button == 0) {
-                this.addRule(hit == FactoryIoPanelRender.Hit.EMPTY_INPUT
-                        ? IoSide.INPUT : IoSide.OUTPUT);
+                this.addRule(hit.input() ? IoSide.INPUT : IoSide.OUTPUT);
             }
             return;
         }
@@ -213,11 +198,11 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             return;
         }
         if (button == 2) {
-            this.popupHit = hit;
+            this.popupSlot = hit;
             this.popupX = (int) Math.min(mouseX + 8,
-                    this.panelRight() - FactoryIoPanelRender.POPUP_W - 2);
-            this.popupY = (int) Math.min(mouseY - 20, this.bottom()
-                    - FactoryIoPanelRender.POPUP_ROW * 3 - 8);
+                    this.left() + this.width() - FactoryIoPanelRender.POPUP_W - 2);
+            this.popupY = (int) Math.min(mouseY - 20,
+                    this.bottom() - FactoryIoPanelRender.POPUP_ROW * 3 - 8);
         }
     }
 
@@ -227,51 +212,46 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
      * @param action 选项下标
      */
     private void applyPopup(int action) {
-        int hit = this.popupHit;
-        this.popupHit = FactoryIoPanelRender.Hit.NONE;
+        FactoryIoPanelRender.SlotHit hit = this.popupSlot;
+        this.popupSlot = null;
         ResourceSpec rule = this.ruleOf(hit);
-        if (rule == null) {
+        if (rule == null || hit == null) {
             return;
         }
+        UUID machineId = this.visible.get(hit.machineIndex()).ref().id();
+        IoSide side = hit.input() ? IoSide.INPUT : IoSide.OUTPUT;
         if (action == 2) {
             this.removeRule(hit);
             return;
         }
-        boolean input = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE;
-        int index = input ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
-                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
-        UUID machineId = this.selected().ref().id();
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                FactoryRuleActionC2S.Action.REMOVE, machineId,
-                input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), null, MatchMode.IGNORE_COMPONENTS));
+                FactoryRuleActionC2S.Action.REMOVE, machineId, side, rule.key(), null,
+                MatchMode.IGNORE_COMPONENTS));
+        Direction face = rule.face();
+        MatchMode mode = rule.mode();
         if (action == 0) {
-            PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                    FactoryRuleActionC2S.Action.ADD, machineId,
-                    input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), nextFace(rule.face()),
-                    rule.mode()));
+            face = nextFace(face);
         } else {
-            MatchMode mode = rule.mode() == MatchMode.IGNORE_COMPONENTS
-                    ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
-            PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                    FactoryRuleActionC2S.Action.ADD, machineId,
-                    input ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), rule.face(), mode));
+            mode = mode == MatchMode.IGNORE_COMPONENTS ? MatchMode.EXACT
+                    : MatchMode.IGNORE_COMPONENTS;
         }
-        this.feedback = "已更新规则 #" + (index + 1);
+        PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
+                FactoryRuleActionC2S.Action.ADD, machineId, side, rule.key(), face, mode));
+        this.feedback = "已更新规则";
         this.feedbackOk = true;
         this.feedbackUntil = Util.getMillis() + FEEDBACK_MILLIS;
     }
 
     @Nullable
-    private ResourceSpec ruleOf(int hit) {
-        FactorySnapshotBuilder.MachineView machine = this.selected();
-        if (machine == null) {
+    private ResourceSpec ruleOf(@Nullable FactoryIoPanelRender.SlotHit hit) {
+        if (hit == null || hit.empty() || hit.machineIndex() >= this.visible.size()) {
             return null;
         }
-        boolean input = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE;
-        int index = input ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
-                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
-        List<ResourceSpec> rules = input ? machine.inputs() : machine.outputs();
-        return index >= 0 && index < rules.size() ? rules.get(index) : null;
+        List<ResourceSpec> rules = hit.input()
+                ? this.visible.get(hit.machineIndex()).inputs()
+                : this.visible.get(hit.machineIndex()).outputs();
+        return hit.ruleIndex() >= 0 && hit.ruleIndex() < rules.size()
+                ? rules.get(hit.ruleIndex()) : null;
     }
 
     /**
@@ -295,27 +275,14 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         };
     }
 
-    private int panelRight() {
-        return this.left() + this.width();
-    }
-
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
-        if (deltaY == 0.0D || !this.render.inPanel(mouseX, mouseY)) {
+        if (deltaY == 0.0D || !this.render.inList(mouseX, mouseY)) {
             return true;
         }
-        if (this.render.inExpandedDetail(mouseX, mouseY)) {
-            FactorySnapshotBuilder.MachineView machine = this.selected();
-            if (machine != null) {
-                int max = this.render.detailMaxScroll(machine);
-                this.detailScroll = Mth.clamp(
-                        this.detailScroll - (int) Math.signum(deltaY) * 12, 0, max);
-            }
-            return true;
-        }
-        int rows = this.render.visibleRows();
-        int max = Math.max(0, this.visible.size() - rows);
-        this.firstRow = Mth.clamp(this.firstRow - (int) Math.signum(deltaY), 0, max);
+        int view = this.render.listBottom() - this.render.listTop();
+        int max = Math.max(0, this.render.contentHeight() - view);
+        this.scroll = Mth.clamp(this.scroll - (int) Math.signum(deltaY) * 18, 0, max);
         return true;
     }
 
@@ -377,13 +344,13 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
 
     /** 配置框是否打开。 */
     boolean popupOpen() {
-        return this.popupHit != FactoryIoPanelRender.Hit.NONE;
+        return this.popupSlot != null;
     }
 
     /** 配置框针对的规则；规则已被删掉时为 {@code null}。 */
     @Nullable
     ResourceSpec popupRule() {
-        return this.ruleOf(this.popupHit);
+        return this.ruleOf(this.popupSlot);
     }
 
     /** 配置框左上角 x。 */
@@ -407,8 +374,9 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             }
         }
         this.visible = FactorySort.machines(filtered, this.sortKey, this.descending);
-        this.firstRow = Mth.clamp(this.firstRow, 0,
-                Math.max(0, this.visible.size() - this.render.visibleRows()));
+        int view = this.render.listBottom() - this.render.listTop();
+        this.scroll = Mth.clamp(this.scroll, 0,
+                Math.max(0, this.render.contentHeight() - view));
     }
 
     /**
@@ -508,23 +476,17 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     /**
      * 删除一条规则。
      *
-     * @param hit 命中的规则槽
+     * @param hit 命中的槽位
      */
-    private void removeRule(int hit) {
-        FactorySnapshotBuilder.MachineView machine = this.selected();
-        if (machine == null) {
-            return;
-        }
-        IoSide side = hit < FactoryIoPanelRender.Hit.OUTPUT_BASE ? IoSide.INPUT : IoSide.OUTPUT;
-        int index = side == IoSide.INPUT
-                ? hit - FactoryIoPanelRender.Hit.INPUT_BASE
-                : hit - FactoryIoPanelRender.Hit.OUTPUT_BASE;
-        List<ResourceSpec> rules = side == IoSide.INPUT ? machine.inputs() : machine.outputs();
-        if (index < 0 || index >= rules.size()) {
+    private void removeRule(FactoryIoPanelRender.SlotHit hit) {
+        ResourceSpec rule = this.ruleOf(hit);
+        if (rule == null || hit == null || hit.machineIndex() >= this.visible.size()) {
             return;
         }
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                FactoryRuleActionC2S.Action.REMOVE, machine.ref().id(), side,
-                rules.get(index).key(), null, MatchMode.IGNORE_COMPONENTS));
+                FactoryRuleActionC2S.Action.REMOVE,
+                this.visible.get(hit.machineIndex()).ref().id(),
+                hit.input() ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), null,
+                MatchMode.IGNORE_COMPONENTS));
     }
 }
