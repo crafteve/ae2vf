@@ -27,7 +27,7 @@ import appeng.api.stacks.AEItemKey;
  * <p>资源名、单位、面名、数量缩写和诊断文案原来散在 {@link FactoryScreen} 里；展开详情
  * 也要用同一套说法，所以集中到这里，避免两处各写一份、翻译后对不上。</p>
  */
-final class FactoryLabels {
+public final class FactoryLabels {
     private FactoryLabels() {
         // 纯静态工具类
     }
@@ -38,7 +38,7 @@ final class FactoryLabels {
      * @param blockId 观测到的方块 id
      * @return 图标；未知方块返回空栈
      */
-    static ItemStack blockStack(@Nullable ResourceLocation blockId) {
+    public static ItemStack blockStack(@Nullable ResourceLocation blockId) {
         if (blockId == null) {
             return ItemStack.EMPTY;
         }
@@ -52,7 +52,7 @@ final class FactoryLabels {
      * @param blockId 观测到的方块 id
      * @return 名称；未知方块返回注册名或“未知机器”
      */
-    static String blockName(@Nullable ResourceLocation blockId) {
+    public static String blockName(@Nullable ResourceLocation blockId) {
         if (blockId == null) {
             return "未知机器";
         }
@@ -66,7 +66,7 @@ final class FactoryLabels {
      * @param key 资源
      * @return 图标；未知资源用屏障
      */
-    static ItemStack icon(AEKey key) {
+    public static ItemStack icon(AEKey key) {
         return switch (AeKeySupport.kind(key)) {
             case ITEM -> AeKeySupport.toStack(key).isEmpty() ? new ItemStack(Items.BARRIER) : AeKeySupport.toStack(key);
             case FLUID -> {
@@ -85,7 +85,7 @@ final class FactoryLabels {
      * @param key 资源
      * @return 名称；查不到时退回注册名
      */
-    static String name(AEKey key) {
+    public static String name(AEKey key) {
         if (AeKeySupport.isEnergy(key)) {
             return "FE";
         }
@@ -108,7 +108,7 @@ final class FactoryLabels {
      * @param spec 规则
      * @return 上/下/北/南/东/西/任意
      */
-    static String face(ResourceSpec spec) {
+    public static String face(ResourceSpec spec) {
         if (spec.face() == null) {
             return "任意";
         }
@@ -139,7 +139,7 @@ final class FactoryLabels {
      * @param kind  资源类型
      * @return 例如 {@code 12}、{@code 28M}、{@code 281T}、{@code 1.5B}、{@code 281kB}
      */
-    static String gridCount(long value, CapabilityKind kind) {
+    public static String gridCount(long value, CapabilityKind kind) {
         return kind == CapabilityKind.FLUID ? compactFluid(value) : compactCount(value);
     }
 
@@ -209,7 +209,7 @@ final class FactoryLabels {
      * @param kind 资源类型
      * @return 带单位的一行
      */
-    static String rateText(long rate, CapabilityKind kind) {
+    public static String rateText(long rate, CapabilityKind kind) {
         return switch (kind) {
             case FLUID -> fluid(rate) + "/s";
             case ENERGY -> count(rate) + " FE/s";
@@ -225,7 +225,7 @@ final class FactoryLabels {
      * @param count 数量
      * @return 例如 {@code 999}、{@code 1.2k}、{@code 3.4M}、{@code 28.1G}
      */
-    static String count(long count) {
+    public static String count(long count) {
         if (count < 0L) {
             return Long.toString(count);
         }
@@ -304,7 +304,7 @@ final class FactoryLabels {
      * @param input  是否输入侧
      * @return 中文诊断
      */
-    static String reason(IoResult.Reason reason, boolean input) {
+    public static String reason(IoResult.Reason reason, boolean input) {
         return switch (reason) {
             case OK -> "正常";
             case NO_ITEM -> input ? "仓库缺料" : "机器无产出";
@@ -336,7 +336,7 @@ final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int reasonColor(IoResult.Reason reason, FactoryGuiTheme theme) {
+    public static int reasonColor(IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case OK -> theme.statusRun();
             case NO_ITEM -> theme.statusIdle();
@@ -435,7 +435,7 @@ final class FactoryLabels {
      * @param reason 最近一轮原因
      * @return 有流量时为 {@link IoResult.Reason#OK}，否则原样返回
      */
-    static IoResult.Reason effectiveReason(long rate, IoResult.Reason reason) {
+    public static IoResult.Reason effectiveReason(long rate, IoResult.Reason reason) {
         return rate > 0L ? IoResult.Reason.OK : reason;
     }
 

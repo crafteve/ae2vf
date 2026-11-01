@@ -24,7 +24,7 @@ import net.minecraft.world.entity.player.Inventory;
 public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<FactoryCraftingTerminalMenu>
         implements FactoryTerminalDisplay {
     /** 左面板。 */
-    private final FactoryIoPanel panel = new FactoryIoPanel();
+    private final FactoryIoPanel panel;
 
     /**
      * @param menu            菜单
@@ -35,6 +35,8 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
     public FactoryCraftingTerminalScreen(FactoryCraftingTerminalMenu menu, Inventory inventory,
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
+        this.panel = new FactoryIoPanel(menu.containerId);
+        this.panel.setFocusSink(() -> this.setFocused(null));
     }
 
     @Override

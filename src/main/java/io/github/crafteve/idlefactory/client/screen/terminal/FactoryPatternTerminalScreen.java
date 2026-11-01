@@ -24,7 +24,7 @@ public final class FactoryPatternTerminalScreen
         extends PatternEncodingTermScreen<FactoryPatternTerminalMenu>
         implements FactoryTerminalDisplay {
     /** 左面板。 */
-    private final FactoryPatternPanel panel = new FactoryPatternPanel();
+    private final FactoryPatternPanel panel;
 
     /**
      * @param menu      菜单
@@ -35,6 +35,8 @@ public final class FactoryPatternTerminalScreen
     public FactoryPatternTerminalScreen(FactoryPatternTerminalMenu menu, Inventory inventory,
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
+        this.panel = new FactoryPatternPanel(menu.containerId);
+        this.panel.setFocusSink(() -> this.setFocused(null));
     }
 
     @Override

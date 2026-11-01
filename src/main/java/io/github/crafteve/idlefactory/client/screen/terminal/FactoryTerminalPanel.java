@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
@@ -24,11 +26,41 @@ public abstract class FactoryTerminalPanel {
     protected final Font font = this.minecraft.font;
     /** 当前主题；唯色源。 */
     protected final FactoryGuiTheme theme = FactoryGuiTheme.current();
+    /** 所属菜单容器 id；左面板发动作包时带上，服务端用它拒绝过期界面。 */
+    protected final int containerId;
 
     private int left;
     private int top;
     private int width;
     private int height;
+    private int snapshotTicker;
+    @Nullable
+    private Runnable focusSink;
+
+    /**
+     * @param containerId 所属菜单容器 id
+     */
+    protected FactoryTerminalPanel(int containerId) {
+        this.containerId = containerId;
+    }
+
+    /**
+     * 设置「面板抢到键盘焦点」时的回调；屏幕用它清掉 AE2 搜索框的焦点。
+     *
+     * @param focusSink 回调；传 {@code null} 表示不需要
+     */
+    public final void setFocusSink(@Nullable Runnable focusSink) {
+        this.focusSink = focusSink;
+    }
+
+    /**
+     * 请求把键盘焦点从 AE2 控件挪到面板。
+     */
+    protected final void takeFocus() {
+        if (this.focusSink != null) {
+            this.focusSink.run();
+        }
+    }
 
     /**
      * 绑定面板矩形；由屏幕在 {@code init()} 里调用，缩放时重新绑定。
@@ -43,6 +75,9 @@ public abstract class FactoryTerminalPanel {
         this.top = top;
         this.width = width;
         this.height = height;
+        // 打开与缩放时立刻拉一次；之后每 20 tick 由 tick() 刷新。
+        this.snapshotTicker = 0;
+        this.requestSnapshot();
     }
 
     /** 左边界。 */
@@ -200,7 +235,18 @@ public abstract class FactoryTerminalPanel {
 
     /** 每 tick 一次；默认没有状态要推进。 */
     public void tick() {
-        // 基类无状态。
+        // 每 20 tick 拉一次服务端快照；机器状态、规则与目标都靠它刷新。
+        if (++this.snapshotTicker >= 20) {
+            this.snapshotTicker = 0;
+            this.requestSnapshot();
+        }
+    }
+
+    /**
+     * 请求服务端数据；默认什么都不发，由具体面板决定请求什么。
+     */
+    protected void requestSnapshot() {
+        // 基类没有要拉的数据。
     }
 
     /**

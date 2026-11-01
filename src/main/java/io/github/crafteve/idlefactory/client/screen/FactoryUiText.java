@@ -25,7 +25,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * <p>把「一行多色文字」、搜索字段需要的资源名/tooltip/tag，以及 tooltip/JEI 用的物品形态
  * 收在一起。这里全部是只读的注册表/物品栈查询，不探世界，也不改服务端状态。</p>
  */
-final class FactoryUiText {
+public final class FactoryUiText {
 
     private FactoryUiText() {
         // 纯静态辅助
@@ -83,7 +83,7 @@ final class FactoryUiText {
      * @param namespace 模组 id
      * @return 显示名；空 namespace 返回空串
      */
-    static String modName(String namespace) {
+    public static String modName(String namespace) {
         if (namespace == null || namespace.isEmpty()) {
             return "";
         }
@@ -178,7 +178,7 @@ final class FactoryUiText {
      * @param key 资源
      * @return 名称
      */
-    static String resourceName(AEKey key) {
+    public static String resourceName(AEKey key) {
         return FactoryLabels.name(key);
     }
 

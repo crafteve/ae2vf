@@ -25,7 +25,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * <p>所有比较器都以注册名或机器 id 作为最终兜底键，且方向只反转主键、不反转兜底键；
  * 因此同一份快照无论排序多少次，结果都一致。</p>
  */
-final class FactorySort {
+public final class FactorySort {
     private FactorySort() {
         // 纯静态工具类
     }
@@ -82,7 +82,7 @@ final class FactorySort {
      * <p>状态按「运行 → 可输入 → 缺料 → 堵塞 → 空闲 → 未配置 → 离线 → 未知」排；
      * 最近搬运把从未搬过的机器放最后。</p>
      */
-    enum MachineKey {
+    public enum MachineKey {
         /** 服务端登记顺序。 */
         DEFAULT("默认", "默", true),
         /** 方块显示名。 */
@@ -185,7 +185,7 @@ final class FactorySort {
      * @param descending 是否降序
      * @return 排序后的不可变列表；默认顺序直接返回原列表
      */
-    static List<MachineView> machines(List<MachineView> views, MachineKey key, boolean descending) {
+    public static List<MachineView> machines(List<MachineView> views, MachineKey key, boolean descending) {
         if (key == MachineKey.DEFAULT || views.size() < 2) {
             return views;
         }

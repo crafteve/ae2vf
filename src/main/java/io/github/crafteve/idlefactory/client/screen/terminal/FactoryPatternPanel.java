@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
+
+import net.neoforged.neoforge.network.PacketDistributor;
+
 /**
  * 主动样板面板：目标列表、样板槽视图与主动 / 被动切换。
  *
@@ -7,6 +11,13 @@ package io.github.crafteve.idlefactory.client.screen.terminal;
  * 分开，避免两个视图共享一个巨大的条件分支。</p>
  */
 public final class FactoryPatternPanel extends FactoryTerminalPanel {
+    /**
+     * @param containerId 所属菜单容器 id
+     */
+    public FactoryPatternPanel(int containerId) {
+        super(containerId);
+    }
+
     @Override
     protected String title() {
         return "主动样板";
@@ -15,5 +26,11 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     @Override
     protected String subtitle() {
         return "选择目标后管理样板与模式";
+    }
+
+    @Override
+    protected void requestSnapshot() {
+        // 样板视图复用机器表请求：服务端会顺手回主动目标列表。
+        PacketDistributor.sendToServer(new FactoryTableRequestC2S(this.containerId));
     }
 }

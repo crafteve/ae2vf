@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
  * @param strip 1px 状态条贴图
  * @param lamp  状态灯贴图
  */
-record FactoryStatus(String text, int color, ResourceLocation strip, ResourceLocation lamp) {
+public record FactoryStatus(String text, int color, ResourceLocation strip, ResourceLocation lamp) {
 
     /**
      * 状态种类，和主题无关。
@@ -131,7 +131,7 @@ record FactoryStatus(String text, int color, ResourceLocation strip, ResourceLoc
      * @param theme   当前主题
      * @return 状态文字
      */
-    static String text(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
+    public static String text(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
         return of(machine, theme).text();
     }
 }
