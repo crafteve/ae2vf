@@ -3,17 +3,14 @@ package io.github.crafteve.idlefactory.integration.ae2;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import io.github.crafteve.idlefactory.IdleFactory;
-import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import appeng.api.storage.MEStorage;
-import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
-
 import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
+
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 /**
  * 把 AE2 的 {@link MEStorage} 包成工厂自己的 {@link MEStorage}。
@@ -81,6 +78,18 @@ public final class Ae2Storage implements MEStorage {
             }
         }
         return result;
+    }
+
+    /**
+     * AE2 侧的全量枚举入口：终端列表、配方查看器与 CPU 都读这里。
+     *
+     * <p>不覆盖时 {@link MEStorage} 的默认实现为空，终端会看到「能存能取但列表全空」。</p>
+     *
+     * @param out 收集器；由调用方负责清空
+     */
+    @Override
+    public void getAvailableStacks(KeyCounter out) {
+        this.storage.getAvailableStacks(out);
     }
 
     /** 仓库在 AE2 快照里的描述文本。 */
