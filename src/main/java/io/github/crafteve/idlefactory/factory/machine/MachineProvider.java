@@ -40,11 +40,17 @@ public final class MachineProvider {
     private static final String TAG_PENDING = "Pending";
     private static final String TAG_STACK = "Stack";
     private static final String TAG_FACE = "Face";
+    private static final String TAG_MODE = "Mode";
+    private static final String TAG_MODE_PINNED = "ModePinned";
     /** 余量条目的面：-1 表示还没定面。 */
     private static final byte FACE_UNSET = -1;
 
     /** 阻挡开关。 */
     private BlockingMode blocking = BlockingMode.OFF;
+    /** 主动 / 被动模式。 */
+    private MachineMode mode = MachineMode.PASSIVE;
+    /** 玩家是否手动切过模式；手动切过之后不再按样板自动切换。 */
+    private boolean modePinned;
     /** 样板槽容量；{@code patterns.size()} 永远等于它。 */
     private int capacity = DEFAULT_CAPACITY;
     /** 样板槽，定长、空槽为 {@link ItemStack#EMPTY}。 */
@@ -97,6 +103,42 @@ public final class MachineProvider {
      */
     public void setBlocking(@Nullable BlockingMode mode) {
         this.blocking = mode == null ? BlockingMode.OFF : mode;
+    }
+
+    /** 主动 / 被动模式。 */
+    public MachineMode mode() {
+        return this.mode;
+    }
+
+    /** 玩家是否手动切过模式。 */
+    public boolean modePinned() {
+        return this.modePinned;
+    }
+
+    /**
+     * 手动切换模式；之后不再按「放入第一张样板」自动转主动。
+     *
+     * @param next 新模式
+     * @return 模式是否真的变了
+     */
+    public boolean selectMode(MachineMode next) {
+        boolean changed = !this.modePinned || this.mode != next;
+        this.modePinned = true;
+        this.mode = next;
+        return changed;
+    }
+
+    /**
+     * 写入第一张样板时自动转主动；玩家手动切过模式后不再自动改。
+     *
+     * @return 模式是否因这次写入变化
+     */
+    public boolean autoActivateOnPattern() {
+        if (this.modePinned || this.mode == MachineMode.ACTIVE) {
+            return false;
+        }
+        this.mode = MachineMode.ACTIVE;
+        return true;
     }
 
     /** 样板槽容量。 */
@@ -230,6 +272,8 @@ public final class MachineProvider {
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
         tag.putString(TAG_BLOCKING, this.blocking.name());
+        tag.putString(TAG_MODE, this.mode.name());
+        tag.putBoolean(TAG_MODE_PINNED, this.modePinned);
         tag.putInt(TAG_CAPACITY, this.capacity);
 
         ListTag patternList = new ListTag();
@@ -263,6 +307,8 @@ public final class MachineProvider {
     public static MachineProvider load(CompoundTag tag, HolderLookup.Provider registries) {
         MachineProvider provider = new MachineProvider();
         provider.blocking = BlockingMode.read(tag.getString(TAG_BLOCKING));
+        provider.mode = MachineMode.read(tag.getString(TAG_MODE));
+        provider.modePinned = tag.getBoolean(TAG_MODE_PINNED);
 
         ListTag patternList = tag.getList(TAG_PATTERNS, Tag.TAG_COMPOUND);
         List<ItemStack> loaded = new ArrayList<>(patternList.size());

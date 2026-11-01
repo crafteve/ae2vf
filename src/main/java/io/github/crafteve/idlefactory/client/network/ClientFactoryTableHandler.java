@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.network;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryTerminalDisplay;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
@@ -24,6 +25,11 @@ public final class ClientFactoryTableHandler {
         FactoryScreen screen = currentScreen(payload.containerId());
         if (screen != null) {
             screen.acceptTable(payload);
+            return;
+        }
+        FactoryTerminalDisplay display = currentTerminal(payload.containerId());
+        if (display != null) {
+            display.acceptTable(payload);
         }
     }
 
@@ -48,7 +54,27 @@ public final class ClientFactoryTableHandler {
         FactoryScreen screen = currentScreen(payload.containerId());
         if (screen != null) {
             screen.acceptEditFeedback(payload);
+            return;
         }
+        FactoryTerminalDisplay display = currentTerminal(payload.containerId());
+        if (display != null) {
+            display.acceptEditFeedback(payload);
+        }
+    }
+
+    /**
+     * 当前打开且容器 id 匹配的工厂终端屏幕。
+     *
+     * @param containerId 容器 id
+     * @return 屏幕；不匹配时为 {@code null}
+     */
+    private static FactoryTerminalDisplay currentTerminal(int containerId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof FactoryTerminalDisplay display
+                && display.containerId() == containerId) {
+            return display;
+        }
+        return null;
     }
 
     private static FactoryScreen currentScreen(int containerId) {

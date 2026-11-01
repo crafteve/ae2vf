@@ -216,6 +216,18 @@ public final class NodeManager {
     }
 
     /**
+     * 让一台机器重新向 CPU 广告样板；模式切换后调用。
+     *
+     * @param machineId 机器 id
+     */
+    public void refreshPatterns(UUID machineId) {
+        MachineNode node = this.nodes.get(machineId);
+        if (node != null) {
+            node.requestPatternUpdate();
+        }
+    }
+
+    /**
      * 更新一台机器的可用性；机器方块出现 / 消失时由观测迁移驱动。
      *
      * @param machineId 机器 id

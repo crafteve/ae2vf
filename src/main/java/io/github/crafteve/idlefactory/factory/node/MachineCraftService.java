@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.github.crafteve.idlefactory.factory.machine.MachineMode;
 import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
 
 import appeng.api.config.Actionable;
@@ -50,7 +51,9 @@ final class MachineCraftService implements ICraftingProvider {
 
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
-        return this.node.isAvailable() ? this.patterns : List.of();
+        // 被动模式只是「样板存着但不参与合成」：节点保留，样板访问终端仍能上传，只是 CPU 看不到。
+        return this.node.isAvailable() && this.node.machine().provider().mode() == MachineMode.ACTIVE
+                ? this.patterns : List.of();
     }
 
     @Override

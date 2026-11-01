@@ -30,7 +30,7 @@ import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
-import io.github.crafteve.idlefactory.menu.FactoryMenu;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -41,8 +41,8 @@ import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.Container;
-import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -79,22 +79,36 @@ public final class FactoryService {
     // ------------------------------------------------------------------
 
     /**
-     * 打开工厂工作台。
-     *
-     * <p>入口有三个：{@code /idf gui}、手持工厂终端右键、终端快捷键。快捷键在客户端先查一次
-     * 背包，服务端收到请求后再查一次；三条入口最终都走这里，不另写打开逻辑。</p>
+     * 打开工厂终端（指令与快捷键入口）。
      *
      * <p>第一次打开时自动给玩家建一个工厂，省掉先执行 {@code /idf create} 的空状态。
      * 创建失败只记日志，不挡打开；界面仍会显示未创建。</p>
+     *
+     * <p>开哪个界面由 {@link FactoryTerminalMenus} 判断：接入 ME 网络后是 AE 终端，
+     * 容器模式或还没绑网络时退回旧工作台。</p>
      *
      * @param player 发起请求的玩家
      * @return 命令结果（{@code 1} 已请求打开）
      */
     public static int openGui(ServerPlayer player) {
         ensureFactory(player);
-        player.openMenu(new SimpleMenuProvider(
-                (containerId, playerInventory, ignored) -> new FactoryMenu(containerId, playerInventory),
-                Component.translatable("screen.idlefactory.title")));
+        FactoryTerminalMenus.open(player, null);
+        return 1;
+    }
+
+    /**
+     * 手持终端右键打开界面。
+     *
+     * <p>和 {@link #openGui(ServerPlayer)} 的区别只有定位器：右键知道是哪只手的物品，
+     * 菜单里可以直接锁定这个槽位；指令与快捷键只能扫背包。</p>
+     *
+     * @param player 发起请求的玩家
+     * @param hand   使用的手
+     * @return 命令结果（{@code 1} 已请求打开）
+     */
+    public static int openTerminal(ServerPlayer player, InteractionHand hand) {
+        ensureFactory(player);
+        FactoryTerminalMenus.open(player, hand);
         return 1;
     }
 

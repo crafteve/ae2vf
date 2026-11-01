@@ -38,6 +38,10 @@ final class MachinePatternInventory implements InternalInventory {
         MachineProvider provider = this.provider();
         int capacityBefore = provider.capacity();
         provider.setPattern(slot, stack);
+        // 第一张处理样板意味着这台机器开始参与主动合成；玩家手动切过模式后不再自动改。
+        if (!stack.isEmpty() && provider.autoActivateOnPattern()) {
+            this.node.requestPatternUpdate();
+        }
         this.node.onPatternSlotChanged(provider.capacity() != capacityBefore);
     }
 

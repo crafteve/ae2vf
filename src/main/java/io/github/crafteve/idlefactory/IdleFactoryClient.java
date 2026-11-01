@@ -3,7 +3,16 @@ package io.github.crafteve.idlefactory;
 import io.github.crafteve.idlefactory.client.ModKeyMappings;
 import io.github.crafteve.idlefactory.client.screen.FactoryUiConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryCraftingTerminalScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPatternTerminalScreen;
+import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
+import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
+
+import appeng.client.gui.style.StyleManager;
+
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -49,12 +58,25 @@ public class IdleFactoryClient {
     }
 
     /**
-     * 把工厂工作台的 MenuType 与界面绑起来。
+     * 把工厂工作台与两个终端视图的 MenuType 和界面绑起来。
      *
-     * <p>M0 只有这一个界面；后续新增界面都往这里加。</p>
+     * <p>样式在屏幕构造时才加载：{@code StyleManager} 依赖客户端资源管理器就绪，
+     * 在注册事件里提前加载会拿不到资源。</p>
      */
     @SubscribeEvent
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.FACTORY.get(), FactoryScreen::new);
+        event.<FactoryCraftingTerminalMenu, FactoryCraftingTerminalScreen>register(
+                ModMenus.FACTORY_CRAFTING_TERMINAL.get(),
+                (FactoryCraftingTerminalMenu menu, Inventory inventory, Component title) ->
+                        new FactoryCraftingTerminalScreen(menu, inventory, title,
+                                StyleManager.loadStyleDoc(
+                                        "/screens/terminals/crafting_terminal.json")));
+        event.<FactoryPatternTerminalMenu, FactoryPatternTerminalScreen>register(
+                ModMenus.FACTORY_PATTERN_TERMINAL.get(),
+                (FactoryPatternTerminalMenu menu, Inventory inventory, Component title) ->
+                        new FactoryPatternTerminalScreen(menu, inventory, title,
+                                StyleManager.loadStyleDoc(
+                                        "/screens/terminals/pattern_encoding_terminal.json")));
     }
 }

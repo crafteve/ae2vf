@@ -1,8 +1,10 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.menu.FactoryMenu;
+import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
+import io.github.crafteve.idlefactory.network.FactoryTerminalSnapshots;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -39,6 +41,9 @@ public record FactoryTableRequestC2S(int containerId) implements CustomPacketPay
     /**
      * 服务端处理：校验容器，构建并回一份机器表。
      *
+     * <p>样板视图的机器表请求顺带刷新主动目标列表：两个列表在同一个左面板里，界面
+     * 每 20 tick 只发一次请求，不另开一个只差用途的包。</p>
+     *
      * @param payload 请求
      * @param context 上下文
      */
@@ -47,11 +52,13 @@ public record FactoryTableRequestC2S(int containerId) implements CustomPacketPay
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            if (!(player.containerMenu instanceof FactoryMenu menu)
-                    || menu.containerId != payload.containerId()) {
+            if (!FactoryTerminalMenus.isFactoryMenu(player.containerMenu, payload.containerId())) {
                 return;
             }
             FactoryTableSnapshots.send(player, payload.containerId());
+            if (player.containerMenu instanceof FactoryPatternTerminalMenu) {
+                FactoryTerminalSnapshots.sendTargets(player, payload.containerId());
+            }
         });
     }
 }

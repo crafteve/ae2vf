@@ -56,6 +56,7 @@ public record FactoryStorageActionC2S(int containerId, @Nullable AEKey key,
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
+            // 仓库格只存在于旧工作台；终端右半边的库存走 AE2 自己的交互包。
             if (!(player.containerMenu instanceof FactoryMenu menu)
                     || menu.containerId != payload.containerId()) {
                 return;
