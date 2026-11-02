@@ -8,9 +8,7 @@ import appeng.client.gui.style.ScreenStyle;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
-import appeng.menu.slot.AppEngSlot;
 
-import io.github.crafteve.idlefactory.menu.FactoryPatternSlots;
 import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
@@ -23,7 +21,6 @@ import org.jetbrains.annotations.Nullable;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.Slot;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
@@ -70,18 +67,6 @@ public final class FactoryPatternTerminalScreen
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
         FactoryTerminalToolbar.moveToWindowLeft(this);
-        this.hidePatternSlots();
-    }
-
-    /**
-     * 样板槽已改成左面板自绘的列表，菜单里那 9 个真实槽位挪到屏幕外，
-     * 不再参与渲染与命中（样板增删由自绘槽位发动作包）。
-     */
-    private void hidePatternSlots() {
-        for (Slot slot : this.menu.getSlots(FactoryPatternSlots.PATTERN_SLOT)) {
-            slot.x = -1000;
-            slot.y = -1000;
-        }
     }
 
     @Override

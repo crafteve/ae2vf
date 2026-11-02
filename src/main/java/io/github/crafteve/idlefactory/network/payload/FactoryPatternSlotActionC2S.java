@@ -7,9 +7,12 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
+import io.github.crafteve.idlefactory.factory.node.MachineNode;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 import io.github.crafteve.idlefactory.network.FactoryTerminalSnapshots;
 
+import appeng.api.inventories.InternalInventory;
+import appeng.core.definitions.AEItems;
 import appeng.menu.AEBaseMenu;
 
 import io.netty.handler.codec.DecoderException;
@@ -29,6 +32,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 只认工厂终端菜单、存在的机器、合法槽位，然后读写 {@link MachineProvider} 并把结果
  * 通过 {@code setCarried} 同步回客户端。客户端传来的机器 id、槽位、动作一律不信内容，
  * 只当意图。</p>
+ *
+ * <p><b>写入必须经 {@link MachineNode#getTerminalPatternInventory()}，不能直接调
+ * {@code provider.setPattern}</b>：后者只是把样板塞进数组，不触发「按第一张样板转主动」
+ * 「样板脏标记」「容量刷新」三件事，结果就是界面放完样板后 CPU 看不到、容量不更新。
+ * 本条包是界面第二条写路径，与 AE2 样板访问终端走同一个入口。</p>
  *
  * @param containerId 菜单容器 id
  * @param machineId   机器 id
@@ -98,7 +106,13 @@ public record FactoryPatternSlotActionC2S(int containerId, UUID machineId, int s
             if (payload.slot() < 0 || payload.slot() >= provider.capacity()) {
                 return;
             }
-            apply(menu, player, provider, payload.slot(), payload.action());
+            MachineNode node = runtime.nodeManager().node(machine.id());
+            if (node == null) {
+                // 节点对账还没跑到这台机器：本轮不写。写入必须经节点，否则会绕开脏标记。
+                FactoryTerminalSnapshots.sendTargets(player, payload.containerId(), factory);
+                return;
+            }
+            apply(node, menu, player, provider, payload.slot(), payload.action());
             // 样板池变了，重发列表，客户端自绘槽位才会跟着更新。
             FactoryTerminalSnapshots.sendTargets(player, payload.containerId(), factory);
         });
@@ -107,14 +121,20 @@ public record FactoryPatternSlotActionC2S(int containerId, UUID machineId, int s
     /**
      * 执行一个动作；不合法组合直接忽略，不写任何东西。
      *
-     * @param menu     当前菜单
-     * @param player   玩家
-     * @param provider 机器样板池
+     * <p>写库存一律走 {@link MachineNode#getTerminalPatternInventory()}，由
+     * {@code MachinePatternInventory} 负责在写完后刷样板脏标记与容量；先写库存再动光标，
+     * 写失败时光标不动，不会出现「光标拿了、槽里没清」的两份。</p>
+     *
+     * @param node     机器节点，提供样板库存的写入口
+     * @param menu     当前菜单，光标在这里
+     * @param player   玩家，快速移动进背包时用
+     * @param provider 机器样板池，只用来读当前槽内容
      * @param slot     槽位
      * @param action   动作
      */
-    private static void apply(AEBaseMenu menu, ServerPlayer player, MachineProvider provider,
-            int slot, Action action) {
+    private static void apply(MachineNode node, AEBaseMenu menu, ServerPlayer player,
+            MachineProvider provider, int slot, Action action) {
+        InternalInventory inventory = node.getTerminalPatternInventory();
         ItemStack carried = menu.getCarried();
         ItemStack slotStack = provider.pattern(slot);
         switch (action) {
@@ -122,21 +142,23 @@ public record FactoryPatternSlotActionC2S(int containerId, UUID machineId, int s
                 if (!carried.isEmpty() || slotStack.isEmpty()) {
                     return;
                 }
+                inventory.setItemDirect(slot, ItemStack.EMPTY);
                 menu.setCarried(slotStack.copy());
-                provider.setPattern(slot, ItemStack.EMPTY);
             }
             case PLACE -> {
-                if (carried.isEmpty() || !slotStack.isEmpty()) {
+                if (carried.isEmpty() || !slotStack.isEmpty()
+                        || !AEItems.PROCESSING_PATTERN.is(carried)) {
                     return;
                 }
-                provider.setPattern(slot, carried);
+                inventory.setItemDirect(slot, carried);
                 menu.setCarried(ItemStack.EMPTY);
             }
             case SWAP -> {
-                if (carried.isEmpty() || slotStack.isEmpty()) {
+                if (carried.isEmpty() || !AEItems.PROCESSING_PATTERN.is(carried)
+                        || slotStack.isEmpty()) {
                     return;
                 }
-                provider.setPattern(slot, carried);
+                inventory.setItemDirect(slot, carried);
                 menu.setCarried(slotStack.copy());
             }
             case QUICK_MOVE -> {
@@ -146,7 +168,7 @@ public record FactoryPatternSlotActionC2S(int containerId, UUID machineId, int s
                 if (!player.getInventory().add(slotStack.copy())) {
                     return;
                 }
-                provider.setPattern(slot, ItemStack.EMPTY);
+                inventory.setItemDirect(slot, ItemStack.EMPTY);
             }
         }
     }
