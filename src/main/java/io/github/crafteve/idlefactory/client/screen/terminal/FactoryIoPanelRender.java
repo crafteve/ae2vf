@@ -184,18 +184,19 @@ final class FactoryIoPanelRender {
         // 机器行只画贴图 + 状态灯 + 名字，不再套槽位背景；图标按参考图缩小到 12×12。
         ItemStack icon = FactoryLabels.blockStack(machine.blockId());
         if (!icon.isEmpty()) {
+            // 12×12 图标居中在 16×16 的标识列里，和下面的输入 / 输出标识对齐。
             graphics.pose().pushPose();
-            graphics.pose().translate(x, row.headerY() + 2, 0);
+            graphics.pose().translate(x + 2, row.headerY() + 2, 0);
             graphics.pose().scale(MACHINE_ICON_SCALE, MACHINE_ICON_SCALE, 1.0F);
             graphics.renderItem(icon, 0, 0);
             graphics.pose().popPose();
         }
         FactoryStatus status = FactoryStatus.of(machine, this.panel.theme);
-        FactoryNineSlice.icon(graphics, status.lamp(), x + 14, row.headerY() + 6,
+        FactoryNineSlice.icon(graphics, status.lamp(), x + 16, row.headerY() + 6,
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
         graphics.drawString(this.panel.font,
-                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 24),
-                x + 20, row.headerY() + 4, this.panel.theme.textPrimary(), false);
+                trim(this.panel.font, FactoryLabels.blockName(machine.blockId()), width - 26),
+                x + 22, row.headerY() + 4, this.panel.theme.textPrimary(), false);
         this.drawGroup(graphics, row, true, mouseX, mouseY);
         this.drawGroup(graphics, row, false, mouseX, mouseY);
     }
