@@ -85,6 +85,6 @@ public class IdleFactoryClient {
                 (FactoryPatternAccessMenu menu, Inventory inventory, Component title) ->
                         new FactoryPatternAccessScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
-                                        "/screens/pattern_access_terminal.json")));
+                                        "/screens/terminals/pattern_access_terminal.json")));
     }
 }
