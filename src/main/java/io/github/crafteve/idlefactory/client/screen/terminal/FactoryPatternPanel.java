@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.client.screen.terminal;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -11,13 +12,16 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalTargets;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryPatternSlotActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -221,7 +225,88 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (button == 0) {
+            SlotHit hit = this.slotAt(mouseX, mouseY);
+            if (hit != null) {
+                this.sendSlotAction(hit);
+            }
+        }
         return true;
+    }
+
+    /**
+     * 按鼠标位置找自绘样板槽。
+     *
+     * @param mouseX 鼠标 x
+     * @param mouseY 鼠标 y
+     * @return 命中的槽；不在槽上时为 {@code null}
+     */
+    @Nullable
+    private SlotHit slotAt(double mouseX, double mouseY) {
+        int left = this.contentLeft();
+        int y = this.listTop() - this.scroll;
+        for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
+            int rows = rowsOf(entry);
+            int gridTop = y + HEADER_ROW;
+            int gridHeight = rows * CELL;
+            if (mouseY >= gridTop && mouseY < gridTop + gridHeight
+                    && mouseX >= left && mouseX < left + COLUMNS * CELL) {
+                int col = (int) ((mouseX - left) / CELL);
+                int row = (int) ((mouseY - gridTop) / CELL);
+                int slot = row * COLUMNS + col;
+                if (slot < entry.capacity()) {
+                    return new SlotHit(parseMachineId(entry.key()), slot,
+                            entry.patterns().getOrDefault(slot, ItemStack.EMPTY));
+                }
+            }
+            y += HEADER_ROW + gridHeight + SECTION_GAP;
+        }
+        return null;
+    }
+
+    /**
+     * 按光标与槽位状态决定动作并发给服务端。
+     *
+     * @param hit 命中的槽
+     */
+    private void sendSlotAction(SlotHit hit) {
+        if (this.minecraft.player == null) {
+            return;
+        }
+        ItemStack carried = this.minecraft.player.containerMenu.getCarried();
+        FactoryPatternSlotActionC2S.Action action;
+        if (Screen.hasShiftDown()) {
+            action = FactoryPatternSlotActionC2S.Action.QUICK_MOVE;
+        } else if (carried.isEmpty()) {
+            action = FactoryPatternSlotActionC2S.Action.PICKUP;
+        } else if (hit.stack().isEmpty()) {
+            action = FactoryPatternSlotActionC2S.Action.PLACE;
+        } else {
+            action = FactoryPatternSlotActionC2S.Action.SWAP;
+        }
+        PacketDistributor.sendToServer(new FactoryPatternSlotActionC2S(this.containerId,
+                hit.machineId(), hit.slot(), action));
+    }
+
+    /**
+     * 从目标键里取机器 id。
+     *
+     * @param key 目标键
+     * @return 机器 id；格式不对时返回全零 uuid
+     */
+    private static UUID parseMachineId(String key) {
+        if (!key.startsWith(FactoryTerminalTargets.MACHINE_PREFIX)) {
+            return new UUID(0L, 0L);
+        }
+        try {
+            return UUID.fromString(key.substring(FactoryTerminalTargets.MACHINE_PREFIX.length()));
+        } catch (IllegalArgumentException e) {
+            return new UUID(0L, 0L);
+        }
+    }
+
+    /** 命中的自绘样板槽。 */
+    private record SlotHit(UUID machineId, int slot, ItemStack stack) {
     }
 
     @Override
