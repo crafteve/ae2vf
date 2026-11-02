@@ -7,6 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEKey;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalTargetKind;
@@ -22,6 +23,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -42,6 +44,11 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private static final int MODE_WIDTH = 58;
     /** 反馈停留时间（毫秒）。 */
     private static final long FEEDBACK_MILLIS = 3000L;
+    /** AE2 普通按钮贴图。 */
+    private static final ResourceLocation BUTTON =
+            ResourceLocation.fromNamespaceAndPath("ae2", "button");
+    /** 按钮文字颜色：AE2 按钮上的亮色字，不带阴影。 */
+    private static final int BUTTON_TEXT = 0xFFF2F2F2;
 
     private List<FactoryTerminalTargetsS2C.Entry> targets = List.of();
     @Nullable
@@ -105,10 +112,38 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     @Override
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
         super.renderBackground(graphics, mouseX, mouseY);
+        this.drawWorkArea(graphics);
         this.renderTargets(graphics, mouseX, mouseY);
         this.renderDetail(graphics, mouseX, mouseY);
         this.renderSlots(graphics);
         this.renderFeedback(graphics);
+    }
+
+    /**
+     * 深色工作区：和被动 IO 面板同一套底（深色底 + 1px 白边 + 2px 内阴影），
+     * 目标列表与样板槽都画在这块底上。
+     *
+     * @param graphics 绘制器
+     */
+    private void drawWorkArea(GuiGraphics graphics) {
+        int x = this.contentLeft() - 2;
+        int y = this.listTop() - 4;
+        int width = this.contentWidth() + 4;
+        int height = this.bottom() - 14 - y;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_BG, x, y, width, height);
+        // 1px 白边框；四边分开画，避免整块刷白。
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y + height - 1,
+                width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, 1, height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 1, y, 1,
+                height);
+        // 顶部内阴影。
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_SHADOW, x + 1, y + 1,
+                width - 2, FactoryTerminalGeometry.WORK_SHADOW_HEIGHT);
     }
 
     @Override
@@ -255,22 +290,31 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         }
         if (this.detail.kind() == FactoryTerminalTargetKind.MACHINE) {
             boolean active = this.detail.modeOrdinal() == MachineMode.ACTIVE.ordinal();
-            FactoryNineSlice.button(graphics, this.modeLeft(), this.detailTop(), MODE_WIDTH,
-                    FactoryTerminalGeometry.SEARCH_HEIGHT);
-            String label = active ? "主动" : "被动";
-            graphics.drawString(this.font, label,
-                    this.modeLeft() + (MODE_WIDTH - this.font.width(label)) / 2,
-                    this.detailTop() + 3, active ? this.theme.statusRun() : this.theme.textDim(),
-                    false);
+            this.drawButton(graphics, this.modeLeft(), this.detailTop(), MODE_WIDTH,
+                    FactoryTerminalGeometry.SEARCH_HEIGHT, active ? "主动" : "被动");
         }
         if (this.pageCount() > 1) {
-            FactoryNineSlice.button(graphics, this.pageLeft(), this.detailTop(), PAGE_WIDTH,
-                    FactoryTerminalGeometry.SEARCH_HEIGHT);
-            String label = "◀ " + (this.page + 1) + "/" + this.pageCount() + " ▶";
-            graphics.drawString(this.font, label,
-                    this.pageLeft() + (PAGE_WIDTH - this.font.width(label)) / 2,
-                    this.detailTop() + 3, this.theme.textPrimary(), false);
+            this.drawButton(graphics, this.pageLeft(), this.detailTop(), PAGE_WIDTH,
+                    FactoryTerminalGeometry.SEARCH_HEIGHT,
+                    "◀ " + (this.page + 1) + "/" + this.pageCount() + " ▶");
         }
+    }
+
+    /**
+     * AE2 风格按钮：凸起按钮底 + 亮色无阴影文字。
+     *
+     * @param graphics 绘制器
+     * @param x        左边界
+     * @param y        上边界
+     * @param width    宽度
+     * @param height   高度
+     * @param label    按钮文字
+     */
+    private void drawButton(GuiGraphics graphics, int x, int y, int width, int height,
+            String label) {
+        graphics.blitSprite(BUTTON, x, y, width, height);
+        graphics.drawString(this.font, label, x + (width - this.font.width(label)) / 2,
+                y + (height - 8) / 2, BUTTON_TEXT, false);
     }
 
     private void renderSlots(GuiGraphics graphics) {
@@ -278,7 +322,9 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
             return;
         }
         for (int i = 0; i < FactoryPatternSlotView.PAGE_SIZE; i++) {
-            FactoryNineSlice.slot(graphics, this.patternSlotX(i), this.patternSlotY(i), CELL, CELL);
+            // 槽位是真实槽位，格子底往左上让 1px，让 16×16 槽位落在 18×18 格子中间。
+            FactoryNineSlice.terminalSlot(graphics, this.patternSlotX(i) - 1,
+                    this.patternSlotY(i) - 1, CELL, CELL);
         }
     }
 
