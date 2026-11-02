@@ -34,8 +34,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * （格子 + 图标），点击与拖拽由面板自己按「机器 + 槽位下标」换算成动作，不挂菜单槽位。</p>
  */
 public final class FactoryPatternPanel extends FactoryTerminalPanel {
-    /** 机器描述行高。 */
-    private static final int HEADER_ROW = 16;
+    /** 机器描述行高：和槽位格同高，机器图标正好压在第一列槽位上。 */
+    private static final int HEADER_ROW = 18;
     /** 槽位格边长：16 格 + 2 间距。 */
     private static final int CELL = 18;
     /** 每行槽位数。 */
@@ -165,13 +165,18 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private void drawHeader(GuiGraphics graphics, FactoryTerminalTargetsS2C.Entry entry, int x,
             int y, int right) {
         if (!entry.icon().isEmpty()) {
-            graphics.renderItem(entry.icon(), x, y);
+            // 机器图标按槽位格同尺寸（18×18）缩放，和下面第一列槽位严格对齐。
+            graphics.pose().pushPose();
+            graphics.pose().translate(x, y, 0);
+            graphics.pose().scale((float) CELL / 16.0F, (float) CELL / 16.0F, 1.0F);
+            graphics.renderItem(entry.icon(), 0, 0);
+            graphics.pose().popPose();
         }
         String count = entry.used() + "/" + entry.capacity();
         int countWidth = this.font.width(count);
-        graphics.drawString(this.font, this.trim(entry.name(), right - x - 20 - countWidth - 4),
-                x + 18, y + 4, this.theme.textPrimary(), false);
-        graphics.drawString(this.font, count, right - countWidth - 2, y + 4,
+        graphics.drawString(this.font, this.trim(entry.name(), right - x - 22 - countWidth - 4),
+                x + 20, y + 5, this.theme.textPrimary(), false);
+        graphics.drawString(this.font, count, right - countWidth - 2, y + 5,
                 this.theme.textDim(), false);
     }
 
