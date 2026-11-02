@@ -1,10 +1,9 @@
-package io.github.crafteve.idlefactory.factory.observation;
+package io.github.crafteve.idlefactory.factory;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 
 import net.minecraft.core.BlockPos;
@@ -31,9 +30,13 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
  *
  * <p>过滤器就是占用表：事件过来先派生统一 id 查有没有登记——没登记的事件连 map 都
  * 不进，直接丢。这也是“事件驱动和全局表是天作之合”的意思。</p>
+ *
+ * <p>本类住在工厂包而不是观测包：它要同时读占用索引（{@code links}）与观测服务
+ * （{@code observations}），两者都挂在 {@link FactoryRuntime} 上；放在观测包会让
+ * 观测层反向依赖工厂层。事件订阅器只能走静态入口，这是本包唯一允许的定位点。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
-public final class WorldEventBridge {
+public final class FactoryWorldEventBridge {
     /** 邻居更新标脏冷却（tick）：同一位置 20 tick 内只标一次。 */
     private static final long NEIGHBOR_COOLDOWN_TICKS = 20L;
     /** 冷却表上限：超了就把过期的清掉，防止只增不减。 */
@@ -44,7 +47,7 @@ public final class WorldEventBridge {
     /** 位置 → 上次标脏时刻（游戏时间），防红石抖动。只活在服务器线程。 */
     private static final Map<BlockKey, Long> NEIGHBOR_COOLDOWN = new HashMap<>();
 
-    private WorldEventBridge() {
+    private FactoryWorldEventBridge() {
         // 纯静态事件处理
     }
 
