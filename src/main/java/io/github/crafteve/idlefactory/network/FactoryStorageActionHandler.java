@@ -7,7 +7,6 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.FactoryStorageSnapshots;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S.Gesture;

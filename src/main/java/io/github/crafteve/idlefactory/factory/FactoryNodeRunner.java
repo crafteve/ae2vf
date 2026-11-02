@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -19,7 +18,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * 虚拟节点的每 tick 推进：对账（该建的建、该拆的拆）、节点 tick、以及把节点告警写回事件流。
+ * 虚拟节点的每 tick 推进：对账（该建的建、该拆的拆）与节点 tick。
  *
  * <p>对账只在运行时这一侧拼期望集合：节点层不认识工厂，也不需要知道仓库模式。锚点方块不在、
  * 区块没加载或没有 ME 节点时，这家工厂不贡献任何期望节点，已有节点会被拆掉；锚点回来后
@@ -71,23 +70,6 @@ final class FactoryNodeRunner {
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("Idle Factory: 虚拟节点 tick 失败：{}", e.toString());
         }
-    }
-
-    /**
-     * 把节点告警写进所属工厂的事件流；工厂已经没了就只记日志。
-     *
-     * @param notice 节点告警
-     */
-    void recordNotice(NodeManager.Notice notice) {
-        Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
-        if (factory == null) {
-            IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",
-                    notice.machineId(), notice.message());
-            return;
-        }
-        long now = this.server.overworld().getGameTime();
-        factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
-                DiagEvent.Category.MACH, notice.machineId(), null, notice.message()));
     }
 
     /**
