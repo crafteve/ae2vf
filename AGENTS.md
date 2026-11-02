@@ -217,6 +217,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - Conventional Commits + scope：`feat`、`fix`、`refactor`、`docs`、`chore`、`perf`、`test`、`style`；scope 用模块名，如 `io`、`ui`、`command`、`storage`、`tools`。
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
+- `.tmp/` 是 Agent 的临时工作目录（审查报告、校验脚本、diff 落盘）。它已被 git 忽略，**禁止 Agent 私自删除**；确需清理必须先征得用户同意，且只删自己本轮新建的文件，不得整目录清空。
 - 当前分支 `1.21.1neoforge`（主线）；旧 M3 画布线归档在 `archive/m3-canvas`，只读，不再从它拉分支。
 
 ### 5.5 草稿纸（讨论文档）

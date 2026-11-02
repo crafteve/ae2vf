@@ -38,6 +38,8 @@ run/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/
+# Agent 的临时工作目录：审查报告、校验脚本、diff 落盘都在这里。
+# 不提交；也不许 Agent 私自删除（见 AGENTS.md 5.4）。
 .tmp/
 # 临时脚本与文本（.tmp_ 前缀），历史上被别的项目误放进来过
 .tmp_*
