@@ -39,6 +39,12 @@ final class FactoryRuleConfigScreen extends Screen {
     private static final int WIDTH = 230;
     /** 窗口高度：标题栏 + 物品行 + 面行 + 匹配行。 */
     private static final int HEIGHT = 96;
+    /** 物品槽位边长：图标 16×16 居中托在槽里。 */
+    private static final int ITEM_SLOT = 20;
+    /** 面按钮行总宽：7 个 27px 按钮 + 6 个 2px 间隔。 */
+    private static final int FACE_ROW_WIDTH = 7 * 27 + 6 * 2;
+    /** 匹配按钮行总宽：2 个 50px 按钮 + 2px 间隔。 */
+    private static final int MODE_ROW_WIDTH = 2 * 50 + 2;
     /** AE2 普通按钮贴图。 */
     private static final ResourceLocation BUTTON =
             ResourceLocation.fromNamespaceAndPath("ae2", "button");
@@ -52,7 +58,7 @@ final class FactoryRuleConfigScreen extends Screen {
     /** 物品名称颜色：纯黑、不带阴影。 */
     private static final int NAME_COLOR = 0xFF000000;
     /** 返回按钮边长。 */
-    private static final int BACK_SIZE = 20;
+    private static final int BACK_SIZE = 24;
     /** 返回箭头染色：AE2 的 BACK 是白箭头，图 1 的按钮上是深色箭头。 */
     private static final float BACK_TINT = 0.25F;
 
@@ -103,16 +109,18 @@ final class FactoryRuleConfigScreen extends Screen {
         this.left = (this.width - WIDTH) / 2;
         this.top = (this.height - HEIGHT) / 2;
 
-        this.addRenderableWidget(new BackButton(this.left + WIDTH - BACK_SIZE - 6,
-                this.top + 4, button -> this.onClose()));
+        // 返回按钮骑在面板右上角的边框上：右边缘与面板右边缘平齐，顶部略高出边框。
+        this.addRenderableWidget(new BackButton(this.left + WIDTH - BACK_SIZE,
+                this.top - 5, button -> this.onClose()));
 
-        // 面：任意在前，其余按上 / 下 / 东 / 西 / 南 / 北排成一行；点一下即生效。
+        // 面：一行居中，任意在前，其余按上 / 下 / 东 / 西 / 南 / 北；点一下即生效。
+        int faceX = this.left + (WIDTH - FACE_ROW_WIDTH) / 2;
         Direction[] faces = { null, Direction.UP, Direction.DOWN, Direction.EAST,
                 Direction.WEST, Direction.SOUTH, Direction.NORTH };
         String[] labels = { "任意", "上", "下", "东", "西", "南", "北" };
         for (int i = 0; i < faces.length; i++) {
             Direction option = faces[i];
-            this.addRenderableWidget(new OptionButton(this.left + 6 + i * 29, this.top + 46,
+            this.addRenderableWidget(new OptionButton(faceX + i * 29, this.top + 50,
                     27, 18, Component.literal(labels[i]),
                     () -> this.face == option,
                     button -> {
@@ -121,13 +129,14 @@ final class FactoryRuleConfigScreen extends Screen {
                     }));
         }
 
-        this.addRenderableWidget(new OptionButton(this.left + 6, this.top + 70, 50, 18,
+        int modeX = this.left + (WIDTH - MODE_ROW_WIDTH) / 2;
+        this.addRenderableWidget(new OptionButton(modeX, this.top + 74, 50, 18,
                 Component.literal("精准"), () -> this.mode == MatchMode.EXACT,
                 button -> {
                     this.mode = MatchMode.EXACT;
                     this.update();
                 }));
-        this.addRenderableWidget(new OptionButton(this.left + 60, this.top + 70, 50, 18,
+        this.addRenderableWidget(new OptionButton(modeX + 52, this.top + 74, 50, 18,
                 Component.literal("模糊"), () -> this.mode == MatchMode.IGNORE_COMPONENTS,
                 button -> {
                     this.mode = MatchMode.IGNORE_COMPONENTS;
@@ -155,10 +164,12 @@ final class FactoryRuleConfigScreen extends Screen {
         // 否则会被背景盖掉。
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, "IO配置", this.left + 8, this.top + 7, TITLE_COLOR, false);
-        FactoryResourceIconRender.draw(graphics, this.font, this.key, this.left + 8,
-                this.top + 24);
-        graphics.drawString(this.font, FactoryLabels.name(this.key), this.left + 28,
-                this.top + 28, NAME_COLOR, false);
+        // 物品图标托在槽位里，不是凭空画的孤块。
+        FactoryNineSlice.slot(graphics, this.left + 8, this.top + 26, ITEM_SLOT, ITEM_SLOT);
+        FactoryResourceIconRender.draw(graphics, this.font, this.key, this.left + 10,
+                this.top + 28);
+        graphics.drawString(this.font, FactoryLabels.name(this.key), this.left + 32,
+                this.top + 30, NAME_COLOR, false);
     }
 
     @Override
@@ -220,10 +231,12 @@ final class FactoryRuleConfigScreen extends Screen {
                 float partialTick) {
             graphics.blitSprite(this.isHoveredOrFocused() ? BUTTON_ACTIVE : BUTTON,
                     this.getX(), this.getY(), this.getWidth(), this.getHeight());
+            int iconSize = Icon.BACK.width;
+            int iconX = this.getX() + (this.getWidth() - iconSize) / 2;
+            int iconY = this.getY() + (this.getHeight() - Icon.BACK.height) / 2;
             graphics.setColor(BACK_TINT, BACK_TINT, BACK_TINT, 1.0F);
-            graphics.blit(Icon.TEXTURE, this.getX() + 2, this.getY() + 2,
-                    Icon.BACK.width, Icon.BACK.height, Icon.BACK.x, Icon.BACK.y,
-                    Icon.BACK.width, Icon.BACK.height,
+            graphics.blit(Icon.TEXTURE, iconX, iconY, Icon.BACK.width, Icon.BACK.height,
+                    Icon.BACK.x, Icon.BACK.y, Icon.BACK.width, Icon.BACK.height,
                     Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
             graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
         }
