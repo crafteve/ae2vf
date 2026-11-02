@@ -28,17 +28,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 被动 IO 规则的独立配置界面。
  *
  * <p>照 AE2「选择数量」那种独立小窗做：AE2 的通用背景板、AE2 的凸起按钮，标题在左上、
- * 返回按钮在右上。面（任意 / 上 / 下 / 东 / 西 / 南 / 北）和匹配（精准 / 模糊）各占一行，
- * 当前选中的按钮用 AE2 的按下态贴图高亮；按钮文字用 AE2 的亮色无阴影字。</p>
+ * 返回按钮在右上。只有三行内容——物品图标与名称、面（任意 / 上 / 下 / 东 / 西 / 南 / 北）、
+ * 匹配（精准 / 模糊）。当前选中的按钮用 AE2 的按下态贴图高亮，按钮文字用 AE2 的亮色无阴影字。</p>
  *
- * <p>确定时发 {@link FactoryRuleActionC2S.Action#UPDATE}，由服务端重校验并回推快照；取消、
- * ESC 或右上角返回都回到打开前的终端界面。</p>
+ * <p>没有确定 / 取消：点选即改，右上角返回、取消或 ESC 都回到终端界面；确定时发
+ * {@link FactoryRuleActionC2S.Action#UPDATE}，由服务端重校验并回推快照。</p>
  */
 final class FactoryRuleConfigScreen extends Screen {
     /** 窗口宽度：7 个面按钮一行放得下。 */
     private static final int WIDTH = 230;
-    /** 窗口高度。 */
-    private static final int HEIGHT = 140;
+    /** 窗口高度：标题栏 + 物品行 + 面行 + 匹配行。 */
+    private static final int HEIGHT = 96;
     /** AE2 普通按钮贴图。 */
     private static final ResourceLocation BUTTON =
             ResourceLocation.fromNamespaceAndPath("ae2", "button");
@@ -53,6 +53,8 @@ final class FactoryRuleConfigScreen extends Screen {
     private static final int NAME_COLOR = 0xFF000000;
     /** 返回按钮边长。 */
     private static final int BACK_SIZE = 20;
+    /** 返回箭头染色：AE2 的 BACK 是白箭头，图 1 的按钮上是深色箭头。 */
+    private static final float BACK_TINT = 0.25F;
 
     /** 打开配置前的终端界面；关闭时切回去。 */
     private final Screen parent;
@@ -102,42 +104,44 @@ final class FactoryRuleConfigScreen extends Screen {
         this.top = (this.height - HEIGHT) / 2;
 
         this.addRenderableWidget(new BackButton(this.left + WIDTH - BACK_SIZE - 6,
-                this.top + 5, button -> this.onClose()));
+                this.top + 4, button -> this.onClose()));
 
-        // 面：任意在前，其余按上 / 下 / 东 / 西 / 南 / 北排成一行。
+        // 面：任意在前，其余按上 / 下 / 东 / 西 / 南 / 北排成一行；点一下即生效。
         Direction[] faces = { null, Direction.UP, Direction.DOWN, Direction.EAST,
                 Direction.WEST, Direction.SOUTH, Direction.NORTH };
         String[] labels = { "任意", "上", "下", "东", "西", "南", "北" };
         for (int i = 0; i < faces.length; i++) {
             Direction option = faces[i];
-            this.addRenderableWidget(new OptionButton(this.left + 6 + i * 29, this.top + 54,
+            this.addRenderableWidget(new OptionButton(this.left + 6 + i * 29, this.top + 46,
                     27, 18, Component.literal(labels[i]),
                     () -> this.face == option,
-                    button -> this.face = option));
+                    button -> {
+                        this.face = option;
+                        this.update();
+                    }));
         }
 
-        this.addRenderableWidget(new OptionButton(this.left + 6, this.top + 78, 50, 18,
+        this.addRenderableWidget(new OptionButton(this.left + 6, this.top + 70, 50, 18,
                 Component.literal("精准"), () -> this.mode == MatchMode.EXACT,
-                button -> this.mode = MatchMode.EXACT));
-        this.addRenderableWidget(new OptionButton(this.left + 60, this.top + 78, 50, 18,
+                button -> {
+                    this.mode = MatchMode.EXACT;
+                    this.update();
+                }));
+        this.addRenderableWidget(new OptionButton(this.left + 60, this.top + 70, 50, 18,
                 Component.literal("模糊"), () -> this.mode == MatchMode.IGNORE_COMPONENTS,
-                button -> this.mode = MatchMode.IGNORE_COMPONENTS));
-
-        this.addRenderableWidget(new OptionButton(this.left + 6, this.top + HEIGHT - 26, 50, 18,
-                Component.literal("取消"), () -> false, button -> this.onClose()));
-        this.addRenderableWidget(new OptionButton(this.left + WIDTH - 56,
-                this.top + HEIGHT - 26, 50, 18, Component.literal("确定"), () -> false,
-                button -> this.apply()));
+                button -> {
+                    this.mode = MatchMode.IGNORE_COMPONENTS;
+                    this.update();
+                }));
     }
 
     /**
-     * 提交修改：发 UPDATE 包并回到终端。
+     * 点选即生效：把当前面与匹配模式发给服务端，不等关闭。
      */
-    private void apply() {
+    private void update() {
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
                 FactoryRuleActionC2S.Action.UPDATE, this.machineId, this.side, this.key,
                 this.face, this.mode));
-        this.onClose();
     }
 
     @Override
@@ -147,14 +151,14 @@ final class FactoryRuleConfigScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.drawString(this.font, "IO配置", this.left + 8, this.top + 9, TITLE_COLOR, false);
-        FactoryResourceIconRender.draw(graphics, this.font, this.key, this.left + 8,
-                this.top + 28);
-        graphics.drawString(this.font, FactoryLabels.name(this.key), this.left + 28,
-                this.top + 32, NAME_COLOR, false);
-        graphics.drawString(this.font, "面", this.left + 8, this.top + 43, TITLE_COLOR, false);
-        graphics.drawString(this.font, "匹配", this.left + 8, this.top + 67, TITLE_COLOR, false);
+        // Screen.render 内部会先 renderBackground（画面板）再画按钮，所以文字必须最后画，
+        // 否则会被背景盖掉。
         super.render(graphics, mouseX, mouseY, partialTick);
+        graphics.drawString(this.font, "IO配置", this.left + 8, this.top + 7, TITLE_COLOR, false);
+        FactoryResourceIconRender.draw(graphics, this.font, this.key, this.left + 8,
+                this.top + 24);
+        graphics.drawString(this.font, FactoryLabels.name(this.key), this.left + 28,
+                this.top + 28, NAME_COLOR, false);
     }
 
     @Override
@@ -199,7 +203,7 @@ final class FactoryRuleConfigScreen extends Screen {
     }
 
     /**
-     * 右上角的返回按钮：AE2 的深色工具栏按钮底 + 返回箭头。
+     * 右上角的返回按钮：AE2 普通按钮底 + 染成深色的返回箭头。
      */
     private static final class BackButton extends Button {
         /**
@@ -214,14 +218,14 @@ final class FactoryRuleConfigScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY,
                 float partialTick) {
-            drawIcon(graphics, Icon.TOOLBAR_BUTTON_BACKGROUND, this.getX() + 2, this.getY() + 2);
-            drawIcon(graphics, Icon.BACK, this.getX() + 2, this.getY() + 2);
-        }
-
-        private static void drawIcon(GuiGraphics graphics, Icon icon, int x, int y) {
-            graphics.blit(Icon.TEXTURE, x, y, icon.width, icon.height,
-                    icon.x, icon.y, icon.width, icon.height,
+            graphics.blitSprite(this.isHoveredOrFocused() ? BUTTON_ACTIVE : BUTTON,
+                    this.getX(), this.getY(), this.getWidth(), this.getHeight());
+            graphics.setColor(BACK_TINT, BACK_TINT, BACK_TINT, 1.0F);
+            graphics.blit(Icon.TEXTURE, this.getX() + 2, this.getY() + 2,
+                    Icon.BACK.width, Icon.BACK.height, Icon.BACK.x, Icon.BACK.y,
+                    Icon.BACK.width, Icon.BACK.height,
                     Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
+            graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }
 }
