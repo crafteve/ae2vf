@@ -112,14 +112,32 @@ public final class MachineNode
             this.managed.create(this.anchorLevel, this.machine.ref().pos());
             IGridNode node = this.managed.getNode();
             if (node == null) {
+                // create 没抛异常却没给出节点：不回滚就会留下一个没人拆的半节点，
+                // 调用方拿到 false 就丢引用，锚点网络上再也没人认领它。
+                this.discard();
+                this.logThrottled(this.server.overworld().getGameTime(), "建节点失败：create 后没有节点");
                 return false;
             }
             GridHelper.createConnection(node, anchor);
             return true;
         } catch (RuntimeException e) {
-            this.managed.destroy();
+            this.discard();
             this.logThrottled(this.server.overworld().getGameTime(), "建节点失败：" + e);
             return false;
+        }
+    }
+
+    /**
+     * 收拾一个没有接上的节点。
+     *
+     * <p>清理本身也必须降级：{@code destroy} 再抛异常会盖掉原始失败原因，还会把异常甩给
+     * {@link NodeManager}，等于 attach 没兜住。</p>
+     */
+    private void discard() {
+        try {
+            this.managed.destroy();
+        } catch (RuntimeException e) {
+            this.logThrottled(this.server.overworld().getGameTime(), "销毁未接上的节点失败：" + e);
         }
     }
 
@@ -169,8 +187,10 @@ public final class MachineNode
             changed |= ProviderOverflow.flush(this);
         }
         if (this.patternsDirty) {
-            this.patternsDirty = false;
             this.craft.rebuild();
+            // 先建后清：rebuild 抛异常时标记还留着，下一 tick 自然重试；
+            // 先清再建会让 CPU 永远看旧样板。
+            this.patternsDirty = false;
             changed = true;
         }
         if (this.dataDirty) {
