@@ -20,19 +20,24 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * 把一条物品规则展开成「一个变体一个适配器」。
  *
  * <p>精确规则只有一个候选；模糊规则在输入侧取仓库变体索引，在输出侧扫机器库存。
- * 候选数量受单规则与单组预算约束，防止变体爆炸时一轮打满。</p>
+ * 候选数量受单规则与本侧额度约束，防止变体爆炸时一轮打满。</p>
  */
 public final class ItemCandidates {
     /** 单条模糊规则每 tick 最多试几个变体。 */
     public static final int MAX_VARIANTS_PER_RULE_TICK = 8;
-    /** 单个 IO 组每 tick 最多试几个变体（输入+输出共享）。 */
-    public static final int MAX_VARIANTS_PER_GROUP_TICK = 16;
+    /** 单台机器每 tick 的变体总量上限；输入侧与输出侧扣减合计不超过它。 */
+    public static final int MAX_VARIANTS_PER_MACHINE_TICK = 16;
+    /** 输出侧的预留额度；输出实际可用 = 单机器总量 - 输入实际用量，不固定为它。 */
+    public static final int VARIANT_BUDGET_RESERVED_FOR_OUTPUT = 4;
+    /** 输出侧需要预留时输入侧每 tick 的额度；余量由输出借用。 */
+    public static final int MAX_VARIANTS_PER_INPUT_TICK =
+            MAX_VARIANTS_PER_MACHINE_TICK - VARIANT_BUDGET_RESERVED_FOR_OUTPUT;
 
     /**
      * 展开结果。
      *
      * @param adapters      候选适配器
-     * @param budgetStarved 是否因为组预算耗尽而没展开；这种空结果不能当成「缺料」
+     * @param budgetStarved 是否因为本侧预算耗尽而没展开；这种空结果不能当成「缺料」
      */
     public record Candidates(List<ItemAdapter> adapters, boolean budgetStarved) {
         public Candidates {
@@ -53,7 +58,7 @@ public final class ItemCandidates {
      * @param input    {@code true} 表示输入方向
      * @param variants 变体索引；{@code null} 时模糊输入没有候选
      * @param now      当前 tick
-     * @param budget   组级剩余预算，单元素数组，调用后扣减
+     * @param budget   本侧剩余预算，单元素数组，调用后扣减
      * @return 候选；空且 {@code budgetStarved=false} 表示仓库/机器当前确实没有可搬的变体
      */
     public static Candidates of(MEStorage storage, ItemAdapter base, ResourceSpec spec,

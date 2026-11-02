@@ -30,8 +30,9 @@ import appeng.api.stacks.AEItemKey;
  *
  * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.machine.MatchMode#IGNORE_COMPONENTS}
  * 会把一条规则展开成多个「一个变体一个适配器」，每个变体走一遍 {@link IoTransfer} 的事务逻辑；
- * 候选变体来自 {@link ItemVariantIndex}（输入）或机器库存（输出）。每 tick 有单规则与单组的
- * 变体预算，防止变体爆炸时一次打满；规则处理顺序按 tick 轮转，避免后面的规则被饿死。</p>
+ * 候选变体来自 {@link ItemVariantIndex}（输入）或机器库存（输出）。每 tick 的变体预算为
+ * 单规则 8、单机器 16，输入/输出按侧分配，防止变体爆炸时一次打满；规则处理顺序按 tick
+ * 轮转，避免后面的规则被饿死。</p>
  */
 public final class GroupRunner {
     /**
@@ -137,11 +138,18 @@ public final class GroupRunner {
         IoResult.Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
-        // 输入/输出共享的变体预算：模糊规则多时也不会一轮扫几十个变体。
-        int[] variantBudget = {ItemCandidates.MAX_VARIANTS_PER_GROUP_TICK};
-
-        // 规则按 tick 轮转起点：模糊规则共享预算时，后面的规则不会被前面的永久挤掉。
         List<ResourceSpec> inputs = group.inputs();
+        List<ResourceSpec> outputs = group.outputs();
+        // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
+        // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
+        // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
+        boolean outputUsesVariants = usesVariants(outputs);
+        int[] inputBudget = {outputUsesVariants
+                ? ItemCandidates.MAX_VARIANTS_PER_INPUT_TICK
+                : ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
+        int inputQuota = inputBudget[0];
+
+        // 规则按 tick 轮转起点：同一侧的多条模糊规则共享本侧额度时，后面的规则不会被前面的永久挤掉。
         int inputStart = inputs.isEmpty() ? 0 : (int) Math.floorMod(now, (long) inputs.size());
         for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
             ResourceSpec spec = inputs.get((inputStart + ruleIndex) % inputs.size());
@@ -157,9 +165,9 @@ public final class GroupRunner {
                 continue;
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
-                    variantBudget);
+                    inputBudget);
             if (adapters.starved()) {
-                // 组预算被前面的规则用完：本轮跳过，不写入原因；也不代表机器拒收。
+                // 本侧额度被前面的规则用完：本轮跳过，不写入原因；也不代表机器拒收。
                 anyInputAccepted = true;
                 continue;
             }
@@ -206,7 +214,11 @@ public final class GroupRunner {
             }
         }
 
-        List<ResourceSpec> outputs = group.outputs();
+        int inputUsed = inputQuota - inputBudget[0];
+        // 输出实际额度 = 16 - 输入实际用量。输入在输出能花预算时最多 12，所以天然保底 4；
+        // 输入拿满 16 只发生在输出侧没有模糊物品规则时，此时输出不会扣预算。
+        int[] outputBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK - inputUsed};
+
         int outputStart = outputs.isEmpty() ? 0 : (int) Math.floorMod(now + 1L, (long) outputs.size());
         for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
             ResourceSpec spec = outputs.get((outputStart + ruleIndex) % outputs.size());
@@ -221,9 +233,9 @@ public final class GroupRunner {
                 continue;
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
-                    variantBudget);
+                    outputBudget);
             if (adapters.starved()) {
-                // 预算耗尽：本轮不判断方向，交给下一 tick 的轮转；同样不能算机器堵塞。
+                // 本侧额度耗尽：本轮不判断方向，交给下一 tick 的轮转；同样不能算机器堵塞。
                 continue;
             }
             if (adapters.list().isEmpty()) {
@@ -268,7 +280,7 @@ public final class GroupRunner {
     }
 
     /**
-     * 一组搬运通道；{@code starved} 表示组预算耗尽，而不是真的没有候选。
+     * 一组搬运通道；{@code starved} 表示本侧预算耗尽，而不是真的没有候选。
      */
     private record Adapters(List<ResourceAdapter> list, boolean starved) {
     }
@@ -290,6 +302,25 @@ public final class GroupRunner {
                 variants, now, budget);
         List<ResourceAdapter> result = new ArrayList<>(candidates.adapters());
         return new Adapters(result, candidates.budgetStarved());
+    }
+
+    /**
+     * 这一侧的规则里是否有会扣变体预算的模糊物品规则。
+     *
+     * <p>只有模糊物品规则会进 {@link ItemCandidates} 展开并扣预算：精确物品规则直接返回单条
+     * 通道，流体 / 能量根本不进变体展开。用它决定另一侧要不要留额度，避免按「规则列表非空」
+     * 判断时把只有流体或精确物品输出的机器也算进去，白白扣掉输入额度。</p>
+     *
+     * @param specs 一侧的规则
+     * @return 存在模糊物品规则时 {@code true}
+     */
+    private static boolean usesVariants(List<ResourceSpec> specs) {
+        for (ResourceSpec spec : specs) {
+            if (spec.fuzzy()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,
