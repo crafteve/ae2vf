@@ -57,10 +57,8 @@ final class FactoryRuleConfigScreen extends Screen {
     private static final int BUTTON_TEXT = 0xFFF2F2F2;
     /** 物品名称颜色：纯黑、不带阴影。 */
     private static final int NAME_COLOR = 0xFF000000;
-    /** 返回按钮边长。 */
-    private static final int BACK_SIZE = 24;
-    /** 返回箭头染色：AE2 的 BACK 是白箭头，图 1 的按钮上是深色箭头。 */
-    private static final float BACK_TINT = 0.25F;
+    /** 返回按钮边长；AE2 工具栏按钮底图是 16×16，外面留 2px。 */
+    private static final int BACK_SIZE = 20;
 
     /** 打开配置前的终端界面；关闭时切回去。 */
     private final Screen parent;
@@ -109,9 +107,9 @@ final class FactoryRuleConfigScreen extends Screen {
         this.left = (this.width - WIDTH) / 2;
         this.top = (this.height - HEIGHT) / 2;
 
-        // 返回按钮骑在面板右上角的边框上：右边缘与面板右边缘平齐，顶部略高出边框。
-        this.addRenderableWidget(new BackButton(this.left + WIDTH - BACK_SIZE,
-                this.top - 5, button -> this.onClose()));
+        // 返回按钮放在面板右上角上方偏内，和选择数量界面的位置一致。
+        this.addRenderableWidget(new BackButton(this.left + WIDTH - 36,
+                this.top - 11, button -> this.onClose()));
 
         // 面：一行居中，任意在前，其余按上 / 下 / 东 / 西 / 南 / 北；点一下即生效。
         int faceX = this.left + (WIDTH - FACE_ROW_WIDTH) / 2;
@@ -164,11 +162,12 @@ final class FactoryRuleConfigScreen extends Screen {
         // 否则会被背景盖掉。
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawString(this.font, "IO配置", this.left + 8, this.top + 7, TITLE_COLOR, false);
-        // 物品图标托在槽位里，不是凭空画的孤块。
-        FactoryNineSlice.slot(graphics, this.left + 8, this.top + 26, ITEM_SLOT, ITEM_SLOT);
-        FactoryResourceIconRender.draw(graphics, this.font, this.key, this.left + 10,
+        // 物品槽位的左边缘和「任意」按钮左边缘对齐。
+        int itemX = this.left + (WIDTH - FACE_ROW_WIDTH) / 2;
+        FactoryNineSlice.slot(graphics, itemX, this.top + 26, ITEM_SLOT, ITEM_SLOT);
+        FactoryResourceIconRender.draw(graphics, this.font, this.key, itemX + 2,
                 this.top + 28);
-        graphics.drawString(this.font, FactoryLabels.name(this.key), this.left + 32,
+        graphics.drawString(this.font, FactoryLabels.name(this.key), itemX + ITEM_SLOT + 4,
                 this.top + 30, NAME_COLOR, false);
     }
 
@@ -229,16 +228,17 @@ final class FactoryRuleConfigScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY,
                 float partialTick) {
-            graphics.blitSprite(this.isHoveredOrFocused() ? BUTTON_ACTIVE : BUTTON,
-                    this.getX(), this.getY(), this.getWidth(), this.getHeight());
-            int iconSize = Icon.BACK.width;
-            int iconX = this.getX() + (this.getWidth() - iconSize) / 2;
-            int iconY = this.getY() + (this.getHeight() - Icon.BACK.height) / 2;
-            graphics.setColor(BACK_TINT, BACK_TINT, BACK_TINT, 1.0F);
-            graphics.blit(Icon.TEXTURE, iconX, iconY, Icon.BACK.width, Icon.BACK.height,
-                    Icon.BACK.x, Icon.BACK.y, Icon.BACK.width, Icon.BACK.height,
+            // AE2 工具栏按钮底图是 16×16，图标也是 16×16，外圈留 2px。
+            int iconX = this.getX() + (this.getWidth() - 16) / 2;
+            int iconY = this.getY() + (this.getHeight() - 16) / 2;
+            drawIcon(graphics, Icon.TOOLBAR_BUTTON_BACKGROUND, iconX, iconY);
+            drawIcon(graphics, Icon.BACK, iconX, iconY);
+        }
+
+        private static void drawIcon(GuiGraphics graphics, Icon icon, int x, int y) {
+            graphics.blit(Icon.TEXTURE, x, y, icon.width, icon.height,
+                    icon.x, icon.y, icon.width, icon.height,
                     Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
-            graphics.setColor(1.0F, 1.0F, 1.0F, 1.0F);
         }
     }
 }
