@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.storage.FactoryStorageActions;
+import io.github.crafteve.idlefactory.network.FactoryStorageActionHandler;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
 import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
 
@@ -21,7 +21,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 客户端对一个仓库格子做出的动作。
  *
  * <p>只传资源和手势，不传数量、不传物品栈；所有实际数量由
- * {@link FactoryStorageActions} 在服务端重新校验。{@code key == null} 表示点在空气格上，
+ * {@link FactoryStorageActionHandler} 在服务端重新校验。{@code key == null} 表示点在空气格上，
  * 只允许把光标物品放进仓库。</p>
  *
  * @param containerId 菜单容器 id
@@ -61,7 +61,7 @@ public record FactoryStorageActionC2S(int containerId, @Nullable AEKey key,
                     || menu.containerId != payload.containerId()) {
                 return;
             }
-            FactoryStorageActions.handle(player, menu, payload.key(), payload.gesture());
+            FactoryStorageActionHandler.handle(player, menu, payload.key(), payload.gesture());
         });
     }
 

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.storage;
+package io.github.crafteve.idlefactory.network;
 
 import java.util.Optional;
 
@@ -26,8 +26,8 @@ import appeng.api.storage.MEStorage;
  * <p>所有数量都在这里按仓库和玩家背包的实际状态重新计算。客户端只发手势，不能指定数量，
  * 也不能指定物品栈。</p>
  */
-public final class FactoryStorageActions {
-    private FactoryStorageActions() {
+public final class FactoryStorageActionHandler {
+    private FactoryStorageActionHandler() {
         // 纯静态动作层
     }
 

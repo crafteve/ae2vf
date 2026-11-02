@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.menu;
 
-import io.github.crafteve.idlefactory.factory.storage.FactoryStorageActions;
+import io.github.crafteve.idlefactory.network.FactoryStorageActionHandler;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -69,7 +69,7 @@ public class FactoryMenu extends AbstractContainerMenu {
         ItemStack original = stack.copy();
 
         if (player instanceof ServerPlayer serverPlayer
-                && FactoryStorageActions.quickMoveFromPlayer(serverPlayer, slot)) {
+                && FactoryStorageActionHandler.quickMoveFromPlayer(serverPlayer, slot)) {
             return original;
         }
 
