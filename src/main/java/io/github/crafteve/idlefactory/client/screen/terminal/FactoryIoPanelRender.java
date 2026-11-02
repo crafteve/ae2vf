@@ -43,10 +43,6 @@ final class FactoryIoPanelRender {
     static final int WORK_CONTENT_TOP = 3;
     /** 机器之间的间距。 */
     static final int MACHINE_GAP = 6;
-    /** 配置框宽度。 */
-    static final int POPUP_W = 126;
-    /** 配置框行高。 */
-    static final int POPUP_ROW = 16;
 
     /** 槽位命中。 */
     record SlotHit(int machineIndex, boolean input, int ruleIndex, boolean empty, int x, int y) {
@@ -99,17 +95,13 @@ final class FactoryIoPanelRender {
     }
 
     /**
-     * tooltip 与中键配置框。
+     * tooltip。
      *
      * @param graphics 绘制器
      * @param mouseX   鼠标 x
      * @param mouseY   鼠标 y
      */
     void renderForeground(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (this.panel.popupOpen()) {
-            this.drawPopup(graphics);
-            return;
-        }
         List<Component> lines = this.tooltipAt(mouseX, mouseY);
         if (!lines.isEmpty()) {
             graphics.renderTooltip(this.panel.font,
@@ -255,24 +247,6 @@ final class FactoryIoPanelRender {
                 Icon.TEXTURE_WIDTH, Icon.TEXTURE_HEIGHT);
     }
 
-    private void drawPopup(GuiGraphics graphics) {
-        ResourceSpec rule = this.panel.popupRule();
-        if (rule == null) {
-            return;
-        }
-        int x = this.panel.popupX();
-        int y = this.panel.popupY();
-        graphics.fill(x, y, x + POPUP_W, y + POPUP_ROW * 3 + 6, 0xF0101820);
-        graphics.renderOutline(x, y, POPUP_W, POPUP_ROW * 3 + 6, 0xFFE8ECF5);
-        graphics.drawString(this.panel.font, "面：" + FactoryLabels.face(rule), x + 4, y + 4,
-                0xFFE8ECF5, false);
-        graphics.drawString(this.panel.font,
-                "匹配：" + (rule.mode().name().equals("IGNORE_COMPONENTS") ? "模糊" : "精准"),
-                x + 4, y + 4 + POPUP_ROW, 0xFFE8ECF5, false);
-        graphics.drawString(this.panel.font, "删除", x + 4, y + 4 + POPUP_ROW * 2,
-                this.panel.theme.error(), false);
-    }
-
     private void renderFeedback(GuiGraphics graphics) {
         if (this.panel.feedback == null || Util.getMillis() > this.panel.feedbackUntil) {
             return;
@@ -339,26 +313,6 @@ final class FactoryIoPanelRender {
             }
         }
         return -1;
-    }
-
-    /**
-     * 配置框点击结果。
-     *
-     * @param mouseX 鼠标 x
-     * @param mouseY 鼠标 y
-     * @return 选项下标；外面为 {@code -1}
-     */
-    int popupHit(double mouseX, double mouseY) {
-        if (!this.panel.popupOpen()) {
-            return -1;
-        }
-        int x = this.panel.popupX();
-        int y = this.panel.popupY();
-        if (mouseX < x || mouseX >= x + POPUP_W || mouseY < y
-                || mouseY >= y + POPUP_ROW * 3 + 6) {
-            return -1;
-        }
-        return Math.min(2, (int) ((mouseY - y - 2) / POPUP_ROW));
     }
 
     boolean inSearch(double mouseX, double mouseY) {

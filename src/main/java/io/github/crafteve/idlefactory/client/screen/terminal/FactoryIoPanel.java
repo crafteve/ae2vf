@@ -28,7 +28,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
@@ -64,13 +63,6 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     UUID selectedId;
     /** 列表像素滚动。 */
     int scroll;
-    /** 中键配置框针对的槽位；没打开时为 {@code null}。 */
-    @Nullable
-    FactoryIoPanelRender.SlotHit popupSlot;
-    /** 配置框左上角 x。 */
-    int popupX;
-    /** 配置框左上角 y。 */
-    int popupY;
     /** 搜索原文。 */
     String searchText = "";
     /** 解析后的搜索条件。 */
@@ -150,15 +142,6 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
         if (super.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
-        if (this.popupSlot != null) {
-            int action = this.render.popupHit(mouseX, mouseY);
-            if (action >= 0) {
-                this.applyPopup(action);
-            } else {
-                this.popupSlot = null;
-            }
-            return true;
-        }
         if (this.render.inSearch(mouseX, mouseY)) {
             this.focusSearch(true);
             return true;
@@ -178,7 +161,7 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
     }
 
     /**
-     * 槽位点击：左键空位加规则，右键删规则，中键开配置框。
+     * 槽位点击：左键空位加规则、左键已配置开配置界面，右键删规则。
      *
      * @param hit    槽位
      * @param mouseX 鼠标 x
@@ -197,49 +180,25 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             this.removeRule(hit);
             return;
         }
-        if (button == 2) {
-            this.popupSlot = hit;
-            this.popupX = (int) Math.min(mouseX + 8,
-                    this.left() + this.width() - FactoryIoPanelRender.POPUP_W - 2);
-            this.popupY = (int) Math.min(mouseY - 20,
-                    this.bottom() - FactoryIoPanelRender.POPUP_ROW * 3 - 8);
+        if (button == 0) {
+            this.openConfig(hit);
         }
     }
 
     /**
-     * 配置框选项：0 切面，1 切精准/模糊，2 删除。
+     * 打开独立配置界面：面与匹配模式各一行按钮，确定后走 {@code UPDATE}。
      *
-     * @param action 选项下标
+     * @param hit 槽位
      */
-    private void applyPopup(int action) {
-        FactoryIoPanelRender.SlotHit hit = this.popupSlot;
-        this.popupSlot = null;
+    private void openConfig(FactoryIoPanelRender.SlotHit hit) {
         ResourceSpec rule = this.ruleOf(hit);
-        if (rule == null || hit == null) {
+        if (rule == null) {
             return;
         }
-        UUID machineId = this.visible.get(hit.machineIndex()).ref().id();
-        IoSide side = hit.input() ? IoSide.INPUT : IoSide.OUTPUT;
-        if (action == 2) {
-            this.removeRule(hit);
-            return;
-        }
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                FactoryRuleActionC2S.Action.REMOVE, machineId, side, rule.key(), null,
-                MatchMode.IGNORE_COMPONENTS));
-        Direction face = rule.face();
-        MatchMode mode = rule.mode();
-        if (action == 0) {
-            face = nextFace(face);
-        } else {
-            mode = mode == MatchMode.IGNORE_COMPONENTS ? MatchMode.EXACT
-                    : MatchMode.IGNORE_COMPONENTS;
-        }
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(this.containerId,
-                FactoryRuleActionC2S.Action.ADD, machineId, side, rule.key(), face, mode));
-        this.feedback = "已更新规则";
-        this.feedbackOk = true;
-        this.feedbackUntil = Util.getMillis() + FEEDBACK_MILLIS;
+        this.minecraft.setScreen(new FactoryRuleConfigScreen(this.containerId,
+                this.visible.get(hit.machineIndex()).ref().id(),
+                hit.input() ? IoSide.INPUT : IoSide.OUTPUT, rule.key(), rule.face(),
+                rule.mode(), this.minecraft.screen));
     }
 
     @Nullable
@@ -252,27 +211,6 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
                 : this.visible.get(hit.machineIndex()).outputs();
         return hit.ruleIndex() >= 0 && hit.ruleIndex() < rules.size()
                 ? rules.get(hit.ruleIndex()) : null;
-    }
-
-    /**
-     * 循环到下一个面：不限面 → 下 → 上 → 北 → 南 → 西 → 东。
-     *
-     * @param face 当前面
-     * @return 下一个面
-     */
-    @Nullable
-    private static Direction nextFace(@Nullable Direction face) {
-        if (face == null) {
-            return Direction.DOWN;
-        }
-        return switch (face) {
-            case DOWN -> Direction.UP;
-            case UP -> Direction.NORTH;
-            case NORTH -> Direction.SOUTH;
-            case SOUTH -> Direction.WEST;
-            case WEST -> Direction.EAST;
-            case EAST -> null;
-        };
     }
 
     @Override
@@ -340,27 +278,6 @@ public final class FactoryIoPanel extends FactoryTerminalPanel {
             }
         }
         return null;
-    }
-
-    /** 配置框是否打开。 */
-    boolean popupOpen() {
-        return this.popupSlot != null;
-    }
-
-    /** 配置框针对的规则；规则已被删掉时为 {@code null}。 */
-    @Nullable
-    ResourceSpec popupRule() {
-        return this.ruleOf(this.popupSlot);
-    }
-
-    /** 配置框左上角 x。 */
-    int popupX() {
-        return this.popupX;
-    }
-
-    /** 配置框左上角 y。 */
-    int popupY() {
-        return this.popupY;
     }
 
     /**
