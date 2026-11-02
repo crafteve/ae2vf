@@ -64,6 +64,9 @@ public final class FactoryTerminalHost extends ItemMenuHost<FactoryTerminalItem>
     private final InternalInventory craftingGrid = new AppEngInternalInventory(CRAFTING_GRID_SIZE);
     /** 样板编码逻辑；模式 B 使用。 */
     private final PatternEncodingLogic logic = new PatternEncodingLogic(this);
+    /** 动作节点缓存：主线程解析，合成计算线程只读。 */
+    @Nullable
+    private IGridNode actionableNode;
 
     /**
      * @param item    终端物品
@@ -140,6 +143,11 @@ public final class FactoryTerminalHost extends ItemMenuHost<FactoryTerminalItem>
      * 动作节点：服务端是在工厂 ME 锚点方块上找到的节点，客户端为 {@code null}。
      *
      * <p>AE2 的终端拿它做能量源与合成服务查询；拿不到就等同于离线终端，菜单仍然能开。</p>
+     *
+     * <p><b>非主线程只读缓存</b>：AE2 的合成计算线程也会调这里，它一旦经
+     * {@code GridHelper.getNodeHost} 走到 {@code level.getBlockState}，就会 join 主线程的
+     * 区块加载；而主线程此时正卡在 {@code CraftingCalculation.simulateFor} 等计算线程，
+     * 两者互等会直接把服务端线程锁死。所以只有主线程才真正解析，其余线程返回上一次缓存。</p>
      */
     @Override
     @Nullable
@@ -152,8 +160,12 @@ public final class FactoryTerminalHost extends ItemMenuHost<FactoryTerminalItem>
         if (server == null) {
             return null;
         }
+        if (!server.isSameThread()) {
+            return this.actionableNode;
+        }
         ServerLevel level = server.getLevel(anchor.dimension());
-        return level == null ? null : Ae2Binder.nodeAt(level, anchor.pos());
+        this.actionableNode = level == null ? null : Ae2Binder.nodeAt(level, anchor.pos());
+        return this.actionableNode;
     }
 
     @Override
