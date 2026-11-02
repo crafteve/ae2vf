@@ -94,7 +94,12 @@ public final class IoTransfer {
         long inserted = AeKeySupport.insert(storage, adapter.key(), taken, false);
         long refund = taken - inserted;
         if (refund > 0L) {
-            adapter.insert(refund, false);
+            // 机器输出面常常只读，退货会静默返回 0，不检查就查不到丢件。
+            long refunded = adapter.insert(refund, false);
+            if (refunded < refund) {
+                IdleFactory.LOGGER.warn("IdleFactory IO refund failed: {} of {} {} could not go back to machine",
+                        refund - refunded, refund, adapter.key().getDisplayName().getString());
+            }
         }
         return new IoResult(inserted, inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
     }
