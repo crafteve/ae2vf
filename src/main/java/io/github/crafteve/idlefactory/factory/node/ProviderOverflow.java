@@ -66,6 +66,10 @@ final class ProviderOverflow {
     /**
      * 每 tick 试送一次余量。
      *
+     * <p>每送走一笔就立刻把该条的剩余量写回镜像，{@code finally} 统一落库：异常时 pending
+     * 必须只剩「还没送进去的部分」，否则下一轮会把已经进机器的量再送一遍。异常按 4.4 降级成
+     * 一条限流日志，不再上抛，避免把同一节点本 tick 后面的样板重建与落盘一起打断。</p>
+     *
      * @param node 机器节点
      * @return 是否改动了要落盘的数据
      */
@@ -76,36 +80,48 @@ final class ProviderOverflow {
         }
         ProviderFaceResolver.Faces faces = node.faces();
         List<MachineProvider.Pending> entries = provider.pending();
-        List<MachineProvider.Pending> remaining = new ArrayList<>(entries.size());
+        // 与 pending 等长的镜像：谁被送走多少就扣多少，异常时它就是真实的剩余量。
+        List<MachineProvider.Pending> mirror = new ArrayList<>(entries);
         boolean insertedAny = false;
-        for (MachineProvider.Pending entry : entries) {
-            AEKey key = entry.stack().what();
-            long left = entry.stack().amount();
-            Direction face = entry.face();
-            long inserted = 0L;
-            if (faces != null && face != null) {
-                PatternProviderTarget target = faces.target(face);
-                inserted = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
-                left -= inserted;
-            }
-            if (left > 0L && faces != null) {
-                Direction next = faces.select(key, left);
-                if (next != null) {
-                    PatternProviderTarget target = faces.target(next);
-                    long more = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
-                    inserted += more;
-                    left -= more;
-                    face = next;
+        try {
+            for (int i = 0; i < entries.size(); i++) {
+                MachineProvider.Pending entry = entries.get(i);
+                AEKey key = entry.stack().what();
+                long left = entry.stack().amount();
+                Direction face = entry.face();
+                if (faces != null && face != null) {
+                    PatternProviderTarget target = faces.target(face);
+                    long inserted = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
+                    // 先扣量再走下一步：第二次 insert 抛异常时，这一笔不能留在 pending 里重送。
+                    if (inserted > 0L) {
+                        left -= inserted;
+                        mirror.set(i, new MachineProvider.Pending(new GenericStack(key, left), face));
+                    }
+                    insertedAny |= inserted > 0L;
+                }
+                if (left > 0L && faces != null) {
+                    Direction next = faces.select(key, left);
+                    if (next != null) {
+                        PatternProviderTarget target = faces.target(next);
+                        long more = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
+                        // 两条 insert 共用同一个 left / face：换面后剩余量按新面记。
+                        face = next;
+                        if (more > 0L) {
+                            left -= more;
+                        }
+                        mirror.set(i, new MachineProvider.Pending(new GenericStack(key, left), face));
+                        insertedAny |= more > 0L;
+                    }
                 }
             }
-            if (left > 0L) {
-                remaining.add(new MachineProvider.Pending(new GenericStack(key, left), face));
+        } catch (RuntimeException e) {
+            // 4.4：节点 tick 里不外抛；pending 的一致性已经在 finally 里收口。
+            node.logThrottled(node.gameTime(), "余量冲刷异常：" + e);
+        } finally {
+            if (insertedAny) {
+                provider.setPending(mirror);
+                node.markDataChanged();
             }
-            insertedAny |= inserted > 0L;
-        }
-        if (insertedAny) {
-            provider.setPending(remaining);
-            node.markDataChanged();
         }
         return insertedAny;
     }
@@ -131,7 +147,14 @@ final class ProviderOverflow {
             AEKey key = entry.stack().what();
             long left = entry.stack().amount();
             if (network != null) {
-                left -= network.insert(key, left, Actionable.MODULATE, node.actionSource());
+                try {
+                    left -= network.insert(key, left, Actionable.MODULATE, node.actionSource());
+                } catch (RuntimeException e) {
+                    // 按「网络没收下」处理：left 不减，交给下面的掉落兜底。这里是拆机器路径，
+                    // 机器记录马上要删；异常一旦上抛，clearPending 不执行、余量就随记录消失。
+                    // 网络若在已收下后才抛，这部分会重复掉一份——接口无法回读，宁可重也不能丢。
+                    node.logThrottled(node.gameTime(), "拆除时退回余量异常：" + e);
+                }
             }
             if (left > 0L && !dropAtMachine(node, key, left)) {
                 failed++;
