@@ -184,7 +184,7 @@ public final class MachineProvider {
             return;
         }
         this.patterns.set(slot, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
-        this.growIfNearlyFull();
+        this.resizeByUsage();
     }
 
     /**
@@ -350,16 +350,42 @@ public final class MachineProvider {
     }
 
     /**
-     * 已放数量逼近容量时加一组槽。
+     * 按用量调整容量：全满加一组，空出一整组就减一组。
      *
-     * <p>判据是「已放 >= 容量 - 1」：留一个空位，终端永远放得下下一条，扩容本身也就永远
-     * 有触发点。</p>
+     * <p>减容量之前先 {@link #compact()} 把样板压到最前面：玩家把样板放在第二排、第一排
+     * 空着时，缩完容量样板会原封不动挪到第一排，一个都不会被裁掉。缩后的容量取
+     * 「样板数向上取整到 {@link #CAPACITY_STEP} 的倍数」，且不低于 {@link #DEFAULT_CAPACITY}。</p>
      */
-    private void growIfNearlyFull() {
-        if (this.capacity >= MAX_CAPACITY || this.patternCount() < this.capacity - 1) {
+    private void resizeByUsage() {
+        int used = this.patternCount();
+        int free = this.capacity - used;
+        if (free == 0 && this.capacity < MAX_CAPACITY) {
+            this.resize(Math.min(MAX_CAPACITY, this.capacity + CAPACITY_STEP));
             return;
         }
-        this.resize(Math.min(MAX_CAPACITY, this.capacity + CAPACITY_STEP));
+        if (free >= CAPACITY_STEP && this.capacity > DEFAULT_CAPACITY) {
+            this.compact();
+            int groups = Math.max(1, (used + CAPACITY_STEP - 1) / CAPACITY_STEP);
+            int next = Math.max(DEFAULT_CAPACITY, groups * CAPACITY_STEP);
+            this.resize(Math.min(this.capacity - CAPACITY_STEP, next));
+        }
+    }
+
+    /**
+     * 把非空样板按原顺序压到最前面的槽位，消除中间空洞。
+     *
+     * <p>缩容前调用：先压实再截尾部空槽，样板一个都不会丢。</p>
+     */
+    private void compact() {
+        List<ItemStack> kept = new ArrayList<>();
+        for (ItemStack stack : this.patterns) {
+            if (!stack.isEmpty()) {
+                kept.add(stack);
+            }
+        }
+        for (int i = 0; i < this.patterns.size(); i++) {
+            this.patterns.set(i, i < kept.size() ? kept.get(i) : ItemStack.EMPTY);
+        }
     }
 
     /**

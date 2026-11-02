@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -7,6 +8,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEKey;
+import appeng.crafting.pattern.EncodedPatternItem;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
@@ -47,6 +49,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     /** 反馈停留时间（毫秒）。 */
     private static final long FEEDBACK_MILLIS = 3000L;
 
+    /** 样板物品 → 输出产物的缓存；AE2 的样板槽也是解析后显示产物。 */
+    private final Map<ItemStack, ItemStack> displayCache = new HashMap<>();
     private List<FactoryTerminalTargetsS2C.Entry> targets = List.of();
     private int scroll;
     @Nullable
@@ -167,12 +171,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private void drawHeader(GuiGraphics graphics, FactoryTerminalTargetsS2C.Entry entry, int x,
             int y, int right) {
         if (!entry.icon().isEmpty()) {
-            // 机器图标按槽位格同尺寸（18×18）缩放，和下面第一列槽位严格对齐。
-            graphics.pose().pushPose();
-            graphics.pose().translate(x, y, 0);
-            graphics.pose().scale((float) CELL / 16.0F, (float) CELL / 16.0F, 1.0F);
-            graphics.renderItem(entry.icon(), 0, 0);
-            graphics.pose().popPose();
+            // 16×16 图标居在 18×18 的行高里，左边缘和第一列槽位对齐。
+            graphics.renderItem(entry.icon(), x + 1, y + 1);
         }
         String count = entry.used() + "/" + entry.capacity();
         int countWidth = this.font.width(count);
@@ -209,7 +209,7 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
             FactoryNineSlice.terminalSlot(graphics, x, y, CELL, CELL);
             ItemStack stack = patterns.get(slot);
             if (stack != null && !stack.isEmpty()) {
-                graphics.renderItem(stack, x + 1, y + 1);
+                graphics.renderItem(this.displayOf(stack), x + 1, y + 1);
             }
             boolean hovered = mouseX >= x && mouseX < x + CELL && mouseY >= y
                     && mouseY < y + CELL && mouseY >= viewTop && mouseY < viewBottom;
@@ -352,6 +352,34 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     @Override
     public List<FactoryTerminalDropArea> jeiDropAreas() {
         return List.of();
+    }
+
+    /**
+     * 样板物品 → 输出产物。
+     *
+     * <p>AE2 的样板槽也是先解析样板再显示产物（{@code PatternSlot.getDisplayStack()}），
+     * 这样玩家扫一眼就知道这台机器会产出什么；解析失败（损坏或未知样板）回退显示样板本身。
+     * 结果按样板物品缓存，避免每帧解析。</p>
+     *
+     * @param pattern 样板物品
+     * @return 显示用的物品栈
+     */
+    private ItemStack displayOf(ItemStack pattern) {
+        if (pattern.isEmpty()) {
+            return ItemStack.EMPTY;
+        }
+        if (this.displayCache.size() > 256) {
+            this.displayCache.clear();
+        }
+        return this.displayCache.computeIfAbsent(pattern, stack -> {
+            if (stack.getItem() instanceof EncodedPatternItem encoded) {
+                ItemStack output = encoded.getOutput(stack);
+                if (!output.isEmpty()) {
+                    return output;
+                }
+            }
+            return stack;
+        });
     }
 
     /**
