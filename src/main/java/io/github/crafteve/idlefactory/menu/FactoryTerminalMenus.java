@@ -101,24 +101,6 @@ public final class FactoryTerminalMenus {
     }
 
     /**
-     * 打开样板管理终端：换一个菜单类型，数据源仍是工厂 ME 锚点网格里的机器虚拟节点。
-     *
-     * <p>和切换视图一样，用同一个物品定位器重开；样板管理终端自己没有持久状态，关掉即回。</p>
-     *
-     * @param player 玩家
-     * @return 是否已请求打开
-     */
-    public static boolean openPatternAccess(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null || !isMeMode(factory)) {
-            return false;
-        }
-        ItemMenuHostLocator locator = findLocator(player, null);
-        return locator != null
-                && MenuOpener.open(ModMenus.FACTORY_PATTERN_ACCESS.get(), player, locator);
-    }
-
-    /**
      * 从子界面回到主菜单；视图取当前玩家的记录。
      *
      * @param player  玩家

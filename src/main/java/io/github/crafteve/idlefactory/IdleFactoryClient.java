@@ -4,10 +4,8 @@ import io.github.crafteve.idlefactory.client.ModKeyMappings;
 import io.github.crafteve.idlefactory.client.screen.FactoryUiConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryCraftingTerminalScreen;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPatternAccessScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPatternTerminalScreen;
 import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPatternAccessMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
@@ -80,11 +78,5 @@ public class IdleFactoryClient {
                         new FactoryPatternTerminalScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/pattern_encoding_terminal.json")));
-        event.<FactoryPatternAccessMenu, FactoryPatternAccessScreen>register(
-                ModMenus.FACTORY_PATTERN_ACCESS.get(),
-                (FactoryPatternAccessMenu menu, Inventory inventory, Component title) ->
-                        new FactoryPatternAccessScreen(menu, inventory, title,
-                                StyleManager.loadStyleDoc(
-                                        "/screens/terminals/pattern_access_terminal.json")));
     }
 }

@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineModeC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryPatternAccessOpenC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
@@ -101,8 +100,6 @@ public final class ModNetwork {
         // 工厂终端：视图切换、目标选择、机器模式与目标快照
         registrar.playToServer(FactoryTerminalSwitchC2S.TYPE,
                 FactoryTerminalSwitchC2S.STREAM_CODEC, FactoryTerminalSwitchC2S::handle);
-        registrar.playToServer(FactoryPatternAccessOpenC2S.TYPE,
-                FactoryPatternAccessOpenC2S.STREAM_CODEC, FactoryPatternAccessOpenC2S::handle);
         registrar.playToServer(FactoryTerminalSelectC2S.TYPE,
                 FactoryTerminalSelectC2S.STREAM_CODEC, FactoryTerminalSelectC2S::handle);
         registrar.playToServer(FactoryMachineModeC2S.TYPE,

@@ -11,7 +11,6 @@ import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 
 import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryPatternAccessOpenC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSwitchC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
@@ -56,13 +55,6 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
                         new FactoryTerminalSwitchC2S(menu.containerId)));
         this.addToLeftToolbar(viewButton);
         FactoryTerminalToolbar.moveToTop(this, viewButton);
-        // 样板管理终端复用 AE2 原版界面，按钮放在视图切换下面。
-        FactoryTerminalViewButton accessButton = new FactoryTerminalViewButton(
-                Icon.PATTERN_ACCESS_SHOW, "样板管理",
-                pressed -> PacketDistributor.sendToServer(
-                        new FactoryPatternAccessOpenC2S(menu.containerId)));
-        this.addToLeftToolbar(accessButton);
-        FactoryTerminalToolbar.moveToTop(this, accessButton);
     }
 
     @Override

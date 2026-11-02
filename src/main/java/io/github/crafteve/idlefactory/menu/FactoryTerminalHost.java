@@ -12,7 +12,6 @@ import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.security.IActionHost;
 import appeng.api.storage.ILinkStatus;
-import appeng.api.storage.IPatternAccessTermMenuHost;
 import appeng.api.storage.MEStorage;
 import appeng.api.storage.SupplierStorage;
 import appeng.api.util.IConfigManager;
@@ -50,7 +49,7 @@ import net.minecraft.world.level.Level;
  */
 public final class FactoryTerminalHost extends ItemMenuHost<FactoryTerminalItem>
         implements IPatternTerminalMenuHost, IActionHost, ISegmentedInventory,
-        IPatternTerminalLogicHost, IPatternAccessTermMenuHost {
+        IPatternTerminalLogicHost {
     /** 合成格数量；与 AE2 合成终端一致。 */
     private static final int CRAFTING_GRID_SIZE = 9;
 
@@ -167,18 +166,6 @@ public final class FactoryTerminalHost extends ItemMenuHost<FactoryTerminalItem>
         ServerLevel level = server.getLevel(anchor.dimension());
         this.actionableNode = level == null ? null : Ae2Binder.nodeAt(level, anchor.pos());
         return this.actionableNode;
-    }
-
-    /**
-     * 样板管理终端用的网格节点：就是工厂锚点那个节点。
-     *
-     * <p>样板管理终端会从这个节点所在的网格里扫 {@code PatternContainer}；工厂的每台机器
-     * 都挂着一个虚拟节点（{@code MachineNode}），所以扫出来正好是「一机一个容器」。</p>
-     */
-    @Override
-    @Nullable
-    public IGridNode getGridNode() {
-        return this.getActionableNode();
     }
 
     @Override

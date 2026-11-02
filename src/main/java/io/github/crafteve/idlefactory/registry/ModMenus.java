@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.registry;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.menu.FactoryCraftingTerminalMenu;
 import io.github.crafteve.idlefactory.menu.FactoryMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPatternAccessMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPatternTerminalMenu;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalHost;
 
@@ -53,17 +52,6 @@ public final class ModMenus {
                                                     inventory, host),
                                     FactoryTerminalHost.class)
                             .buildUnregistered(id("factory_pattern_terminal")));
-
-    /** 工厂终端 · 样板管理视图：直接复用 AE2 的样板管理终端。 */
-    public static final DeferredHolder<MenuType<?>, MenuType<FactoryPatternAccessMenu>>
-            FACTORY_PATTERN_ACCESS = MENUS.register("factory_pattern_access",
-                    () -> MenuTypeBuilder
-                            .<FactoryPatternAccessMenu, FactoryTerminalHost>create(
-                                    (type, containerId, inventory, host) ->
-                                            new FactoryPatternAccessMenu(type, containerId,
-                                                    inventory, host),
-                                    FactoryTerminalHost.class)
-                            .buildUnregistered(id("factory_pattern_access")));
 
     private static ResourceLocation id(String path) {
         return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, path);
