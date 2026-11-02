@@ -103,10 +103,11 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
      * @param graphics 绘制器
      */
     private void drawWorkArea(GuiGraphics graphics) {
-        int x = this.contentLeft() - 2;
-        int y = this.listTop() - 4;
-        int width = this.contentWidth() + 4;
-        int height = this.listBottom() - this.listTop() + 8;
+        // 和被动 IO 面板完全同一套几何：x = 内容左边界，y = 列表顶，高 = 列表底 - 列表顶。
+        int x = this.contentLeft();
+        int y = this.listTop();
+        int width = this.contentWidth();
+        int height = this.listBottom() - y;
         if (width <= 0 || height <= 0) {
             return;
         }
@@ -374,11 +375,12 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     }
 
     private int listTop() {
-        return this.top() + FactoryTerminalGeometry.HEADER_HEIGHT + 15;
+        // 和被动 IO 面板对齐：标题下 4px 就是工作区起点。
+        return this.top() + FactoryTerminalGeometry.HEADER_HEIGHT + 4;
     }
 
     private int listBottom() {
-        return this.bottom() - 16;
+        return this.bottom() - FactoryTerminalGeometry.CONTENT_PADDING;
     }
 
     /**
