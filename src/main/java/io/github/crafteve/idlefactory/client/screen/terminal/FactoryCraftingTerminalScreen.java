@@ -87,8 +87,10 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)
-                && this.panel.mouseClicked(mouseX, mouseY, button)) {
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
+            // 左面板在 AE2 的 GUI 矩形外：只要事件漏到原版，就会被当成「点击 GUI 外侧」，
+            // 把光标上的物品丢出去。面板内一律吞掉，不再看 panel 的返回值。
+            this.panel.mouseClicked(mouseX, mouseY, button);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -96,8 +98,9 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY)
-                && this.panel.mouseReleased(mouseX, mouseY, button)) {
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
+            // 同上：释放也要吞掉，否则原版会在这里完成「拖到外部丢弃」。
+            this.panel.mouseReleased(mouseX, mouseY, button);
             return true;
         }
         return super.mouseReleased(mouseX, mouseY, button);
@@ -106,8 +109,9 @@ public final class FactoryCraftingTerminalScreen extends CraftingTermScreen<Fact
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
             double dragY) {
-        if (this.panel.isMouseOver(mouseX, mouseY)
-                && this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY)) {
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
+            // 拖到左面板上同样不下传，避免原版把物品拖出 GUI 外丢掉。
+            this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY);
             return true;
         }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
