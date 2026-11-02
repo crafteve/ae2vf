@@ -42,6 +42,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private static final int COLUMNS = 9;
     /** 段与段之间的间距。 */
     private static final int SECTION_GAP = 3;
+    /** 9 列槽位的总宽。 */
+    private static final int GRID_WIDTH = COLUMNS * CELL;
     /** 反馈停留时间（毫秒）。 */
     private static final long FEEDBACK_MILLIS = 3000L;
 
@@ -130,8 +132,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
      * @param mouseY   鼠标 y
      */
     private void renderList(GuiGraphics graphics, int mouseX, int mouseY) {
-        int left = this.contentLeft();
-        int right = left + this.contentWidth();
+        int left = this.gridLeft();
+        int right = left + GRID_WIDTH;
         int viewTop = this.listTop();
         int viewBottom = this.listBottom();
         int y = viewTop - this.scroll;
@@ -249,7 +251,7 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
      */
     @Nullable
     private SlotHit slotAt(double mouseX, double mouseY) {
-        int left = this.contentLeft();
+        int left = this.gridLeft();
         int y = this.listTop() - this.scroll;
         for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
             int rows = rowsOf(entry);
@@ -332,9 +334,9 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
             int rows = rowsOf(entry);
             int sectionHeight = HEADER_ROW + rows * CELL + SECTION_GAP;
-            if (mouseY >= y && mouseY < y + HEADER_ROW && mouseX >= this.contentLeft()
-                    && mouseX < this.contentLeft() + 16) {
-                return this.itemTarget(entry.icon(), this.contentLeft(), y);
+            if (mouseY >= y && mouseY < y + HEADER_ROW && mouseX >= this.gridLeft()
+                    && mouseX < this.gridLeft() + CELL) {
+                return this.itemTarget(entry.icon(), this.gridLeft(), y);
             }
             y += sectionHeight;
         }
@@ -350,6 +352,15 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     @Override
     public List<FactoryTerminalDropArea> jeiDropAreas() {
         return List.of();
+    }
+
+    /**
+     * 槽位网格的左起点：在内容区里左右居中，避免左边顶着工作区、右边空一大块。
+     *
+     * @return 网格左边界
+     */
+    private int gridLeft() {
+        return this.contentLeft() + Math.max(0, (this.contentWidth() - GRID_WIDTH) / 2);
     }
 
     /** 机器段占几行槽位；容量 0 也至少给一行。 */
