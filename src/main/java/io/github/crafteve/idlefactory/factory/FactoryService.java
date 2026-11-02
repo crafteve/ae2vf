@@ -341,7 +341,7 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int disconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, false);
+        return deleteMachine(player, DeletePolicy.PROMPT);
     }
 
     /**
@@ -351,7 +351,7 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int confirmDisconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, true);
+        return deleteMachine(player, DeletePolicy.CONFIRMED);
     }
 
     /**
@@ -362,7 +362,7 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int disconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, false);
+        return deleteMachine(player, shortId, DeletePolicy.PROMPT);
     }
 
     /**
@@ -373,10 +373,10 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int confirmDisconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, true);
+        return deleteMachine(player, shortId, DeletePolicy.CONFIRMED);
     }
 
-    private static int deleteMachine(ServerPlayer player, boolean confirmed) {
+    private static int deleteMachine(ServerPlayer player, DeletePolicy policy) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return 0;
@@ -392,11 +392,11 @@ public final class FactoryService {
             err(player, "这个位置没有接入的机器");
             return 0;
         }
-        return reportDelete(player, factory, target, confirmed,
+        return reportDelete(player, factory, target, policy,
                 "/idf factory disconnect confirm");
     }
 
-    private static int deleteMachine(ServerPlayer player, String shortId, boolean confirmed) {
+    private static int deleteMachine(ServerPlayer player, String shortId, DeletePolicy policy) {
         Factory factory = ownedFactory(player);
         if (factory == null) {
             return 0;
@@ -406,71 +406,132 @@ public final class FactoryService {
             err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
             return 0;
         }
-        return reportDelete(player, factory, target.get(), confirmed,
+        return reportDelete(player, factory, target.get(), policy,
                 "/idf factory disconnect " + shortId + " confirm");
+    }
+
+    /**
+     * 删除策略：决定「有 IO 规则」的机器怎么处理。
+     *
+     * <p>不用布尔参数：三处调用点需要三种语义，一个 {@code confirmed} 布尔只能表达两种，
+     * 连锁路径只能靠调用方自己先跳过，正是旧实现漏掉执行器清理的根源。</p>
+     */
+    private enum DeletePolicy {
+        /** 命令首次删除：有规则只提示确认，不删。 */
+        PROMPT,
+        /** 已确认：有规则也删；命令 confirm 与界面删除都走这里。 */
+        CONFIRMED,
+        /** 连锁断开：有规则就跳过，规则不能批量丢。 */
+        SKIP_WITH_RULES
+    }
+
+    /**
+     * 一次删除尝试的结果。
+     *
+     * @param deleted  是否真的删掉了；{@code false} 只表示「因策略要求未删」，
+     *                 「找不到机器」由调用方在进入出口前用 err 返回，不混进这个分支
+     * @param rules    删除前的规则条数
+     * @param patterns 退回的样板数
+     */
+    private record DeleteOutcome(boolean deleted, int rules, int patterns) {
     }
 
     /**
      * 删除一台机器的唯一出口。
      *
-     * <p>有规则时必须确认；没有规则直接删。删除会同时清掉失联标记，规则随机器一起消失。</p>
+     * <p>三处调用点（命令确认、界面删除、连锁断开）只负责取参与出文案，真正的副作用在这里
+     * 一次做完：清失联标记、退样板、移出机器库、拆虚拟节点、清执行器瞬态。执行器瞬态必须清：
+     * {@code RunnerState} 按机器 id 存睡眠与面路由，不删的话同 id 重连会继承旧睡眠。</p>
+     *
+     * <p>本方法不调 {@code markDirty}：{@code FactoryRuntime.markDirty} 会立刻全量存盘并重建
+     * 链接索引，连锁删除逐台调用会变成 N 次存盘。由调用点在整批删除成功后各调一次。</p>
+     *
+     * @param factory  工厂
+     * @param machine  机器
+     * @param policy   删除策略
+     * @param receiver 样板优先接收者；{@code null} 表示找工厂拥有者
+     * @return 结果；{@code deleted=false} 表示策略要求跳过
+     */
+    private static DeleteOutcome removeMachine(Factory factory, Machine machine,
+            DeletePolicy policy, @Nullable ServerPlayer receiver) {
+        int rules = machine.ruleCount();
+        boolean blocked = switch (policy) {
+            case PROMPT, SKIP_WITH_RULES -> rules > 0;
+            case CONFIRMED -> false;
+        };
+        if (blocked) {
+            return new DeleteOutcome(false, rules, 0);
+        }
+        factory.live().clearMachineMissing(machine.id());
+        int returned = returnPatterns(factory, machine, receiver);
+        factory.config().machines().remove(machine.id());
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
+            runtime.nodeManager().removeMachine(machine.id());
+            // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
+            runtime.machineRunner().forget(machine.id());
+        }
+        return new DeleteOutcome(true, rules, returned);
+    }
+
+    /**
+     * 删除成功后的回执文案；命令与界面共用以保证逐字一致。
+     *
+     * @param machine 被删掉的机器
+     * @param outcome 删除结果
+     * @return 如「已删除机器 [ab12cd34]（2 条 IO 规则已删除）（退回 1 块样板）」
+     */
+    private static String deletedText(Machine machine, DeleteOutcome outcome) {
+        String rulesText = outcome.rules() > 0 ? "（" + outcome.rules() + " 条 IO 规则已删除）" : "";
+        String patternText = outcome.patterns() > 0 ? "（退回 " + outcome.patterns() + " 块样板）" : "";
+        return "已删除机器 [" + machine.ref().shortId() + "]" + rulesText + patternText;
+    }
+
+    /**
+     * 命令侧删除：取机器、按策略删、出文案。
+     *
+     * <p>有规则时 {@link DeletePolicy#PROMPT} 只提示确认指令，不删除；
+     * {@link DeletePolicy#CONFIRMED} 才真正删除。</p>
      *
      * @param player         玩家
      * @param factory        工厂
      * @param target         机器
-     * @param confirmed      是否已经确认
+     * @param policy         删除策略
      * @param confirmCommand 给玩家的确认指令
      * @return 命令结果
      */
     private static int reportDelete(ServerPlayer player, Factory factory, Machine target,
-            boolean confirmed, String confirmCommand) {
-        int rules = target.ruleCount();
-        if (rules > 0 && !confirmed) {
-            warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + rules + " 条 IO 配置"
+            DeletePolicy policy, String confirmCommand) {
+        DeleteOutcome outcome = removeMachine(factory, target, policy, null);
+        if (!outcome.deleted()) {
+            warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + outcome.rules() + " 条 IO 配置"
                     + "，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
             return 0;
         }
-        MachineActions.Result result = deleteMachineById(factory, target.id(), true);
-        if (!result.ok()) {
-            err(player, result.message());
-            return 0;
-        }
-        ok(player, result.message());
+        markDirty();
+        ok(player, deletedText(target, outcome));
         return 1;
     }
 
     /**
      * 按机器 id 删除；界面确认后走这个入口。
      *
+     * <p>界面与命令确认后才会走到这里；确认逻辑在 {@link #reportDelete} 的
+     * {@link DeletePolicy#PROMPT} 策略里，本入口固定按已确认处理。</p>
+     *
      * @param factory   工厂
      * @param machineId 机器 id
-     * @param confirmed 是否已经确认（有规则时必须为 {@code true}）
      * @return 动作结果
      */
-    public static MachineActions.Result deleteMachineById(Factory factory, UUID machineId,
-            boolean confirmed) {
+    public static MachineActions.Result deleteMachineById(Factory factory, UUID machineId) {
         Machine target = factory.config().machines().byId(machineId).orElse(null);
         if (target == null) {
             return MachineActions.Result.err("找不到机器");
         }
-        int rules = target.ruleCount();
-        if (rules > 0 && !confirmed) {
-            return MachineActions.Result.err("这台机器还有 " + rules + " 条 IO 配置，需要确认");
-        }
-        factory.live().clearMachineMissing(machineId);
-        int returned = returnPatterns(factory, target, null);
-        factory.config().machines().remove(machineId);
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
-            runtime.nodeManager().removeMachine(machineId);
-            runtime.machineRunner().forget(machineId);
-        }
+        DeleteOutcome outcome = removeMachine(factory, target, DeletePolicy.CONFIRMED, null);
         markDirty();
-        String rulesText = rules > 0 ? "（" + rules + " 条 IO 规则已删除）" : "";
-        String patternText = returned > 0 ? "（退回 " + returned + " 块样板）" : "";
-        return MachineActions.Result.ok("已删除机器 [" + target.ref().shortId() + "]"
-                + rulesText + patternText);
+        return MachineActions.Result.ok(deletedText(target, outcome));
     }
 
     // ------------------------------------------------------------------
@@ -745,24 +806,20 @@ public final class FactoryService {
         int skippedRules = 0;
         int skipped = 0;
         int returned = 0;
-        FactoryRuntime runtime = FactoryRuntime.get();
         for (BlockPos targetPos : targets) {
             Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (machine == null) {
                 skipped++;
                 continue;
             }
-            if (machine.ruleCount() > 0) {
+            DeleteOutcome outcome =
+                    removeMachine(factory, machine, DeletePolicy.SKIP_WITH_RULES, player);
+            if (!outcome.deleted()) {
                 // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
                 skippedRules++;
                 continue;
             }
-            factory.live().clearMachineMissing(machine.id());
-            returned += returnPatterns(factory, machine, player);
-            factory.config().machines().remove(machine.id());
-            if (runtime != null) {
-                runtime.nodeManager().removeMachine(machine.id());
-            }
+            returned += outcome.patterns();
             deleted++;
         }
         if (deleted > 0) {

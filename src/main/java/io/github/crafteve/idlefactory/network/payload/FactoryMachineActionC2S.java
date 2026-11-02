@@ -74,7 +74,7 @@ public record FactoryMachineActionC2S(int containerId, UUID machineId)
                 return;
             }
             MachineActions.Result result = FactoryService.deleteMachineById(
-                    factory.get(), payload.machineId(), true);
+                    factory.get(), payload.machineId());
             sendFeedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {
                 FactoryTableSnapshots.send(player, payload.containerId());
