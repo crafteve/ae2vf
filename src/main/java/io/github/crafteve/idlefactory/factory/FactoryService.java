@@ -31,7 +31,6 @@ import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
-import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -61,8 +60,6 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 public final class FactoryService {
     /** {@code storage info} 最多列出多少种物品。 */
     private static final int INFO_LIMIT = 30;
-    /** {@code factory info} 最多列多少台机器。 */
-    private static final int INFO_MACHINE_LIMIT = 20;
     /** 清空仓库确认的有效期：1200 tick = 60 秒。 */
     private static final long CLEAR_CONFIRM_TICKS = 1200L;
     /** 玩家 → 待确认的清空请求。 */
@@ -75,74 +72,23 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 01. 界面入口（openGui / ensureFactory） ----
-    // 负责打开终端菜单并保证玩家有工厂；入口是 /idf gui、终端右键与快捷键，ensureFactory 只被 openGui 调用。
+    // ---- 静态门面：装配服务实例并转发 ----
+    // 保留原有静态签名，调用方零改动；业务实现见 FactoryLifecycleService / MachineLinkService / MachineToggleService。
     // ------------------------------------------------------------------
-
-    /**
-     * 打开工厂终端（指令与快捷键入口）。
-     *
-     * <p>第一次打开时自动给玩家建一个工厂，省掉先执行 {@code /idf create} 的空状态。
-     * 创建失败只记日志，不挡打开；界面仍会显示未创建。</p>
-     *
-     * <p>开哪个界面由 {@link FactoryTerminalMenus} 判断：接入 ME 网络后是 AE 终端，
-     * 容器模式或还没绑网络时退回旧工作台。</p>
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 已请求打开）
-     */
-    public static int openGui(ServerPlayer player) {
-        ensureFactory(player);
-        FactoryTerminalMenus.open(player, null);
-        return 1;
-    }
-
-    /**
-     * 手持终端右键打开界面。
-     *
-     * <p>和 {@link #openGui(ServerPlayer)} 的区别只有定位器：右键知道是哪只手的物品，
-     * 菜单里可以直接锁定这个槽位；指令与快捷键只能扫背包。</p>
-     *
-     * @param player 发起请求的玩家
-     * @param hand   使用的手
-     * @return 命令结果（{@code 1} 已请求打开）
-     */
-    public static int openTerminal(ServerPlayer player, InteractionHand hand) {
-        ensureFactory(player);
-        FactoryTerminalMenus.open(player, hand);
-        return 1;
-    }
 
     /**
      * 保证玩家有工厂：没有就静默创建，已有就不动。
      *
-     * <p>创建逻辑与 {@link #create(ServerPlayer)} 共用 id 规则，但不发指令回执；自动创建
-     * 不应该在第一次打开终端时刷屏。</p>
+     * <p>终端菜单打开前调它；业务实现已下沉到 {@link FactoryLifecycleService}。</p>
      *
      * @param player 玩家
      */
-    private static void ensureFactory(ServerPlayer player) {
+    public static void ensureFactory(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return;
+        if (runtime != null) {
+            lifecycle(runtime).ensureFactory(player);
         }
-        if (runtime.manager().byOwner(player.getUUID()).isPresent()) {
-            return;
-        }
-        UUID id = nextId(runtime, player.getUUID());
-        Factory factory = new Factory(id,
-                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
-        if (!runtime.manager().add(factory)) {
-            IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
-            return;
-        }
-        runtime.markDirty();
     }
-
-    // ------------------------------------------------------------------
-    // ---- 02. 工厂生命周期（create / delete / info） ----
-    // 负责创建、删除与打印工厂摘要；由 /idf create、/idf delete 与 /idf factory info 调用，info 的逐行渲染也在本节。
-    // ------------------------------------------------------------------
 
     /**
      * 给玩家创建一个工厂。一人一个，已有工厂时不动。
@@ -153,25 +99,9 @@ public final class FactoryService {
     public static int create(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            err(player, "Idle Factory 尚未启动（服务端未就绪）");
-            return 0;
+            return notStarted(player);
         }
-        Optional<Factory> existing = runtime.manager().byOwner(player.getUUID());
-        if (existing.isPresent()) {
-            err(player, "你已经有工厂了：" + existing.get().id());
-            return 0;
-        }
-
-        UUID id = nextId(runtime, player.getUUID());
-        Factory factory = new Factory(id,
-                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
-        if (!runtime.manager().add(factory)) {
-            err(player, "工厂创建失败：id 或拥有者冲突");
-            return 0;
-        }
-        runtime.markDirty();
-        ok(player, "工厂已创建：" + id);
-        return 1;
+        return lifecycle(runtime).create(player);
     }
 
     /**
@@ -183,155 +113,37 @@ public final class FactoryService {
     public static int delete(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            err(player, "Idle Factory 尚未启动（服务端未就绪）");
-            return 0;
+            return notStarted(player);
         }
-        Optional<Factory> factory = runtime.manager().byOwner(player.getUUID());
-        if (factory.isEmpty()) {
-            err(player, "你还没有工厂，先执行 /idlefactory create");
-            return 0;
-        }
-        int returned = 0;
-        for (Machine machine : factory.get().config().machines().all()) {
-            returned += returnPatterns(factory.get(), machine, player);
-        }
-        runtime.manager().remove(factory.get().id());
-        runtime.nodeManager().removeFactory(factory.get().id());
-        runtime.markDirty();
-        ok(player, "工厂已删除：" + factory.get().id() + patternSuffix(returned));
-        return 1;
+        return lifecycle(runtime).delete(player);
     }
 
     /**
      * 打印工厂摘要和机器库。
      *
-     * <p>读路径<b>不探世界</b>：每台机器的状态取自上一次的观测结论（{@link ObservationService}）。
-     * 刚 connect / 刚恢复的机器会被立刻刷新过，所以第一眼看到的就是准的。</p>
-     *
      * @param player 发起请求的玩家
      * @return 命令结果
      */
     public static int info(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
         }
-        // 即时刷新一次，别让 online 停在 tick 定时器上一秒的状态
-        factory.refreshStorage(storageResolver());
-        info(player, FactorySnapshotBuilder.describe(factory));
-
-        ObservationService observations = observations();
-        List<FactorySnapshotBuilder.MachineView> machines =
-                FactorySnapshotBuilder.machines(factory, observations,
-                        player.serverLevel().getGameTime());
-        if (machines.isEmpty()) {
-            info(player, "机器库为空：准星对准机器执行 /idf factory connect");
-            return 1;
-        }
-        info(player, FactorySnapshotBuilder.health(factory, machines).describe());
-
-        int missingCount = 0;
-        for (FactorySnapshotBuilder.MachineView view : machines) {
-            if (view.machineMissing()) {
-                missingCount++;
-            }
-        }
-        int shown = 0;
-        for (FactorySnapshotBuilder.MachineView view : machines) {
-            if (shown >= INFO_MACHINE_LIMIT) {
-                info(player, "… 还有 " + (machines.size() - shown) + " 台");
-                break;
-            }
-            sendMachineRow(player, view);
-            shown++;
-        }
-        if (missingCount > 0) {
-            info(player, "失联 " + missingCount + " 台 · 放回方块会自动恢复；删除请用机器库界面");
-        }
-        return 1;
+        return lifecycle(runtime).info(player);
     }
-
-    private static void sendMachineRow(ServerPlayer player, FactorySnapshotBuilder.MachineView view) {
-        MachineRef ref = view.ref();
-        String where = ref.dimension().location() + " " + ref.pos().toShortString();
-        String status = FactorySnapshotBuilder.describe(view);
-        StringBuilder hover = new StringBuilder(where).append('\n').append(status)
-                .append(" · 规则 ").append(view.ruleCount()).append(" 条");
-        Component row = Component.empty()
-                .append(FactoryMessages.text("  ", FactoryMessages.INFO))
-                .append(FactoryMessages.hover(ref.shortId(), hover.toString()))
-                .append(FactoryMessages.text(" " + where + "  " + status, FactoryMessages.INFO));
-        FactoryMessages.send(player, row);
-    }
-
-    // ------------------------------------------------------------------
-    // ---- 03. 机器库：准星接入与断开（connectMachine / disconnectMachine） ----
-    // 负责准星选中机器的接入、删除与确认；由 /idf factory connect 与 /idf factory disconnect 调用。
-    // ------------------------------------------------------------------
 
     /**
      * 把准星选中的机器接入玩家自己的工厂。
-     *
-     * <p>只接受「方块实体 + 至少提供 {@code IItemHandler} / {@code IFluidHandler}」的方块。
-     * id 由维度 + 坐标派生，重复接入会自然去重。</p>
      *
      * @param player 发起请求的玩家
      * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
      */
     public static int connectMachine(ServerPlayer player) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
         }
-        BlockPos pos = pickedBlock(player);
-        if (pos == null) {
-            err(player, "没有对准方块（射线 " + (int) REACH + " 格）");
-            return 0;
-        }
-        ServerLevel level = player.serverLevel();
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity == null) {
-            err(player, "这个方块没有方块实体");
-            return 0;
-        }
-        MinecraftServer server = player.getServer();
-        if (server == null) {
-            err(player, "服务端未就绪");
-            return 0;
-        }
-        // 指令路径也是绑定入口，必须和绑定杖走同一套占用规则；自占同角色交给下面的
-        // byId 判断（可能是数据修复，也可能是重复 connect）。
-        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
-        LinkGate.ClaimCheck claim =
-                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
-        if (claim.blocked()) {
-            err(player, gateMessage(claim));
-            return 0;
-        }
-        MachineRef target = MachineRef.of(level.dimension(), pos);
-        BlockProbe.Presence presence = BlockProbe.presence(server,
-                BlockKey.of(target.dimension(), target.pos()));
-        if (presence.health() != Health.PRESENT || presence.kinds().isEmpty()) {
-            err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
-            return 0;
-        }
-        Optional<Machine> existing = factory.config().machines().byId(target.id());
-        if (existing.isPresent()) {
-            err(player, "这台机器已经接入过了：" + existing.get().ref().shortId());
-            return 0;
-        }
-        MachineLibrary.AddResult added = factory.config().machines().add(target);
-        if (added != MachineLibrary.AddResult.ADDED) {
-            err(player, added == MachineLibrary.AddResult.FULL
-                    ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）"
-                    : "这台机器已经接入过了：" + target.shortId());
-            return 0;
-        }
-        refreshObservation(target);
-        markDirty();
-        ok(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
-                + " " + pos.toShortString() + " [" + presence.describe() + "]");
-        return 1;
+        return machineLinks(runtime).connectMachine(player);
     }
 
     /**
@@ -341,7 +153,11 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int disconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, DeletePolicy.PROMPT);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
+        }
+        return machineLinks(runtime).disconnectMachine(player);
     }
 
     /**
@@ -351,7 +167,11 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int confirmDisconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, DeletePolicy.CONFIRMED);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
+        }
+        return machineLinks(runtime).confirmDisconnectMachine(player);
     }
 
     /**
@@ -362,7 +182,11 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int disconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, DeletePolicy.PROMPT);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
+        }
+        return machineLinks(runtime).disconnectMachine(player, shortId);
     }
 
     /**
@@ -373,166 +197,91 @@ public final class FactoryService {
      * @return 命令结果
      */
     public static int confirmDisconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, DeletePolicy.CONFIRMED);
-    }
-
-    private static int deleteMachine(ServerPlayer player, DeletePolicy policy) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        BlockPos pos = pickedBlock(player);
-        if (pos == null) {
-            err(player, "没有对准方块（射线 " + (int) REACH + " 格）");
-            return 0;
-        }
-        ServerLevel level = player.serverLevel();
-        Machine target = factory.config().machines().byPosition(level.dimension(), pos);
-        if (target == null) {
-            err(player, "这个位置没有接入的机器");
-            return 0;
-        }
-        return reportDelete(player, factory, target, policy,
-                "/idf factory disconnect confirm");
-    }
-
-    private static int deleteMachine(ServerPlayer player, String shortId, DeletePolicy policy) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        Optional<Machine> target = factory.config().machines().byShortId(shortId);
-        if (target.isEmpty()) {
-            err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
-            return 0;
-        }
-        return reportDelete(player, factory, target.get(), policy,
-                "/idf factory disconnect " + shortId + " confirm");
-    }
-
-    /**
-     * 删除策略：决定「有 IO 规则」的机器怎么处理。
-     *
-     * <p>不用布尔参数：三处调用点需要三种语义，一个 {@code confirmed} 布尔只能表达两种，
-     * 连锁路径只能靠调用方自己先跳过，正是旧实现漏掉执行器清理的根源。</p>
-     */
-    private enum DeletePolicy {
-        /** 命令首次删除：有规则只提示确认，不删。 */
-        PROMPT,
-        /** 已确认：有规则也删；命令 confirm 与界面删除都走这里。 */
-        CONFIRMED,
-        /** 连锁断开：有规则就跳过，规则不能批量丢。 */
-        SKIP_WITH_RULES
-    }
-
-    /**
-     * 一次删除尝试的结果。
-     *
-     * @param deleted  是否真的删掉了；{@code false} 只表示「因策略要求未删」，
-     *                 「找不到机器」由调用方在进入出口前用 err 返回，不混进这个分支
-     * @param rules    删除前的规则条数
-     * @param patterns 退回的样板数
-     */
-    private record DeleteOutcome(boolean deleted, int rules, int patterns) {
-    }
-
-    /**
-     * 删除一台机器的唯一出口。
-     *
-     * <p>三处调用点（命令确认、界面删除、连锁断开）只负责取参与出文案，真正的副作用在这里
-     * 一次做完：清失联标记、退样板、移出机器库、拆虚拟节点、清执行器瞬态。执行器瞬态必须清：
-     * {@code RunnerState} 按机器 id 存睡眠与面路由，不删的话同 id 重连会继承旧睡眠。</p>
-     *
-     * <p>本方法不调 {@code markDirty}：{@code FactoryRuntime.markDirty} 会立刻全量存盘并重建
-     * 链接索引，连锁删除逐台调用会变成 N 次存盘。由调用点在整批删除成功后各调一次。</p>
-     *
-     * @param factory  工厂
-     * @param machine  机器
-     * @param policy   删除策略
-     * @param receiver 样板优先接收者；{@code null} 表示找工厂拥有者
-     * @return 结果；{@code deleted=false} 表示策略要求跳过
-     */
-    private static DeleteOutcome removeMachine(Factory factory, Machine machine,
-            DeletePolicy policy, @Nullable ServerPlayer receiver) {
-        int rules = machine.ruleCount();
-        boolean blocked = switch (policy) {
-            case PROMPT, SKIP_WITH_RULES -> rules > 0;
-            case CONFIRMED -> false;
-        };
-        if (blocked) {
-            return new DeleteOutcome(false, rules, 0);
-        }
-        factory.live().clearMachineMissing(machine.id());
-        int returned = returnPatterns(factory, machine, receiver);
-        factory.config().machines().remove(machine.id());
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
-            runtime.nodeManager().removeMachine(machine.id());
-            // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
-            runtime.machineRunner().forget(machine.id());
+        if (runtime == null) {
+            return notStarted(player);
         }
-        return new DeleteOutcome(true, rules, returned);
-    }
-
-    /**
-     * 删除成功后的回执文案；命令与界面共用以保证逐字一致。
-     *
-     * @param machine 被删掉的机器
-     * @param outcome 删除结果
-     * @return 如「已删除机器 [ab12cd34]（2 条 IO 规则已删除）（退回 1 块样板）」
-     */
-    private static String deletedText(Machine machine, DeleteOutcome outcome) {
-        String rulesText = outcome.rules() > 0 ? "（" + outcome.rules() + " 条 IO 规则已删除）" : "";
-        String patternText = outcome.patterns() > 0 ? "（退回 " + outcome.patterns() + " 块样板）" : "";
-        return "已删除机器 [" + machine.ref().shortId() + "]" + rulesText + patternText;
-    }
-
-    /**
-     * 命令侧删除：取机器、按策略删、出文案。
-     *
-     * <p>有规则时 {@link DeletePolicy#PROMPT} 只提示确认指令，不删除；
-     * {@link DeletePolicy#CONFIRMED} 才真正删除。</p>
-     *
-     * @param player         玩家
-     * @param factory        工厂
-     * @param target         机器
-     * @param policy         删除策略
-     * @param confirmCommand 给玩家的确认指令
-     * @return 命令结果
-     */
-    private static int reportDelete(ServerPlayer player, Factory factory, Machine target,
-            DeletePolicy policy, String confirmCommand) {
-        DeleteOutcome outcome = removeMachine(factory, target, policy, null);
-        if (!outcome.deleted()) {
-            warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + outcome.rules() + " 条 IO 配置"
-                    + "，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
-            return 0;
-        }
-        markDirty();
-        ok(player, deletedText(target, outcome));
-        return 1;
+        return machineLinks(runtime).confirmDisconnectMachine(player, shortId);
     }
 
     /**
      * 按机器 id 删除；界面确认后走这个入口。
-     *
-     * <p>界面与命令确认后才会走到这里；确认逻辑在 {@link #reportDelete} 的
-     * {@link DeletePolicy#PROMPT} 策略里，本入口固定按已确认处理。</p>
      *
      * @param factory   工厂
      * @param machineId 机器 id
      * @return 动作结果
      */
     public static MachineActions.Result deleteMachineById(Factory factory, UUID machineId) {
-        Machine target = factory.config().machines().byId(machineId).orElse(null);
-        if (target == null) {
-            return MachineActions.Result.err("找不到机器");
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return MachineActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
         }
-        DeleteOutcome outcome = removeMachine(factory, target, DeletePolicy.CONFIRMED, null);
-        markDirty();
-        return MachineActions.Result.ok(deletedText(target, outcome));
+        return machineLinks(runtime).deleteMachineById(factory, machineId);
     }
+
+    /**
+     * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
+     *
+     * @param player 发起请求的玩家
+     * @param pos    目标机器
+     * @param chain  是否连锁
+     * @return 变更的台数
+     */
+    public static int toggleMachines(ServerPlayer player, BlockPos pos, boolean chain) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return notStarted(player);
+        }
+        return machineToggle(runtime).toggleMachines(player, pos, chain);
+    }
+
+    /**
+     * 服务端未就绪时的统一回执。
+     *
+     * @param player 玩家
+     * @return {@code 0}
+     */
+    private static int notStarted(ServerPlayer player) {
+        FactoryMessages.err(player, "Idle Factory 尚未启动（服务端未就绪）");
+        return 0;
+    }
+
+    /**
+     * 装配机器接线服务。
+     *
+     * @param runtime 运行时
+     * @return 服务实例
+     */
+    private static MachineLinkService machineLinks(FactoryRuntime runtime) {
+        return new MachineLinkService(runtime.manager(), runtime::markDirty, runtime.nodeManager(),
+                runtime.machineRunner(), runtime.observations(), runtime.server());
+    }
+
+    /**
+     * 装配机器整组 toggle 服务。
+     *
+     * @param runtime 运行时
+     * @return 服务实例
+     */
+    private static MachineToggleService machineToggle(FactoryRuntime runtime) {
+        return new MachineToggleService(runtime.manager(), runtime::markDirty,
+                runtime.observations(), machineLinks(runtime));
+    }
+
+    /**
+     * 装配工厂生命周期服务。
+     *
+     * @param runtime 运行时
+     * @return 服务实例
+     */
+    private static FactoryLifecycleService lifecycle(FactoryRuntime runtime) {
+        return new FactoryLifecycleService(runtime.manager(), runtime::markDirty,
+                runtime.nodeManager(), machineLinks(runtime), runtime.storageResolver(),
+                runtime.observations(), runtime::takeNextSeq);
+    }
+
+
+
 
     // ------------------------------------------------------------------
     // ---- 04. 占用门禁（LinkGate / GateFilter） ----
@@ -666,200 +415,6 @@ public final class FactoryService {
         return 1;
     }
 
-    // ------------------------------------------------------------------
-    // ---- 07. 绑定杖：机器 toggle（toggleMachines / connectMachineTargets / disconnectMachineTargets） ----
-    // 负责绑定杖左键的整组开关与逐台执行；由 FactoryWandActionC2S 的 MACHINE_TOGGLE 调用。
-    // ------------------------------------------------------------------
-
-    /**
-     * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
-     *
-     * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连，
-     * 就补齐/取回整组。这样 Ctrl 连点两次不会出现一半连、一半断。</p>
-     *
-     * @param player 发起请求的玩家
-     * @param pos    目标机器
-     * @param chain  是否连锁
-     * @return 变更的台数
-     */
-    public static int toggleMachines(ServerPlayer player, BlockPos pos, boolean chain) {
-        Factory factory = ownedFactory(player);
-        if (factory == null) {
-            return 0;
-        }
-        ServerLevel level = player.serverLevel();
-        if (!level.isLoaded(pos)) {
-            barErr(player, "目标区块未加载");
-            return 0;
-        }
-        // 轻检查：没有方块实体的不可能是机器。泥土、石头死在这一步，
-        // 省掉后面贵的能力探测；注意这只是“跳过贵检查”，结论还是贵检查说了算。
-        if (level.getBlockEntity(pos) == null) {
-            barErr(player, "该方块不是可连接的机器");
-            return 0;
-        }
-        // 本次操作现算一张占用表：先扫一遍档案，之后每个目标 O(1) 查表。
-        // 释放只允许「自己的 + 同角色」；别的工厂、自己另一个角色都拒绝。
-        LinkGate gate = LinkGate.of(FactoryRuntime.get().manager());
-        LinkGate.ClaimCheck origin =
-                gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
-        if (origin.blocked()) {
-            barErr(player, gateMessage(origin));
-            return 0;
-        }
-        if (!FactoryLinkFinder.isMachine(level, pos)) {
-            barErr(player, "该方块不是可连接的机器");
-            return 0;
-        }
-        List<BlockPos> found = chain
-                ? FactoryLinkFinder.machines(level, pos)
-                : List.of(pos);
-        if (found.isEmpty()) {
-            barErr(player, "附近没有可连接的机器");
-            return 0;
-        }
-        // BFS 的半径与数量上限按筛选前计算；这里只按占用表分流，过滤后不补位、不重扫。
-        GateFilter filter = filterClaimed(gate, factory, LinkRole.MACHINE, level, found);
-        List<BlockPos> targets = filter.open();
-        if (targets.isEmpty()) {
-            barErr(player, filter.blockedRole() > 0 && filter.blockedOther() == 0
-                    ? "这些位置已经是你的仓库，先解除" : "这组机器都被别的工厂占了");
-            return 0;
-        }
-        boolean allConnected = true;
-        for (BlockPos targetPos : targets) {
-            if (factory.config().machines().byPosition(level.dimension(), targetPos) == null) {
-                allConnected = false;
-                break;
-            }
-        }
-        return allConnected
-                ? disconnectMachineTargets(player, factory, level, targets, chain,
-                        filter.blockedOther(), filter.blockedRole())
-                : connectMachineTargets(player, factory, level, targets, chain,
-                        filter.blockedOther(), filter.blockedRole());
-    }
-
-    private static int connectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
-            int blockedRole) {
-        int added = 0;
-        int skipped = 0;
-        int full = 0;
-        for (BlockPos targetPos : targets) {
-            Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
-            if (existing != null) {
-                skipped++;
-                continue;
-            }
-            MachineRef target = MachineRef.of(level.dimension(), targetPos);
-            switch (factory.config().machines().add(target)) {
-                case ADDED -> {
-                    refreshObservation(target);
-                    added++;
-                }
-                case DUPLICATE -> skipped++;
-                case FULL -> full++;
-            }
-        }
-        if (added > 0) {
-            markDirty();
-        }
-        if (!chain) {
-            String label = machineLabel(level, targets.getFirst());
-            if (added > 0) {
-                barOk(player, "已连接机器 " + label);
-            } else if (full > 0) {
-                barErr(player, "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）");
-            } else {
-                barErr(player, "该机器已被连接 " + label);
-            }
-            return added;
-        }
-        if (added == 0) {
-            barErr(player, full > 0
-                    ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台），未新增机器"
-                    : "没有新增机器（都已连接）");
-            return 0;
-        }
-        String text = "已连接 " + added + " 台";
-        if (skipped > 0) {
-            text += "，跳过 " + skipped + " 台";
-        }
-        if (full > 0) {
-            text += "，机器库已满跳过 " + full + " 台";
-        }
-        if (blockedOther > 0) {
-            text += "，被别家占用 " + blockedOther + " 台";
-        }
-        if (blockedRole > 0) {
-            text += "，角色冲突 " + blockedRole + " 台";
-        }
-        barOk(player, text);
-        return added;
-    }
-
-    private static int disconnectMachineTargets(ServerPlayer player, Factory factory,
-            ServerLevel level, List<BlockPos> targets, boolean chain, int blockedOther,
-            int blockedRole) {
-        int deleted = 0;
-        int skippedRules = 0;
-        int skipped = 0;
-        int returned = 0;
-        for (BlockPos targetPos : targets) {
-            Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
-            if (machine == null) {
-                skipped++;
-                continue;
-            }
-            DeleteOutcome outcome =
-                    removeMachine(factory, machine, DeletePolicy.SKIP_WITH_RULES, player);
-            if (!outcome.deleted()) {
-                // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
-                skippedRules++;
-                continue;
-            }
-            returned += outcome.patterns();
-            deleted++;
-        }
-        if (deleted > 0) {
-            markDirty();
-        }
-        if (!chain) {
-            String label = machineLabel(level, targets.getFirst());
-            if (deleted > 0) {
-                barOk(player, "已删除链接 " + label + patternSuffix(returned));
-            } else if (skippedRules > 0) {
-                barErr(player, "该机器仍有 IO 配置，请在机器库界面删除 " + label);
-            } else {
-                barErr(player, "没有可删除的链接");
-            }
-            return deleted;
-        }
-        if (deleted == 0) {
-            if (skippedRules > 0) {
-                barErr(player, "跳过了 " + skippedRules + " 台有 IO 配置的机器，请在机器库界面删除");
-            } else {
-                barErr(player, "没有可删除的链接");
-            }
-            return 0;
-        }
-        String text = "已删除 " + deleted + " 台" + patternSuffix(returned);
-        if (skippedRules > 0) {
-            text += "，跳过 " + skippedRules + " 台有 IO 配置的机器（请在机器库界面删除）";
-        }
-        if (skipped > 0) {
-            text += "，跳过 " + skipped + " 台";
-        }
-        if (blockedOther > 0) {
-            text += "，被别家占用 " + blockedOther + " 台";
-        }
-        if (blockedRole > 0) {
-            text += "，角色冲突 " + blockedRole + " 台";
-        }
-        barOk(player, text);
-        return deleted;
-    }
 
     // ------------------------------------------------------------------
     // ---- 08. 绑定杖：仓库 toggle（toggleStorage / toggleMeStorage / toggleContainerStorage） ----
@@ -1538,8 +1093,8 @@ public final class FactoryService {
     }
 
     // ------------------------------------------------------------------
-    // ---- 14. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage / nextId） ----
-    // 负责取当前工厂、解析在线仓库、刷新观测、唤醒机器与生成工厂 id；本文件所有公开方法共用。
+    // ---- 14. 内部工具：工厂与仓库解析（ownedFactory / requireOnlineStorage） ----
+    // 负责取当前工厂与解析在线仓库；本文件所有公开方法共用。
     // ------------------------------------------------------------------
 
     /**
@@ -1625,113 +1180,12 @@ public final class FactoryService {
         return runtime == null ? null : runtime.storageResolver();
     }
 
-    /**
-     * 立刻刷新一台机器的观测（接入、取回之后调，别让 {@code info} 看到 UNKNOWN）。
-     *
-     * @param target 机器
-     * @return 刷新后的观测；观测服务未就绪时为 {@code null}
-     */
-    @Nullable
-    private static Observation refreshObservation(MachineRef target) {
-        ObservationService observations = observations();
-        return observations == null ? null : observations.refresh(target.blockKey());
-    }
-
-    /**
-     * 生成一个工厂 id。
-     *
-     * <p>用「拥有者 + 存档自增序号」做确定性 UUID：同一玩家第 N 个工厂的 id 永远一样，
-     * 序号单调递增保证不冲突；外面再套一层查重，防御存档被手改过。</p>
-     *
-     * @param runtime 运行时
-     * @param owner   拥有者 uuid
-     * @return 可用的工厂 id
-     */
-    private static UUID nextId(FactoryRuntime runtime, UUID owner) {
-        UUID id;
-        do {
-            long seq = runtime.takeNextSeq();
-            id = UUID.nameUUIDFromBytes((owner + ":" + seq).getBytes(StandardCharsets.UTF_8));
-        } while (runtime.manager().byId(id).isPresent());
-        return id;
-    }
 
     // ------------------------------------------------------------------
     // ---- 15. 内部工具：背包、文案与回执（countInInventory / msg / markDirty） ----
     // 负责背包装卸、资源与物品文案、聊天与动作栏回执；markDirty 是本文件唯一的档案落盘入口。
     // ------------------------------------------------------------------
 
-    /**
-     * 把一台机器的样板退回玩家。
-     *
-     * <p>样板是玩家的东西，删机器不能吞掉：优先塞接收者（没有接收者就找工厂拥有者）的背包，
-     * 塞不下或不在线就掉在机器坐标；机器所在区块没加载时退回接收者脚下，再不行落到主世界
-     * 出生点，保证不丢。</p>
-     *
-     * @param factory  工厂
-     * @param machine  要被删掉的机器
-     * @param receiver 优先接收者；{@code null} 表示用工厂拥有者
-     * @return 退回去的样板数
-     */
-    private static int returnPatterns(Factory factory, Machine machine,
-            @Nullable ServerPlayer receiver) {
-        List<ItemStack> patterns = machine.provider().takePatterns();
-        if (patterns.isEmpty()) {
-            return 0;
-        }
-        ServerPlayer target = receiver != null ? receiver : onlineOwner(factory);
-        for (ItemStack stack : patterns) {
-            if (target != null) {
-                target.getInventory().add(stack);
-            }
-            if (!stack.isEmpty()) {
-                dropPattern(machine, stack, target);
-            }
-        }
-        return patterns.size();
-    }
-
-    /**
-     * 掉一块样板：机器坐标优先，其次接收者脚下，最后主世界出生点。
-     *
-     * @param machine 机器
-     * @param stack   样板（可能是背包塞不下的剩余）
-     * @param target  在线玩家，可为 {@code null}
-     */
-    private static void dropPattern(Machine machine, ItemStack stack,
-            @Nullable ServerPlayer target) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return;
-        }
-        MinecraftServer server = runtime.server();
-        ServerLevel level = server.getLevel(machine.ref().dimension());
-        if (level != null && level.isLoaded(machine.ref().pos())) {
-            Block.popResource(level, machine.ref().pos(), stack);
-            return;
-        }
-        if (target != null) {
-            Block.popResource(target.serverLevel(), target.blockPosition(), stack);
-            return;
-        }
-        ServerLevel overworld = server.overworld();
-        Block.popResource(overworld, overworld.getSharedSpawnPos(), stack);
-    }
-
-    /** 工厂拥有者；不在线时为 {@code null}。 */
-    @Nullable
-    private static ServerPlayer onlineOwner(Factory factory) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return null;
-        }
-        return runtime.server().getPlayerList().getPlayer(factory.config().owner());
-    }
-
-    /** 回执里的「退回样板」尾巴；没有退回时为空白。 */
-    private static String patternSuffix(int returned) {
-        return returned > 0 ? "，退回 " + returned + " 块样板" : "";
-    }
 
     /** 背包里与样本同物品的总数。 */
     private static int countInInventory(ServerPlayer player, ItemStack template) {

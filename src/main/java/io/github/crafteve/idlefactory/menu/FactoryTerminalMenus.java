@@ -15,6 +15,7 @@ import appeng.menu.locator.MenuLocators;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
@@ -77,6 +78,34 @@ public final class FactoryTerminalMenus {
             openLegacy(player);
         }
         return true;
+    }
+
+    /**
+     * 打开默认工厂界面（{@code /idf gui}、快捷键与请求包都走这里）。
+     *
+     * <p>先保证玩家有工厂，再按当前模式选界面；自动建厂失败不挡打开，界面仍显示未创建。</p>
+     *
+     * @param player 玩家
+     * @return 是否已请求打开界面
+     */
+    public static boolean openDefault(ServerPlayer player) {
+        FactoryService.ensureFactory(player);
+        return open(player, null);
+    }
+
+    /**
+     * 手持终端右键打开界面。
+     *
+     * <p>和 {@link #openDefault(ServerPlayer)} 的区别只有定位器：右键知道是哪只手的物品，
+     * 菜单里可以直接锁定这个槽位；指令与快捷键只能扫背包。</p>
+     *
+     * @param player 玩家
+     * @param hand   使用的手
+     * @return 是否已请求打开界面
+     */
+    public static boolean openFromHand(ServerPlayer player, InteractionHand hand) {
+        FactoryService.ensureFactory(player);
+        return open(player, hand);
     }
 
     /**

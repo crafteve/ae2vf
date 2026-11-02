@@ -6,8 +6,8 @@ import appeng.api.implementations.menuobjects.IMenuItem;
 import appeng.api.implementations.menuobjects.ItemMenuHost;
 import appeng.menu.locator.ItemMenuHostLocator;
 
-import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.menu.FactoryTerminalHost;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 import io.github.crafteve.idlefactory.registry.ModItems;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -38,7 +38,7 @@ public class FactoryTerminalItem extends Item implements IMenuItem {
      * 右键打开工厂界面。
      *
      * <p>只在服务端真正打开菜单；客户端返回成功以播放手部动作。这样和 {@code /idf gui}
-     * 共用 {@link FactoryService}，不会出现两条打开逻辑。</p>
+     * 共用 {@link FactoryTerminalMenus}，不会出现两条打开逻辑。</p>
      *
      * @param level  当前世界
      * @param player 使用物品的玩家
@@ -49,7 +49,7 @@ public class FactoryTerminalItem extends Item implements IMenuItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            FactoryService.openTerminal(serverPlayer, hand);
+            FactoryTerminalMenus.openFromHand(serverPlayer, hand);
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }

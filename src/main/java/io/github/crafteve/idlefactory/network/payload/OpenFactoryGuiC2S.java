@@ -1,8 +1,8 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -15,7 +15,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 客户端请求用工厂终端打开界面。
  *
  * <p>空负载；服务端不信任客户端，收到后重新检查玩家身上是否带终端。快捷键和右键最终
- * 都走 {@link FactoryService#openGui(ServerPlayer)}。</p>
+ * 都走 {@link FactoryTerminalMenus#openDefault(ServerPlayer)}。</p>
  */
 public record OpenFactoryGuiC2S() implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:open_factory_gui}。 */
@@ -42,7 +42,7 @@ public record OpenFactoryGuiC2S() implements CustomPacketPayload {
         context.enqueueWork(() -> {
             if (context.player() instanceof ServerPlayer player
                     && FactoryTerminalItem.isCarriedBy(player)) {
-                FactoryService.openGui(player);
+                FactoryTerminalMenus.openDefault(player);
             }
         });
     }

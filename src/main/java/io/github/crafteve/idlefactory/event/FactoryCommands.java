@@ -22,6 +22,7 @@ import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
 
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -125,7 +126,10 @@ public final class FactoryCommands {
     private static LiteralArgumentBuilder<CommandSourceStack> idleFactory(RegisterCommandsEvent event) {
         return Commands.literal("idlefactory")
                 .then(Commands.literal("gui")
-                        .executes(context -> FactoryService.openGui(player(context))))
+                        .executes(context -> {
+                            FactoryTerminalMenus.openDefault(player(context));
+                            return 1;
+                        }))
                 .then(Commands.literal("create")
                         .executes(context -> FactoryService.create(player(context))))
                 .then(Commands.literal("delete")
