@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
@@ -64,6 +66,16 @@ public final class Factory {
      */
     void setStorageMode(StorageMode mode) {
         this.config.setStorageMode(mode);
+    }
+
+    /**
+     * 读档用：把已经带规则的机器灌进机器库，不触发落盘。
+     *
+     * @param machine 机器
+     * @return 加入结果；id 重复或库满时不是 {@code ADDED}
+     */
+    MachineLibrary.AddResult restoreMachine(Machine machine) {
+        return this.config.library().add(machine);
     }
 
     /**

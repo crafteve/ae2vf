@@ -5,6 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibraryView;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
@@ -81,8 +82,24 @@ public final class FactoryConfig {
         }
     }
 
-    /** 机器库。 */
-    public MachineLibrary machines() {
+    /**
+     * 机器库的只读视图。
+     *
+     * <p>对外只暴露读方法：写入口是 {@code MachineLibraryService}（运行时）与
+     * {@code Factory#restoreMachine}（读档），调用方拿不到可变句柄。</p>
+     *
+     * @return 机器库视图
+     */
+    public MachineLibraryView machines() {
+        return this.machines;
+    }
+
+    /**
+     * 机器库的可变句柄；只允许工厂包内的写入口与读档路径使用。
+     *
+     * @return 机器库
+     */
+    MachineLibrary library() {
         return this.machines;
     }
 }

@@ -26,22 +26,22 @@ import net.minecraft.server.level.ServerPlayer;
  */
 final class MachineToggleService {
     private final FactoryManager manager;
-    private final Runnable publish;
     @Nullable
     private final ObservationService observations;
+    private final MachineLibraryService machineLibrary;
     private final MachineLinkService machineLinks;
 
     /**
      * @param manager       工厂档案柜
-     * @param publish       档案变更的唯一出口
      * @param observations  观测服务；服务端未就绪时为 {@code null}
+     * @param machineLibrary 机器库写入口（整组修改只落盘一次）
      * @param machineLinks  机器接线服务，提供删除出口
      */
-    MachineToggleService(FactoryManager manager, Runnable publish,
-            @Nullable ObservationService observations, MachineLinkService machineLinks) {
+    MachineToggleService(FactoryManager manager, @Nullable ObservationService observations,
+            MachineLibraryService machineLibrary, MachineLinkService machineLinks) {
         this.manager = manager;
-        this.publish = publish;
         this.observations = observations;
+        this.machineLibrary = machineLibrary;
         this.machineLinks = machineLinks;
     }
 
@@ -120,6 +120,7 @@ final class MachineToggleService {
         int added = 0;
         int skipped = 0;
         int full = 0;
+        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
         for (BlockPos targetPos : targets) {
             Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (existing != null) {
@@ -127,7 +128,7 @@ final class MachineToggleService {
                 continue;
             }
             MachineRef target = MachineRef.of(level.dimension(), targetPos);
-            switch (factory.config().machines().add(target)) {
+            switch (batch.add(target)) {
                 case ADDED -> {
                     refreshObservation(target);
                     added++;
@@ -136,9 +137,7 @@ final class MachineToggleService {
                 case FULL -> full++;
             }
         }
-        if (added > 0) {
-            this.publish.run();
-        }
+        batch.close();
         if (!chain) {
             String label = FactoryMessages.machineLabel(level, targets.getFirst());
             if (added > 0) {
@@ -180,6 +179,7 @@ final class MachineToggleService {
         int skippedRules = 0;
         int skipped = 0;
         int returned = 0;
+        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
         for (BlockPos targetPos : targets) {
             Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (machine == null) {
@@ -187,7 +187,7 @@ final class MachineToggleService {
                 continue;
             }
             MachineLinkService.DeleteOutcome outcome = this.machineLinks.removeMachine(
-                    factory, machine, MachineLinkService.DeletePolicy.SKIP_WITH_RULES, player);
+                    factory, machine, MachineLinkService.DeletePolicy.SKIP_WITH_RULES, player, batch);
             if (!outcome.deleted()) {
                 // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
                 skippedRules++;
@@ -196,9 +196,7 @@ final class MachineToggleService {
             returned += outcome.patterns();
             deleted++;
         }
-        if (deleted > 0) {
-            this.publish.run();
-        }
+        batch.close();
         if (!chain) {
             String label = FactoryMessages.machineLabel(level, targets.getFirst());
             if (deleted > 0) {

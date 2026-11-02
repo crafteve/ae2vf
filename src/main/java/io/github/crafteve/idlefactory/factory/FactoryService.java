@@ -200,14 +200,25 @@ public final class FactoryService {
     }
 
     /**
+     * 装配机器库写入口。
+     *
+     * @param runtime 运行时
+     * @return 服务实例
+     */
+    private static MachineLibraryService machineLibrary(FactoryRuntime runtime) {
+        return new MachineLibraryService(runtime::markDirty);
+    }
+
+    /**
      * 装配机器接线服务。
      *
      * @param runtime 运行时
      * @return 服务实例
      */
     private static MachineLinkService machineLinks(FactoryRuntime runtime) {
-        return new MachineLinkService(runtime.manager(), runtime::markDirty, runtime.nodeManager(),
-                runtime.machineRunner(), runtime.observations(), runtime.server());
+        return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
+                runtime.machineRunner(), machineLibrary(runtime), runtime.observations(),
+                runtime.server());
     }
 
     /**
@@ -217,8 +228,8 @@ public final class FactoryService {
      * @return 服务实例
      */
     private static MachineToggleService machineToggle(FactoryRuntime runtime) {
-        return new MachineToggleService(runtime.manager(), runtime::markDirty,
-                runtime.observations(), machineLinks(runtime));
+        return new MachineToggleService(runtime.manager(), runtime.observations(),
+                machineLibrary(runtime), machineLinks(runtime));
     }
 
     /**

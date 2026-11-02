@@ -41,15 +41,16 @@ public final class FactoryManager {
         for (FactoryRecord record : records) {
             FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
                     record.anchor());
+            Factory factory = new Factory(record.id(), config);
             for (Machine machine : record.machines()) {
-                MachineLibrary.AddResult added = config.machines().add(machine);
+                MachineLibrary.AddResult added = factory.restoreMachine(machine);
                 if (added != MachineLibrary.AddResult.ADDED) {
                     IdleFactory.LOGGER.warn(
                             "Idle Factory: 载入工厂 {} 时机器 {} 未登记（{}），保留先登记的那台",
                             record.id(), machine.ref().shortId(), addResultText(added));
                 }
             }
-            if (!add(new Factory(record.id(), config))) {
+            if (!add(factory)) {
                 IdleFactory.LOGGER.warn(
                         "Idle Factory: 载入工厂 {}（拥有者 {}）失败：id 或拥有者与先登记的记录冲突，本条已忽略",
                         record.id(), record.owner());

@@ -19,7 +19,7 @@ import net.minecraft.world.level.Level;
  * <p>方块没了不会把机器移出机器库，只由运行时 {@code machineMissing} 标记；只有玩家显式删除
  * 才会真正移除。</p>
  */
-public final class MachineLibrary {
+public final class MachineLibrary implements MachineLibraryView {
     /**
      * 机器库容量上限：一台工厂最多接管多少台机器。
      *

@@ -37,28 +37,28 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  */
 final class MachineLinkService {
     private final FactoryManager manager;
-    private final Runnable publish;
     private final NodeManager nodeManager;
     private final MachineRunner machineRunner;
+    private final MachineLibraryService machineLibrary;
     @Nullable
     private final ObservationService observations;
     private final MinecraftServer server;
 
     /**
      * @param manager       工厂档案柜
-     * @param publish       档案变更的唯一出口（落盘 + 索引重建 + 节点对账请求）
      * @param nodeManager   虚拟节点管理器
      * @param machineRunner 执行器
+     * @param machineLibrary 机器库写入口（落盘由它统一触发）
      * @param observations  观测服务；服务端未就绪时为 {@code null}
      * @param server        服务端
      */
-    MachineLinkService(FactoryManager manager, Runnable publish, NodeManager nodeManager,
-            MachineRunner machineRunner, @Nullable ObservationService observations,
-            MinecraftServer server) {
+    MachineLinkService(FactoryManager manager, NodeManager nodeManager,
+            MachineRunner machineRunner, MachineLibraryService machineLibrary,
+            @Nullable ObservationService observations, MinecraftServer server) {
         this.manager = manager;
-        this.publish = publish;
         this.nodeManager = nodeManager;
         this.machineRunner = machineRunner;
+        this.machineLibrary = machineLibrary;
         this.observations = observations;
         this.server = server;
     }
@@ -114,7 +114,8 @@ final class MachineLinkService {
             FactoryMessages.err(player, "这台机器已经接入过了：" + existing.get().ref().shortId());
             return 0;
         }
-        MachineLibrary.AddResult added = factory.config().machines().add(target);
+        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
+        MachineLibrary.AddResult added = batch.add(target);
         if (added != MachineLibrary.AddResult.ADDED) {
             FactoryMessages.err(player, added == MachineLibrary.AddResult.FULL
                     ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）"
@@ -122,7 +123,7 @@ final class MachineLinkService {
             return 0;
         }
         refreshObservation(target);
-        this.publish.run();
+        batch.close();
         FactoryMessages.ok(player, "已接入机器：" + target.shortId() + " @ " + level.dimension().location()
                 + " " + pos.toShortString() + " [" + presence.describe() + "]");
         return 1;
@@ -237,17 +238,18 @@ final class MachineLinkService {
      * 一次做完：清失联标记、退样板、移出机器库、拆虚拟节点、清执行器瞬态。执行器瞬态必须清：
      * {@code RunnerState} 按机器 id 存睡眠与面路由，不删的话同 id 重连会继承旧睡眠。</p>
      *
-     * <p>本方法不调 {@code publish}：发布是整批操作的出口，连锁删除逐台调用会变成 N 次存盘。
-     * 由调用点在整批删除成功后各调一次。</p>
+     * <p>本方法不落盘：批量句柄由调用方传入，整批删除结束后由调用方 {@code close()} 一次，
+     * 连锁删除才不会变成 N 次存盘。</p>
      *
      * @param factory  工厂
      * @param machine  机器
      * @param policy   删除策略
      * @param receiver 样板优先接收者；{@code null} 表示找工厂拥有者
+     * @param batch    本次操作的机器库批量句柄
      * @return 结果；{@code deleted=false} 表示策略要求跳过
      */
     DeleteOutcome removeMachine(Factory factory, Machine machine,
-            DeletePolicy policy, @Nullable ServerPlayer receiver) {
+            DeletePolicy policy, @Nullable ServerPlayer receiver, MachineLibraryService.Batch batch) {
         int rules = machine.ruleCount();
         boolean blocked = switch (policy) {
             case PROMPT, SKIP_WITH_RULES -> rules > 0;
@@ -258,7 +260,7 @@ final class MachineLinkService {
         }
         factory.live().clearMachineMissing(machine.id());
         int returned = returnPatterns(factory, machine, receiver);
-        factory.config().machines().remove(machine.id());
+        batch.remove(machine.id());
         // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
         this.nodeManager.removeMachine(machine.id());
         // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
@@ -294,13 +296,14 @@ final class MachineLinkService {
      */
     private int reportDelete(ServerPlayer player, Factory factory, Machine target,
             DeletePolicy policy, String confirmCommand) {
-        DeleteOutcome outcome = removeMachine(factory, target, policy, null);
+        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
+        DeleteOutcome outcome = removeMachine(factory, target, policy, null, batch);
         if (!outcome.deleted()) {
             FactoryMessages.warn(player, "机器 [" + target.ref().shortId() + "] 还有 " + outcome.rules()
                     + " 条 IO 配置，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
             return 0;
         }
-        this.publish.run();
+        batch.close();
         FactoryMessages.ok(player, deletedText(target, outcome));
         return 1;
     }
@@ -320,8 +323,9 @@ final class MachineLinkService {
         if (target == null) {
             return MachineActions.Result.err("找不到机器");
         }
-        DeleteOutcome outcome = removeMachine(factory, target, DeletePolicy.CONFIRMED, null);
-        this.publish.run();
+        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
+        DeleteOutcome outcome = removeMachine(factory, target, DeletePolicy.CONFIRMED, null, batch);
+        batch.close();
         return MachineActions.Result.ok(deletedText(target, outcome));
     }
 
