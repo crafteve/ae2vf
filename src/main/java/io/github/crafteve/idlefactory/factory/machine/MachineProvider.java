@@ -350,7 +350,9 @@ public final class MachineProvider {
     }
 
     /**
-     * 按用量调整容量：全满加一组，空出一整组就减一组。
+     * 按用量调整容量：全满加一组，空出超过一组才减一组。
+     *
+     * <p>「刚好空一组」是刚扩容完的正常状态，不能缩，否则会扩→缩→扩死循环。</p>
      *
      * <p>减容量之前先 {@link #compact()} 把样板压到最前面：玩家把样板放在第二排、第一排
      * 空着时，缩完容量样板会原封不动挪到第一排，一个都不会被裁掉。缩后的容量取
@@ -363,7 +365,8 @@ public final class MachineProvider {
             this.resize(Math.min(MAX_CAPACITY, this.capacity + CAPACITY_STEP));
             return;
         }
-        if (free >= CAPACITY_STEP && this.capacity > DEFAULT_CAPACITY) {
+        if (free > CAPACITY_STEP && this.capacity > DEFAULT_CAPACITY) {
+            // 空出超过一组才缩：刚好空 9 是「刚扩容完」的正常状态，再缩会扩缩死循环。
             this.compact();
             int groups = Math.max(1, (used + CAPACITY_STEP - 1) / CAPACITY_STEP);
             int next = Math.max(DEFAULT_CAPACITY, groups * CAPACITY_STEP);

@@ -46,6 +46,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private static final int SECTION_GAP = 3;
     /** 9 列槽位的总宽。 */
     private static final int GRID_WIDTH = COLUMNS * CELL;
+    /** 机器图标缩放：和被动 IO 机器行一致，12×12。 */
+    private static final float MACHINE_ICON_SCALE = 0.75F;
     /** 反馈停留时间（毫秒）。 */
     private static final long FEEDBACK_MILLIS = 3000L;
 
@@ -171,8 +173,12 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     private void drawHeader(GuiGraphics graphics, FactoryTerminalTargetsS2C.Entry entry, int x,
             int y, int right) {
         if (!entry.icon().isEmpty()) {
-            // 16×16 图标居在 18×18 的行高里，左边缘和第一列槽位对齐。
-            graphics.renderItem(entry.icon(), x + 1, y + 1);
+            // 和被动 IO 的机器行同尺寸：12×12 居在 18×18 的行高里。
+            graphics.pose().pushPose();
+            graphics.pose().translate(x + 3, y + 3, 0);
+            graphics.pose().scale(MACHINE_ICON_SCALE, MACHINE_ICON_SCALE, 1.0F);
+            graphics.renderItem(entry.icon(), 0, 0);
+            graphics.pose().popPose();
         }
         String count = entry.used() + "/" + entry.capacity();
         int countWidth = this.font.width(count);
