@@ -1,61 +1,48 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
-import io.github.crafteve.idlefactory.menu.FactoryTerminalTargetKind;
-import io.github.crafteve.idlefactory.menu.FactoryTerminalTargets;
-import io.github.crafteve.idlefactory.menu.FactoryPatternSlotView;
-import io.github.crafteve.idlefactory.factory.machine.MachineMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryMachineModeC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSelectC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
 import net.minecraft.Util;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 主动样板面板：目标列表、选中目标的模式 / 翻页，以及 9 格样板槽。
+ * 主动样板面板：照着 AE2 样板管理终端的列表做——一台机器一段，段头是机器描述行，
+ * 下面按样板池容量铺 9 列 × n 行样板槽；整块可滚动。
  *
- * <p>样板槽不是自己画的：它们是菜单里的真实 {@code AppEngSlot}，屏幕按本面板给出的
- * 格子坐标摆位。面板只负责画槽底、目标列表与翻页控件，物品交互全部交给 AE2 的槽位。</p>
+ * <p>不分区：没有「目标列表 / 详情 / 翻页」这些层，列表本身就是全部内容。槽位是自绘的
+ * （格子 + 图标），点击与拖拽由面板自己按「机器 + 槽位下标」换算成动作，不挂菜单槽位。</p>
  */
 public final class FactoryPatternPanel extends FactoryTerminalPanel {
-    /** 目标行高。 */
-    private static final int TARGET_ROW = 16;
-    /** 样板格边长。 */
+    /** 机器描述行高。 */
+    private static final int HEADER_ROW = 16;
+    /** 槽位格边长：16 格 + 2 间距。 */
     private static final int CELL = 18;
-    /** 页控件宽度。 */
-    private static final int PAGE_WIDTH = 54;
-    /** 模式按钮宽度。 */
-    private static final int MODE_WIDTH = 58;
+    /** 每行槽位数。 */
+    private static final int COLUMNS = 9;
+    /** 段与段之间的间距。 */
+    private static final int SECTION_GAP = 3;
     /** 反馈停留时间（毫秒）。 */
     private static final long FEEDBACK_MILLIS = 3000L;
-    /** AE2 普通按钮贴图。 */
-    private static final ResourceLocation BUTTON =
-            ResourceLocation.fromNamespaceAndPath("ae2", "button");
-    /** 按钮文字颜色：AE2 按钮上的亮色字，不带阴影。 */
-    private static final int BUTTON_TEXT = 0xFFF2F2F2;
 
     private List<FactoryTerminalTargetsS2C.Entry> targets = List.of();
-    @Nullable
-    private FactoryTerminalTargetS2C detail;
-    private String selectedKey = "";
-    private int page;
-    private int firstRow;
+    private int scroll;
     @Nullable
     private String feedback;
     private boolean feedbackOk = true;
@@ -74,32 +61,21 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     }
 
     @Override
-    protected String subtitle() {
-        return "选择目标后管理样板与模式";
-    }
-
-    @Override
     protected void requestSnapshot() {
-        // 样板视图复用机器表请求：服务端会顺手回主动目标列表。
+        // 样板视图复用机器表请求：服务端会顺手回主动目标列表（带样板槽内容）。
         PacketDistributor.sendToServer(new FactoryTableRequestC2S(this.containerId));
     }
 
     @Override
     public void acceptTargets(FactoryTerminalTargetsS2C payload) {
         this.targets = payload.targets();
-        if (!this.selectedKey.isEmpty() && this.targetRow(this.selectedKey) < 0) {
-            this.selectedKey = "";
-            this.detail = null;
-        }
-        this.firstRow = Mth.clamp(this.firstRow, 0,
-                Math.max(0, this.targets.size() - this.targetRows()));
+        this.scroll = Mth.clamp(this.scroll, 0,
+                Math.max(0, this.contentHeight() - this.viewHeight()));
     }
 
     @Override
     public void acceptTargetDetail(FactoryTerminalTargetS2C payload) {
-        this.detail = payload;
-        this.selectedKey = payload.key();
-        this.page = payload.page();
+        // 列表直接带样板槽内容，详情包不再参与渲染。
     }
 
     @Override
@@ -113,15 +89,12 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
     public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY) {
         super.renderBackground(graphics, mouseX, mouseY);
         this.drawWorkArea(graphics);
-        this.renderTargets(graphics, mouseX, mouseY);
-        this.renderDetail(graphics, mouseX, mouseY);
-        this.renderSlots(graphics);
+        this.renderList(graphics, mouseX, mouseY);
         this.renderFeedback(graphics);
     }
 
     /**
-     * 深色工作区：和被动 IO 面板同一套底（深色底 + 1px 白边 + 2px 内阴影），
-     * 目标列表与样板槽都画在这块底上。
+     * 深色工作区：和被动 IO 面板同一套底。
      *
      * @param graphics 绘制器
      */
@@ -129,49 +102,123 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         int x = this.contentLeft() - 2;
         int y = this.listTop() - 4;
         int width = this.contentWidth() + 4;
-        int height = this.bottom() - 14 - y;
+        int height = this.listBottom() - this.listTop() + 8;
         if (width <= 0 || height <= 0) {
             return;
         }
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_BG, x, y, width, height);
-        // 1px 白边框；四边分开画，避免整块刷白。
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, width, 1);
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y + height - 1,
                 width, 1);
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, 1, height);
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 1, y, 1,
                 height);
-        // 顶部内阴影。
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_SHADOW, x + 1, y + 1,
                 width - 2, FactoryTerminalGeometry.WORK_SHADOW_HEIGHT);
+    }
+
+    /**
+     * 逐段画机器列表；段按滚动量上移，超出工作区的段整段跳过。
+     *
+     * @param graphics 绘制器
+     * @param mouseX   鼠标 x
+     * @param mouseY   鼠标 y
+     */
+    private void renderList(GuiGraphics graphics, int mouseX, int mouseY) {
+        int left = this.contentLeft();
+        int right = left + this.contentWidth();
+        int viewTop = this.listTop();
+        int viewBottom = this.listBottom();
+        int y = viewTop - this.scroll;
+        for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
+            int rows = rowsOf(entry);
+            int sectionHeight = HEADER_ROW + rows * CELL + SECTION_GAP;
+            if (y + sectionHeight < viewTop || y > viewBottom) {
+                y += sectionHeight;
+                continue;
+            }
+            this.drawHeader(graphics, entry, left, y, right);
+            this.drawPatterns(graphics, entry, left, y + HEADER_ROW, viewTop, viewBottom,
+                    mouseX, mouseY);
+            y += sectionHeight;
+        }
+        if (this.targets.isEmpty()) {
+            graphics.drawString(this.font, "没有可用机器", left + 2, viewTop + 2,
+                    this.theme.textDim(), false);
+        }
+    }
+
+    /**
+     * 段头：机器图标 + 名字 + 用量。
+     *
+     * @param graphics 绘制器
+     * @param entry    目标
+     * @param x        左边界
+     * @param y        上边界
+     * @param right    右边界
+     */
+    private void drawHeader(GuiGraphics graphics, FactoryTerminalTargetsS2C.Entry entry, int x,
+            int y, int right) {
+        if (!entry.icon().isEmpty()) {
+            graphics.renderItem(entry.icon(), x, y);
+        }
+        String count = entry.used() + "/" + entry.capacity();
+        int countWidth = this.font.width(count);
+        graphics.drawString(this.font, this.trim(entry.name(), right - x - 20 - countWidth - 4),
+                x + 18, y + 4, this.theme.textPrimary(), false);
+        graphics.drawString(this.font, count, right - countWidth - 2, y + 4,
+                this.theme.textDim(), false);
+    }
+
+    /**
+     * 段内样板槽：9 列 × n 行，格子底 + 样板图标；只画可见行。
+     *
+     * @param graphics   绘制器
+     * @param entry      目标
+     * @param left       左边界
+     * @param top        第一行槽位的上边界
+     * @param viewTop    工作区上边界
+     * @param viewBottom 工作区下边界
+     * @param mouseX     鼠标 x
+     * @param mouseY     鼠标 y
+     */
+    private void drawPatterns(GuiGraphics graphics, FactoryTerminalTargetsS2C.Entry entry,
+            int left, int top, int viewTop, int viewBottom, int mouseX, int mouseY) {
+        int slots = Math.max(COLUMNS, rowsOf(entry) * COLUMNS);
+        Map<Integer, ItemStack> patterns = entry.patterns();
+        for (int slot = 0; slot < slots; slot++) {
+            int col = slot % COLUMNS;
+            int row = slot / COLUMNS;
+            int x = left + col * CELL;
+            int y = top + row * CELL;
+            if (y + CELL < viewTop || y > viewBottom) {
+                continue;
+            }
+            FactoryNineSlice.terminalSlot(graphics, x, y, CELL, CELL);
+            ItemStack stack = patterns.get(slot);
+            if (stack != null && !stack.isEmpty()) {
+                graphics.renderItem(stack, x + 1, y + 1);
+            }
+            boolean hovered = mouseX >= x && mouseX < x + CELL && mouseY >= y
+                    && mouseY < y + CELL && mouseY >= viewTop && mouseY < viewBottom;
+            if (hovered) {
+                graphics.fill(x + 1, y + 1, x + CELL - 1, y + CELL - 1, 0x40FFFFFF);
+            }
+        }
+    }
+
+    private void renderFeedback(GuiGraphics graphics) {
+        if (this.feedback == null || Util.getMillis() > this.feedbackUntil) {
+            return;
+        }
+        int color = this.feedbackOk ? this.theme.statusRun() : this.theme.error();
+        graphics.drawString(this.font, this.trim(this.feedback, this.contentWidth() - 4),
+                this.contentLeft(), this.bottom() - 12, color, false);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) {
-            return true;
-        }
-        int row = this.targetRowAt(mouseY);
-        if (row >= 0) {
-            int index = this.firstRow + row;
-            if (index < this.targets.size()) {
-                this.select(this.targets.get(index).key(), 0);
-            }
-            return true;
-        }
-        if (this.detail != null && this.detail.kind() == FactoryTerminalTargetKind.MACHINE
-                && this.inModeButton(mouseX, mouseY)) {
-            MachineMode next = this.detail.modeOrdinal() == MachineMode.ACTIVE.ordinal()
-                    ? MachineMode.PASSIVE : MachineMode.ACTIVE;
-            PacketDistributor.sendToServer(new FactoryMachineModeC2S(this.containerId,
-                    machineId(this.detail.key()), next));
-            return true;
-        }
-        if (!this.selectedKey.isEmpty() && this.inPageButton(mouseX, mouseY)) {
-            int pages = this.pageCount();
-            int next = mouseX < this.pageLeft() + PAGE_WIDTH / 2
-                    ? Math.max(0, this.page - 1) : Math.min(pages - 1, this.page + 1);
-            this.select(this.selectedKey, next);
             return true;
         }
         return true;
@@ -182,186 +229,55 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         if (deltaY == 0.0D || mouseY < this.listTop() || mouseY >= this.listBottom()) {
             return true;
         }
-        int max = Math.max(0, this.targets.size() - this.targetRows());
-        this.firstRow = Mth.clamp(this.firstRow - (int) Math.signum(deltaY), 0, max);
+        int max = Math.max(0, this.contentHeight() - this.viewHeight());
+        this.scroll = Mth.clamp(this.scroll - (int) Math.signum(deltaY) * CELL, 0, max);
         return true;
-    }
-
-    /**
-     * 目标格子的屏幕 x；屏幕用它给真实槽位摆位。
-     *
-     * @param index 槽位下标 0..8
-     * @return 绝对 x
-     */
-    public int patternSlotX(int index) {
-        return this.contentLeft() + 2 + (index % 3) * CELL;
-    }
-
-    /**
-     * 目标格子的屏幕 y；屏幕用它给真实槽位摆位。
-     *
-     * @param index 槽位下标 0..8
-     * @return 绝对 y
-     */
-    public int patternSlotY(int index) {
-        return this.gridTop() + (index / 3) * CELL;
-    }
-
-    /**
-     * 发送选中请求。
-     *
-     * @param key  目标键
-     * @param page 页号
-     */
-    private void select(String key, int page) {
-        this.selectedKey = key;
-        this.page = Math.max(0, page);
-        PacketDistributor.sendToServer(new FactoryTerminalSelectC2S(this.containerId, key, page));
-    }
-
-    /** 当前是否选中了目标；屏幕据此启用 / 禁用样板槽。 */
-    public boolean hasSelection() {
-        return this.detail != null;
-    }
-
-    /**
-     * 鼠标是否落在 3×3 样板格上；屏幕据此把事件让给真实槽位。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 命中格子时为 {@code true}
-     */
-    public boolean inPatternGrid(double mouseX, double mouseY) {
-        if (!this.hasSelection()) {
-            return false;
-        }
-        for (int i = 0; i < FactoryPatternSlotView.PAGE_SIZE; i++) {
-            int x = this.patternSlotX(i);
-            int y = this.patternSlotY(i);
-            if (mouseX >= x && mouseX < x + 16 && mouseY >= y && mouseY < y + 16) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private void renderTargets(GuiGraphics graphics, int mouseX, int mouseY) {
-        int x = this.contentLeft();
-        int width = this.contentWidth();
-        if (this.targets.isEmpty()) {
-            graphics.drawString(this.font, "没有可用目标", x + 2, this.listTop() + 2,
-                    this.theme.textDim(), false);
-            return;
-        }
-        int rows = this.targetRows();
-        for (int row = 0; row < rows; row++) {
-            int index = this.firstRow + row;
-            if (index >= this.targets.size()) {
-                break;
-            }
-            FactoryTerminalTargetsS2C.Entry entry = this.targets.get(index);
-            int y = this.listTop() + row * TARGET_ROW;
-            boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y
-                    && mouseY < y + TARGET_ROW;
-            if (entry.key().equals(this.selectedKey)) {
-                graphics.fill(x, y, x + width, y + TARGET_ROW,
-                        FactoryTerminalGeometry.ROW_SELECTED);
-            } else if (hovered) {
-                graphics.fill(x, y, x + width, y + TARGET_ROW,
-                        FactoryTerminalGeometry.ROW_HOVER);
-            }
-            if (!entry.icon().isEmpty()) {
-                graphics.renderItem(entry.icon(), x, y);
-            }
-            int countWidth = 34;
-            String count = entry.used() + "/" + entry.capacity();
-            graphics.drawString(this.font, this.trim(entry.name(), width - 20 - countWidth - 2),
-                    x + 18, y + 4, this.theme.textPrimary(), false);
-            graphics.drawString(this.font, count, x + width - this.font.width(count), y + 4,
-                    this.theme.textDim(), false);
-        }
-    }
-
-    private void renderDetail(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (this.detail == null) {
-            graphics.drawString(this.font, "选中目标后显示样板槽", this.contentLeft() + 2,
-                    this.detailTop() + 3, this.theme.textDim(), false);
-            return;
-        }
-        if (this.detail.kind() == FactoryTerminalTargetKind.MACHINE) {
-            boolean active = this.detail.modeOrdinal() == MachineMode.ACTIVE.ordinal();
-            this.drawButton(graphics, this.modeLeft(), this.detailTop(), MODE_WIDTH,
-                    FactoryTerminalGeometry.SEARCH_HEIGHT, active ? "主动" : "被动");
-        }
-        if (this.pageCount() > 1) {
-            this.drawButton(graphics, this.pageLeft(), this.detailTop(), PAGE_WIDTH,
-                    FactoryTerminalGeometry.SEARCH_HEIGHT,
-                    "◀ " + (this.page + 1) + "/" + this.pageCount() + " ▶");
-        }
-    }
-
-    /**
-     * AE2 风格按钮：凸起按钮底 + 亮色无阴影文字。
-     *
-     * @param graphics 绘制器
-     * @param x        左边界
-     * @param y        上边界
-     * @param width    宽度
-     * @param height   高度
-     * @param label    按钮文字
-     */
-    private void drawButton(GuiGraphics graphics, int x, int y, int width, int height,
-            String label) {
-        graphics.blitSprite(BUTTON, x, y, width, height);
-        graphics.drawString(this.font, label, x + (width - this.font.width(label)) / 2,
-                y + (height - 8) / 2, BUTTON_TEXT, false);
-    }
-
-    private void renderSlots(GuiGraphics graphics) {
-        if (!this.hasSelection()) {
-            return;
-        }
-        for (int i = 0; i < FactoryPatternSlotView.PAGE_SIZE; i++) {
-            // 槽位是真实槽位，格子底往左上让 1px，让 16×16 槽位落在 18×18 格子中间。
-            FactoryNineSlice.terminalSlot(graphics, this.patternSlotX(i) - 1,
-                    this.patternSlotY(i) - 1, CELL, CELL);
-        }
-    }
-
-    private void renderFeedback(GuiGraphics graphics) {
-        if (this.feedback == null || Util.getMillis() > this.feedbackUntil) {
-            return;
-        }
-        int color = this.feedbackOk ? this.theme.statusRun() : this.theme.error();
-        graphics.drawString(this.font, this.trim(this.feedback, this.contentWidth() - 4),
-                this.contentLeft() + 2, this.bottom() - 12, color, false);
     }
 
     @Override
     public FactoryScreen.JeiTarget jeiTargetAt(double mouseX, double mouseY) {
-        int row = this.targetRowAt(mouseY);
-        if (row < 0) {
-            return null;
+        // 段头图标命中时返回该机器的图标，供 R/U 查配方。
+        int y = this.listTop() - this.scroll;
+        for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
+            int rows = rowsOf(entry);
+            int sectionHeight = HEADER_ROW + rows * CELL + SECTION_GAP;
+            if (mouseY >= y && mouseY < y + HEADER_ROW && mouseX >= this.contentLeft()
+                    && mouseX < this.contentLeft() + 16) {
+                return this.itemTarget(entry.icon(), this.contentLeft(), y);
+            }
+            y += sectionHeight;
         }
-        int index = this.firstRow + row;
-        if (index >= this.targets.size()
-                || mouseX >= this.contentLeft() + FactoryTerminalGeometry.ICON_SIZE) {
-            return null;
-        }
-        FactoryTerminalTargetsS2C.Entry entry = this.targets.get(index);
-        return this.itemTarget(entry.icon(), this.contentLeft(),
-                this.listTop() + row * TARGET_ROW);
+        return null;
     }
 
     @Override
     public boolean dropJeiKey(AEKey key, double mouseX, double mouseY) {
-        // 样板槽是真实槽位，JEI 拖拽走 AE2 自己的槽位交互，不需要额外区域。
+        // 样板槽是自绘的，JEI 拖拽下一步接动作包；先不吞。
         return false;
     }
 
     @Override
     public List<FactoryTerminalDropArea> jeiDropAreas() {
         return List.of();
+    }
+
+    /** 机器段占几行槽位；容量 0 也至少给一行。 */
+    private static int rowsOf(FactoryTerminalTargetsS2C.Entry entry) {
+        return Math.max(1, (entry.capacity() + COLUMNS - 1) / COLUMNS);
+    }
+
+    /** 列表总高（含段间距）。 */
+    private int contentHeight() {
+        int height = 0;
+        for (FactoryTerminalTargetsS2C.Entry entry : this.targets) {
+            height += HEADER_ROW + rowsOf(entry) * CELL + SECTION_GAP;
+        }
+        return height;
+    }
+
+    /** 工作区可视高度。 */
+    private int viewHeight() {
+        return this.listBottom() - this.listTop();
     }
 
     private int contentLeft() {
@@ -376,82 +292,8 @@ public final class FactoryPatternPanel extends FactoryTerminalPanel {
         return this.top() + FactoryTerminalGeometry.HEADER_HEIGHT + 15;
     }
 
-    private int targetRows() {
-        return Mth.clamp((this.height() - 150) / TARGET_ROW, 2, 6);
-    }
-
     private int listBottom() {
-        return this.listTop() + this.targetRows() * TARGET_ROW;
-    }
-
-    private int detailTop() {
-        return this.listBottom() + 2;
-    }
-
-    private int gridTop() {
-        return this.detailTop() + FactoryTerminalGeometry.SEARCH_HEIGHT + 4;
-    }
-
-    private int modeLeft() {
-        return this.contentLeft();
-    }
-
-    private int pageLeft() {
-        return this.contentLeft() + this.contentWidth() - PAGE_WIDTH;
-    }
-
-    private int pageCount() {
-        if (this.detail == null) {
-            return 1;
-        }
-        return Math.max(1, (this.detail.capacity() + FactoryPatternSlotView.PAGE_SIZE - 1)
-                / FactoryPatternSlotView.PAGE_SIZE);
-    }
-
-    private int targetRowAt(double mouseY) {
-        if (mouseY < this.listTop() || mouseY >= this.listBottom()) {
-            return -1;
-        }
-        return (int) ((mouseY - this.listTop()) / TARGET_ROW);
-    }
-
-    private int targetRow(String key) {
-        for (int i = 0; i < this.targets.size(); i++) {
-            if (this.targets.get(i).key().equals(key)) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private boolean inModeButton(double mouseX, double mouseY) {
-        return mouseX >= this.modeLeft() && mouseX < this.modeLeft() + MODE_WIDTH
-                && mouseY >= this.detailTop()
-                && mouseY < this.detailTop() + FactoryTerminalGeometry.SEARCH_HEIGHT;
-    }
-
-    private boolean inPageButton(double mouseX, double mouseY) {
-        return this.pageCount() > 1 && mouseX >= this.pageLeft()
-                && mouseX < this.pageLeft() + PAGE_WIDTH
-                && mouseY >= this.detailTop()
-                && mouseY < this.detailTop() + FactoryTerminalGeometry.SEARCH_HEIGHT;
-    }
-
-    /**
-     * 从机器目标键里取机器 id。
-     *
-     * @param key 目标键
-     * @return 机器 id；格式不对时返回全零 uuid
-     */
-    private static UUID machineId(String key) {
-        if (!key.startsWith(FactoryTerminalTargets.MACHINE_PREFIX)) {
-            return new UUID(0L, 0L);
-        }
-        try {
-            return UUID.fromString(key.substring(FactoryTerminalTargets.MACHINE_PREFIX.length()));
-        } catch (IllegalArgumentException e) {
-            return new UUID(0L, 0L);
-        }
+        return this.bottom() - 16;
     }
 
     /**

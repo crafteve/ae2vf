@@ -2,7 +2,9 @@ package io.github.crafteve.idlefactory.menu;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +28,7 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -48,9 +51,13 @@ public final class FactoryTerminalTargets {
     /** AE2 原生目标的键前缀。 */
     public static final String AE2_PREFIX = "ae2:";
 
-    /** 一条目标摘要。 */
+    /**
+     * 一条目标摘要。
+     *
+     * @param patterns 非空样板槽：槽位下标 → 样板物品；左面板按它画机器段
+     */
     public record Entry(FactoryTerminalTargetKind kind, String key, String name, ItemStack icon,
-            int capacity, int used) {
+            int capacity, int used, Map<Integer, ItemStack> patterns) {
     }
 
     /**
@@ -104,7 +111,7 @@ public final class FactoryTerminalTargets {
             PatternContainerGroup group = container.getTerminalGroup();
             entries.add(new Entry(FactoryTerminalTargetKind.AE2_PROVIDER,
                     keyOf(container), group.name().getString(), iconOf(group),
-                    inventory.size(), usedSlots(inventory)));
+                    inventory.size(), usedSlots(inventory), patternsOf(inventory)));
         }
         return entries;
     }
@@ -192,9 +199,45 @@ public final class FactoryTerminalTargets {
             MachineProvider provider = machine.provider();
             entries.add(new Entry(FactoryTerminalTargetKind.MACHINE, keyOf(machine.id()),
                     nameOf(view.blockId(), machine), icon(view.blockId()), provider.capacity(),
-                    provider.patternCount()));
+                    provider.patternCount(), patternsOf(provider)));
         }
         return entries;
+    }
+
+    /**
+     * 取样板池里的非空样板，上限 {@link FactoryTerminalTargetsS2C#MAX_PATTERNS}。
+     *
+     * @param provider 机器样板池
+     * @return 槽位下标 → 样板物品
+     */
+    private static Map<Integer, ItemStack> patternsOf(MachineProvider provider) {
+        Map<Integer, ItemStack> patterns = new LinkedHashMap<>();
+        int limit = Math.min(provider.capacity(), FactoryTerminalTargetsS2C.MAX_PATTERNS);
+        for (int slot = 0; slot < limit; slot++) {
+            ItemStack stack = provider.pattern(slot);
+            if (!stack.isEmpty()) {
+                patterns.put(slot, stack.copy());
+            }
+        }
+        return patterns;
+    }
+
+    /**
+     * 取样板库存里的非空样板，上限 {@link FactoryTerminalTargetsS2C#MAX_PATTERNS}。
+     *
+     * @param inventory 样板库存
+     * @return 槽位下标 → 样板物品
+     */
+    private static Map<Integer, ItemStack> patternsOf(InternalInventory inventory) {
+        Map<Integer, ItemStack> patterns = new LinkedHashMap<>();
+        int limit = Math.min(inventory.size(), FactoryTerminalTargetsS2C.MAX_PATTERNS);
+        for (int slot = 0; slot < limit; slot++) {
+            ItemStack stack = inventory.getStackInSlot(slot);
+            if (!stack.isEmpty()) {
+                patterns.put(slot, stack.copy());
+            }
+        }
+        return patterns;
     }
 
     @Nullable

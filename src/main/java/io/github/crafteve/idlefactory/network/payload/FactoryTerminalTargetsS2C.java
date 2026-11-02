@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTerminalHandler;
@@ -32,6 +34,8 @@ public record FactoryTerminalTargetsS2C(int containerId,
     public static final int MAX_TARGETS = 512;
     /** 名字 / 键的长度上限。 */
     public static final int MAX_TEXT = 128;
+    /** 每个目标最多同步多少个非空样板槽；样板池上限 1024，界面一次也显示不了这么多。 */
+    public static final int MAX_PATTERNS = 128;
 
     /** 包类型：{@code idlefactory:terminal_targets}。 */
     public static final Type<FactoryTerminalTargetsS2C> TYPE =
@@ -69,11 +73,13 @@ public record FactoryTerminalTargetsS2C(int containerId,
      * @param icon     图标；未知时为空栈
      * @param capacity 样板槽数
      * @param used     已放样板数
+     * @param patterns 非空样板槽：槽位下标 → 样板物品
      */
     public record Entry(FactoryTerminalTargetKind kind, String key, String name, ItemStack icon,
-            int capacity, int used) {
+            int capacity, int used, Map<Integer, ItemStack> patterns) {
         public Entry {
             icon = icon.copy();
+            patterns = Map.copyOf(patterns);
         }
     }
 
@@ -89,6 +95,11 @@ public record FactoryTerminalTargetsS2C(int containerId,
             ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, entry.icon());
             buf.writeVarInt(entry.capacity());
             buf.writeVarInt(entry.used());
+            buf.writeVarInt(entry.patterns().size());
+            for (Map.Entry<Integer, ItemStack> pattern : entry.patterns().entrySet()) {
+                buf.writeVarInt(pattern.getKey());
+                ItemStack.OPTIONAL_STREAM_CODEC.encode(buf, pattern.getValue());
+            }
         }
     }
 
@@ -106,7 +117,16 @@ public record FactoryTerminalTargetsS2C(int containerId,
             ItemStack icon = ItemStack.OPTIONAL_STREAM_CODEC.decode(buf);
             int capacity = buf.readVarInt();
             int used = buf.readVarInt();
-            targets.add(new Entry(kind, key, name, icon, capacity, used));
+            int patternCount = buf.readVarInt();
+            if (patternCount < 0 || patternCount > MAX_PATTERNS) {
+                throw new DecoderException("invalid pattern count: " + patternCount);
+            }
+            Map<Integer, ItemStack> patterns = new LinkedHashMap<>(patternCount);
+            for (int p = 0; p < patternCount; p++) {
+                int slot = buf.readVarInt();
+                patterns.put(slot, ItemStack.OPTIONAL_STREAM_CODEC.decode(buf));
+            }
+            targets.add(new Entry(kind, key, name, icon, capacity, used, patterns));
         }
         return new FactoryTerminalTargetsS2C(containerId, targets);
     }

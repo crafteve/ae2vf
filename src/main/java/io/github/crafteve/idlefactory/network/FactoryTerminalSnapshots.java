@@ -55,7 +55,8 @@ public final class FactoryTerminalSnapshots {
         for (FactoryTerminalTargets.Entry entry
                 : new FactoryTerminalTargets(factory, player).entries()) {
             entries.add(new FactoryTerminalTargetsS2C.Entry(entry.kind(), entry.key(),
-                    entry.name(), entry.icon(), entry.capacity(), entry.used()));
+                    entry.name(), entry.icon(), entry.capacity(), entry.used(),
+                    entry.patterns()));
         }
         PacketDistributor.sendToPlayer(player,
                 new FactoryTerminalTargetsS2C(containerId, entries));

@@ -70,35 +70,17 @@ public final class FactoryPatternTerminalScreen
         this.panel.bind(FactoryTerminalGeometry.panelLeft(this.leftPos), this.topPos,
                 FactoryTerminalGeometry.PANEL_WIDTH, this.imageHeight);
         FactoryTerminalToolbar.moveToWindowLeft(this);
-        this.positionPatternSlots();
-        this.updatePatternSlotState();
+        this.hidePatternSlots();
     }
 
     /**
-     * 没选目标时禁用 9 个样板槽：空槽还能点开会让人以为能往里放。
+     * 样板槽已改成左面板自绘的列表，菜单里那 9 个真实槽位挪到屏幕外，
+     * 不再参与渲染与命中（样板增删由自绘槽位发动作包）。
      */
-    private void updatePatternSlotState() {
-        boolean enabled = this.panel.hasSelection();
+    private void hidePatternSlots() {
         for (Slot slot : this.menu.getSlots(FactoryPatternSlots.PATTERN_SLOT)) {
-            if (slot instanceof AppEngSlot appEngSlot) {
-                appEngSlot.setSlotEnabled(enabled);
-            }
-        }
-    }
-
-    /**
-     * 把菜单里的 9 个样板槽摆到左面板的 3×3 格子上。
-     *
-     * <p>槽位坐标是相对 {@code leftPos} 的，而左面板在 {@code leftPos} 左边，所以这里会得到
-     * 负的 x；渲染时 {@code AbstractContainerScreen} 统一加上 {@code leftPos}，位置正好落回
-     * 面板内。</p>
-     */
-    private void positionPatternSlots() {
-        List<Slot> slots = this.menu.getSlots(FactoryPatternSlots.PATTERN_SLOT);
-        for (int i = 0; i < slots.size(); i++) {
-            Slot slot = slots.get(i);
-            slot.x = this.panel.patternSlotX(i) - this.leftPos;
-            slot.y = this.panel.patternSlotY(i) - this.topPos;
+            slot.x = -1000;
+            slot.y = -1000;
         }
     }
 
@@ -117,9 +99,8 @@ public final class FactoryPatternTerminalScreen
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        // 样板格是真实槽位，点在格子上时必须交给容器菜单；其余面板区域一律吞掉，
-        // 因为左面板在 AE2 的 GUI 矩形外，漏到原版会被当成「点外部」丢物品。
-        if (this.panel.isMouseOver(mouseX, mouseY) && !this.panel.inPatternGrid(mouseX, mouseY)) {
+        // 左面板在 AE2 的 GUI 矩形外，面板内一律吞掉，避免被原版当成「点外部」丢物品。
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
             this.panel.mouseClicked(mouseX, mouseY, button);
             return true;
         }
@@ -128,7 +109,7 @@ public final class FactoryPatternTerminalScreen
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
-        if (this.panel.isMouseOver(mouseX, mouseY) && !this.panel.inPatternGrid(mouseX, mouseY)) {
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
             this.panel.mouseReleased(mouseX, mouseY, button);
             return true;
         }
@@ -138,7 +119,7 @@ public final class FactoryPatternTerminalScreen
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX,
             double dragY) {
-        if (this.panel.isMouseOver(mouseX, mouseY) && !this.panel.inPatternGrid(mouseX, mouseY)) {
+        if (this.panel.isMouseOver(mouseX, mouseY)) {
             this.panel.mouseDragged(mouseX, mouseY, button, dragX, dragY);
             return true;
         }
@@ -174,7 +155,6 @@ public final class FactoryPatternTerminalScreen
     public void containerTick() {
         super.containerTick();
         this.panel.tick();
-        this.updatePatternSlotState();
     }
 
     @Override
