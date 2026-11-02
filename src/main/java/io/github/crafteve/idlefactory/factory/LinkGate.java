@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -8,6 +10,10 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 
 /**
  * 一次绑定操作的占用表。
@@ -62,6 +68,44 @@ public final class LinkGate {
         }
         return new ClaimCheck(claim, claim.role() == role
                 ? ClaimCheck.Kind.SELF_SAME : ClaimCheck.Kind.SELF_OTHER);
+    }
+
+    /**
+     * 按占用表过滤一批目标：空地和自己的同角色目标放行，别人的和别人角色的分别计数。
+     *
+     * <p>连锁是“先按世界事实找全，再按归属过滤”——BFS 的半径与数量上限都在
+     * {@code FactoryLinkFinder} 里按筛选前计算，这里只分流，过滤后不补位、不重扫。</p>
+     *
+     * @param factoryId 当前工厂
+     * @param role      本次操作的角色
+     * @param dimension 所在维度
+     * @param targets   候选坐标
+     * @return 过滤结果
+     */
+    public Filter filter(UUID factoryId, LinkRole role, ResourceKey<Level> dimension,
+            List<BlockPos> targets) {
+        List<BlockPos> open = new ArrayList<>(targets.size());
+        int blockedOther = 0;
+        int blockedRole = 0;
+        for (BlockPos targetPos : targets) {
+            ClaimCheck check = this.check(BlockKey.of(dimension, targetPos), factoryId, role);
+            switch (check.kind()) {
+                case FREE, SELF_SAME -> open.add(targetPos);
+                case SELF_OTHER -> blockedRole++;
+                case OTHER -> blockedOther++;
+            }
+        }
+        return new Filter(open, blockedOther, blockedRole);
+    }
+
+    /**
+     * 一次过滤的结果：放行的目标，以及被别家占、角色冲突而跳过的数量。
+     *
+     * @param open         放行的目标坐标
+     * @param blockedOther 被别的工厂占了的数量
+     * @param blockedRole  位置属于自己、但角色不是本次操作角色的数量
+     */
+    public record Filter(List<BlockPos> open, int blockedOther, int blockedRole) {
     }
 
     /**

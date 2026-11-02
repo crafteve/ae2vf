@@ -9,6 +9,7 @@ import java.util.Set;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.storage.ContainerCapabilityAdapter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -59,7 +60,7 @@ public final class FactoryLinkFinder {
      * @return 容器坐标；目标不是有效容器时为空
      */
     public static List<BlockPos> containers(ServerLevel level, BlockPos origin) {
-        return find(level, origin, MAX_CONTAINERS, pos -> FactoryService.isAnyContainer(level, pos));
+        return find(level, origin, MAX_CONTAINERS, pos -> ContainerCapabilityAdapter.isContainer(level, pos));
     }
 
     /**

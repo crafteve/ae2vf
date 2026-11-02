@@ -1,10 +1,15 @@
 package io.github.crafteve.idlefactory.factory;
 
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -118,5 +123,123 @@ public final class FactoryMessages {
      */
     public static void send(ServerPlayer player, Component message) {
         player.sendSystemMessage(message);
+    }
+
+    /**
+     * 给玩家发一条正文。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void msg(ServerPlayer player, String text) {
+        send(player, plain(text));
+    }
+
+    /**
+     * 给玩家发一条成功回执。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void ok(ServerPlayer player, String text) {
+        send(player, ok(text));
+    }
+
+    /**
+     * 给玩家发一条失败回执。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void err(ServerPlayer player, String text) {
+        send(player, err(text));
+    }
+
+    /**
+     * 给玩家发一条说明。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void info(ServerPlayer player, String text) {
+        send(player, info(text));
+    }
+
+    /**
+     * 给玩家发一条警告。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void warn(ServerPlayer player, String text) {
+        send(player, warn(text));
+    }
+
+    /**
+     * 动作栏成功提示。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void barOk(ServerPlayer player, String text) {
+        player.displayClientMessage(
+                Component.literal("[OK] " + text).withStyle(ChatFormatting.GREEN), true);
+    }
+
+    /**
+     * 动作栏失败提示。
+     *
+     * @param player 接收者
+     * @param text   文本
+     */
+    public static void barErr(ServerPlayer player, String text) {
+        player.displayClientMessage(
+                Component.literal("[!!] " + text).withStyle(ChatFormatting.RED), true);
+    }
+
+    /**
+     * 回执里的「退回样板」尾巴；没有退回时为空白。
+     *
+     * @param returned 退回的样板数
+     * @return 如「，退回 1 块样板」
+     */
+    public static String patternSuffix(int returned) {
+        return returned > 0 ? "，退回 " + returned + " 块样板" : "";
+    }
+
+    /**
+     * 仓库模式的中文名。
+     *
+     * @param mode 模式
+     * @return “ME”或“容器”
+     */
+    public static String modeLabel(StorageMode mode) {
+        return mode == StorageMode.ME ? "ME" : "容器";
+    }
+
+    /**
+     * 方块的显示名：短坐标 + 方块名；区块未加载时只有短坐标。
+     *
+     * @param level 服务端世界
+     * @param pos   方块坐标
+     * @return 展示文本
+     */
+    public static String blockLabel(ServerLevel level, BlockPos pos) {
+        if (!level.isLoaded(pos)) {
+            return pos.toShortString();
+        }
+        return pos.toShortString() + "（"
+                + level.getBlockState(pos).getBlock().getName().getString() + "）";
+    }
+
+    /**
+     * 机器的显示名；当前与方块显示名一致。
+     *
+     * @param level 服务端世界
+     * @param pos   机器坐标
+     * @return 展示文本
+     */
+    public static String machineLabel(ServerLevel level, BlockPos pos) {
+        return blockLabel(level, pos);
     }
 }

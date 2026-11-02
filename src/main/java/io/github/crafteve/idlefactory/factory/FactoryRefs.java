@@ -7,6 +7,8 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
+import net.minecraft.server.level.ServerPlayer;
+
 /**
  * 机器引用解析。
  *
@@ -32,5 +34,19 @@ public final class FactoryRefs {
             return Optional.empty();
         }
         return factory.config().machines().byShortId(ref).map(Machine::ref);
+    }
+
+    /**
+     * 取玩家自己的工厂；找不到时的文案由调用方给。
+     *
+     * <p>和 {@link #machine(Factory, String)} 一样保持静默：补全与指令共用这条解析路径，
+     * 解析层不发消息。</p>
+     *
+     * @param manager 工厂档案柜
+     * @param player  玩家
+     * @return 工厂；没有时为 {@code null}
+     */
+    public static Factory owned(FactoryManager manager, ServerPlayer player) {
+        return manager.byOwner(player.getUUID()).orElse(null);
     }
 }
