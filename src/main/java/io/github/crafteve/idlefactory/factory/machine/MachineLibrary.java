@@ -20,34 +20,65 @@ import net.minecraft.world.level.Level;
  * 才会真正移除。</p>
  */
 public final class MachineLibrary {
+    /**
+     * 机器库容量上限：一台工厂最多接管多少台机器。
+     *
+     * <p>这个值同时是 {@code FactoryTableS2C} 的解码上限，改这里等于改线协议，必须同步递增
+     * {@code ModNetwork.PROTOCOL_VERSION}。与 {@code FactoryLinkFinder.MAX_MACHINES}
+     * （BFS 扫描上限 128）同名不同义，禁止静态导入，引用时必须写全
+     * {@code MachineLibrary.MAX_MACHINES}。</p>
+     */
+    public static final int MAX_MACHINES = 512;
+
     private final Map<UUID, Machine> byId = new LinkedHashMap<>();
+
+    /**
+     * 一次加入的结果。
+     *
+     * <p>不用 boolean：调用方要区分「id 重复」和「库满」——前者是「已接入过」，
+     * 后者要给上限回执；混成一个 {@code false} 会让第 513 台被误报成重复接入。</p>
+     */
+    public enum AddResult {
+        /** 已加入。 */
+        ADDED,
+        /** id 已存在，未加入。 */
+        DUPLICATE,
+        /** 机器库已满，未加入。 */
+        FULL
+    }
 
     /**
      * 按坐标加一台没有规则的新机器。
      *
      * @param target 机器身份
-     * @return 是否真的加入；已存在时返回 {@code false}
+     * @return 加入结果；已存在返回 {@link AddResult#DUPLICATE}，库满返回 {@link AddResult#FULL}
      */
-    public boolean add(MachineRef target) {
+    public AddResult add(MachineRef target) {
         if (this.byId.containsKey(target.id())) {
-            return false;
+            return AddResult.DUPLICATE;
+        }
+        if (this.byId.size() >= MAX_MACHINES) {
+            return AddResult.FULL;
         }
         this.byId.put(target.id(), new Machine(target));
-        return true;
+        return AddResult.ADDED;
     }
 
     /**
      * 加一台已经带规则的机器（读档用）。
      *
      * @param machine 机器
-     * @return 是否真的加入；id 已存在时返回 {@code false}
+     * @return 加入结果；id 已存在返回 {@link AddResult#DUPLICATE}，库满返回 {@link AddResult#FULL}
      */
-    public boolean add(Machine machine) {
+    public AddResult add(Machine machine) {
         if (this.byId.containsKey(machine.id())) {
-            return false;
+            return AddResult.DUPLICATE;
+        }
+        if (this.byId.size() >= MAX_MACHINES) {
+            return AddResult.FULL;
         }
         this.byId.put(machine.id(), machine);
-        return true;
+        return AddResult.ADDED;
     }
 
     /**

@@ -13,6 +13,8 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
+import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
@@ -46,9 +48,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline,
         List<FactorySnapshotBuilder.MachineView> machines) implements CustomPacketPayload {
-
-    private static final int MAX_MACHINES = 512;
-    private static final int MAX_RULES_PER_SIDE = 16;
 
     /** 包类型：{@code idlefactory:factory_table}。 */
     public static final Type<FactoryTableS2C> TYPE =
@@ -96,7 +95,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int count = readCount(buf, MAX_MACHINES, "machines");
+        int count = readCount(buf, MachineLibrary.MAX_MACHINES, "machines");
         List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
@@ -167,7 +166,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,
             List<IoResult.Reason> reasons) {
-        int count = Math.min(reasons.size(), MAX_RULES_PER_SIDE);
+        int count = Math.min(reasons.size(), MachineIoGroup.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             buf.writeByte(reasons.get(i).ordinal());
@@ -175,7 +174,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<IoResult.Reason> readReasons(RegistryFriendlyByteBuf buf, int expected) {
-        int count = readCount(buf, MAX_RULES_PER_SIDE, "rule reasons");
+        int count = readCount(buf, MachineIoGroup.MAX_RULES_PER_SIDE, "rule reasons");
         List<IoResult.Reason> reasons = new ArrayList<>(expected);
         for (int i = 0; i < count; i++) {
             reasons.add(readEnum(buf, IoResult.Reason.values(), "rule reason"));
@@ -187,7 +186,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeRates(RegistryFriendlyByteBuf buf, List<Long> rates) {
-        int count = Math.min(rates.size(), MAX_RULES_PER_SIDE);
+        int count = Math.min(rates.size(), MachineIoGroup.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             buf.writeVarLong(rates.get(i));
@@ -195,7 +194,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<Long> readRates(RegistryFriendlyByteBuf buf, int expected) {
-        int count = readCount(buf, MAX_RULES_PER_SIDE, "rule rates");
+        int count = readCount(buf, MachineIoGroup.MAX_RULES_PER_SIDE, "rule rates");
         List<Long> rates = new ArrayList<>(expected);
         for (int i = 0; i < count; i++) {
             rates.add(buf.readVarLong());
@@ -207,7 +206,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeRules(RegistryFriendlyByteBuf buf, List<ResourceSpec> rules) {
-        int count = Math.min(rules.size(), MAX_RULES_PER_SIDE);
+        int count = Math.min(rules.size(), MachineIoGroup.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             ResourceSpec rule = rules.get(i);
@@ -222,7 +221,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<ResourceSpec> readRules(RegistryFriendlyByteBuf buf) {
-        int count = readCount(buf, MAX_RULES_PER_SIDE, "rules");
+        int count = readCount(buf, MachineIoGroup.MAX_RULES_PER_SIDE, "rules");
         List<ResourceSpec> rules = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             AEKey key = ResourceKeyCodec.read(buf);

@@ -113,7 +113,7 @@ public final class Machine {
         if (!derived.equals(ref.id())) {
             return null;
         }
-        MachineIoGroup io = MachineIoGroup.load(tag.getCompound(TAG_IO), registries);
+        MachineIoGroup io = MachineIoGroup.load(tag.getCompound(TAG_IO), registries, ref.id());
         MachineProvider provider = MachineProvider.load(tag.getCompound(TAG_PROVIDER), registries);
         return new Machine(ref, io, provider);
     }

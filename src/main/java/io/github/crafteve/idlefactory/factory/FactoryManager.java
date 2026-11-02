@@ -9,8 +9,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 
 /**
  * 工厂档案柜：内存里的索引。
@@ -27,6 +29,10 @@ public final class FactoryManager {
      *
      * <p>P1 删除产线后只剩机器：把记录里的机器逐台灌进机器库即可。</p>
      *
+     * <p>机器库拒绝登记（同 id 重复或超过 {@link MachineLibrary#MAX_MACHINES}）时保留先登记的
+     * 那条并打 warn：静默丢弃会让下一次 {@code markDirty → save} 永久抹掉这些机器，必须留下
+     * 可排查的痕迹。工厂记录本身因 id 或 owner 冲突被拒同样只记日志，保持「先登记的优先」。</p>
+     *
      * @param records 存档里的工厂记录
      */
     public void loadFrom(List<FactoryRecord> records) {
@@ -36,10 +42,33 @@ public final class FactoryManager {
             FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
                     record.anchor());
             for (Machine machine : record.machines()) {
-                config.machines().add(machine);
+                MachineLibrary.AddResult added = config.machines().add(machine);
+                if (added != MachineLibrary.AddResult.ADDED) {
+                    IdleFactory.LOGGER.warn(
+                            "Idle Factory: 载入工厂 {} 时机器 {} 未登记（{}），保留先登记的那台",
+                            record.id(), machine.ref().shortId(), addResultText(added));
+                }
             }
-            add(new Factory(record.id(), config));
+            if (!add(new Factory(record.id(), config))) {
+                IdleFactory.LOGGER.warn(
+                        "Idle Factory: 载入工厂 {}（拥有者 {}）失败：id 或拥有者与先登记的记录冲突，本条已忽略",
+                        record.id(), record.owner());
+            }
         }
+    }
+
+    /**
+     * 机器未登记原因的中文文案，只用于日志。
+     *
+     * @param result 机器库的加入结果
+     * @return 如「机器库已满」
+     */
+    private static String addResultText(MachineLibrary.AddResult result) {
+        return switch (result) {
+            case ADDED -> "已加入";
+            case DUPLICATE -> "id 重复";
+            case FULL -> "机器库已满";
+        };
     }
 
     /**

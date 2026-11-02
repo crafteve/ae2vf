@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
 import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -319,8 +320,11 @@ public final class FactoryService {
             err(player, "这台机器已经接入过了：" + existing.get().ref().shortId());
             return 0;
         }
-        if (!factory.config().machines().add(target)) {
-            err(player, "这台机器已经接入过了：" + target.shortId());
+        MachineLibrary.AddResult added = factory.config().machines().add(target);
+        if (added != MachineLibrary.AddResult.ADDED) {
+            err(player, added == MachineLibrary.AddResult.FULL
+                    ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）"
+                    : "这台机器已经接入过了：" + target.shortId());
             return 0;
         }
         refreshObservation(target);
@@ -680,6 +684,7 @@ public final class FactoryService {
             int blockedRole) {
         int added = 0;
         int skipped = 0;
+        int full = 0;
         for (BlockPos targetPos : targets) {
             Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
             if (existing != null) {
@@ -687,11 +692,13 @@ public final class FactoryService {
                 continue;
             }
             MachineRef target = MachineRef.of(level.dimension(), targetPos);
-            if (factory.config().machines().add(target)) {
-                refreshObservation(target);
-                added++;
-            } else {
-                skipped++;
+            switch (factory.config().machines().add(target)) {
+                case ADDED -> {
+                    refreshObservation(target);
+                    added++;
+                }
+                case DUPLICATE -> skipped++;
+                case FULL -> full++;
             }
         }
         if (added > 0) {
@@ -701,18 +708,25 @@ public final class FactoryService {
             String label = machineLabel(level, targets.getFirst());
             if (added > 0) {
                 barOk(player, "已连接机器 " + label);
+            } else if (full > 0) {
+                barErr(player, "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）");
             } else {
                 barErr(player, "该机器已被连接 " + label);
             }
             return added;
         }
         if (added == 0) {
-            barErr(player, "没有新增机器（都已连接）");
+            barErr(player, full > 0
+                    ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台），未新增机器"
+                    : "没有新增机器（都已连接）");
             return 0;
         }
         String text = "已连接 " + added + " 台";
         if (skipped > 0) {
             text += "，跳过 " + skipped + " 台";
+        }
+        if (full > 0) {
+            text += "，机器库已满跳过 " + full + " 台";
         }
         if (blockedOther > 0) {
             text += "，被别家占用 " + blockedOther + " 台";

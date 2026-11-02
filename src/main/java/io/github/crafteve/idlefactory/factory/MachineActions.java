@@ -33,9 +33,6 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * 界面侧放进反馈包。</p>
  */
 public final class MachineActions {
-    /** 每侧规则上限；和网络包、AGENTS 的规模约束一致。 */
-    public static final int MAX_RULES_PER_SIDE = 16;
-
     /**
      * 一次写操作的结果。
      *
@@ -119,8 +116,9 @@ public final class MachineActions {
         }
         MachineIoGroup io = ioFound.get();
         List<ResourceSpec> rules = rules(io, side);
-        if (rules.size() >= MAX_RULES_PER_SIDE) {
-            return Result.err(sideName(side) + "已达上限 " + MAX_RULES_PER_SIDE + " 条");
+        if (rules.size() >= MachineIoGroup.MAX_RULES_PER_SIDE) {
+            return Result.err(sideName(side) + "已达上限 "
+                    + MachineIoGroup.MAX_RULES_PER_SIDE + " 条");
         }
         if (find(rules, key) != null) {
             return Result.err(sideName(side) + "里已经有 " + key.getDisplayName().getString());
