@@ -25,6 +25,13 @@ public final class RunnerState {
     public static final long SLEEP_AFTER_TICKS = 100L;
     /** 睡眠后多久醒一次（tick）。 */
     public static final long WAKE_INTERVAL = 200L;
+    /**
+     * 同一台机器两次「本轮 IO 异常」warn 的最小间隔（tick），1200 tick = 60 秒。
+     *
+     * <p>坏掉的机器每个 IO 轮次都会抛，逐轮打会把 latest.log 刷满；这里只限日志，
+     * 不限制重试：异常轮仍走 {@code sleepIfIdle}，睡醒后照常再搬。</p>
+     */
+    public static final long FAILURE_LOG_INTERVAL = 1200L;
 
     private final Map<UUID, MachineState> machines = new HashMap<>();
 
@@ -98,6 +105,13 @@ public final class RunnerState {
         public long sleepSince = -1L;
         /** 下次唤醒时间（game time）。 */
         public long wakeAt;
+        /**
+         * 上次因搬运异常打 warn 的 game time；{@code -1} 表示还没打过。
+         *
+         * <p>刻意不因一次成功清零：成败交替的坏 handler 会因此退化成每轮一行日志，
+         * 正是要避免的刷屏。删机器时随整条状态一起清掉（{@code forget}）。</p>
+         */
+        public long lastFailureLogAt = -1L;
         /** 这台机器的面路由表。 */
         public final RouteTable routes = new RouteTable();
     }

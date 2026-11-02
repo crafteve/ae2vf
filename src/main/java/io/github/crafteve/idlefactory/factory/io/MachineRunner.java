@@ -125,8 +125,22 @@ public final class MachineRunner {
         long generation = observations == null ? 0L : observations.facesGeneration(target.blockKey());
         ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                 id -> new ItemVariantIndex());
-        GroupRunner.GroupRun result = GroupRunner.run(storage, level, target.pos(), machine.io(), caps,
-                machineState.routes, generation, factoryVariants, now);
+        GroupRunner.GroupRun result;
+        try {
+            result = GroupRunner.run(storage, level, target.pos(), machine.io(), caps,
+                    machineState.routes, generation, factoryVariants, now);
+        } catch (RuntimeException e) {
+            // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
+            // GroupRunner 内部被调用，异常穿出去会带崩整个服务端 tick。更糟的是 IoTransfer
+            // 已经先从仓库扣了料（IoTransfer:49）才交给机器（:55），异常意味着「已扣未给」，
+            // 这台机器本轮只能按「未搬动」处理：记节流 warn、走 sleepIfIdle、直接返回，
+            // 下一轮照常重试，其余机器不受影响。
+            // 只捕 RuntimeException，不捕 Error：OOM / StackOverflow / LinkageError 不是单台
+            // 机器的运行期故障，吞掉只会掩盖更严重的问题；捕获后也不带半状态往下跑。
+            logFailure(machine, machineState, now, e);
+            sleepIfIdle(machineState, now);
+            return 0L;
+        }
         // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
         // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
         // 都算“路没问题”，清掉连续计数。详见 noteRejected。
@@ -178,6 +192,30 @@ public final class MachineRunner {
             machineState.sleeping = true;
             machineState.wakeAt = now + RunnerState.WAKE_INTERVAL;
         }
+    }
+
+    /**
+     * 一台机器本轮搬运异常时记一条 warn，按机器节流。
+     *
+     * <p>坏机器每个 IO 轮次都会抛，逐轮打会把 latest.log 刷满：首条必打（{@code lastFailureLogAt}
+     * 初值 {@code -1} 表示还没打过），之后同一台机器每 {@link RunnerState#FAILURE_LOG_INTERVAL}
+     * tick 最多一条。节流状态挂在这台机器的瞬态状态里，{@code forget} 删机器时一起清掉，
+     * 重新加回来的机器能立刻再看见。</p>
+     *
+     * @param machine      出事的机器，日志里只取 short id
+     * @param machineState 这台机器的瞬态状态，用来记上次打日志的时间
+     * @param now          当前 game time
+     * @param cause        捕获到的异常，作为 throwable 参数打印完整栈
+     */
+    private static void logFailure(Machine machine, RunnerState.MachineState machineState, long now,
+            RuntimeException cause) {
+        if (machineState.lastFailureLogAt >= 0L
+                && now - machineState.lastFailureLogAt < RunnerState.FAILURE_LOG_INTERVAL) {
+            return;
+        }
+        machineState.lastFailureLogAt = now;
+        IdleFactory.LOGGER.warn("Idle Factory: 机器 {} 本轮 IO 异常，已跳过本轮",
+                machine.ref().shortId(), cause);
     }
 
     /**
