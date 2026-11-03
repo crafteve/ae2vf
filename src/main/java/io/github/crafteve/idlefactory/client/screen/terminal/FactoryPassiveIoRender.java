@@ -35,13 +35,11 @@ import net.minecraft.world.item.Items;
  * {@code scroll}，不改排版。所有静态外观来自 {@link FactoryNineSlice} 贴图与
  * {@link FactoryGuiTheme.Io} 色值。</p>
  *
- * <p>列表式为机器行 + 规则行 + 虚线新增行；磁贴式为机器行 + 77×34 磁贴两列 + 虚线新增磁贴。
- * 每台机器只有一圈机器大卡片，机器行是它顶部的一条深色带；状态灯（机器行状态、规则方向）
- * 统一走 {@link FactoryLamp}，落在卡片轮廓之内。</p>
+ * <p>列表式为机器行 + 规则行；磁贴式为机器行 + 77×34 磁贴两列。每台机器只有一圈机器大卡片，
+ * 机器行是它顶部的一条深色带；状态灯只画在机器行，走 {@link FactoryLamp}，落在卡片轮廓之内。
+ * 没有虚线新增行 / 磁贴：整张卡片就是拖入目标。</p>
  */
 final class FactoryPassiveIoRender {
-    /** 磁贴方向灯高（磁贴高减上下各 1px）。 */
-    private static final int TILE_LAMP_H = 32;
     /** 滚动到中途时，内容在视口上 / 下沿被切掉处的内阴影；由外向内逐像素变淡。 */
     private static final int[] SCROLL_EDGE_SHADE = {0x45000000, 0x26000000, 0x10000000};
     /** 悬停底色（白色 12%）。 */
@@ -96,11 +94,11 @@ final class FactoryPassiveIoRender {
             FactoryCard.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
                     viewport.width() - 1, box.bottom() - box.top(),
                     FactoryCard.Level.MACHINE, true);
-            drawMachineRow(graphics, viewport, block, top);
+            drawMachineRow(graphics, viewport, block, top, bottom);
             if (layout.view() == FactoryPassiveIoView.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
             } else {
-                drawTileBody(graphics, viewport, box, block, scroll, hover, dragging);
+                drawTileBody(graphics, viewport, box, block, scroll, hover);
             }
         }
         if (!dragging) {
@@ -157,10 +155,12 @@ final class FactoryPassiveIoRender {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hover.block());
         switch (hover.kind()) {
+            // 没有规则的机器没有块体，高亮不能越过卡片下边缘压到块间缝里。
             case MACHINE -> graphics.fill(FactoryPassiveIoLayout.headerX(viewport),
                     FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll),
                     FactoryPassiveIoLayout.contentRight(viewport),
-                    FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll), HOVER_FILL);
+                    FactoryPassiveIoLayout.screenY(viewport,
+                            Math.min(box.bodyTop(), box.bottom()), scroll), HOVER_FILL);
             case RULE -> {
                 if (layout.view() == FactoryPassiveIoView.LIST) {
                     int rowY = rowScreenY(layout, box, hover.rule(), scroll);
@@ -178,30 +178,13 @@ final class FactoryPassiveIoRender {
                             tileY + FactoryPassiveIoLayout.TILE_H - 1, HOVER_FILL);
                 }
             }
-            case ADD -> drawAddHover(graphics, layout, box, scroll);
-            default -> {
+            case ADD -> {
+                // 卡片空白区是拖入目标，悬停不铺色：拖拽高亮由 JEI / EMI 自己画。
+            }
+            case CHIP_DIR, CHIP_FACE, CHIP_MODE -> {
                 // chip 的高亮在 drawChip 内部按 chip 矩形画，这里不再叠第二层。
             }
         }
-    }
-
-    private void drawAddHover(GuiGraphics graphics, FactoryPassiveIoLayout layout, BlockBox box,
-            int scroll) {
-        Viewport viewport = layout.viewport();
-        if (layout.view() == FactoryPassiveIoView.LIST) {
-            int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
-            graphics.fill(FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD,
-                    y + 1, FactoryPassiveIoLayout.contentRight(viewport), y + FactoryPassiveIoLayout.ADD_ROW_H - 1,
-                    HOVER_FILL);
-            return;
-        }
-        int addIndex = box.ruleCount();
-        int row = addIndex / 2;
-        int col = addIndex % 2;
-        int x = FactoryPassiveIoLayout.tileX(viewport, col);
-        int y = FactoryPassiveIoLayout.tileRowY(viewport, box, row, scroll);
-        graphics.fill(x + 1, y + 1, x + FactoryPassiveIoLayout.TILE_W - 1,
-                y + FactoryPassiveIoLayout.TILE_H - 1, HOVER_FILL);
     }
 
     private int rowScreenY(FactoryPassiveIoLayout layout, BlockBox box, int rule, int scroll) {
@@ -215,17 +198,24 @@ final class FactoryPassiveIoRender {
      * 看起来就像浮在卡片外。现在深色带直接铺在机器大卡片内部，最左 3px 交给状态灯，
      * 卡片的下 / 右外阴影把灯一起收进轮廓里。</p>
      *
-     * @param graphics 画布
-     * @param viewport 视口
-     * @param block    块
-     * @param top      机器行上边缘（屏幕坐标）
+     * <p>高度再按块高夹一次：没有规则的机器整块只有机器行高，深色带不能盖掉卡片自己的
+     * 下暗边。</p>
+     *
+     * @param graphics    画布
+     * @param viewport    视口
+     * @param block       块
+     * @param top         机器行上边缘（屏幕坐标）
+     * @param blockBottom 机器大卡片下边缘（屏幕坐标）
      */
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
-            int top) {
+            int top, int blockBottom) {
         int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
         // 右边界排掉卡片最右 1px 竖边，深色带只铺在内区，卡片亮边 / 暗边保持完整。
         int right = FactoryPassiveIoLayout.bodyX(viewport) + viewport.width() - 2;
-        int height = FactoryPassiveIoLayout.MACHINE_ROW_H - 1;
+        int height = Math.min(FactoryPassiveIoLayout.MACHINE_ROW_H - 1, blockBottom - top - 2);
+        if (height <= 0) {
+            return;
+        }
         graphics.fill(left, top + 1, right, top + 1 + height, this.theme.io().machineRow());
         FactoryLamp.draw(graphics, left, top + 1, height, block.status().color());
         int slotX = FactoryPassiveIoLayout.headerX(viewport);
@@ -254,7 +244,6 @@ final class FactoryPassiveIoRender {
         for (int i = 0; i < block.rules().size(); i++) {
             drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
         }
-        drawAddRow(graphics, viewport, box, scroll, hover);
     }
 
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -263,9 +252,6 @@ final class FactoryPassiveIoRender {
         int x = FactoryPassiveIoLayout.bodyX(viewport);
         FactoryCard.draw(graphics, x + FactoryPassiveIoLayout.ROW_INSET, y,
                 viewport.width() - 4, FactoryPassiveIoLayout.ROW_H, FactoryCard.Level.IO, true);
-        // 方向灯顶掉卡片最左一条竖边，和机器行状态灯同一套画法、同一高度规则。
-        FactoryLamp.draw(graphics, x + FactoryPassiveIoLayout.ROW_INSET, y,
-                FactoryPassiveIoLayout.ROW_H, directionColor(rule));
         int slotX = FactoryPassiveIoLayout.slotX(viewport);
         int slotY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.SLOT) / 2;
         FactoryNineSlice.slot(graphics, slotX, slotY, FactoryPassiveIoLayout.SLOT,
@@ -352,34 +338,11 @@ final class FactoryPassiveIoRender {
         return FactoryLabels.rateText(rule.rate(), kind);
     }
 
-    private void drawAddRow(GuiGraphics graphics, Viewport viewport, BlockBox box, int scroll,
-            @Nullable Hit hover) {
-        int x = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD;
-        int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
-        int width = FactoryPassiveIoLayout.contentRight(viewport) - x;
-        boolean hovered = hover != null && hover.kind() == FactoryPassiveIoLayout.Kind.ADD
-                && hover.block() == box.index();
-        dashedRect(graphics, x, y, width, FactoryPassiveIoLayout.ADD_ROW_H,
-                hovered ? this.theme.textValue() : this.theme.textDim());
-        graphics.drawString(this.font, "+ 拖到这里新建行", x + 4,
-                y + (FactoryPassiveIoLayout.ADD_ROW_H - 8) / 2,
-                hovered ? this.theme.textValue() : this.theme.textDim(), false);
-    }
-
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, int scroll, @Nullable Hit hover, boolean dragging) {
-        int count = block.rules().size();
-        for (int i = 0; i <= count; i++) {
-            int row = i / 2;
-            int col = i % 2;
-            int tileX = FactoryPassiveIoLayout.tileX(viewport, col);
-            int tileY = FactoryPassiveIoLayout.tileRowY(viewport, box, row, scroll);
-            if (i == count) {
-                drawAddTile(graphics, tileX, tileY, hover != null
-                        && hover.kind() == FactoryPassiveIoLayout.Kind.ADD
-                        && hover.block() == box.index(), dragging);
-                continue;
-            }
+            BlockView block, int scroll, @Nullable Hit hover) {
+        for (int i = 0; i < block.rules().size(); i++) {
+            int tileX = FactoryPassiveIoLayout.tileX(viewport, i % 2);
+            int tileY = FactoryPassiveIoLayout.tileRowY(viewport, box, i / 2, scroll);
             drawTile(graphics, viewport, block, block.rules().get(i), box.index(), i, tileX,
                     tileY, hover);
         }
@@ -389,7 +352,6 @@ final class FactoryPassiveIoRender {
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
         FactoryCard.draw(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
                 FactoryPassiveIoLayout.TILE_H, FactoryCard.Level.IO, true);
-        FactoryLamp.draw(graphics, x + 1, y + 1, TILE_LAMP_H, directionColor(rule));
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;
         FactoryNineSlice.slot(graphics, slotX, y + 2, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
@@ -417,16 +379,6 @@ final class FactoryPassiveIoRender {
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 1, color,
                 false);
-    }
-
-    private void drawAddTile(GuiGraphics graphics, int x, int y, boolean hovered,
-            boolean dragging) {
-        dashedRect(graphics, x, y, FactoryPassiveIoLayout.TILE_W, FactoryPassiveIoLayout.TILE_H,
-                hovered || dragging ? this.theme.textValue() : this.theme.textDim());
-        String plus = "+";
-        int plusX = x + (FactoryPassiveIoLayout.TILE_W - this.font.width(plus)) / 2;
-        graphics.drawString(this.font, plus, plusX, y + 12,
-                hovered || dragging ? this.theme.textValue() : this.theme.textDim(), false);
     }
 
     /**

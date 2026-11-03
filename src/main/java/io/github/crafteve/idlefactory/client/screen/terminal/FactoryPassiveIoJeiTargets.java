@@ -23,7 +23,7 @@ import net.minecraft.world.item.ItemStack;
 /**
  * 被动 IO 内容区的 JEI 目标：R/U 查询区域与拖拽新建区域。
  *
- * <p>两类目标都从同一份排版算出来：拖拽目标是每台机器的虚线新增行 / 虚线新增磁贴，查询目标是
+ * <p>两类目标都从同一份排版算出来：拖拽目标是整张机器大卡片（含机器行），查询目标是
  * 机器图标与规则图标。几何不在插件里重算，插件只负责把目标交给 JEI。</p>
  */
 public final class FactoryPassiveIoJeiTargets {
@@ -35,7 +35,7 @@ public final class FactoryPassiveIoJeiTargets {
      * 一条 JEI 拖拽目标。
      *
      * @param block 机器块下标
-     * @param area  虚线新增行 / 磁贴的屏幕区域
+     * @param area  机器大卡片的屏幕区域（已按视口裁剪）
      */
     public record AddTarget(int block, Rect2i area) {
     }
@@ -53,6 +53,9 @@ public final class FactoryPassiveIoJeiTargets {
     /**
      * 构造全部拖拽目标。
      *
+     * <p>每台机器一条，区域就是它的机器大卡片：整卡可拖入，不再依赖虚线新增行。
+     * 区域按视口裁剪，滚出视口的部分不参与命中，否则拖拽高亮会画到滚动条或背包槽上。</p>
+     *
      * @param layout 当前排版
      * @param scroll 当前滚动
      * @return 每台机器一条
@@ -60,20 +63,18 @@ public final class FactoryPassiveIoJeiTargets {
     static List<AddTarget> addTargets(FactoryPassiveIoLayout layout, int scroll) {
         List<AddTarget> targets = new ArrayList<>();
         Viewport viewport = layout.viewport();
+        int left = FactoryPassiveIoLayout.bodyX(viewport);
+        int width = viewport.width() - 1;
+        int viewTop = viewport.y();
+        int viewBottom = viewport.y() + viewport.height();
         for (BlockBox box : layout.boxes()) {
-            if (layout.view() == FactoryPassiveIoView.LIST) {
-                int x = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD;
-                int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
-                targets.add(new AddTarget(box.index(), new Rect2i(x, y,
-                        FactoryPassiveIoLayout.contentRight(viewport) - x,
-                        FactoryPassiveIoLayout.ADD_ROW_H)));
-            } else {
-                int add = box.ruleCount();
-                int x = FactoryPassiveIoLayout.tileX(viewport, add % 2);
-                int y = FactoryPassiveIoLayout.tileRowY(viewport, box, add / 2, scroll);
-                targets.add(new AddTarget(box.index(), new Rect2i(x, y,
-                        FactoryPassiveIoLayout.TILE_W, FactoryPassiveIoLayout.TILE_H)));
+            int top = Math.max(viewTop, FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll));
+            int bottom = Math.min(viewBottom,
+                    FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll));
+            if (bottom <= top) {
+                continue;
             }
+            targets.add(new AddTarget(box.index(), new Rect2i(left, top, width, bottom - top)));
         }
         return targets;
     }

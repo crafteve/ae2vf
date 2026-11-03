@@ -14,8 +14,8 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * <p>块从内容顶部开始顺序铺开，坐标相对内容区（不叠加视口原点与滚动 Offset），绘制、命中、
  * tooltip 和 JEI 都从这里取同一份结果。滚动只在取值时加 {@code scroll}，不重建排版。</p>
  *
- * <p>块内结构（列表式）：机器行 20 → 规则行 20×n → 虚线新增行 20；磁贴式：机器行 20 →
- * 磁贴区（上下各 2 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，刚好容下 1px 外阴影。</p>
+ * <p>块内结构（列表式）：机器行 20 → 规则行 20×n；磁贴式：机器行 20 → 磁贴区
+ * （上下各 2 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，刚好容下 1px 外阴影。</p>
  */
 final class FactoryPassiveIoLayout {
     /** 规则行高。 */
@@ -24,8 +24,6 @@ final class FactoryPassiveIoLayout {
     static final int ROW_GAP = 2;
     /** 机器行高。 */
     static final int MACHINE_ROW_H = 20;
-    /** 虚线新增行高。 */
-    static final int ADD_ROW_H = 20;
     /** 块间距：留 2px 刚好一件 1px 外阴影 + 1px 空隙。 */
     static final int BLOCK_GAP = 2;
     /** 机器行与下面卡片之间的间距。 */
@@ -34,8 +32,10 @@ final class FactoryPassiveIoLayout {
     static final int STATUS_W = FactoryLamp.WIDTH;
     /** 块内左右内边距。 */
     static final int PAD = 2;
-    /** 规则行 / 磁贴卡片相对块左边缘的内缩；状态灯顶掉卡片最左一条竖边。 */
+    /** 规则行 / 磁贴卡片相对块左边缘的内缩；卡片与块之间留 1px 让外阴影收口。 */
     static final int ROW_INSET = 1;
+    /** 规则行内容左缩进：卡片内缩 + 内边距。 */
+    static final int CONTENT_INSET = ROW_INSET + PAD;
     /** 图标凹槽边长。 */
     static final int SLOT = 18;
     /** 行内元素间距。 */
@@ -57,10 +57,10 @@ final class FactoryPassiveIoLayout {
     static final int BADGE_H = 11;
     /** 磁贴第二行（chip 行）相对磁贴顶部的偏移。 */
     static final int TILE_CHIP_Y = 20;
-    /** 磁贴内容左缩进：1px 高光边 + 3px 方向条 + 2px 间距。 */
-    static final int TILE_INSET = 6;
-    /** 磁贴里名字的 x 偏移。 */
-    static final int TILE_NAME_X = 26;
+    /** 磁贴内容左缩进：1px 卡片边 + 1px 内边距。 */
+    static final int TILE_INSET = 2;
+    /** 磁贴里名字的 x 偏移：图标凹槽之后再空 2px。 */
+    static final int TILE_NAME_X = TILE_INSET + SLOT + 2;
 
     /**
      * 内容视口。
@@ -76,14 +76,15 @@ final class FactoryPassiveIoLayout {
     /**
      * 一块在内容坐标系里的位置。
      *
+     * <p>没有单独的「新增行」：整块卡片就是拖入目标，空白区由 {@link Kind#ADD} 命中。</p>
+     *
      * @param index     块下标
      * @param top       上边缘
      * @param bodyTop   块体上边缘（机器行之下）
-     * @param addTop    虚线新增行上边缘（列表式）
      * @param bottom    下边缘
      * @param ruleCount 这块有几条规则
      */
-    record BlockBox(int index, int top, int bodyTop, int addTop, int bottom, int ruleCount) {
+    record BlockBox(int index, int top, int bodyTop, int bottom, int ruleCount) {
     }
 
     /** 命中种类。 */
@@ -98,7 +99,7 @@ final class FactoryPassiveIoLayout {
         CHIP_FACE,
         /** 模式 chip。 */
         CHIP_MODE,
-        /** 虚线新增行 / 虚线磁贴。 */
+        /** 机器卡片的空白区：行缝、规则之后、空机器的卡底；拖入资源即在这里新建规则。 */
         ADD
     }
 
@@ -141,8 +142,8 @@ final class FactoryPassiveIoLayout {
             FactoryPassiveIoModel.BlockView block = blocks.get(i);
             int height = blockHeight(block, view);
             int bodyTop = cursor + MACHINE_ROW_H + BODY_GAP;
-            boxes.add(new BlockBox(i, cursor, bodyTop,
-                    cursor + height - ADD_ROW_H, cursor + height, block.rules().size()));
+            boxes.add(new BlockBox(i, cursor, bodyTop, cursor + height,
+                    block.rules().size()));
             cursor += height + BLOCK_GAP;
         }
         int contentHeight = boxes.isEmpty() ? 0 : cursor - BLOCK_GAP;
@@ -152,17 +153,21 @@ final class FactoryPassiveIoLayout {
     /**
      * 一块的高度。
      *
+     * <p>没有规则时只保留机器行：整张卡片就是拖入目标，不再额外留一条空行。</p>
+     *
      * @param block 块
      * @param view  视图
      * @return 像素高度
      */
     static int blockHeight(FactoryPassiveIoModel.BlockView block, FactoryPassiveIoView view) {
         int rules = block.rules().size();
-        if (view == FactoryPassiveIoView.LIST) {
-            return MACHINE_ROW_H + BODY_GAP + rules * (ROW_H + ROW_GAP) + ADD_ROW_H;
+        if (rules == 0) {
+            return MACHINE_ROW_H;
         }
-        int tiles = rules + 1;
-        int rows = (tiles + 1) / 2;
+        if (view == FactoryPassiveIoView.LIST) {
+            return MACHINE_ROW_H + BODY_GAP + rules * ROW_H + (rules - 1) * ROW_GAP;
+        }
+        int rows = (rules + 1) / 2;
         return MACHINE_ROW_H + BODY_GAP + TILE_PAD + rows * TILE_H + (rows - 1) * TILE_GAP
                 + TILE_PAD;
     }
@@ -233,18 +238,14 @@ final class FactoryPassiveIoLayout {
         return null;
     }
 
-    @Nullable
     private Hit hitList(BlockBox box, int localX, int localY) {
-        if (localY >= box.addTop()) {
-            return new Hit(Kind.ADD, box.index(), -1);
-        }
         int pitch = ROW_H + ROW_GAP;
         int rule = (localY - box.bodyTop()) / pitch;
-        int rowY = box.bodyTop() + rule * pitch;
-        // 行与行之间的 2px 缝隙不属于任何一张卡。
-        if (localY >= rowY + ROW_H) {
-            return null;
+        // 行缝、最后一行之下、空机器的卡底都属于拖入区：没有单独的虚线新增行。
+        if (rule >= box.ruleCount() || localY >= box.bodyTop() + rule * pitch + ROW_H) {
+            return new Hit(Kind.ADD, box.index(), -1);
         }
+        int rowY = box.bodyTop() + rule * pitch;
         int chipY = rowY + (ROW_H - CHIP) / 2;
         if (localY >= chipY && localY < chipY + CHIP) {
             if (inside(localX, chipX(this.viewport, 0), CHIP)) {
@@ -260,27 +261,21 @@ final class FactoryPassiveIoLayout {
         return new Hit(Kind.RULE, box.index(), rule);
     }
 
-    @Nullable
     private Hit hitTiles(BlockBox box, int localX, int localY) {
         int relY = localY - (box.bodyTop() + TILE_PAD);
         if (relY < 0) {
-            return null;
+            return new Hit(Kind.ADD, box.index(), -1);
         }
         int row = relY / (TILE_H + TILE_GAP);
         int inTileY = relY - row * (TILE_H + TILE_GAP);
         if (inTileY >= TILE_H) {
-            return null;
+            return new Hit(Kind.ADD, box.index(), -1);
         }
         int col = inside(localX, tileX(this.viewport, 0), TILE_W) ? 0
                 : inside(localX, tileX(this.viewport, 1), TILE_W) ? 1 : -1;
-        if (col < 0) {
-            return null;
-        }
-        int tile = row * 2 + col;
-        if (tile > box.ruleCount()) {
-            return null;
-        }
-        if (tile == box.ruleCount()) {
+        int tile = col < 0 ? -1 : row * 2 + col;
+        // 磁贴缝、最后一块磁贴之后、空机器的卡底同样属于拖入区。
+        if (tile < 0 || tile >= box.ruleCount()) {
             return new Hit(Kind.ADD, box.index(), -1);
         }
         int chipY = box.bodyTop() + TILE_PAD + row * (TILE_H + TILE_GAP) + TILE_CHIP_Y;
@@ -307,7 +302,7 @@ final class FactoryPassiveIoLayout {
      * 机器行内容左边缘（屏幕坐标）。
      *
      * <p>机器行是机器大卡片顶部的一条深色带，状态灯顶掉卡片最左一条竖边；内容从灯的右侧
-     * 再空 1px 开始，和 {@link #slotX} 的推导保持同一套缩进。</p>
+     * 再空 1px 开始。</p>
      */
     static int headerX(Viewport viewport) {
         return viewport.x() + ROW_INSET + STATUS_W + GAP;
@@ -316,8 +311,8 @@ final class FactoryPassiveIoLayout {
     /**
      * 规则 / 磁贴主体左边缘（屏幕坐标）。
      *
-     * <p>机器大卡片铺到内容区最左边；规则行与磁贴再内缩 {@link #ROW_INSET}，让状态灯
-     * 顶掉卡片最左一条竖边。</p>
+     * <p>机器大卡片铺到内容区最左边，规则行与磁贴再内缩 {@link #ROW_INSET}，
+     * 给卡片外阴影留 1px。</p>
      */
     static int bodyX(Viewport viewport) {
         return viewport.x();
@@ -328,9 +323,9 @@ final class FactoryPassiveIoLayout {
         return viewport.x() + viewport.width() - PAD;
     }
 
-    /** 规则行图标凹槽 x：卡片内缩 + 状态灯 + 1px 间隙。 */
+    /** 规则行图标凹槽 x：卡片内缩 + 内边距。 */
     static int slotX(Viewport viewport) {
-        return bodyX(viewport) + ROW_INSET + STATUS_W + GAP;
+        return bodyX(viewport) + CONTENT_INSET;
     }
 
     /** 规则行名字 x。 */

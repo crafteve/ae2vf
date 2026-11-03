@@ -13,7 +13,6 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
@@ -45,8 +44,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 内容区的模型、排版、绘制、滚动、JEI 目标与探针各自独立，屏幕类不内联任何卡片坐标。</p>
  *
  * <p>请求节拍与旧工作台一致：每 {@link #REQUEST_INTERVAL} tick 拉一份机器表；界面不靠服务端
- * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈在内容区底部停 {@link #FEEDBACK_TICKS}
- * tick。</p>
+ * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈不在界面上展示，动作结果只由随后
+ * 到达的机器快照体现。</p>
  */
 public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         implements FactoryTableSink {
@@ -62,8 +61,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private static final int WORK_GAP = 2;
     /** 机器表请求节拍。 */
     private static final int REQUEST_INTERVAL = 20;
-    /** 编辑反馈停留 tick。 */
-    private static final int FEEDBACK_TICKS = 40;
     /** 顶栏搜索框的外框位置与尺寸。 */
     private static final int SEARCH_X = 46;
     private static final int SEARCH_Y = 4;
@@ -94,12 +91,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     /** 顶栏搜索框。 */
     @Nullable
     private FactorySearchEditBox searchBox;
-    /** 最近一次编辑反馈文案。 */
-    private String feedback = "";
-    /** 最近一次编辑反馈是否成功。 */
-    private boolean feedbackOk;
-    /** 反馈剩余显示 tick。 */
-    private int feedbackTicks;
     /** 是否正在从 JEI 拖动资源。 */
     private boolean jeiDragging;
     /** 上一次日志签名，避免每秒刷一行表快照。 */
@@ -191,10 +182,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         FactoryPassiveIoChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
-        if (this.feedbackTicks > 0 && this.layout != null) {
-            FactoryPassiveIoChrome.drawFeedback(graphics, this.font, this.layout.viewport(),
-                    this.feedback, this.feedbackOk);
-        }
         List<Component> tooltip = FactoryPassiveIoTooltip.of(this.model.blocks(), hover);
         if (!tooltip.isEmpty()) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
@@ -227,9 +214,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     @Override
     public void containerTick() {
         super.containerTick();
-        if (this.feedbackTicks > 0) {
-            this.feedbackTicks--;
-        }
         if (++this.requestTicker >= REQUEST_INTERVAL) {
             this.requestTicker = 0;
             requestTable();
@@ -283,13 +267,17 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         }
     }
 
+    /**
+     * 编辑反馈不再展示。
+     *
+     * <p>终端里没有提示条：动作是否生效由随后到达的机器快照体现，失败时规则会原样留在表里。
+     * 接口是两屏共用的，旧工作台仍需要这条反馈，所以这里保留空实现而不是删方法。</p>
+     *
+     * @param payload 反馈
+     */
     @Override
     public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
-        this.feedback = payload.message();
-        this.feedbackOk = payload.ok();
-        this.feedbackTicks = FEEDBACK_TICKS;
-        IdleFactory.LOGGER.info("[ui-probe] feedback ok={} message={}", payload.ok(),
-                payload.message());
+        // 不展示、不记状态。
     }
 
     /**
