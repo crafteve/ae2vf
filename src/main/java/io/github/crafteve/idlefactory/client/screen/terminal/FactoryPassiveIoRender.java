@@ -6,7 +6,6 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
@@ -46,6 +45,8 @@ final class FactoryPassiveIoRender {
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** chip 悬停提亮（白色 20%）。 */
     private static final int CHIP_HOVER = 0x33FFFFFF;
+    /** 卡片外阴影。 */
+    private static final int CARD_SHADOW = 0x33000000;
     /** 磁贴里速率列宽。 */
     private static final int TILE_RATE_W = 32;
     /** 磁贴名字宽。 */
@@ -181,7 +182,7 @@ final class FactoryPassiveIoRender {
             int top) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
-        FactoryNineSlice.listMachineRow(graphics, x, top, width,
+        FactoryNineSlice.machineCard(graphics, x, top, width,
                 FactoryPassiveIoLayout.MACHINE_ROW_H);
         int slotX = x + FactoryPassiveIoLayout.PAD;
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
@@ -196,11 +197,11 @@ final class FactoryPassiveIoRender {
         int badge1X = badge2X - 2 - FactoryPassiveIoLayout.BADGE_W;
         graphics.drawString(this.font,
                 ellipsize(block.name(), badge1X - 2 - nameX), nameX, top + 6,
-                this.theme.textPrimary(), false);
+                0xFFFFFFFF, false);
         dashedRect(graphics, badge1X, top + 4, FactoryPassiveIoLayout.BADGE_W,
-                FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
+                FactoryPassiveIoLayout.BADGE_H, 0xFFD8D9DF);
         dashedRect(graphics, badge2X, top + 4, FactoryPassiveIoLayout.BADGE_W,
-                FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
+                FactoryPassiveIoLayout.BADGE_H, 0xFFD8D9DF);
         FactoryNineSlice.icon(graphics, block.status().lamp(), right - 4, top + 8, 4);
     }
 
@@ -210,8 +211,10 @@ final class FactoryPassiveIoRender {
         int width = viewport.width();
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
-                bottom - bodyTop);
+        FactoryNineSlice.card(graphics, x, bodyTop, width, bottom - bodyTop);
+        // 卡片外 1px 阴影，和亮边一起把块从终端底板上抬起来。
+        graphics.fill(x + 1, bottom, x + width, bottom + 1, CARD_SHADOW);
+        graphics.fill(x + width, bodyTop + 1, x + width + 1, bottom + 1, CARD_SHADOW);
         for (int i = 0; i < block.rules().size(); i++) {
             drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
         }
@@ -222,6 +225,8 @@ final class FactoryPassiveIoRender {
             BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.bodyX(viewport);
+        FactoryNineSlice.card(graphics, x + 1, y, viewport.width() - 2,
+                FactoryPassiveIoLayout.ROW_H);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
                 x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
                 y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
@@ -331,8 +336,10 @@ final class FactoryPassiveIoRender {
         int width = viewport.width();
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
-                bottom - bodyTop);
+        FactoryNineSlice.card(graphics, x, bodyTop, width, bottom - bodyTop);
+        // 卡片外 1px 阴影，和亮边一起把块从终端底板上抬起来。
+        graphics.fill(x + 1, bottom, x + width, bottom + 1, CARD_SHADOW);
+        graphics.fill(x + width, bodyTop + 1, x + width + 1, bottom + 1, CARD_SHADOW);
         int count = block.rules().size();
         for (int i = 0; i <= count; i++) {
             int row = i / 2;
@@ -352,7 +359,7 @@ final class FactoryPassiveIoRender {
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
-        FactoryNineSlice.listTile(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
+        FactoryNineSlice.card(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
                 FactoryPassiveIoLayout.TILE_H);
         graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
                 directionColor(rule));

@@ -19,6 +19,8 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 final class FactoryPassiveIoLayout {
     /** 规则行高。 */
     static final int ROW_H = 20;
+    /** 列表规则行之间的间距。 */
+    static final int ROW_GAP = 2;
     /** 机器行高。 */
     static final int MACHINE_ROW_H = 20;
     /** 虚线新增行高。 */
@@ -44,7 +46,7 @@ final class FactoryPassiveIoLayout {
     /** 磁贴高。 */
     static final int TILE_H = 34;
     /** 磁贴列间隔。 */
-    static final int TILE_GAP = 3;
+    static final int TILE_GAP = 2;
     /** 磁贴区内边距。 */
     static final int TILE_PAD = 3;
     /** 机器行徽标宽 / 高。 */
@@ -153,7 +155,7 @@ final class FactoryPassiveIoLayout {
     static int blockHeight(FactoryPassiveIoModel.BlockView block, FactoryPassiveIoView view) {
         int rules = block.rules().size();
         if (view == FactoryPassiveIoView.LIST) {
-            return MACHINE_ROW_H + rules * ROW_H + ADD_ROW_H;
+            return MACHINE_ROW_H + rules * (ROW_H + ROW_GAP) + ADD_ROW_H;
         }
         int tiles = rules + 1;
         int rows = (tiles + 1) / 2;
@@ -227,8 +229,13 @@ final class FactoryPassiveIoLayout {
         if (localY >= box.addTop()) {
             return new Hit(Kind.ADD, box.index(), -1);
         }
-        int rule = (localY - box.bodyTop()) / ROW_H;
-        int rowY = box.bodyTop() + rule * ROW_H;
+        int pitch = ROW_H + ROW_GAP;
+        int rule = (localY - box.bodyTop()) / pitch;
+        int rowY = box.bodyTop() + rule * pitch;
+        // 行与行之间的 2px 缝隙不属于任何一张卡。
+        if (localY >= rowY + ROW_H) {
+            return null;
+        }
         int chipY = rowY + (ROW_H - CHIP) / 2;
         if (localY >= chipY && localY < chipY + CHIP) {
             if (inside(localX, chipX(this.viewport, 0), CHIP)) {
@@ -347,7 +354,7 @@ final class FactoryPassiveIoLayout {
 
     /** 列表式某一行的屏幕 y。 */
     static int rowY(Viewport viewport, BlockBox box, int rule, int scroll) {
-        return viewport.y() - scroll + box.bodyTop() + rule * ROW_H;
+        return viewport.y() - scroll + box.bodyTop() + rule * (ROW_H + ROW_GAP);
     }
 
     /** 磁贴区某一行的屏幕 y。 */

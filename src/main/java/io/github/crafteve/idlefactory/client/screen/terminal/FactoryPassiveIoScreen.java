@@ -56,8 +56,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private static final int CONTENT_PADDING = 4;
     /** 右侧滚动条占用的宽度；内容不能压到滚动条下面。 */
     private static final int SCROLLBAR_RESERVE = 20;
-    /** 工作区描边框宽：内容区再往里缩 2px，给描边让位。 */
-    private static final int WORK_FRAME = 2;
+    /** 工作区描边框宽：内容区再往里缩 1px，给亮边让位。 */
+    private static final int WORK_FRAME = 1;
     /** 描边框与顶栏搜索框之间的间距。 */
     private static final int WORK_GAP = 2;
     /** 机器表请求节拍。 */

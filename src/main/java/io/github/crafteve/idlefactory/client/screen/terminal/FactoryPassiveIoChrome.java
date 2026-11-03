@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 
@@ -28,8 +28,8 @@ final class FactoryPassiveIoChrome {
     }
 
     /**
-     * 画自绘滚动区的 2px 描边：外层深色 1px + 内层亮色 1px，和 V1 左表同款，
-     * 让内容区看起来是浮在终端面板上的一扇窗口。
+     * 画自绘滚动区的亮色描边 + 阴影：上 / 左 1px 亮边，下 / 右 1px 暗边，
+     * 再在下 / 右外面压 1px 半透明阴影。参考 AE2 样板管理终端的槽位区边框。
      *
      * @param graphics 画布
      * @param x        左边缘
@@ -41,20 +41,16 @@ final class FactoryPassiveIoChrome {
         if (width <= 3 || height <= 3) {
             return;
         }
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y + height - 1,
-                width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, 1, height);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + width - 1, y, 1,
-                height);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1,
-                width - 2, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1, 1,
-                height - 2);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + height - 2,
-                width - 2, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 2, y + 1,
-                1, height - 2);
+        FactoryGuiTheme theme = FactoryGuiTheme.current();
+        // 外阴影先画，避免盖住亮边。
+        graphics.fill(x + 1, y + height, x + width, y + height + 1, 0x55000000);
+        graphics.fill(x + width, y + 1, x + width + 1, y + height + 1, 0x55000000);
+        int light = theme.panelBorderLight();
+        graphics.fill(x, y, x + width, y + 1, light);
+        graphics.fill(x, y, x + 1, y + height, light);
+        int dark = theme.slotBorderDark();
+        graphics.fill(x, y + height - 1, x + width, y + height, dark);
+        graphics.fill(x + width - 1, y, x + width, y + height, dark);
     }
 
     /**
@@ -79,22 +75,8 @@ final class FactoryPassiveIoChrome {
      * @param height   高
      */
     static void drawSearchField(GuiGraphics graphics, int x, int y, int width, int height) {
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BG, x + 2, y + 2,
-                width - 4, height - 4);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y, width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y + height - 1,
-                width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x, y, 1, height);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_BORDER, x + width - 1, y, 1,
-                height);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_SHADOW, x + 1, y + 1,
-                width - 2, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_SHADOW, x + 1, y + 1, 1,
-                height - 2);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_HIGHLIGHT, x + 1,
-                y + height - 2, width - 2, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.SEARCH_HIGHLIGHT, x + width - 2,
-                y + 1, 1, height - 2);
+        // AE2 原生搜索框贴图：亮色边框 + 内凹阴影，和样板管理终端同款。
+        FactoryNineSlice.ae2TextField(graphics, x, y, width);
     }
 
     /**
