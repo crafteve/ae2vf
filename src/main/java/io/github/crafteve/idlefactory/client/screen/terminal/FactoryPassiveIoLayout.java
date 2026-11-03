@@ -13,16 +13,16 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * <p>块从内容顶部开始顺序铺开，坐标相对内容区（不叠加视口原点与滚动 Offset），绘制、命中、
  * tooltip 和 JEI 都从这里取同一份结果。滚动只在取值时加 {@code scroll}，不重建排版。</p>
  *
- * <p>块内结构（列表式）：机器行 20 → 规则行 18×n → 虚线新增行 18；磁贴式：机器行 20 →
+ * <p>块内结构（列表式）：机器行 20 → 规则行 20×n → 虚线新增行 20；磁贴式：机器行 20 →
  * 磁贴区（上下各 3 内边距，77×34 两列，间隔 4）。块左侧 3px 状态竖线贯穿整块。</p>
  */
 final class FactoryPassiveIoLayout {
     /** 规则行高。 */
-    static final int ROW_H = 18;
+    static final int ROW_H = 20;
     /** 机器行高。 */
     static final int MACHINE_ROW_H = 20;
     /** 虚线新增行高。 */
-    static final int ADD_ROW_H = 18;
+    static final int ADD_ROW_H = 20;
     /** 块间距。 */
     static final int BLOCK_GAP = 3;
     /** 块左侧状态竖线宽。 */

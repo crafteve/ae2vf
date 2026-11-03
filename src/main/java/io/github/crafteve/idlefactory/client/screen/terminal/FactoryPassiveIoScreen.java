@@ -158,11 +158,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         FactoryPassiveIoFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
         // AE2 的终端行贴图中间带一排物品槽（ME 终端用来放仓库格）；本界面内容区自绘，
-        // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。左右各留 2px
-        // 让终端自己的亮边保留下来。
+        // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。右侧 174 之后是
+        // AE2 终端自带的滚动条滑轨（178~183），必须留着，否则滚动条只剩滑块没有轨道。
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
         graphics.fill(this.leftPos + 2, this.topPos + header,
-                this.leftPos + this.imageWidth - 2,
+                this.leftPos + this.imageWidth - 21,
                 this.topPos + header + this.rows * rowHeight(),
                 FactoryGuiTheme.current().panelBg());
         FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
@@ -362,6 +362,18 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      */
     public List<AddTarget> addTargets() {
         this.jeiDragging = true;
+        return targets();
+    }
+
+    /**
+     * 只算虚线新增区域，不改拖拽状态。
+     *
+     * <p>EMI 自己画拖拽高亮，不需要 {@code jeiDragging}；如果复用 {@link #addTargets()}，
+     * EMI 拖完没有 JEI 的 {@code onComplete} 来复位，虚线会一直亮着。</p>
+     *
+     * @return 目标列表
+     */
+    public List<AddTarget> targets() {
         if (this.layout == null) {
             return List.of();
         }

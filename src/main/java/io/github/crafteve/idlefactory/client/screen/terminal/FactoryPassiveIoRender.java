@@ -38,8 +38,6 @@ import net.minecraft.world.item.Items;
  * 块左侧 3px 状态竖线贯穿整块，是分组边界也是状态表达。</p>
  */
 final class FactoryPassiveIoRender {
-    /** 规则行方向色条高度。 */
-    private static final int DIR_STRIPE_H = 18;
     /** 磁贴方向色条高度（磁贴高减上下各 1px）。 */
     private static final int TILE_DIR_STRIPE_H = 32;
     /** 磁贴方向色条宽。 */
@@ -242,18 +240,21 @@ final class FactoryPassiveIoRender {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
                 x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
-                y + DIR_STRIPE_H, directionColor(rule));
+                y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
         int slotX = FactoryPassiveIoLayout.slotX(viewport);
-        FactoryNineSlice.slot(graphics, slotX, y, FactoryPassiveIoLayout.SLOT,
+        int slotY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.SLOT) / 2;
+        FactoryNineSlice.slot(graphics, slotX, slotY, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), slotX + 1, y + 1);
+        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), slotX + 1,
+                slotY + 1);
         int nameX = FactoryPassiveIoLayout.nameX(viewport);
         int chipX = FactoryPassiveIoLayout.chipX(viewport, 0);
+        int textY = y + (FactoryPassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
-                y + 4, this.theme.textPrimary(), false);
+                textY, this.theme.textPrimary(), false);
         drawChips(graphics, viewport, block, rule, y, chipIndex(hover, index));
-        drawRate(graphics, rule, y + 4,
+        drawRate(graphics, rule, textY,
                 FactoryPassiveIoLayout.rateX(viewport) + FactoryPassiveIoLayout.RATE_W,
                 FactoryPassiveIoLayout.RATE_W);
     }
@@ -333,7 +334,8 @@ final class FactoryPassiveIoRender {
                 && hover.block() == box.index();
         dashedRect(graphics, x, y, width, FactoryPassiveIoLayout.ADD_ROW_H,
                 hovered ? this.theme.textValue() : this.theme.textDim());
-        graphics.drawString(this.font, "+ 拖到这里新建行", x + 4, y + 5,
+        graphics.drawString(this.font, "+ 拖到这里新建行", x + 4,
+                y + (FactoryPassiveIoLayout.ADD_ROW_H - 8) / 2,
                 hovered ? this.theme.textValue() : this.theme.textDim(), false);
     }
 
