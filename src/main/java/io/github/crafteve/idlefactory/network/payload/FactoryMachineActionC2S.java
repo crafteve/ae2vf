@@ -8,7 +8,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.MachineActions;
-import io.github.crafteve.idlefactory.menu.FactoryTerminalMenus;
+import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
 
 import io.netty.handler.codec.DecoderException;
@@ -60,7 +60,7 @@ public record FactoryMachineActionC2S(int containerId, UUID machineId)
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            if (!FactoryTerminalMenus.isFactoryMenu(player.containerMenu, payload.containerId())) {
+            if (!FactoryGuiOpening.isFactoryMenu(player.containerMenu, payload.containerId())) {
                 return;
             }
             FactoryRuntime runtime = FactoryRuntime.get();

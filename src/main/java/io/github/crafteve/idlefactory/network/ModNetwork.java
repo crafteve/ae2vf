@@ -5,16 +5,12 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryPatternSlotActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSwitchC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryTerminalTargetsS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 import io.github.crafteve.idlefactory.network.payload.OpenFactoryGuiC2S;
 
@@ -30,12 +26,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、仓库动作、机器动作、IO 规则动作、编辑反馈、终端打开界面与
- * 绑定杖链接同步。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
+ * <p>当前包含机器表、仓库快照、仓库动作、机器动作、IO 规则动作、编辑反馈、界面打开请求与
+ * 绑定杖链接同步。第二版终端的视图切换与样板目标包已删除。改包结构时记得递增
+ * {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "22";
+    public static final String PROTOCOL_VERSION = "23";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -95,16 +92,6 @@ public final class ModNetwork {
                 FactoryLinksRequestC2S::handle);
         registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
                 FactoryLinksS2C::handle);
-
-        // 工厂终端：视图切换、样板槽动作与目标快照
-        registrar.playToServer(FactoryTerminalSwitchC2S.TYPE,
-                FactoryTerminalSwitchC2S.STREAM_CODEC, FactoryTerminalSwitchC2S::handle);
-        registrar.playToServer(FactoryPatternSlotActionC2S.TYPE,
-                FactoryPatternSlotActionC2S.STREAM_CODEC, FactoryPatternSlotActionC2S::handle);
-        registrar.playToClient(FactoryTerminalTargetsS2C.TYPE,
-                FactoryTerminalTargetsS2C.STREAM_CODEC, FactoryTerminalTargetsS2C::handle);
-        registrar.playToClient(FactoryTerminalTargetS2C.TYPE,
-                FactoryTerminalTargetS2C.STREAM_CODEC, FactoryTerminalTargetS2C::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }
