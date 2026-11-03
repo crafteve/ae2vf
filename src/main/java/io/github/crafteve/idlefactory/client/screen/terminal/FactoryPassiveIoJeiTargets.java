@@ -120,9 +120,10 @@ public final class FactoryPassiveIoJeiTargets {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hit.block());
         if (layout.view() == FactoryPassiveIoView.LIST) {
-            int y = FactoryPassiveIoLayout.rowY(viewport, box, hit.rule(), scroll);
+            int y = FactoryPassiveIoLayout.rowY(viewport, box, hit.rule(), scroll)
+                    + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.RULE_ICON) / 2;
             return new Rect2i(FactoryPassiveIoLayout.slotX(viewport), y,
-                    FactoryPassiveIoLayout.SLOT, FactoryPassiveIoLayout.SLOT);
+                    FactoryPassiveIoLayout.RULE_ICON, FactoryPassiveIoLayout.RULE_ICON);
         }
         int x = FactoryPassiveIoLayout.tileX(viewport, hit.rule() % 2)
                 + FactoryPassiveIoLayout.TILE_INSET;

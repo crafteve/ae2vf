@@ -22,7 +22,7 @@ final class FactoryPassiveIoLayout {
     /** 规则行高。 */
     static final int ROW_H = 20;
     /** 列表规则行之间的间距。 */
-    static final int ROW_GAP = 2;
+    static final int ROW_GAP = 1;
     /** 机器行高。 */
     static final int MACHINE_ROW_H = 20;
     /** 块间距：留 2px 刚好一件 1px 外阴影 + 1px 空隙。 */
@@ -42,8 +42,10 @@ final class FactoryPassiveIoLayout {
     static final int ROW_INSET = 1;
     /** 规则行内容左缩进：卡片内缩 + 内边距。 */
     static final int CONTENT_INSET = ROW_INSET + PAD;
-    /** 图标凹槽边长。 */
+    /** 机器行 / 磁贴图标凹槽边长。 */
     static final int SLOT = 18;
+    /** 列表规则行资源图标边长；比凹槽小，行内不再画槽位底。 */
+    static final int RULE_ICON = 12;
     /** 行内元素间距。 */
     static final int GAP = 1;
     /** 三枚 chip 的边长：1px 立体边 + 1px 内边距 + 9px 单字，中文才不贴边。 */
@@ -337,7 +339,7 @@ final class FactoryPassiveIoLayout {
 
     /** 规则行名字 x。 */
     static int nameX(Viewport viewport) {
-        return slotX(viewport) + SLOT + GAP;
+        return slotX(viewport) + RULE_ICON + GAP;
     }
 
     /** 速率列 x。 */

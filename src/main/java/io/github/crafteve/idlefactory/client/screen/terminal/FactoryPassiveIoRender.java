@@ -243,36 +243,62 @@ final class FactoryPassiveIoRender {
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover) {
+        if (block.rules().isEmpty()) {
+            return;
+        }
+        // 行不再各自成卡，块体底铺一层面板色：和原来行卡片的底色一致，只是没有边和阴影。
+        int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
+        int right = FactoryPassiveIoLayout.bodyX(viewport) + viewport.width() - 2;
+        int top = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
+        int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll) - 1;
+        if (bottom > top) {
+            graphics.fill(left, top, right, bottom, this.theme.panelBg());
+        }
         for (int i = 0; i < block.rules().size(); i++) {
-            drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
+            drawRuleRow(graphics, viewport, box, block.rules().get(i), i, scroll, hover);
         }
     }
 
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
+            RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
-        int x = FactoryPassiveIoLayout.bodyX(viewport);
-        FactoryCard.draw(graphics, x + FactoryPassiveIoLayout.ROW_INSET, y,
-                viewport.width() - 4, FactoryPassiveIoLayout.ROW_H, FactoryCard.Level.IO, true);
         int slotX = FactoryPassiveIoLayout.slotX(viewport);
-        int slotY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.SLOT) / 2;
-        FactoryNineSlice.slot(graphics, slotX, slotY, FactoryPassiveIoLayout.SLOT,
-                FactoryPassiveIoLayout.SLOT);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), slotX + 1,
-                slotY + 1);
+        // 行不再套卡片，也不再画槽位底：图标直接落在机器卡片的浅色底上。
+        int iconY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.RULE_ICON) / 2;
+        drawRuleIcon(graphics, rule, slotX, iconY);
         int nameX = FactoryPassiveIoLayout.nameX(viewport);
         int chipX = FactoryPassiveIoLayout.chipX(viewport, 0);
         int textY = y + (FactoryPassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
                 textY, this.theme.textPrimary(), false);
-        drawChips(graphics, viewport, block, rule, y, chipIndex(hover, box.index(), index));
+        drawChips(graphics, viewport, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
                 FactoryPassiveIoLayout.rateX(viewport) + FactoryPassiveIoLayout.RATE_W,
                 FactoryPassiveIoLayout.RATE_W);
     }
 
-    private void drawChips(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
+    /**
+     * 画规则行的资源图标：12px，直接落在机器卡片的浅色底上，不衬槽位。
+     *
+     * <p>原版图标与流体贴图固定 16px，这里用 pose 缩到 0.75 得到 12px；push / pop
+     * 只包住图标，后面的文字、chip、速率都不受影响。</p>
+     *
+     * @param graphics 画布
+     * @param rule     规则
+     * @param x        图标左上角 x
+     * @param y        图标左上角 y
+     */
+    private void drawRuleIcon(GuiGraphics graphics, RuleRow rule, int x, int y) {
+        float scale = FactoryPassiveIoLayout.RULE_ICON / 16.0F;
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0.0F);
+        graphics.pose().scale(scale, scale, 1.0F);
+        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), 0, 0);
+        graphics.pose().popPose();
+    }
+
+    private void drawChips(GuiGraphics graphics, Viewport viewport, RuleRow rule,
             int y, int hoveredChip) {
         int cy = y + FactoryPassiveIoLayout.CHIP_INSET_Y;
         drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 0), cy,
