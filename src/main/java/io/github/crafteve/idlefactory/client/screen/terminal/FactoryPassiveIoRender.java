@@ -253,7 +253,8 @@ final class FactoryPassiveIoRender {
                 ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
                 y + 4, this.theme.textPrimary(), false);
         drawChips(graphics, viewport, block, rule, y, chipIndex(hover, index));
-        drawRate(graphics, rule, y + 4, FactoryPassiveIoLayout.rateX(viewport),
+        drawRate(graphics, rule, y + 4,
+                FactoryPassiveIoLayout.rateX(viewport) + FactoryPassiveIoLayout.RATE_W,
                 FactoryPassiveIoLayout.RATE_W);
     }
 

@@ -58,6 +58,14 @@ final class FactoryPassiveIoProbe {
                 deleteLastRule(screen);
                 yield true;
             }
+            case GLFW.GLFW_KEY_F10 -> {
+                screen.clickHit(new Hit(Kind.CHIP_FACE, 0, 0), 0);
+                yield true;
+            }
+            case GLFW.GLFW_KEY_F11 -> {
+                screen.clickHit(new Hit(Kind.CHIP_MODE, 0, 0), 0);
+                yield true;
+            }
             default -> false;
         };
     }
