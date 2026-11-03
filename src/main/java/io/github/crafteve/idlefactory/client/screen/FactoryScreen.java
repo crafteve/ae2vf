@@ -53,7 +53,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 移动方法归属。分节头按现有代码顺序放置，不改变字段或方法的声明顺序。</p>
  */
 public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
-        implements FactoryScreenContext {
+        implements FactoryScreenContext, FactoryTableSink {
     // ------------------------------------------------------------------
     // ---- 01. 字段与生命周期 ----
     // 这里放常量、状态字段、构造、init 与 tick；只描述壳的生命周期，业务派生在 03/04。
@@ -232,6 +232,12 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      *
      * @param payload 机器表快照
      */
+    @Override
+    public int containerId() {
+        return this.menu.containerId;
+    }
+
+    @Override
     public void acceptTable(FactoryTableS2C payload) {
         this.state.acceptTable(payload);
         if (this.editController != null) {
@@ -260,6 +266,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu>
      *
      * @param payload 反馈
      */
+    @Override
     public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
         if (this.editController != null) {
             this.editController.onFeedback(payload);

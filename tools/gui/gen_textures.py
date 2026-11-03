@@ -77,6 +77,17 @@ STATUS_WARN = (0xD1, 0x8A, 0x00)
 STATUS_ERROR = (0xD6, 0x3A, 0x3A)
 STATUS_IDLE = (0x8A, 0x93, 0xA6)
 
+# ---------------------------------------------------------------------------
+# 被动 IO 终端内容区（与 FactoryGuiTheme.Io 逐项一致）
+# ---------------------------------------------------------------------------
+LIST_MACHINE_ROW = (0xA9, 0xAA, 0xB8)     # 机器行底
+LIST_MACHINE_TOP = (0xBE, 0xBF, 0xCB)     # 机器行上沿提亮
+LIST_MACHINE_BOTTOM = (0x7F, 0x7F, 0x8F)  # 机器行下沿阴影
+LIST_BODY = (0xD8, 0xD9, 0xDF)            # 块体（规则行 / 磁贴区）底
+LIST_TILE = (0xC2, 0xC2, 0xCE)            # 磁贴底
+LIST_TILE_TOP = (0xE4, 0xE4, 0xEC)        # 磁贴左上高光
+LIST_TILE_BOTTOM = (0xA0, 0xA0, 0xAE)     # 磁贴右下阴影
+
 # 搜索框与图标
 SEARCH_BG = (0xB4, 0xB8, 0xC9)
 SEARCH_BORDER = (0x4D, 0x4D, 0x67)
@@ -242,6 +253,31 @@ def machine_card(width: int = 6, height: int = 6) -> Image.Image:
     rect(img, 0, height - 1, width, 1, MACHINE_CARD_BOTTOM)
     rect(img, 0, 0, 1, height, MACHINE_CARD_BORDER)
     rect(img, width - 1, 0, 1, height, MACHINE_CARD_BORDER)
+    return img
+
+
+def list_machine_row(width: int = 6, height: int = 6) -> Image.Image:
+    """被动 IO 终端机器行：亮顶、暗底，左右不画边框。
+
+    机器行是块的标题条，左右两侧接的是块体自己的边界，不用竖边；
+    这样相邻块的机器行拼起来也不会出现双线。
+    """
+    img = Image.new("RGBA", (width, height), LIST_MACHINE_ROW)
+    rect(img, 0, 0, width, 1, LIST_MACHINE_TOP)
+    rect(img, 0, height - 1, width, 1, LIST_MACHINE_BOTTOM)
+    return img
+
+
+def list_tile(width: int = 6, height: int = 6) -> Image.Image:
+    """被动 IO 终端磁贴：左上高光、右下阴影，没有单独的外框。
+
+    磁贴靠块的浅色底衬托边界，再加外框会和块体底组成双线；高光与阴影已经足够表达凸起。
+    """
+    img = Image.new("RGBA", (width, height), LIST_TILE)
+    rect(img, 0, 0, width, 1, LIST_TILE_TOP)
+    rect(img, 0, 0, 1, height, LIST_TILE_TOP)
+    rect(img, 0, height - 1, width, 1, LIST_TILE_BOTTOM)
+    rect(img, width - 1, 0, 1, height, LIST_TILE_BOTTOM)
     return img
 
 
@@ -488,6 +524,9 @@ SPECS = {
     "table_header": (table_header, "凸起表头：6×6 border=1"),
     "row_card": (row_card, "行卡片：6×6 border=1"),
     "machine_card": (machine_card, "机器库卡片：6×6 border=1"),
+    "list_machine_row": (list_machine_row, "被动 IO 机器行：6×6 亮顶暗底无竖边"),
+    "list_tile": (list_tile, "被动 IO 磁贴：6×6 左上高光右下阴影"),
+    "list_body": (lambda: solid(LIST_BODY), "被动 IO 块体底：1×1 拉伸"),
     "table_light": (lambda: solid(TABLE_FRAME_LIGHT), "表格内圈亮边：1×1"),
     "status_strip_run": (lambda: solid(STATUS_RUN), "状态条：运行"),
     "status_strip_warn": (lambda: solid(STATUS_WARN), "状态条：警告"),

@@ -36,7 +36,7 @@ final class FactoryPassiveIoViewButton extends IconButton {
 
     @Override
     public List<Component> getTooltipMessage() {
-        String next = this.view.get() == FactoryPassiveIoView.LIST ? "卡片视图" : "列表视图";
+        String next = this.view.get() == FactoryPassiveIoView.LIST ? "磁贴视图" : "列表视图";
         return List.of(Component.literal("切换为" + next));
     }
 }

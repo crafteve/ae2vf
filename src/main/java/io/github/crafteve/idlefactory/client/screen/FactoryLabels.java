@@ -417,7 +417,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int rateColorUi(long rate, IoResult.Reason reason, FactoryGuiTheme theme) {
+    public static int rateColorUi(long rate, IoResult.Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case NO_HANDLER, REJECTED -> theme.error();
             case NO_SPACE -> theme.statusWarn();

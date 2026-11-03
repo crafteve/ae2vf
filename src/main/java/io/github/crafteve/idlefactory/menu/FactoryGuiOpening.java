@@ -35,15 +35,17 @@ public final class FactoryGuiOpening {
     }
 
     /**
-     * 当前菜单是不是工厂自己的工作台。
+     * 当前菜单是不是工厂自己的界面（旧工作台或被动 IO 终端）。
      *
-     * <p>只认容器 id 与 {@link FactoryMenu}，避免旧终端的负载在界面切换后落到别的菜单上。</p>
+     * <p>容器 id 必须精确匹配，类型必须是本模组注册的两种菜单之一：机器表请求、规则动作与仓库
+     * 请求都靠这里拒绝过期或伪造的界面。新增工厂界面时在这里显式加类型，不要放宽成「任意菜单」。</p>
      *
      * @param menu        玩家当前菜单
      * @param containerId 负载里的容器 id
      * @return 是否允许处理该负载
      */
     public static boolean isFactoryMenu(AbstractContainerMenu menu, int containerId) {
-        return menu.containerId == containerId && menu instanceof FactoryMenu;
+        return menu.containerId == containerId
+                && (menu instanceof FactoryMenu || menu instanceof FactoryPassiveIoMenu);
     }
 }

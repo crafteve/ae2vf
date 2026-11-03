@@ -76,6 +76,13 @@ public final class FactoryGuiTextures {
     /** 表格内圈亮边：1×1。 */
     public static final ResourceLocation TABLE_LIGHT = id("table_light");
 
+    /** 被动 IO 终端机器行：九宫格，边框 1（只画上下沿）。 */
+    public static final ResourceLocation LIST_MACHINE_ROW = id("list_machine_row");
+    /** 被动 IO 终端块体底：1×1，拉伸使用。 */
+    public static final ResourceLocation LIST_BODY = id("list_body");
+    /** 被动 IO 终端磁贴：九宫格，边框 1。 */
+    public static final ResourceLocation LIST_TILE = id("list_tile");
+
     /** IO 展开详情底板：九宫格，边框 3。 */
     public static final ResourceLocation IO_PANEL = id("io_panel");
     /** IO 规则单元格：九宫格，边框 1。 */
@@ -145,6 +152,10 @@ public final class FactoryGuiTextures {
     public static final int TABLE_FRAME_SIZE = 6;
     /** 机器库卡片边长。 */
     public static final int MACHINE_CARD_SIZE = 6;
+    /** 被动 IO 机器行贴图边长（正方形）。 */
+    public static final int LIST_MACHINE_ROW_SIZE = 6;
+    /** 被动 IO 磁贴贴图边长（正方形）。 */
+    public static final int LIST_TILE_SIZE = 6;
     /** IO 详情底板边长。 */
     public static final int IO_PANEL_SIZE = 10;
     /** IO 详情底板九宫格边框。 */

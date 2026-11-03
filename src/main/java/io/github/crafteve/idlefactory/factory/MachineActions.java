@@ -167,6 +167,60 @@ public final class MachineActions {
     }
 
     /**
+     * 把一条规则从一个方向搬到另一个方向。
+     *
+     * <p>界面的方向按钮用它：客户端不能自己发「先删后加」——两个包之间没有原子性，目标侧满或
+     * 已有同名 key 时会把规则删丢。这里先查目标侧能不能放，再先加后删；删失败时把刚加的那条
+     * 回滚掉，保证要么两侧都变，要么都不变。</p>
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @param from      当前方向
+     * @param key       规则 key
+     * @param to        目标方向
+     * @return 结果
+     */
+    public static Result moveRule(Factory factory, UUID machineId, IoSide from, AEKey key,
+            IoSide to) {
+        if (from == to) {
+            return Result.err("方向没有变化");
+        }
+        Optional<MachineIoGroup> ioFound = requireIo(factory, machineId);
+        if (ioFound.isEmpty()) {
+            return Result.err("找不到机器");
+        }
+        MachineIoGroup io = ioFound.get();
+        ResourceSpec current = find(rules(io, from), key);
+        if (current == null) {
+            return Result.err(sideName(from) + "里没有 " + key.getDisplayName().getString());
+        }
+        List<ResourceSpec> target = rules(io, to);
+        if (target.size() >= MachineIoGroup.MAX_RULES_PER_SIDE) {
+            return Result.err(sideName(to) + "已达上限 "
+                    + MachineIoGroup.MAX_RULES_PER_SIDE + " 条");
+        }
+        if (find(target, key) != null) {
+            return Result.err(sideName(to) + "里已经有 " + key.getDisplayName().getString());
+        }
+        boolean added = to == IoSide.INPUT ? io.addInput(current) : io.addOutput(current);
+        if (!added) {
+            return Result.err(sideName(to) + "没有写入（已存在或已满）");
+        }
+        boolean removed = from == IoSide.INPUT ? io.removeInput(key) : io.removeOutput(key);
+        if (!removed) {
+            // 回滚：源侧没删掉就把目标侧刚加的那条撤掉，避免两侧各留一份。
+            if (to == IoSide.INPUT) {
+                io.removeInput(key);
+            } else {
+                io.removeOutput(key);
+            }
+            return Result.err("换方向失败，规则已留在" + sideName(from));
+        }
+        afterRuleChange(machineId);
+        return Result.ok("已改为" + sideName(to) + "：" + current.describe());
+    }
+
+    /**
      * 删除一条规则。
      *
      * @param factory   工厂

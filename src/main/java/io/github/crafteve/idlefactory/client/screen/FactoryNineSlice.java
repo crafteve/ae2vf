@@ -88,6 +88,22 @@ public final class FactoryNineSlice {
                 x, y, width, height);
     }
 
+    /**
+     * 画被动 IO 终端的机器行。
+     *
+     * <p>贴图只画上下沿，左右不画边：机器行左右接的是块体，竖边会把相邻块的边拼成双线。</p>
+     */
+    public static void listMachineRow(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, FactoryGuiTextures.LIST_MACHINE_ROW,
+                FactoryGuiTextures.LIST_MACHINE_ROW_SIZE, 1, x, y, width, height);
+    }
+
+    /** 画被动 IO 终端的磁贴。 */
+    public static void listTile(GuiGraphics graphics, int x, int y, int width, int height) {
+        slice(graphics, FactoryGuiTextures.LIST_TILE,
+                FactoryGuiTextures.LIST_TILE_SIZE, 1, x, y, width, height);
+    }
+
     /** 画 IO 展开详情底板。 */
     public static void ioPanel(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, FactoryGuiTextures.IO_PANEL, FactoryGuiTextures.IO_PANEL_SIZE,

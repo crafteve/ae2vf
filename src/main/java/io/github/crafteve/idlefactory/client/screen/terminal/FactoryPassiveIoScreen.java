@@ -1,6 +1,11 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.List;
+
+import org.jetbrains.annotations.Nullable;
+
 import appeng.api.config.Settings;
+import appeng.api.stacks.AEKey;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.style.TerminalStyle;
@@ -8,45 +13,93 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
+import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 第三版被动 IO 管理界面：AE2 终端边框 + 36 个玩家背包槽 + 中间内容区。
+ * 第三版被动 IO 管理界面：AE2 终端边框 + 36 个玩家背包槽 + 自绘内容区。
  *
- * <p>当前只搭 B 方案框架：边框、背包槽、内容区占位，机器卡片与规则磁贴等自绘内容
- * 留到下一步。内容区高度按窗口高度换算成行数，固定为 18px 的整数倍，保证和 AE2
- * 终端的行切片对齐。</p>
+ * <p>壳只做五件事：算内容视口、拉机器表、把快照交给模型、把鼠标命中交给动作层、按快照重画。
+ * 内容区的模型、排版、绘制、滚动、JEI 目标与探针各自独立，屏幕类不内联任何卡片坐标。</p>
  *
- * <p>不继承 {@code MEStorageScreen}：没有 repo、搜索框与排序控件；滚动条、左侧按钮和
- * 内容区都由本屏幕自己维护。左侧按钮沿用 AE2 的 {@code VerticalButtonBar}。</p>
+ * <p>请求节拍与旧工作台一致：每 {@link #REQUEST_INTERVAL} tick 拉一份机器表；界面不靠服务端
+ * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈在内容区底部停 {@link #FEEDBACK_TICKS}
+ * tick。</p>
  */
-public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu> {
+public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
+        implements FactoryTableSink {
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
     private static final int CONTENT_PADDING = 4;
     /** 右侧滚动条占用的宽度；内容不能压到滚动条下面。 */
     private static final int SCROLLBAR_RESERVE = 20;
-    /** 占位标题颜色：AE2 面板上的深靛色。 */
-    private static final int PLACEHOLDER_TITLE = 0xFF33445C;
-    /** 占位说明颜色。 */
-    private static final int PLACEHOLDER_HINT = 0xFF707070;
+    /** 机器表请求节拍。 */
+    private static final int REQUEST_INTERVAL = 20;
+    /** 编辑反馈停留 tick。 */
+    private static final int FEEDBACK_TICKS = 40;
+    /** 顶栏搜索框的外框位置与尺寸。 */
+    private static final int SEARCH_X = 46;
+    private static final int SEARCH_Y = 2;
+    private static final int SEARCH_W = 124;
+    private static final int SEARCH_H = 13;
+
+    /** 开发者探针：只在非生产环境响应 F6–F9，避免把调试键带进正式包。 */
+    private static final boolean PROBES = !FMLLoader.isProduction();
+    /** 跨界面保留的搜索词；关闭界面再打开仍保留。 */
+    private static String rememberedQuery = "";
 
     /** 当前内容行数；init 时按窗口高度计算。 */
     private int rows = MIN_ROWS;
-    /** 当前列表 / 卡片视图；初值来自物品组件。 */
+    /** 当前列表 / 磁贴视图；初值来自物品组件。 */
     private FactoryPassiveIoView view;
-    /** AE2 右侧滚动条；范围由内容高度决定。 */
-    private final Scrollbar scrollbar;
+    /** 内容模型：快照 + 搜索词 → 机器块。 */
+    private final FactoryPassiveIoModel model;
+    /** 本帧排版；由模型、视图与视口重建。 */
+    @Nullable
+    private FactoryPassiveIoLayout layout;
+    /** 内容区绘制器；init 时按当前字体与主题创建。 */
+    @Nullable
+    private FactoryPassiveIoRender render;
+    /** 滚动状态与 AE2 滚动条。 */
+    private final FactoryPassiveIoScroll scroll;
+    /** 请求节拍计数。 */
+    private int requestTicker;
+    /** 顶栏搜索框。 */
+    @Nullable
+    private FactorySearchEditBox searchBox;
+    /** 最近一次编辑反馈文案。 */
+    private String feedback = "";
+    /** 最近一次编辑反馈是否成功。 */
+    private boolean feedbackOk;
+    /** 反馈剩余显示 tick。 */
+    private int feedbackTicks;
+    /** 是否正在从 JEI 拖动资源。 */
+    private boolean jeiDragging;
+    /** 上一次日志签名，避免每秒刷一行表快照。 */
+    private int lastLogSignature = -1;
 
     /**
      * @param menu      菜单
@@ -58,7 +111,9 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
         this.view = menu.host().view();
-        this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
+        this.model = new FactoryPassiveIoModel(FactoryGuiTheme.current());
+        Scrollbar bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
+        this.scroll = new FactoryPassiveIoScroll(bar);
         // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
         // 先用一个同图标、同位置的按钮占位，等指南页确定后再换成 GuideME 跳转。
         this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
@@ -73,8 +128,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     @Override
     protected void init() {
         TerminalStyle terminal = this.style.getTerminalStyle();
-        // getPossibleRows 内部会自己减 header / bottom，这里只能传屏幕可用高度；
-        // 之前提前减了一次，possibleRows 被压到 0，rows 永远被 MIN_ROWS 兜底成最矮。
+        // getPossibleRows 内部会自己减 header / bottom，这里只能传屏幕可用高度。
         int margin = AEConfig.instance().getTerminalMargin();
         int usable = Math.max(0, this.height - margin * 2);
         int possibleRows = terminal.getPossibleRows(usable);
@@ -85,28 +139,301 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super.init();
         // base_terminal.json 带一条 ME 终端的「条目数」文本，本界面不用它，必须显式隐藏。
         this.setTextHidden("entriesShown", true);
-        this.scrollbar.setHeight(this.contentHeight());
-        this.scrollbar.setVisible(true);
-        this.updateScrollbar();
+        this.render = new FactoryPassiveIoRender(this.font, FactoryGuiTheme.current());
+        this.searchBox = new FactorySearchEditBox(this.font,
+                this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
+                SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索机器…"));
+        this.searchBox.setValue(rememberedQuery);
+        this.searchBox.setResponder(this::applyQuery);
+        this.addRenderableWidget(this.searchBox);
+        this.applyQuery(rememberedQuery);
+        FactoryPassiveIoProbe.logScreen(this);
+        requestTable();
     }
 
     @Override
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        TerminalStyle terminal = this.style.getTerminalStyle();
-        FactoryPassiveIoFrame.draw(graphics, terminal, this.leftPos, this.topPos, this.rows);
+        FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
+                this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
+    }
 
-        int x = this.leftPos + CONTENT_PADDING;
-        int y = this.topPos + terminal.getHeader().getSrcHeight();
-        int width = this.contentWidth();
-        int height = this.contentHeight();
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.WORK_BG, x, y, width, height);
-        this.drawBorder(graphics, x, y, width, height);
-        graphics.drawString(this.font, "被动 IO 管理终端", x + 8, y + 8,
-                PLACEHOLDER_TITLE, false);
-        graphics.drawString(this.font, "第三版框架 · 内容区待实现", x + 8, y + 20,
-                PLACEHOLDER_HINT, false);
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        if (this.layout != null) {
+            this.scroll.syncFromBar(this.layout);
+        }
+        super.render(graphics, mouseX, mouseY, partialTick);
+        FactoryPassiveIoChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
+        Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
+        drawContent(graphics, hover);
+        if (this.feedbackTicks > 0 && this.layout != null) {
+            FactoryPassiveIoChrome.drawFeedback(graphics, this.font, this.layout.viewport(),
+                    this.feedback, this.feedbackOk);
+        }
+        List<Component> tooltip = FactoryPassiveIoTooltip.of(this.model.blocks(), hover);
+        if (!tooltip.isEmpty()) {
+            graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+    }
+
+    /**
+     * 画内容区；先按视口裁剪，滚出视口的部分不能画到背包槽或滚动条上。
+     *
+     * @param graphics 画布
+     * @param hover    当前命中
+     */
+    private void drawContent(GuiGraphics graphics, @Nullable Hit hover) {
+        FactoryPassiveIoRender content = this.render;
+        FactoryPassiveIoLayout current = this.layout;
+        if (content == null || current == null) {
+            return;
+        }
+        Viewport viewport = current.viewport();
+        graphics.enableScissor(viewport.x(), viewport.y(),
+                viewport.x() + viewport.width(), viewport.y() + viewport.height());
+        try {
+            content.draw(graphics, current, this.model.blocks(), scroll(), hover,
+                    this.jeiDragging, emptyText());
+        } finally {
+            graphics.disableScissor();
+        }
+    }
+
+    @Override
+    public void containerTick() {
+        super.containerTick();
+        if (this.feedbackTicks > 0) {
+            this.feedbackTicks--;
+        }
+        if (++this.requestTicker >= REQUEST_INTERVAL) {
+            this.requestTicker = 0;
+            requestTable();
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        if (this.layout == null) {
+            return false;
+        }
+        Hit hit = this.layout.hit(mouseX, mouseY, scroll());
+        if (hit == null) {
+            return false;
+        }
+        clickHit(hit, button);
+        return true;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (this.layout != null && insideViewport(this.layout.viewport(), mouseX, mouseY)) {
+            this.scroll.scrollBy(this.layout, (int) (-scrollY * FactoryPassiveIoLayout.ROW_H));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (PROBES && FactoryPassiveIoProbe.handleKey(this, keyCode)) {
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public int containerId() {
+        return this.menu.containerId;
+    }
+
+    @Override
+    public void acceptTable(FactoryTableS2C payload) {
+        this.model.accept(payload);
+        rebuildLayout();
+        int signature = payload.machines().size() * 37 + totalRules();
+        if (signature != this.lastLogSignature) {
+            this.lastLogSignature = signature;
+            FactoryPassiveIoProbe.logTable(this);
+        }
+    }
+
+    @Override
+    public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
+        this.feedback = payload.message();
+        this.feedbackOk = payload.ok();
+        this.feedbackTicks = FEEDBACK_TICKS;
+        IdleFactory.LOGGER.info("[ui-probe] feedback ok={} message={}", payload.ok(),
+                payload.message());
+    }
+
+    /**
+     * 接收服务端确认的视图。
+     *
+     * @param next 服务端保存的视图
+     */
+    public void acceptView(FactoryPassiveIoView next) {
+        if (this.view == next) {
+            return;
+        }
+        this.view = next;
+        rebuildLayout();
+        FactoryPassiveIoProbe.logScreen(this);
+    }
+
+    /**
+     * 按当前视口重建排版并夹紧滚动。
+     *
+     * <p>由快照、搜索词、视图与窗口尺寸变化触发；滚动本身不重建排版。</p>
+     */
+    void rebuildLayout() {
+        if (this.render == null) {
+            return;
+        }
+        Viewport viewport = contentViewport();
+        this.layout = FactoryPassiveIoLayout.of(this.model.blocks(), viewport, this.view);
+        this.scroll.clampTo(this.layout);
+    }
+
+    /**
+     * 当前内容视口。
+     *
+     * @return 视口（屏幕坐标）
+     */
+    Viewport contentViewport() {
+        int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
+        return new Viewport(this.leftPos + CONTENT_PADDING, this.topPos + header,
+                this.imageWidth - CONTENT_PADDING * 2 - SCROLLBAR_RESERVE,
+                this.rows * rowHeight());
+    }
+
+    /** 当前滚动像素。 */
+    int scroll() {
+        return this.scroll.value();
+    }
+
+    /** 当前排版；可能为 {@code null}。 */
+    @Nullable
+    FactoryPassiveIoLayout layout() {
+        return this.layout;
+    }
+
+    /** 当前模型。 */
+    FactoryPassiveIoModel model() {
+        return this.model;
+    }
+
+    /** 当前视图。 */
+    FactoryPassiveIoView view() {
+        return this.view;
+    }
+
+    /** 当前行数，给探针日志用。 */
+    int rows() {
+        return this.rows;
+    }
+
+    /** 当前内容块。 */
+    List<BlockView> blocks() {
+        return this.model.blocks();
+    }
+
+    /** 打开 / 关闭 JEI 拖动状态。 */
+    public void setJeiDragging(boolean value) {
+        this.jeiDragging = value;
+    }
+
+    /**
+     * JEI 拖拽目标：每台机器一条虚线新增行 / 虚线新增磁贴。
+     *
+     * @return 目标列表
+     */
+    public List<AddTarget> addTargets() {
+        this.jeiDragging = true;
+        if (this.layout == null) {
+            return List.of();
+        }
+        return FactoryPassiveIoJeiTargets.addTargets(this.layout, scroll());
+    }
+
+    /**
+     * JEI 拖入后新建一条输入规则。
+     *
+     * @param block 目标机器块下标
+     * @param key   资源
+     */
+    public void addFromJei(int block, AEKey key) {
+        if (block < 0 || block >= this.model.blocks().size()) {
+            return;
+        }
+        FactoryPassiveIoActions.add(this.menu.containerId, this.model.blocks().get(block), key);
+    }
+
+    /**
+     * 鼠标下的 JEI 查询目标（R / U）。
+     *
+     * @param mouseX 屏幕 x
+     * @param mouseY 屏幕 y
+     * @return 目标；没有物品时为 {@code null}
+     */
+    @Nullable
+    public JeiTarget jeiTargetAt(double mouseX, double mouseY) {
+        if (this.layout == null) {
+            return null;
+        }
+        return FactoryPassiveIoJeiTargets.targetAt(this.layout, this.model.blocks(), scroll(),
+                mouseX, mouseY);
+    }
+
+    /**
+     * 点击命中：chip 左键改参数，规则行右键删除。
+     *
+     * @param hit    命中
+     * @param button 鼠标键
+     */
+    void clickHit(Hit hit, int button) {
+        if (hit.block() < 0 || hit.block() >= this.model.blocks().size()) {
+            return;
+        }
+        BlockView block = this.model.blocks().get(hit.block());
+        if (button == 1) {
+            if (hit.rule() >= 0) {
+                FactoryPassiveIoActions.delete(this.menu.containerId, block,
+                        block.rules().get(hit.rule()));
+            }
+            return;
+        }
+        if (button != 0 || hit.rule() < 0) {
+            return;
+        }
+        RuleRow rule = block.rules().get(hit.rule());
+        switch (hit.kind()) {
+            case CHIP_DIR -> FactoryPassiveIoActions.flip(this.menu.containerId, block, rule);
+            case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block, rule);
+            case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block, rule);
+            default -> {
+                // 规则行与机器行左键暂不动作。
+            }
+        }
+    }
+
+    private void toggleView() {
+        setView(this.view.next());
+    }
+
+    private void setView(FactoryPassiveIoView next) {
+        if (this.view == next) {
+            return;
+        }
+        this.view = next;
+        PacketDistributor.sendToServer(
+                new FactoryPassiveIoViewC2S(this.menu.containerId, next));
+        rebuildLayout();
+        FactoryPassiveIoProbe.logScreen(this);
     }
 
     /**
@@ -124,70 +451,43 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.init();
     }
 
-    /**
-     * 视图按钮：先本地切换，再发 C2S 让服务端把设置写进物品组件。
-     */
-    private void toggleView() {
-        FactoryPassiveIoView next = this.view.next();
-        this.view = next;
-        PacketDistributor.sendToServer(
-                new FactoryPassiveIoViewC2S(this.menu.containerId, next));
-        this.updateScrollbar();
-    }
-
-    /**
-     * 接收服务端确认的视图；当前屏幕只更新图标与滚动范围。
-     *
-     * @param next 服务端保存的视图
-     */
-    public void acceptView(FactoryPassiveIoView next) {
-        if (this.view == next) {
-            return;
-        }
-        this.view = next;
-        this.updateScrollbar();
-    }
-
-    /**
-     * @return 当前菜单容器 id；服务端同步包用它过滤过期界面
-     */
-    public int containerId() {
-        return this.menu.containerId;
-    }
-
-    private int contentWidth() {
-        return this.imageWidth - CONTENT_PADDING * 2 - SCROLLBAR_RESERVE;
-    }
-
-    private int contentHeight() {
-        return this.rows * this.rowHeight();
-    }
-
     private int rowHeight() {
         return this.style.getTerminalStyle().getRow().getSrcHeight();
     }
 
-    /**
-     * 重算滚动范围。当前内容区还是占位，范围为整块视口；接入卡片后由实际内容高度替换。
-     */
-    private void updateScrollbar() {
-        int page = this.contentHeight();
-        this.scrollbar.setHeight(page);
-        this.scrollbar.setRange(0, Math.max(1, page), page);
-        this.scrollbar.setVisible(true);
+    private void applyQuery(String raw) {
+        rememberedQuery = raw == null ? "" : raw;
+        this.model.setQuery(FactorySearchQuery.parse(rememberedQuery,
+                JecharactersCompat::contains));
+        rebuildLayout();
     }
 
-    private void drawBorder(GuiGraphics graphics, int x, int y, int width, int height) {
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y + height - 1,
-                width, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x, y, 1, height);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 1, y, 1,
-                height);
-        // 1px 亮边之外再压一条深边，避免工作区直接贴到 AE2 行切片上。
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + 1, y + 1,
-                width - 2, 1);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + 1, y + height - 2,
-                width - 2, 1);
+    private void requestTable() {
+        if (this.minecraft != null && this.minecraft.player != null) {
+            PacketDistributor.sendToServer(new FactoryTableRequestC2S(this.menu.containerId));
+        }
+    }
+
+    private String emptyText() {
+        if (!this.model.hasFactory()) {
+            return "先执行 /idf create";
+        }
+        if (this.model.filteredEmpty()) {
+            return "没有匹配的机器";
+        }
+        return "还没有机器 · 用 /idf factory connect 接入";
+    }
+
+    private int totalRules() {
+        int total = 0;
+        for (BlockView block : this.model.blocks()) {
+            total += block.rules().size();
+        }
+        return total;
+    }
+
+    private static boolean insideViewport(Viewport viewport, double mouseX, double mouseY) {
+        return mouseX >= viewport.x() && mouseX < viewport.x() + viewport.width()
+                && mouseY >= viewport.y() && mouseY < viewport.y() + viewport.height();
     }
 }

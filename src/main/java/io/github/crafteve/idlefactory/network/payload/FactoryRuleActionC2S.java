@@ -28,22 +28,27 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 客户端对一台机器的 IO 规则做出的动作：新增 / 更新面或匹配模式 / 删除。
+ * 客户端对一台机器的 IO 规则做出的动作：新增 / 更新面或匹配模式 / 换方向 / 删除。
  *
- * <p>只传资源 key、面、匹配模式和机器 id；规则数量固定“塞满”，服务端不接受客户端指定数量。
- * 规则身份是资源 key，更新和删除都按 key 找。P1 删除产线后不再附带产线 id。</p>
+ * <p>只传资源 key、面、匹配模式和机器 id；规则数量固定「塞满」，服务端不接受客户端指定数量。
+ * 规则身份是资源 key，更新、换方向和删除都按 key 找。</p>
+ *
+ * <p>换方向用 {@link Action#MOVE}：{@code side} 是当前侧，{@code targetSide} 是目标侧。客户端不
+ * 自己发「先删后加」——两个包之间没有原子性，目标侧满或重名时会把规则删丢。其它动作
+ * {@code targetSide} 为 {@code null}。</p>
  *
  * @param containerId 菜单容器 id
  * @param action      动作
  * @param machineId   机器 id
- * @param side        输入 / 输出
+ * @param side        输入 / 输出；MOVE 时是「从哪一侧搬走」
  * @param key         资源
- * @param face        面；{@code null} 表示不限；删除时忽略
- * @param mode        匹配模式；删除时忽略
+ * @param face        面；{@code null} 表示不限；删除与 MOVE 忽略
+ * @param mode        匹配模式；删除与 MOVE 忽略
+ * @param targetSide  MOVE 的目标侧；其它动作传 {@code null}
  */
 public record FactoryRuleActionC2S(int containerId, Action action, UUID machineId,
         IoSide side, AEKey key, @Nullable Direction face,
-        MatchMode mode) implements CustomPacketPayload {
+        MatchMode mode, @Nullable IoSide targetSide) implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:factory_rule_action}。 */
     public static final Type<FactoryRuleActionC2S> TYPE =
@@ -53,6 +58,12 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, FactoryRuleActionC2S> STREAM_CODEC =
             StreamCodec.of(FactoryRuleActionC2S::write, FactoryRuleActionC2S::read);
+
+    /** 不带目标侧的便捷构造：ADD / UPDATE / REMOVE 用。 */
+    public FactoryRuleActionC2S(int containerId, Action action, UUID machineId, IoSide side,
+            AEKey key, @Nullable Direction face, MatchMode mode) {
+        this(containerId, action, machineId, side, key, face, mode, null);
+    }
 
     @Override
     public Type<FactoryRuleActionC2S> type() {
@@ -71,6 +82,11 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
                 return;
             }
             if (!FactoryGuiOpening.isFactoryMenu(player.containerMenu, payload.containerId())) {
+                return;
+            }
+            if (payload.action() == Action.MOVE
+                    && (payload.targetSide() == null || payload.targetSide() == payload.side())) {
+                // 目标侧缺失或与源侧相同都是客户端错误；丢弃，不猜意图。
                 return;
             }
             FactoryRuntime runtime = FactoryRuntime.get();
@@ -97,6 +113,8 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
                     payload.side(), payload.key(), payload.face(), payload.mode());
             case UPDATE -> MachineActions.updateRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
+            case MOVE -> MachineActions.moveRule(factory, payload.machineId(),
+                    payload.side(), payload.key(), payload.targetSide());
             case REMOVE -> MachineActions.removeRule(factory, payload.machineId(),
                     payload.side(), payload.key());
         };
@@ -119,6 +137,10 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             buf.writeByte(payload.face().ordinal());
         }
         buf.writeByte(payload.mode().ordinal());
+        buf.writeBoolean(payload.targetSide() != null);
+        if (payload.targetSide() != null) {
+            buf.writeByte(payload.targetSide().ordinal());
+        }
     }
 
     private static FactoryRuleActionC2S read(RegistryFriendlyByteBuf buf) {
@@ -148,7 +170,16 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             throw new DecoderException("invalid match mode: " + modeOrdinal);
         }
         MatchMode mode = MatchMode.values()[modeOrdinal];
-        return new FactoryRuleActionC2S(containerId, action, machineId, side, key, face, mode);
+        IoSide targetSide = null;
+        if (buf.readBoolean()) {
+            int targetOrdinal = buf.readUnsignedByte();
+            if (targetOrdinal >= IoSide.values().length) {
+                throw new DecoderException("invalid target io side: " + targetOrdinal);
+            }
+            targetSide = IoSide.values()[targetOrdinal];
+        }
+        return new FactoryRuleActionC2S(containerId, action, machineId, side, key, face, mode,
+                targetSide);
     }
 
     /** IO 规则动作。 */
@@ -157,6 +188,8 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
         ADD,
         /** 更新面 / 匹配模式。 */
         UPDATE,
+        /** 把规则搬到另一侧。 */
+        MOVE,
         /** 删除规则。 */
         REMOVE
     }

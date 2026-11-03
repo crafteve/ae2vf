@@ -303,15 +303,7 @@ final class FactoryScreenState {
      * @return 搜索字段
      */
     FactorySearchQuery.Fields machineSearchFields(FactorySnapshotBuilder.MachineView machine) {
-        String id = machine.blockId() == null ? "" : machine.blockId().toString();
-        String namespace = machine.blockId() == null ? "" : machine.blockId().getNamespace();
-        String name = FactoryLabels.blockName(machine.blockId());
-        String tooltip = FactoryStatus.text(machine, this.theme) + "\n"
-                + machine.ref().dimension().location() + " "
-                + machine.ref().pos().toShortString() + "\n"
-                + "规则 " + machine.ruleCount() + " 条";
-        return new FactorySearchQuery.Fields(name, id, namespace,
-                FactoryUiText.modName(namespace), tooltip, List.of());
+        return FactoryMachineSearchFields.of(machine, this.theme);
     }
 
     /**

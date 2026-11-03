@@ -54,7 +54,31 @@ public record FactoryGuiTheme(
         /** 状态：缺料 / 警告。 */
         int statusWarn,
         /** 状态：空闲 / 未加载 / 未配置。 */
-        int statusIdle) {
+        int statusIdle,
+        /** 被动 IO 终端内容区的专用色。 */
+        Io io) {
+
+    /**
+     * 被动 IO 终端内容区的色板。
+     *
+     * <p>终端的面板底来自 AE2 的 {@code terminal.png}（内部实色 {@code #CBCCD4}），旧工作台的
+     * 面板色 {@code #CBCCD4} 与它一致，但机器行、块体、方向色和模式块是终端独有的四层表面，
+     * 放在这里仍然只有一个色源。贴图生成脚本 {@code tools/gui/gen_textures.py} 里的
+     * {@code LIST_*} 调色板必须与这里的值逐项一致。</p>
+     *
+     * @param machineRow      机器行底色
+     * @param body            块体（规则行 / 磁贴区）底色
+     * @param border          块边界线与磁贴边框
+     * @param dirIn           输入方向色（规则行左条、方向块）
+     * @param dirOut          输出方向色
+     * @param modeFuzzy       模糊模式块底
+     * @param modeFuzzyText   模糊模式块字
+     * @param modeExact       精确模式块底
+     * @param modeExactText   精确模式块字
+     */
+    public record Io(int machineRow, int body, int border, int dirIn, int dirOut,
+            int modeFuzzy, int modeFuzzyText, int modeExact, int modeExactText) {
+    }
 
     /**
      * 深色 tooltip 的霓虹配色。
@@ -104,7 +128,9 @@ public record FactoryGuiTheme(
             0xFFD63A3A, // error
             0xFF2E9E4F, // statusRun
             0xFFD18A00, // statusWarn
-            0xFF8A93A6  // statusIdle
+            0xFF8A93A6, // statusIdle
+            new Io(0xFFA9AAB8, 0xFFD8D9DF, 0xFF878FA5, 0xFF2F6FB0, 0xFFB06A2F,
+                    0xFFC8B06A, 0xFF3A2C08, 0xFF8FB4D8, 0xFF123048)
     );
 
     /** 深色主题（保留，暂不作为默认；贴图目前只生成了浅色一套）。 */
@@ -129,7 +155,9 @@ public record FactoryGuiTheme(
             0xFFD63A3A,
             0xFF2E9E4F,
             0xFFD18A00,
-            0xFF8A93A6
+            0xFF8A93A6,
+            new Io(0xFF2A2A30, 0xFF1E1E22, 0xFF3A3A42, 0xFF4A90D9, 0xFFD98A4A,
+                    0xFF8A7434, 0xFF1A1408, 0xFF3E6A8A, 0xFF081820)
     );
 
     /** 当前主题；默认 {@link #AE2}。 */
