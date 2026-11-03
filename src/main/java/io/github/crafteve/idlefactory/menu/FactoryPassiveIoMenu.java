@@ -12,6 +12,9 @@ import net.minecraft.world.inventory.MenuType;
  * 不是真实槽位，后续版本自己发快照包。</p>
  */
 public final class FactoryPassiveIoMenu extends AEBaseMenu {
+    /** 终端宿主；视图设置从这里读写。 */
+    private final FactoryPassiveIoHost host;
+
     /**
      * @param menuType    注册出来的菜单类型
      * @param containerId 本次会话的容器 id
@@ -21,6 +24,14 @@ public final class FactoryPassiveIoMenu extends AEBaseMenu {
     public FactoryPassiveIoMenu(MenuType<?> menuType, int containerId, Inventory inventory,
             FactoryPassiveIoHost host) {
         super(menuType, containerId, inventory, host);
+        this.host = host;
         this.createPlayerInventorySlots(inventory);
+    }
+
+    /**
+     * @return 被动 IO 终端宿主
+     */
+    public FactoryPassiveIoHost host() {
+        return this.host;
     }
 }

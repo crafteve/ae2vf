@@ -5,6 +5,8 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
@@ -26,13 +28,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、仓库动作、机器动作、IO 规则动作、编辑反馈、界面打开请求与
- * 绑定杖链接同步。第二版终端的视图切换与样板目标包已删除。改包结构时记得递增
- * {@link #PROTOCOL_VERSION}。</p>
+ * <p>当前包含机器表、仓库快照、仓库动作、机器动作、IO 规则动作、编辑反馈、界面打开请求、
+ * 被动 IO 视图同步与绑定杖链接同步。第二版终端的视图切换与样板目标包已删除。改包结构时
+ * 记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "23";
+    public static final String PROTOCOL_VERSION = "24";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -84,6 +86,12 @@ public final class ModNetwork {
         // 物品入口：终端右键 / 快捷键请求打开界面
         registrar.playToServer(OpenFactoryGuiC2S.TYPE, OpenFactoryGuiC2S.STREAM_CODEC,
                 OpenFactoryGuiC2S::handle);
+
+        // 被动 IO：列表 / 卡片视图写物品组件，服务端确认后回同步
+        registrar.playToServer(FactoryPassiveIoViewC2S.TYPE,
+                FactoryPassiveIoViewC2S.STREAM_CODEC, FactoryPassiveIoViewC2S::handle);
+        registrar.playToClient(FactoryPassiveIoViewS2C.TYPE,
+                FactoryPassiveIoViewS2C.STREAM_CODEC, FactoryPassiveIoViewS2C::handle);
 
         // 绑定杖：操作请求 + 链接快照
         registrar.playToServer(FactoryWandActionC2S.TYPE, FactoryWandActionC2S.STREAM_CODEC,
