@@ -15,7 +15,8 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * tooltip 和 JEI 都从这里取同一份结果。滚动只在取值时加 {@code scroll}，不重建排版。</p>
  *
  * <p>块内结构（列表式）：机器行 20 → 规则行 20×n；磁贴式：机器行 20 → 磁贴区
- * （上下各 2 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，刚好容下 1px 外阴影。</p>
+ * （上边紧贴机器行，下边留 2px 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，
+ * 刚好容下 1px 外阴影。</p>
  */
 final class FactoryPassiveIoLayout {
     /** 规则行高。 */
@@ -26,8 +27,13 @@ final class FactoryPassiveIoLayout {
     static final int MACHINE_ROW_H = 20;
     /** 块间距：留 2px 刚好一件 1px 外阴影 + 1px 空隙。 */
     static final int BLOCK_GAP = 2;
-    /** 机器行与下面卡片之间的间距。 */
-    static final int BODY_GAP = 2;
+    /**
+     * 机器行与下面第一张卡 / 磁贴之间的空档。
+     *
+     * <p>空档 1px + 卡片自己的 1px 上亮边，视觉上正好 2px；写 2 会变成 3px，
+     * 因为卡片亮边和空档都落在同一块浅色底上。</p>
+     */
+    static final int BODY_GAP = 1;
     /** 块左侧状态灯宽；宽度由 {@link FactoryLamp} 给出，排版只引用不另写数值。 */
     static final int STATUS_W = FactoryLamp.WIDTH;
     /** 块内左右内边距。 */
@@ -170,8 +176,7 @@ final class FactoryPassiveIoLayout {
             return MACHINE_ROW_H + BODY_GAP + rules * ROW_H + (rules - 1) * ROW_GAP;
         }
         int rows = (rules + 1) / 2;
-        return MACHINE_ROW_H + BODY_GAP + TILE_PAD + rows * TILE_H + (rows - 1) * TILE_GAP
-                + TILE_PAD;
+        return MACHINE_ROW_H + BODY_GAP + rows * TILE_H + (rows - 1) * TILE_GAP + TILE_PAD;
     }
 
     /** 块位置列表。 */
@@ -264,7 +269,7 @@ final class FactoryPassiveIoLayout {
     }
 
     private Hit hitTiles(BlockBox box, int localX, int localY) {
-        int relY = localY - (box.bodyTop() + TILE_PAD);
+        int relY = localY - box.bodyTop();
         if (relY < 0) {
             return new Hit(Kind.ADD, box.index(), -1);
         }
@@ -280,7 +285,7 @@ final class FactoryPassiveIoLayout {
         if (tile < 0 || tile >= box.ruleCount()) {
             return new Hit(Kind.ADD, box.index(), -1);
         }
-        int chipY = box.bodyTop() + TILE_PAD + row * (TILE_H + TILE_GAP) + TILE_CHIP_Y;
+        int chipY = box.bodyTop() + row * (TILE_H + TILE_GAP) + TILE_CHIP_Y;
         if (localY >= chipY && localY < chipY + CHIP) {
             int x = tileX(this.viewport, col) + TILE_INSET;
             if (inside(localX, x, CHIP)) {
@@ -368,9 +373,9 @@ final class FactoryPassiveIoLayout {
         return viewport.y() - scroll + box.bodyTop() + rule * (ROW_H + ROW_GAP);
     }
 
-    /** 磁贴区某一行的屏幕 y。 */
+    /** 磁贴区某一行的屏幕 y；第一行紧贴机器行下方，不再叠一层内边距。 */
     static int tileRowY(Viewport viewport, BlockBox box, int row, int scroll) {
-        return viewport.y() - scroll + box.bodyTop() + TILE_PAD + row * (TILE_H + TILE_GAP);
+        return viewport.y() - scroll + box.bodyTop() + row * (TILE_H + TILE_GAP);
     }
 
     /** 屏幕 y：块相对坐标转屏幕坐标。 */
