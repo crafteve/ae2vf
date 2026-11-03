@@ -268,8 +268,10 @@ final class FactoryPassiveIoRender {
             BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.bodyX(viewport);
-        FactoryNineSlice.listTile(graphics, x + 1, y, viewport.width() - 2,
-                FactoryPassiveIoLayout.ROW_H);
+        // 行卡片只保留平底 + 顶部 1px 高光，不再画底部暗边，避免和相邻卡片形成阴影带。
+        graphics.fill(x + 1, y, x + viewport.width() - 1, y + FactoryPassiveIoLayout.ROW_H,
+                0xFFC2C2CE);
+        graphics.fill(x + 1, y, x + viewport.width() - 1, y + 1, 0xFFE4E4EC);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
                 x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
                 y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
@@ -400,8 +402,10 @@ final class FactoryPassiveIoRender {
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
-        FactoryNineSlice.listTile(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
-                FactoryPassiveIoLayout.TILE_H);
+        // 磁贴同样只保留平底 + 顶部高光，去掉底部暗边。
+        graphics.fill(x, y, x + FactoryPassiveIoLayout.TILE_W, y + FactoryPassiveIoLayout.TILE_H,
+                0xFFC2C2CE);
+        graphics.fill(x, y, x + FactoryPassiveIoLayout.TILE_W, y + 1, 0xFFE4E4EC);
         graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
                 directionColor(rule));
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;

@@ -50,7 +50,7 @@ final class FactoryPassiveIoLayout {
     /** 磁贴列间隔。 */
     static final int TILE_GAP = 2;
     /** 磁贴区内边距。 */
-    static final int TILE_PAD = 3;
+    static final int TILE_PAD = 2;
     /** 机器行徽标宽 / 高。 */
     static final int BADGE_W = 14;
     static final int BADGE_H = 11;
