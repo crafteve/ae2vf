@@ -62,21 +62,18 @@ public record FactoryGuiTheme(
      * 被动 IO 终端内容区的色板。
      *
      * <p>终端的面板底来自 AE2 的 {@code terminal.png}（内部实色 {@code #CBCCD4}），旧工作台的
-     * 面板色 {@code #CBCCD4} 与它一致，但机器行、块体、方向色和模式块是终端独有的四层表面，
-     * 放在这里仍然只有一个色源。贴图生成脚本 {@code tools/gui/gen_textures.py} 里的
-     * {@code LIST_*} 调色板必须与这里的值逐项一致。</p>
+     * 面板色 {@code #CBCCD4} 与它一致；机器行深色带、方向色和模式块是终端独有的表面，
+     * 全部由代码绘制，没有对应贴图，改色只改这里。</p>
      *
-     * @param machineRow      机器行底色
-     * @param body            块体（规则行 / 磁贴区）底色
-     * @param border          块边界线与磁贴边框
-     * @param dirIn           输入方向色（规则行左条、方向块）
+     * @param machineRow      机器行深色带底色
+     * @param dirIn           输入方向色（方向 chip）
      * @param dirOut          输出方向色
-     * @param modeFuzzy       模糊模式块底
-     * @param modeFuzzyText   模糊模式块字
-     * @param modeExact       精确模式块底
-     * @param modeExactText   精确模式块字
+     * @param modeFuzzy       模糊模式 chip 底
+     * @param modeFuzzyText   模糊模式 chip 字
+     * @param modeExact       精确模式 chip 底
+     * @param modeExactText   精确模式 chip 字
      */
-    public record Io(int machineRow, int body, int border, int dirIn, int dirOut,
+    public record Io(int machineRow, int dirIn, int dirOut,
             int modeFuzzy, int modeFuzzyText, int modeExact, int modeExactText) {
     }
 
@@ -129,7 +126,7 @@ public record FactoryGuiTheme(
             0xFF2E9E4F, // statusRun
             0xFFD18A00, // statusWarn
             0xFF6B6B6B, // statusIdle（中性灰，不再发蓝）
-            new Io(0xFFA9AAB8, 0xFFD8D9DF, 0xFF878FA5, 0xFF2F6FB0, 0xFFB06A2F,
+            new Io(0xFFA9AAB8, 0xFF2F6FB0, 0xFFB06A2F,
                     0xFFC8B06A, 0xFF3A2C08, 0xFF8FB4D8, 0xFF000000)
     );
 
@@ -156,7 +153,7 @@ public record FactoryGuiTheme(
             0xFF2E9E4F,
             0xFFD18A00,
             0xFF8A93A6,
-            new Io(0xFF2A2A30, 0xFF1E1E22, 0xFF3A3A42, 0xFF4A90D9, 0xFFD98A4A,
+            new Io(0xFF2A2A30, 0xFF4A90D9, 0xFFD98A4A,
                     0xFF8A7434, 0xFF1A1408, 0xFF3E6A8A, 0xFF081820)
     );
 
