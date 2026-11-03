@@ -9,6 +9,7 @@ import appeng.api.stacks.AEItemKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryCard;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.FactoryResourceIconRender;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.BlockBox;
@@ -35,13 +36,14 @@ import net.minecraft.world.item.Items;
  * {@link FactoryGuiTheme.Io} 色值。</p>
  *
  * <p>列表式为机器行 + 规则行 + 虚线新增行；磁贴式为机器行 + 77×34 磁贴两列 + 虚线新增磁贴。
- * 块左侧 3px 状态竖线贯穿整块，是分组边界也是状态表达。</p>
+ * 每台机器只有一圈机器大卡片，机器行是它顶部的一条深色带；状态灯（机器行状态、规则方向）
+ * 统一走 {@link FactoryLamp}，落在卡片轮廓之内。</p>
  */
 final class FactoryPassiveIoRender {
-    /** 磁贴方向色条高度（磁贴高减上下各 1px）。 */
-    private static final int TILE_DIR_STRIPE_H = 32;
-    /** 磁贴方向色条宽。 */
-    private static final int TILE_DIR_STRIPE_W = 3;
+    /** 磁贴方向灯高（磁贴高减上下各 1px）。 */
+    private static final int TILE_LAMP_H = 32;
+    /** 滚动到中途时，内容在视口上 / 下沿被切掉处的内阴影；由外向内逐像素变淡。 */
+    private static final int[] SCROLL_EDGE_SHADE = {0x45000000, 0x26000000, 0x10000000};
     /** 悬停底色（白色 12%）。 */
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** chip 悬停提亮（白色 20%）。 */
@@ -90,10 +92,10 @@ final class FactoryPassiveIoRender {
             if (bottom <= viewport.y() || top >= viewport.y() + viewport.height()) {
                 continue;
             }
+            // 宽度收到视口内 1px：外阴影画在卡片右侧，不收就会永远被视口裁剪。
             FactoryCard.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
-                    viewport.width(), box.bottom() - box.top(), FactoryCard.Level.MACHINE, true);
-            drawStatusLine(graphics, viewport, block, top,
-                    FactoryPassiveIoLayout.MACHINE_ROW_H);
+                    viewport.width() - 1, box.bottom() - box.top(),
+                    FactoryCard.Level.MACHINE, true);
             drawMachineRow(graphics, viewport, block, top);
             if (layout.view() == FactoryPassiveIoView.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
@@ -103,6 +105,39 @@ final class FactoryPassiveIoRender {
         }
         if (!dragging) {
             drawHover(graphics, layout, hover, scroll);
+        }
+        drawScrollEdges(graphics, layout, scroll);
+    }
+
+    /**
+     * 画视口上 / 下沿的滚动内阴影。
+     *
+     * <p>内容被裁在视口里，卡片滚到边缘时上亮边会被切掉、看起来变平；在确实还有内容的
+     * 那一侧压 3px 由深到浅的内阴影，读作「压在视口边下继续」，不伪造卡片边线。
+     * 只覆盖有溢出的一侧：滚到顶不画上沿，滚到底不画下沿。</p>
+     *
+     * @param graphics 画布
+     * @param layout   排版
+     * @param scroll   滚动像素
+     */
+    private static void drawScrollEdges(GuiGraphics graphics, FactoryPassiveIoLayout layout,
+            int scroll) {
+        Viewport viewport = layout.viewport();
+        int maxScroll = layout.maxScroll(viewport.height());
+        if (maxScroll <= 0) {
+            return;
+        }
+        int left = viewport.x();
+        int right = viewport.x() + viewport.width();
+        for (int i = 0; i < SCROLL_EDGE_SHADE.length; i++) {
+            if (scroll > 0) {
+                graphics.fill(left, viewport.y() + i, right, viewport.y() + i + 1,
+                        SCROLL_EDGE_SHADE[i]);
+            }
+            if (scroll < maxScroll) {
+                int y = viewport.y() + viewport.height() - 1 - i;
+                graphics.fill(left, y, right, y + 1, SCROLL_EDGE_SHADE[i]);
+            }
         }
     }
 
@@ -122,7 +157,7 @@ final class FactoryPassiveIoRender {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hover.block());
         switch (hover.kind()) {
-            case MACHINE -> graphics.fill(FactoryPassiveIoLayout.rowAreaX(viewport),
+            case MACHINE -> graphics.fill(FactoryPassiveIoLayout.headerX(viewport),
                     FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll),
                     FactoryPassiveIoLayout.contentRight(viewport),
                     FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll), HOVER_FILL);
@@ -174,50 +209,26 @@ final class FactoryPassiveIoRender {
     }
 
     /**
-     * 画一台机器的大卡片描边：每台机器只有这一圈卡框，避免多层卡片边框 / 阴影叠在一起。
+     * 画机器行：机器大卡片顶部的一条深色带，不再单独成卡。
+     *
+     * <p>机器行以前是一张独立卡片，它的底阴影从灯右侧起算，状态灯那一列下面没有阴影接着，
+     * 看起来就像浮在卡片外。现在深色带直接铺在机器大卡片内部，最左 3px 交给状态灯，
+     * 卡片的下 / 右外阴影把灯一起收进轮廓里。</p>
      *
      * @param graphics 画布
      * @param viewport 视口
-     * @param box      块
-     * @param scroll   滚动
+     * @param block    块
+     * @param top      机器行上边缘（屏幕坐标）
      */
-    private void drawStatusLine(GuiGraphics graphics, Viewport viewport, BlockView block,
-            int top, int height) {
-        int x = viewport.x();
-        int color = block.status().color();
-        // 3px 灯条：左 1px 提亮、中间本色、右 1px 压暗，给平涂加一点立体感。
-        graphics.fill(x, top, x + 1, top + height, brighten(color));
-        graphics.fill(x + 1, top, x + 2, top + height, color);
-        graphics.fill(x + 2, top, x + 3, top + height, darken(color));
-    }
-
-    /**
-     * 提亮 / 压暗颜色，用于状态灯条的 1px 高光与阴影。
-     *
-     * @param color 原色 ARGB
-     * @return 调整后的颜色
-     */
-    private static int brighten(int color) {
-        int r = Math.min(255, ((color >> 16) & 0xFF) + 38);
-        int g = Math.min(255, ((color >> 8) & 0xFF) + 38);
-        int b = Math.min(255, (color & 0xFF) + 38);
-        return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
-    }
-
-    private static int darken(int color) {
-        int r = Math.max(0, ((color >> 16) & 0xFF) - 38);
-        int g = Math.max(0, ((color >> 8) & 0xFF) - 38);
-        int b = Math.max(0, (color & 0xFF) - 38);
-        return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
-    }
-
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top) {
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport);
-        int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W - 2;
-        FactoryCard.draw(graphics, x, top, width,
-                FactoryPassiveIoLayout.MACHINE_ROW_H, FactoryCard.Level.HEADER, true);
-        int slotX = x + FactoryPassiveIoLayout.PAD;
+        int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
+        // 右边界排掉卡片最右 1px 竖边，深色带只铺在内区，卡片亮边 / 暗边保持完整。
+        int right = FactoryPassiveIoLayout.bodyX(viewport) + viewport.width() - 2;
+        int height = FactoryPassiveIoLayout.MACHINE_ROW_H - 1;
+        graphics.fill(left, top + 1, right, top + 1 + height, this.theme.io().machineRow());
+        FactoryLamp.draw(graphics, left, top + 1, height, block.status().color());
+        int slotX = FactoryPassiveIoLayout.headerX(viewport);
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
         ItemStack icon = block.machine().machineMissing()
@@ -225,8 +236,8 @@ final class FactoryPassiveIoRender {
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
         int nameX = slotX + FactoryPassiveIoLayout.SLOT + FactoryPassiveIoLayout.GAP;
-        int right = FactoryPassiveIoLayout.contentRight(viewport);
-        int badge2X = right - 4 - 2 - FactoryPassiveIoLayout.BADGE_W;
+        int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
+        int badge2X = contentRight - 4 - 2 - FactoryPassiveIoLayout.BADGE_W;
         int badge1X = badge2X - 2 - FactoryPassiveIoLayout.BADGE_W;
         graphics.drawString(this.font,
                 ellipsize(block.name(), badge1X - 2 - nameX), nameX, top + 6,
@@ -235,7 +246,7 @@ final class FactoryPassiveIoRender {
                 FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
         dashedRect(graphics, badge2X, top + 4, FactoryPassiveIoLayout.BADGE_W,
                 FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
-        FactoryNineSlice.icon(graphics, block.status().lamp(), right - 5, top + 8, 3);
+        FactoryNineSlice.icon(graphics, block.status().lamp(), contentRight - 5, top + 8, 3);
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -250,11 +261,11 @@ final class FactoryPassiveIoRender {
             BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.bodyX(viewport);
-        FactoryCard.draw(graphics, x + 1, y, viewport.width() - 4,
-                FactoryPassiveIoLayout.ROW_H, FactoryCard.Level.IO, true);
-        graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
-                x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
-                y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
+        FactoryCard.draw(graphics, x + FactoryPassiveIoLayout.ROW_INSET, y,
+                viewport.width() - 4, FactoryPassiveIoLayout.ROW_H, FactoryCard.Level.IO, true);
+        // 方向灯顶掉卡片最左一条竖边，和机器行状态灯同一套画法、同一高度规则。
+        FactoryLamp.draw(graphics, x + FactoryPassiveIoLayout.ROW_INSET, y,
+                FactoryPassiveIoLayout.ROW_H, directionColor(rule));
         int slotX = FactoryPassiveIoLayout.slotX(viewport);
         int slotY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.SLOT) / 2;
         FactoryNineSlice.slot(graphics, slotX, slotY, FactoryPassiveIoLayout.SLOT,
@@ -378,8 +389,7 @@ final class FactoryPassiveIoRender {
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
         FactoryCard.draw(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
                 FactoryPassiveIoLayout.TILE_H, FactoryCard.Level.IO, true);
-        graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
-                directionColor(rule));
+        FactoryLamp.draw(graphics, x + 1, y + 1, TILE_LAMP_H, directionColor(rule));
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;
         FactoryNineSlice.slot(graphics, slotX, y + 2, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);

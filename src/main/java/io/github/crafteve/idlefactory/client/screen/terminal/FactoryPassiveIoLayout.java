@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 /**
@@ -14,7 +15,7 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * tooltip 和 JEI 都从这里取同一份结果。滚动只在取值时加 {@code scroll}，不重建排版。</p>
  *
  * <p>块内结构（列表式）：机器行 20 → 规则行 20×n → 虚线新增行 20；磁贴式：机器行 20 →
- * 磁贴区（上下各 3 内边距，77×34 两列，间隔 4）。块左侧 3px 状态竖线贯穿整块。</p>
+ * 磁贴区（上下各 2 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，刚好容下 1px 外阴影。</p>
  */
 final class FactoryPassiveIoLayout {
     /** 规则行高。 */
@@ -25,16 +26,16 @@ final class FactoryPassiveIoLayout {
     static final int MACHINE_ROW_H = 20;
     /** 虚线新增行高。 */
     static final int ADD_ROW_H = 20;
-    /** 块间距。 */
-    static final int BLOCK_GAP = 5;
+    /** 块间距：留 2px 刚好一件 1px 外阴影 + 1px 空隙。 */
+    static final int BLOCK_GAP = 2;
     /** 机器行与下面卡片之间的间距。 */
     static final int BODY_GAP = 2;
-    /** 块左侧状态竖线宽。 */
-    static final int STATUS_W = 3;
+    /** 块左侧状态灯宽；宽度由 {@link FactoryLamp} 给出，排版只引用不另写数值。 */
+    static final int STATUS_W = FactoryLamp.WIDTH;
     /** 块内左右内边距。 */
     static final int PAD = 2;
-    /** 规则行左边缘方向色条宽。 */
-    static final int DIR_STRIPE_W = 2;
+    /** 规则行 / 磁贴卡片相对块左边缘的内缩；状态灯顶掉卡片最左一条竖边。 */
+    static final int ROW_INSET = 1;
     /** 图标凹槽边长。 */
     static final int SLOT = 18;
     /** 行内元素间距。 */
@@ -302,16 +303,21 @@ final class FactoryPassiveIoLayout {
         return value >= start && value < start + length;
     }
 
-    /** 列表式行区域左边缘（屏幕坐标）。 */
-    /** 机器行左边缘（屏幕坐标）：让出左侧 3px 状态条。 */
-    static int rowAreaX(Viewport viewport) {
-        return viewport.x() + STATUS_W;
+    /**
+     * 机器行内容左边缘（屏幕坐标）。
+     *
+     * <p>机器行是机器大卡片顶部的一条深色带，状态灯顶掉卡片最左一条竖边；内容从灯的右侧
+     * 再空 1px 开始，和 {@link #slotX} 的推导保持同一套缩进。</p>
+     */
+    static int headerX(Viewport viewport) {
+        return viewport.x() + ROW_INSET + STATUS_W + GAP;
     }
 
     /**
      * 规则 / 磁贴主体左边缘（屏幕坐标）。
      *
-     * <p>状态条只画在机器行左侧，机器行以下把 3px 还给卡片，卡片可以铺到内容区最左边。</p>
+     * <p>机器大卡片铺到内容区最左边；规则行与磁贴再内缩 {@link #ROW_INSET}，让状态灯
+     * 顶掉卡片最左一条竖边。</p>
      */
     static int bodyX(Viewport viewport) {
         return viewport.x();
@@ -322,9 +328,9 @@ final class FactoryPassiveIoLayout {
         return viewport.x() + viewport.width() - PAD;
     }
 
-    /** 规则行图标凹槽 x。 */
+    /** 规则行图标凹槽 x：卡片内缩 + 状态灯 + 1px 间隙。 */
     static int slotX(Viewport viewport) {
-        return bodyX(viewport) + PAD + DIR_STRIPE_W + GAP;
+        return bodyX(viewport) + ROW_INSET + STATUS_W + GAP;
     }
 
     /** 规则行名字 x。 */

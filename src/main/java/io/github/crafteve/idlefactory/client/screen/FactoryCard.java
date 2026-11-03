@@ -5,7 +5,7 @@ import net.minecraft.client.gui.GuiGraphics;
 /**
  * 统一的卡片组件：所有层级都走这一套光照明暗。
  *
- * <p>四级卡片——工作区大卡片、机器大卡片、机器行小卡片、IO 配置小卡片——只有底色不同，
+ * <p>三级卡片——工作区大卡片、机器大卡片、IO 配置小卡片——只有底色不同，
  * 高光方向、暗边方向、外侧阴影颜色和偏移完全一致：上 / 左 1px 亮边，下 / 右 1px 暗边，
  * 下 / 右外侧 1px 半透明阴影。调用方负责在卡片外侧留出 1px 影子空间。</p>
  */
@@ -16,8 +16,6 @@ public final class FactoryCard {
         WORK_AREA,
         /** 机器大卡片（机器行 + IO 卡片的父卡）。 */
         MACHINE,
-        /** 机器行小卡片。 */
-        HEADER,
         /** IO 配置小卡片（列表行 / 磁贴）。 */
         IO
     }
@@ -63,7 +61,6 @@ public final class FactoryCard {
         return switch (level) {
             case WORK_AREA, IO -> theme.panelBg();
             case MACHINE -> theme.bevelLight();
-            case HEADER -> theme.slotBg();
         };
     }
 }

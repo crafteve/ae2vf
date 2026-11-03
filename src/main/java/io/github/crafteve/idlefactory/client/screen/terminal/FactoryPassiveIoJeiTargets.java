@@ -110,7 +110,7 @@ public final class FactoryPassiveIoJeiTargets {
     private static Rect2i machineIconArea(FactoryPassiveIoLayout layout, Hit hit, int scroll) {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hit.block());
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport) + FactoryPassiveIoLayout.PAD;
+        int x = FactoryPassiveIoLayout.headerX(viewport);
         int y = FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll) + 1;
         return new Rect2i(x, y, FactoryPassiveIoLayout.SLOT, FactoryPassiveIoLayout.SLOT);
     }
