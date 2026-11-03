@@ -22,10 +22,12 @@ public class FactorySearchEditBox extends EditBox {
         this.theme = theme;
         this.hint = hint;
         setBordered(false);
-        setTextColor(theme.textPrimary());
-        setTextColorUneditable(theme.textDim());
+        // AE2 的输入框底板是中等灰蓝，文字与提示都用亮色才看得清。
+        setTextColor(0xFFFFFFFF);
+        setTextColorUneditable(0xFFD8D9DF);
         setTextShadow(false);
-        setHint(hint);
+        // 原版 hint 颜色写死成灰色，自己画亮色提示。
+        setHint(Component.empty());
         setMaxLength(64);
     }
 
@@ -41,11 +43,14 @@ public class FactorySearchEditBox extends EditBox {
 
     @Override
     public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 原版 EditBox 只在 value 为空时画提示，不判断聚焦；这里把「聚焦」也算作正在使用，
-        // 否则光标和「搜索机器…」会同时出现在输入槽里。
-        boolean showHint = isVisible() && !isFocused() && getValue().isEmpty();
-        setHint(showHint ? this.hint : Component.empty());
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
+
+        // 未聚焦且为空时画亮色占位提示；聚焦或有内容时不画，避免和光标 / 输入文字叠住。
+        if (isVisible() && !isFocused() && getValue().isEmpty()) {
+            Font font = Minecraft.getInstance().font;
+            guiGraphics.drawString(font, this.hint.getString(), getX(), getY() + 1,
+                    0xFFE6EEF8, false);
+        }
 
         if (!isFocused() || !isVisible()) {
             return;

@@ -66,7 +66,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private static final int FEEDBACK_TICKS = 40;
     /** 顶栏搜索框的外框位置与尺寸。 */
     private static final int SEARCH_X = 46;
-    private static final int SEARCH_Y = 2;
+    private static final int SEARCH_Y = 4;
     private static final int SEARCH_W = 124;
     private static final int SEARCH_H = 13;
 

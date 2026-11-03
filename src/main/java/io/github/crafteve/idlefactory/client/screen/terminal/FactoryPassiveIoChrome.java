@@ -62,7 +62,7 @@ final class FactoryPassiveIoChrome {
      * @param topPos   面板上边缘
      */
     static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos) {
-        graphics.drawString(font, "被动 IO", leftPos + 8, topPos + 4, TITLE_COLOR, false);
+        graphics.drawString(font, "被动 IO", leftPos + 8, topPos + 5, TITLE_COLOR, false);
     }
 
     /**

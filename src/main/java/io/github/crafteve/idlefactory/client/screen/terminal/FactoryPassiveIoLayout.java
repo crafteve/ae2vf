@@ -26,7 +26,9 @@ final class FactoryPassiveIoLayout {
     /** 虚线新增行高。 */
     static final int ADD_ROW_H = 20;
     /** 块间距。 */
-    static final int BLOCK_GAP = 3;
+    static final int BLOCK_GAP = 5;
+    /** 机器行与下面卡片之间的间距。 */
+    static final int BODY_GAP = 2;
     /** 块左侧状态竖线宽。 */
     static final int STATUS_W = 3;
     /** 块内左右内边距。 */
@@ -137,7 +139,8 @@ final class FactoryPassiveIoLayout {
         for (int i = 0; i < blocks.size(); i++) {
             FactoryPassiveIoModel.BlockView block = blocks.get(i);
             int height = blockHeight(block, view);
-            boxes.add(new BlockBox(i, cursor, cursor + MACHINE_ROW_H,
+            int bodyTop = cursor + MACHINE_ROW_H + BODY_GAP;
+            boxes.add(new BlockBox(i, cursor, bodyTop,
                     cursor + height - ADD_ROW_H, cursor + height, block.rules().size()));
             cursor += height + BLOCK_GAP;
         }
@@ -155,11 +158,12 @@ final class FactoryPassiveIoLayout {
     static int blockHeight(FactoryPassiveIoModel.BlockView block, FactoryPassiveIoView view) {
         int rules = block.rules().size();
         if (view == FactoryPassiveIoView.LIST) {
-            return MACHINE_ROW_H + rules * (ROW_H + ROW_GAP) + ADD_ROW_H;
+            return MACHINE_ROW_H + BODY_GAP + rules * (ROW_H + ROW_GAP) + ADD_ROW_H;
         }
         int tiles = rules + 1;
         int rows = (tiles + 1) / 2;
-        return MACHINE_ROW_H + TILE_PAD + rows * TILE_H + (rows - 1) * TILE_GAP + TILE_PAD;
+        return MACHINE_ROW_H + BODY_GAP + TILE_PAD + rows * TILE_H + (rows - 1) * TILE_GAP
+                + TILE_PAD;
     }
 
     /** 块位置列表。 */
@@ -215,6 +219,10 @@ final class FactoryPassiveIoLayout {
                 continue;
             }
             if (localY < box.bodyTop()) {
+                // 机器行与下面卡片之间的 2px 缝隙不属于任何元素。
+                if (localY >= box.top() + MACHINE_ROW_H) {
+                    return null;
+                }
                 return new Hit(Kind.MACHINE, box.index(), -1);
             }
             return this.view == FactoryPassiveIoView.LIST

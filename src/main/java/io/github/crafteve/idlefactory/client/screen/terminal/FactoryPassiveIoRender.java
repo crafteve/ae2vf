@@ -45,8 +45,6 @@ final class FactoryPassiveIoRender {
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** chip 悬停提亮（白色 20%）。 */
     private static final int CHIP_HOVER = 0x33FFFFFF;
-    /** 卡片外阴影。 */
-    private static final int CARD_SHADOW = 0x33000000;
     /** 磁贴里速率列宽。 */
     private static final int TILE_RATE_W = 32;
     /** 磁贴名字宽。 */
@@ -174,8 +172,32 @@ final class FactoryPassiveIoRender {
 
     private void drawStatusLine(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top, int height) {
-        graphics.fill(viewport.x(), top, viewport.x() + FactoryPassiveIoLayout.STATUS_W,
-                top + height, block.status().color());
+        int x = viewport.x();
+        int color = block.status().color();
+        // 3px 灯条：左 1px 提亮、中间本色、右 1px 压暗，给平涂加一点立体感。
+        graphics.fill(x, top, x + 1, top + height, brighten(color));
+        graphics.fill(x + 1, top, x + 2, top + height, color);
+        graphics.fill(x + 2, top, x + 3, top + height, darken(color));
+    }
+
+    /**
+     * 提亮 / 压暗颜色，用于状态灯条的 1px 高光与阴影。
+     *
+     * @param color 原色 ARGB
+     * @return 调整后的颜色
+     */
+    private static int brighten(int color) {
+        int r = Math.min(255, ((color >> 16) & 0xFF) + 38);
+        int g = Math.min(255, ((color >> 8) & 0xFF) + 38);
+        int b = Math.min(255, (color & 0xFF) + 38);
+        return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
+    }
+
+    private static int darken(int color) {
+        int r = Math.max(0, ((color >> 16) & 0xFF) - 38);
+        int g = Math.max(0, ((color >> 8) & 0xFF) - 38);
+        int b = Math.max(0, (color & 0xFF) - 38);
+        return (color & 0xFF000000) | (r << 16) | (g << 8) | b;
     }
 
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
@@ -202,7 +224,7 @@ final class FactoryPassiveIoRender {
                 FactoryPassiveIoLayout.BADGE_H, 0xFFD8D9DF);
         dashedRect(graphics, badge2X, top + 4, FactoryPassiveIoLayout.BADGE_W,
                 FactoryPassiveIoLayout.BADGE_H, 0xFFD8D9DF);
-        FactoryNineSlice.icon(graphics, block.status().lamp(), right - 4, top + 8, 4);
+        FactoryNineSlice.icon(graphics, block.status().lamp(), right - 5, top + 8, 3);
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -212,9 +234,6 @@ final class FactoryPassiveIoRender {
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
         FactoryNineSlice.card(graphics, x, bodyTop, width, bottom - bodyTop);
-        // 卡片外 1px 阴影，和亮边一起把块从终端底板上抬起来。
-        graphics.fill(x + 1, bottom, x + width, bottom + 1, CARD_SHADOW);
-        graphics.fill(x + width, bodyTop + 1, x + width + 1, bottom + 1, CARD_SHADOW);
         for (int i = 0; i < block.rules().size(); i++) {
             drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
         }
@@ -337,9 +356,6 @@ final class FactoryPassiveIoRender {
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
         FactoryNineSlice.card(graphics, x, bodyTop, width, bottom - bodyTop);
-        // 卡片外 1px 阴影，和亮边一起把块从终端底板上抬起来。
-        graphics.fill(x + 1, bottom, x + width, bottom + 1, CARD_SHADOW);
-        graphics.fill(x + width, bodyTop + 1, x + width + 1, bottom + 1, CARD_SHADOW);
         int count = block.rules().size();
         for (int i = 0; i <= count; i++) {
             int row = i / 2;
