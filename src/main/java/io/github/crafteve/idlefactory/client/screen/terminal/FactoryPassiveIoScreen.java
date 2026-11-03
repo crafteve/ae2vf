@@ -157,6 +157,14 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
         FactoryPassiveIoFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
+        // AE2 的终端行贴图中间带一排物品槽（ME 终端用来放仓库格）；本界面内容区自绘，
+        // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。左右各留 2px
+        // 让终端自己的亮边保留下来。
+        int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
+        graphics.fill(this.leftPos + 2, this.topPos + header,
+                this.leftPos + this.imageWidth - 2,
+                this.topPos + header + this.rows * rowHeight(),
+                FactoryGuiTheme.current().panelBg());
         FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
@@ -217,18 +225,16 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (super.mouseClicked(mouseX, mouseY, button)) {
-            return true;
+        // 内容区先于 super 处理：原版容器界面会把面板内的空白点击也吃掉，
+        // 先走 super 的话 chip 永远收不到点击。内容区不与槽位 / 搜索框 / 滚动条重叠。
+        if (this.layout != null) {
+            Hit hit = this.layout.hit(mouseX, mouseY, scroll());
+            if (hit != null) {
+                clickHit(hit, button);
+                return true;
+            }
         }
-        if (this.layout == null) {
-            return false;
-        }
-        Hit hit = this.layout.hit(mouseX, mouseY, scroll());
-        if (hit == null) {
-            return false;
-        }
-        clickHit(hit, button);
-        return true;
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
