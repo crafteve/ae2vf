@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.FactoryCard;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 
@@ -28,8 +28,7 @@ final class FactoryPassiveIoChrome {
     }
 
     /**
-     * 画自绘滚动区的亮色描边：上 / 左 1px 亮边，下 / 右 1px 暗边。参考 AE2 样板管理
-     * 终端的槽位区边框；不再叠外侧阴影，避免和卡片框、滑轨挤成黑带。
+     * 画工作区大卡片：和其他卡片共用 {@link FactoryCard} 的光照与阴影，只换层级底色。
      *
      * @param graphics 画布
      * @param x        左边缘
@@ -38,33 +37,7 @@ final class FactoryPassiveIoChrome {
      * @param height   高
      */
     static void drawWorkAreaFrame(GuiGraphics graphics, int x, int y, int width, int height) {
-        if (width <= 3 || height <= 3) {
-            return;
-        }
-        FactoryGuiTheme theme = FactoryGuiTheme.current();
-        int light = theme.panelBorderLight();
-        graphics.fill(x, y, x + width, y + 1, light);
-        graphics.fill(x, y, x + 1, y + height, light);
-        int dark = theme.slotBorderDark();
-        graphics.fill(x, y + height - 1, x + width, y + height, dark);
-        graphics.fill(x + width - 1, y, x + width, y + height, dark);
-    }
-
-    /**
-     * 画 2px 细滑轨：左暗右亮，滑块在上面移动；比 AE2 终端贴图自带的 6px 宽槽干净。
-     *
-     * @param graphics 画布
-     * @param x        左边缘
-     * @param y        上边缘
-     * @param height   高
-     */
-    static void drawScrollTrack(GuiGraphics graphics, int x, int y, int height) {
-        if (height <= 0) {
-            return;
-        }
-        FactoryGuiTheme theme = FactoryGuiTheme.current();
-        graphics.fill(x, y, x + 1, y + height, theme.slotBorderDark());
-        graphics.fill(x + 1, y, x + 2, y + height, theme.panelBorderLight());
+        FactoryCard.draw(graphics, x, y, width, height, FactoryCard.Level.WORK_AREA, true);
     }
 
     /**

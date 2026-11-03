@@ -171,15 +171,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         // AE2 终端自带的滚动条滑轨（178~183），必须留着，否则滚动条只剩滑块没有轨道。
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
         graphics.fill(this.leftPos + 2, this.topPos + header,
-                this.leftPos + this.imageWidth - 2,
+                this.leftPos + this.imageWidth - 21,
                 this.topPos + header + this.rows * rowHeight(),
                 FactoryGuiTheme.current().panelBg());
-        // AE2 终端贴图自带的 6px 滑轨太宽，会和卡片框、工作区框挤成一条黑带；
-        // 把面板铺平后自己画 2px 细轨，滑块仍然由 AE2 Scrollbar 画。
-        FactoryPassiveIoChrome.drawScrollTrack(graphics, this.leftPos + 180,
-                this.topPos + header, this.rows * rowHeight());
-        // 给自绘滚动区加一圈 2px 描边，让它看起来浮在终端面板上。
-        // 框只包内容，不含左侧按钮、搜索框和右侧滚动条；顶部留 2px 与搜索框隔开。
+        // 填充停在滑轨左侧，保留 AE2 终端贴图自带的滑轨与 Scrollbar 原始渲染。
         Viewport frame = workAreaFrame();
         FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
                 frame.height());

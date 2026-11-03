@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTextures;
+import io.github.crafteve.idlefactory.client.screen.FactoryCard;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
@@ -90,6 +90,8 @@ final class FactoryPassiveIoRender {
             if (bottom <= viewport.y() || top >= viewport.y() + viewport.height()) {
                 continue;
             }
+            FactoryCard.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
+                    viewport.width(), box.bottom() - box.top(), FactoryCard.Level.MACHINE, true);
             drawStatusLine(graphics, viewport, block, top,
                     FactoryPassiveIoLayout.MACHINE_ROW_H);
             drawMachineRow(graphics, viewport, block, top);
@@ -98,8 +100,6 @@ final class FactoryPassiveIoRender {
             } else {
                 drawTileBody(graphics, viewport, box, block, scroll, hover, dragging);
             }
-            // 每台机器只画一圈大卡片描边；内部行 / 磁贴只保留轻微亮暗，不再各自套卡框。
-            drawCardOutline(graphics, viewport, box, scroll);
         }
         if (!dragging) {
             drawHover(graphics, layout, hover, scroll);
@@ -181,18 +181,6 @@ final class FactoryPassiveIoRender {
      * @param box      块
      * @param scroll   滚动
      */
-    private void drawCardOutline(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            int scroll) {
-        int x = FactoryPassiveIoLayout.bodyX(viewport);
-        int y = FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll);
-        int width = viewport.width();
-        int height = box.bottom() - box.top();
-        graphics.fill(x, y, x + width, y + 1, 0xFFE4E5EA);
-        graphics.fill(x, y, x + 1, y + height, 0xFF878FA5);
-        graphics.fill(x, y + height - 1, x + width, y + height, 0xFF9A9EB2);
-        graphics.fill(x + width - 1, y, x + width, y + height, 0xFF878FA5);
-    }
-
     private void drawStatusLine(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top, int height) {
         int x = viewport.x();
@@ -226,9 +214,9 @@ final class FactoryPassiveIoRender {
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
-        int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
-        FactoryNineSlice.listMachineRow(graphics, x, top, width,
-                FactoryPassiveIoLayout.MACHINE_ROW_H);
+        int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W - 2;
+        FactoryCard.draw(graphics, x, top, width,
+                FactoryPassiveIoLayout.MACHINE_ROW_H, FactoryCard.Level.HEADER, true);
         int slotX = x + FactoryPassiveIoLayout.PAD;
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
@@ -252,12 +240,6 @@ final class FactoryPassiveIoRender {
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover) {
-        int x = FactoryPassiveIoLayout.bodyX(viewport);
-        int width = viewport.width();
-        int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
-        int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
-                bottom - bodyTop);
         for (int i = 0; i < block.rules().size(); i++) {
             drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
         }
@@ -268,10 +250,8 @@ final class FactoryPassiveIoRender {
             BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.bodyX(viewport);
-        // 行卡片只保留平底 + 顶部 1px 高光，不再画底部暗边，避免和相邻卡片形成阴影带。
-        graphics.fill(x + 1, y, x + viewport.width() - 1, y + FactoryPassiveIoLayout.ROW_H,
-                0xFFC2C2CE);
-        graphics.fill(x + 1, y, x + viewport.width() - 1, y + 1, 0xFFE4E4EC);
+        FactoryCard.draw(graphics, x + 1, y, viewport.width() - 4,
+                FactoryPassiveIoLayout.ROW_H, FactoryCard.Level.IO, true);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
                 x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
                 y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
@@ -377,12 +357,6 @@ final class FactoryPassiveIoRender {
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover, boolean dragging) {
-        int x = FactoryPassiveIoLayout.bodyX(viewport);
-        int width = viewport.width();
-        int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
-        int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
-                bottom - bodyTop);
         int count = block.rules().size();
         for (int i = 0; i <= count; i++) {
             int row = i / 2;
@@ -402,10 +376,8 @@ final class FactoryPassiveIoRender {
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
-        // 磁贴同样只保留平底 + 顶部高光，去掉底部暗边。
-        graphics.fill(x, y, x + FactoryPassiveIoLayout.TILE_W, y + FactoryPassiveIoLayout.TILE_H,
-                0xFFC2C2CE);
-        graphics.fill(x, y, x + FactoryPassiveIoLayout.TILE_W, y + 1, 0xFFE4E4EC);
+        FactoryCard.draw(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
+                FactoryPassiveIoLayout.TILE_H, FactoryCard.Level.IO, true);
         graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
                 directionColor(rule));
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;
