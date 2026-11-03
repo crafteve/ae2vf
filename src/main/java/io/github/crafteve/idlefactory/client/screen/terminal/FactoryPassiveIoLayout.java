@@ -38,7 +38,7 @@ final class FactoryPassiveIoLayout {
     /** 三枚 chip 的边长。 */
     static final int CHIP = 11;
     /** 速率列宽。 */
-    static final int RATE_W = 34;
+    static final int RATE_W = 38;
     /** 磁贴宽。 */
     static final int TILE_W = 77;
     /** 磁贴高。 */

@@ -16,8 +16,10 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.client.gui.Font;
@@ -251,8 +253,8 @@ final class FactoryPassiveIoRender {
                 ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
                 y + 4, this.theme.textPrimary(), false);
         drawChips(graphics, viewport, block, rule, y, chipIndex(hover, index));
-        drawRate(graphics, viewport, rule, y + 4, FactoryPassiveIoLayout.rateX(viewport),
-                FactoryPassiveIoLayout.RATE_W, block.status().color());
+        drawRate(graphics, rule, y + 4, FactoryPassiveIoLayout.rateX(viewport),
+                FactoryPassiveIoLayout.RATE_W);
     }
 
     private void drawChips(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
@@ -295,16 +297,30 @@ final class FactoryPassiveIoRender {
         }
     }
 
-    private void drawRate(GuiGraphics graphics, Viewport viewport, RuleRow rule, int textY,
-            int right, int maxWidth, int idleColor) {
-        String text = FactoryLabels.rateText(rule.rate(),
-                io.github.crafteve.idlefactory.factory.storage.AeKeySupport.kind(rule.spec().key()));
+    private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,
+            int maxWidth) {
         IoResult.Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
-        int color = rule.rate() <= 0L ? idleColor
+        int color = rule.rate() <= 0L ? this.theme.statusIdle()
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
-        String clipped = ellipsize(text, maxWidth);
+        String clipped = ellipsize(rateText(rule), maxWidth);
         graphics.drawString(this.font, clipped, right - this.font.width(clipped), textY, color,
                 false);
+    }
+
+    /**
+     * 终端里的速率文案：FE 去掉「 FE」后缀，单位留给 tooltip。
+     *
+     * <p>速率列只有 38px，{@code 28.1G FE/s} 放不下；FE 的类型已经由图标和颜色表达。</p>
+     *
+     * @param rule 规则
+     * @return 速率文案
+     */
+    private static String rateText(RuleRow rule) {
+        CapabilityKind kind = AeKeySupport.kind(rule.spec().key());
+        if (kind == CapabilityKind.ENERGY) {
+            return FactoryLabels.count(rule.rate()) + "/s";
+        }
+        return FactoryLabels.rateText(rule.rate(), kind);
     }
 
     private void drawAddRow(GuiGraphics graphics, Viewport viewport, BlockBox box, int scroll,
@@ -370,12 +386,10 @@ final class FactoryPassiveIoRender {
                 chipY, modeLabel(rule.spec()),
                 item ? modeColor(rule.spec()) : this.theme.slotBg(),
                 item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
-        String rate = ellipsize(FactoryLabels.rateText(rule.rate(),
-                io.github.crafteve.idlefactory.factory.storage.AeKeySupport.kind(rule.spec().key())),
-                TILE_RATE_W);
+        String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + FactoryPassiveIoLayout.TILE_W - 2;
         IoResult.Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
-        int color = rule.rate() <= 0L ? block.status().color()
+        int color = rule.rate() <= 0L ? this.theme.statusIdle()
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 1, color,
                 false);

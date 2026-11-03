@@ -155,6 +155,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
+        FactoryPassiveIoFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
+                this.topPos, this.rows);
         FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
