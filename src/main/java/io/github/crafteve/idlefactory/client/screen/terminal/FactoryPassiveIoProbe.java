@@ -51,34 +51,73 @@ final class FactoryPassiveIoProbe {
                 yield true;
             }
             case GLFW.GLFW_KEY_F8 -> {
-                screen.clickHit(new Hit(Kind.CHIP_DIR, 0, 0), 0);
+                flipTestRule(screen);
                 yield true;
             }
             case GLFW.GLFW_KEY_F9 -> {
-                deleteLastRule(screen);
+                deleteTestRule(screen);
                 yield true;
             }
             case GLFW.GLFW_KEY_F10 -> {
-                screen.clickHit(new Hit(Kind.CHIP_FACE, 0, 0), 0);
+                clickTestRule(screen, Kind.CHIP_FACE);
                 yield true;
             }
             case GLFW.GLFW_KEY_F11 -> {
-                screen.clickHit(new Hit(Kind.CHIP_MODE, 0, 0), 0);
+                clickTestRule(screen, Kind.CHIP_MODE);
                 yield true;
             }
             default -> false;
         };
     }
 
-    private static void deleteLastRule(FactoryPassiveIoScreen screen) {
+    /**
+     * 翻转测试规则：优先找 F7 加进来的红石，找不到就翻最后一条。
+     *
+     * <p>目标固定为「测试规则」而不是第 0 条，避免探针把原始机器的第一条输入搬走，
+     * 测完还得手工恢复。</p>
+     */
+    private static void flipTestRule(FactoryPassiveIoScreen screen) {
+        int index = testRuleIndex(screen);
+        if (index >= 0) {
+            screen.clickHit(new Hit(Kind.CHIP_DIR, 0, index), 0);
+        }
+    }
+
+    private static void deleteTestRule(FactoryPassiveIoScreen screen) {
+        int index = testRuleIndex(screen);
+        if (index >= 0) {
+            screen.clickHit(new Hit(Kind.RULE, 0, index), 1);
+        }
+    }
+
+    private static void clickTestRule(FactoryPassiveIoScreen screen, Kind kind) {
+        int index = testRuleIndex(screen);
+        if (index >= 0) {
+            screen.clickHit(new Hit(kind, 0, index), 0);
+        }
+    }
+
+    /**
+     * 测试规则下标：优先红石，其次最后一条。
+     *
+     * @param screen 屏幕
+     * @return 下标；没有规则时为 -1
+     */
+    private static int testRuleIndex(FactoryPassiveIoScreen screen) {
         if (screen.blocks().isEmpty()) {
-            return;
+            return -1;
         }
         BlockView block = screen.blocks().get(0);
         if (block.rules().isEmpty()) {
-            return;
+            return -1;
         }
-        screen.clickHit(new Hit(Kind.RULE, 0, block.rules().size() - 1), 1);
+        for (int i = 0; i < block.rules().size(); i++) {
+            if ("minecraft:redstone".equals(
+                    block.rules().get(i).spec().key().getId().toString())) {
+                return i;
+            }
+        }
+        return block.rules().size() - 1;
     }
 
     /**
