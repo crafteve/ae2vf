@@ -16,7 +16,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -31,12 +30,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 内容区都由本屏幕自己维护。左侧按钮沿用 AE2 的 {@code VerticalButtonBar}。</p>
  */
 public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu> {
-    /** 窗口上下留白；给屏幕边框和 AE2 终端留呼吸空间。 */
-    private static final int MARGIN = 8;
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
-    /** 最多内容行数；再高会顶到屏幕外，内容应滚动而不是无限拉长。 */
-    private static final int MAX_ROWS = 12;
     /** 内容区左右内边距。 */
     private static final int CONTENT_PADDING = 4;
     /** 右侧滚动条占用的宽度；内容不能压到滚动条下面。 */
@@ -64,6 +59,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super(menu, inventory, title, style);
         this.view = menu.host().view();
         this.scrollbar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
+        // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
+        // 先用一个同图标、同位置的按钮占位，等指南页确定后再换成 GuideME 跳转。
+        this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
+            // 指南页待接入。
+        }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
         this.addToLeftToolbar(new FactoryPassiveIoViewButton(() -> this.view,
@@ -73,11 +73,13 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     @Override
     protected void init() {
         TerminalStyle terminal = this.style.getTerminalStyle();
-        int header = terminal.getHeader().getSrcHeight();
-        int row = terminal.getRow().getSrcHeight();
-        int bottom = terminal.getBottom().getSrcHeight();
-        int usable = Math.max(0, this.height - MARGIN * 2 - header - bottom);
-        this.rows = Mth.clamp(usable / row, MIN_ROWS, MAX_ROWS);
+        // getPossibleRows 内部会自己减 header / bottom，这里只能传屏幕可用高度；
+        // 之前提前减了一次，possibleRows 被压到 0，rows 永远被 MIN_ROWS 兜底成最矮。
+        int margin = AEConfig.instance().getTerminalMargin();
+        int usable = Math.max(0, this.height - margin * 2);
+        int possibleRows = terminal.getPossibleRows(usable);
+        this.rows = Math.max(MIN_ROWS,
+                AEConfig.instance().getTerminalStyle().getRows(possibleRows));
         this.imageWidth = terminal.getScreenWidth();
         this.imageHeight = terminal.getScreenHeight(this.rows);
         super.init();
