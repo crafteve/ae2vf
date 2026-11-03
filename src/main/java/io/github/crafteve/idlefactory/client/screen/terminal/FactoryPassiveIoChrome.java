@@ -28,6 +28,36 @@ final class FactoryPassiveIoChrome {
     }
 
     /**
+     * 画自绘滚动区的 2px 描边：外层深色 1px + 内层亮色 1px，和 V1 左表同款，
+     * 让内容区看起来是浮在终端面板上的一扇窗口。
+     *
+     * @param graphics 画布
+     * @param x        左边缘
+     * @param y        上边缘
+     * @param width    宽
+     * @param height   高
+     */
+    static void drawWorkAreaFrame(GuiGraphics graphics, int x, int y, int width, int height) {
+        if (width <= 3 || height <= 3) {
+            return;
+        }
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y + height - 1,
+                width, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x, y, 1, height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + width - 1, y, 1,
+                height);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1,
+                width - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + 1, 1,
+                height - 2);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + 1, y + height - 2,
+                width - 2, 1);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.TABLE_LIGHT, x + width - 2, y + 1,
+                1, height - 2);
+    }
+
+    /**
      * 画标题。
      *
      * @param graphics 画布

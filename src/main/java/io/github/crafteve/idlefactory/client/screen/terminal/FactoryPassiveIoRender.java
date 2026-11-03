@@ -72,13 +72,12 @@ final class FactoryPassiveIoRender {
      * @param blocks   模型块
      * @param scroll   滚动像素
      * @param hover    当前悬停目标；可为 {@code null}
-     * @param selected 当前选中的规则卡；可为 {@code null}
      * @param dragging 是否正在从 JEI 拖动资源
      * @param emptyText 内容为空时的提示
      */
     void draw(GuiGraphics graphics, FactoryPassiveIoLayout layout,
-            List<BlockView> blocks, int scroll, @Nullable Hit hover, @Nullable Hit selected,
-            boolean dragging, String emptyText) {
+            List<BlockView> blocks, int scroll, @Nullable Hit hover, boolean dragging,
+            String emptyText) {
         Viewport viewport = layout.viewport();
         if (blocks.isEmpty()) {
             drawEmpty(graphics, viewport, emptyText);
@@ -94,9 +93,9 @@ final class FactoryPassiveIoRender {
             drawStatusLine(graphics, viewport, block, top, bottom - top);
             drawMachineRow(graphics, viewport, block, top);
             if (layout.view() == FactoryPassiveIoView.LIST) {
-                drawListBody(graphics, viewport, box, block, scroll, hover, selected);
+                drawListBody(graphics, viewport, box, block, scroll, hover);
             } else {
-                drawTileBody(graphics, viewport, box, block, scroll, hover, selected, dragging);
+                drawTileBody(graphics, viewport, box, block, scroll, hover, dragging);
             }
         }
         if (!dragging) {
@@ -125,10 +124,21 @@ final class FactoryPassiveIoRender {
                     FactoryPassiveIoLayout.contentRight(viewport),
                     FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll), HOVER_FILL);
             case RULE -> {
-                int rowY = rowScreenY(layout, box, hover.rule(), scroll);
-                graphics.fill(FactoryPassiveIoLayout.rowAreaX(viewport), rowY,
-                        FactoryPassiveIoLayout.contentRight(viewport), rowY + FactoryPassiveIoLayout.ROW_H,
-                        HOVER_FILL);
+                if (layout.view() == FactoryPassiveIoView.LIST) {
+                    int rowY = rowScreenY(layout, box, hover.rule(), scroll);
+                    graphics.fill(FactoryPassiveIoLayout.rowAreaX(viewport), rowY,
+                            FactoryPassiveIoLayout.contentRight(viewport),
+                            rowY + FactoryPassiveIoLayout.ROW_H, HOVER_FILL);
+                } else {
+                    // 磁贴悬停必须用磁贴自己的几何；之前误用了列表行高，只亮了卡片的一截。
+                    int row = hover.rule() / 2;
+                    int col = hover.rule() % 2;
+                    int tileX = FactoryPassiveIoLayout.tileX(viewport, col);
+                    int tileY = FactoryPassiveIoLayout.tileRowY(viewport, box, row, scroll);
+                    graphics.fill(tileX + 1, tileY + 1,
+                            tileX + FactoryPassiveIoLayout.TILE_W - 1,
+                            tileY + FactoryPassiveIoLayout.TILE_H - 1, HOVER_FILL);
+                }
             }
             case ADD -> drawAddHover(graphics, layout, box, scroll);
             default -> {
@@ -194,7 +204,7 @@ final class FactoryPassiveIoRender {
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, int scroll, @Nullable Hit hover, @Nullable Hit selected) {
+            BlockView block, int scroll, @Nullable Hit hover) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
@@ -202,15 +212,13 @@ final class FactoryPassiveIoRender {
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
                 bottom - bodyTop);
         for (int i = 0; i < block.rules().size(); i++) {
-            drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover,
-                    selected);
+            drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
         }
         drawAddRow(graphics, viewport, box, scroll, hover);
     }
 
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover,
-            @Nullable Hit selected) {
+            BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
@@ -232,10 +240,6 @@ final class FactoryPassiveIoRender {
         drawRate(graphics, rule, textY,
                 FactoryPassiveIoLayout.rateX(viewport) + FactoryPassiveIoLayout.RATE_W,
                 FactoryPassiveIoLayout.RATE_W);
-        if (isSelected(selected, box.index(), index)) {
-            outline(graphics, x, y, FactoryPassiveIoLayout.contentRight(viewport) - x,
-                    FactoryPassiveIoLayout.ROW_H);
-        }
     }
 
     private void drawChips(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
@@ -321,8 +325,7 @@ final class FactoryPassiveIoRender {
     }
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, int scroll, @Nullable Hit hover, @Nullable Hit selected,
-            boolean dragging) {
+            BlockView block, int scroll, @Nullable Hit hover, boolean dragging) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
@@ -342,12 +345,12 @@ final class FactoryPassiveIoRender {
                 continue;
             }
             drawTile(graphics, viewport, block, block.rules().get(i), box.index(), i, tileX,
-                    tileY, hover, selected);
+                    tileY, hover);
         }
     }
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
-            int blockIndex, int index, int x, int y, @Nullable Hit hover, @Nullable Hit selected) {
+            int blockIndex, int index, int x, int y, @Nullable Hit hover) {
         FactoryNineSlice.listTile(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
                 FactoryPassiveIoLayout.TILE_H);
         graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
@@ -379,10 +382,6 @@ final class FactoryPassiveIoRender {
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 1, color,
                 false);
-        if (isSelected(selected, blockIndex, index)) {
-            outline(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
-                    FactoryPassiveIoLayout.TILE_H);
-        }
     }
 
     private void drawAddTile(GuiGraphics graphics, int x, int y, boolean hovered,
@@ -413,36 +412,6 @@ final class FactoryPassiveIoRender {
             case CHIP_MODE -> 2;
             default -> -1;
         };
-    }
-
-    /**
-     * 判断某个规则卡是否被选中。
-     *
-     * @param selected   选中目标
-     * @param blockIndex 机器块下标
-     * @param ruleIndex  规则下标
-     * @return 是否选中
-     */
-    private static boolean isSelected(@Nullable Hit selected, int blockIndex, int ruleIndex) {
-        return selected != null && selected.block() == blockIndex
-                && selected.rule() == ruleIndex;
-    }
-
-    /**
-     * 画 1px 选中描边。
-     *
-     * @param graphics 画布
-     * @param x        左边缘
-     * @param y        上边缘
-     * @param width    宽
-     * @param height   高
-     */
-    private void outline(GuiGraphics graphics, int x, int y, int width, int height) {
-        int color = this.theme.textPrimary();
-        graphics.fill(x, y, x + width, y + 1, color);
-        graphics.fill(x, y + height - 1, x + width, y + height, color);
-        graphics.fill(x, y, x + 1, y + height, color);
-        graphics.fill(x + width - 1, y, x + width, y + height, color);
     }
 
     private void drawEmpty(GuiGraphics graphics, Viewport viewport, String text) {

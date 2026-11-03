@@ -86,10 +86,7 @@ final class FactoryPassiveIoProbe {
     private static void deleteTestRule(FactoryPassiveIoScreen screen) {
         int index = testRuleIndex(screen);
         if (index >= 0) {
-            Hit hit = new Hit(Kind.RULE, 0, index);
-            // 右键现在只有「已选中」的卡片才删；探针先补一次左键选中。
-            screen.clickHit(hit, 0);
-            screen.clickHit(hit, 1);
+            screen.clickHit(new Hit(Kind.RULE, 0, index), 1);
         }
     }
 
