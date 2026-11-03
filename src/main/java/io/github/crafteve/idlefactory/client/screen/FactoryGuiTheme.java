@@ -104,8 +104,8 @@ public record FactoryGuiTheme(
      * AE2 浅色（默认）。
      *
      * <p>色值取自 AE2 1.21（19.2.10）的终端贴图与 {@code assets/ae2/screens/common/palette.json}。
-     * {@code accent} 与 {@code textPrimary} 刻意同色——AE2 浅色主题里「强调」就是最深的那个靛色，
-     * 不要再自创蓝色。</p>
+     * {@code accent} 是强调色（光标 / 选中描边），{@code textPrimary} 是正文纯黑；
+     * 两者不再刻意同色。</p>
      */
     public static final FactoryGuiTheme AE2 = new FactoryGuiTheme(
             0xFFCBCCD4, // panelBg
@@ -116,10 +116,10 @@ public record FactoryGuiTheme(
             0xFFADB0C4, // slotBg
             0xFF878FA5, // slotBorderDark
             0xFFF2F2F2, // slotBorderLight
-            0xFF33445C, // accent
-            0xFF33445C, // textPrimary
-            0xFF7C8BA3, // textDim
-            0xFF0E8FA8, // textValue（亮青，浅色面板上更像科技终端）
+            0xFF33445C, // accent（光标 / 选中描边，不是正文色）
+            0xFF000000, // textPrimary（正文纯黑，不再用蓝黑）
+            0xFF5F5F5F, // textDim（中性灰）
+            0xFF000000, // textValue（数字与值也用黑，颜色留给状态与速率）
             0xFF7B3FA0, // textFace（浅色面板上的面名紫）
             new Tooltip(0xFFFFFFFF, 0xFFC9D4E4, 0xFF4DE3FF, 0xFFC792EA, 0xFFFFB86B,
                     0xFF5CE66B, 0xFFFFB84D, 0xFFFF5A7A, 0xFF9AA8BF),
@@ -128,9 +128,9 @@ public record FactoryGuiTheme(
             0xFFD63A3A, // error
             0xFF2E9E4F, // statusRun
             0xFFD18A00, // statusWarn
-            0xFF8A93A6, // statusIdle
+            0xFF6B6B6B, // statusIdle（中性灰，不再发蓝）
             new Io(0xFFA9AAB8, 0xFFD8D9DF, 0xFF878FA5, 0xFF2F6FB0, 0xFFB06A2F,
-                    0xFFC8B06A, 0xFF3A2C08, 0xFF8FB4D8, 0xFF123048)
+                    0xFFC8B06A, 0xFF3A2C08, 0xFF8FB4D8, 0xFF000000)
     );
 
     /** 深色主题（保留，暂不作为默认；贴图目前只生成了浅色一套）。 */

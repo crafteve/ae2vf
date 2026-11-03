@@ -72,12 +72,13 @@ final class FactoryPassiveIoRender {
      * @param blocks   模型块
      * @param scroll   滚动像素
      * @param hover    当前悬停目标；可为 {@code null}
+     * @param selected 当前选中的规则卡；可为 {@code null}
      * @param dragging 是否正在从 JEI 拖动资源
      * @param emptyText 内容为空时的提示
      */
     void draw(GuiGraphics graphics, FactoryPassiveIoLayout layout,
-            List<BlockView> blocks, int scroll, @Nullable Hit hover, boolean dragging,
-            String emptyText) {
+            List<BlockView> blocks, int scroll, @Nullable Hit hover, @Nullable Hit selected,
+            boolean dragging, String emptyText) {
         Viewport viewport = layout.viewport();
         if (blocks.isEmpty()) {
             drawEmpty(graphics, viewport, emptyText);
@@ -93,9 +94,9 @@ final class FactoryPassiveIoRender {
             drawStatusLine(graphics, viewport, block, top, bottom - top);
             drawMachineRow(graphics, viewport, block, top);
             if (layout.view() == FactoryPassiveIoView.LIST) {
-                drawListBody(graphics, viewport, box, block, scroll, hover);
+                drawListBody(graphics, viewport, box, block, scroll, hover, selected);
             } else {
-                drawTileBody(graphics, viewport, box, block, scroll, hover, dragging);
+                drawTileBody(graphics, viewport, box, block, scroll, hover, selected, dragging);
             }
         }
         if (!dragging) {
@@ -131,9 +132,7 @@ final class FactoryPassiveIoRender {
             }
             case ADD -> drawAddHover(graphics, layout, box, scroll);
             default -> {
-                int[] rect = chipRect(layout, box, hover, scroll);
-                graphics.fill(rect[0] + 1, rect[1] + 1, rect[0] + FactoryPassiveIoLayout.CHIP - 1,
-                        rect[1] + FactoryPassiveIoLayout.CHIP - 1, CHIP_HOVER);
+                // chip 的高亮在 drawChip 内部按 chip 矩形画，这里不再叠第二层。
             }
         }
     }
@@ -155,32 +154,6 @@ final class FactoryPassiveIoRender {
         int y = FactoryPassiveIoLayout.tileRowY(viewport, box, row, scroll);
         graphics.fill(x + 1, y + 1, x + FactoryPassiveIoLayout.TILE_W - 1,
                 y + FactoryPassiveIoLayout.TILE_H - 1, HOVER_FILL);
-    }
-
-    private int[] chipRect(FactoryPassiveIoLayout layout, BlockBox box, Hit hit, int scroll) {
-        Viewport viewport = layout.viewport();
-        int[] rect = new int[2];
-        if (layout.view() == FactoryPassiveIoView.LIST) {
-            int y = rowScreenY(layout, box, hit.rule(), scroll);
-            rect[0] = FactoryPassiveIoLayout.chipX(viewport, chipIndex(hit.kind()));
-            rect[1] = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.CHIP) / 2;
-            return rect;
-        }
-        int row = hit.rule() / 2;
-        int col = hit.rule() % 2;
-        rect[0] = FactoryPassiveIoLayout.tileX(viewport, col) + FactoryPassiveIoLayout.TILE_INSET
-                + chipIndex(hit.kind()) * (FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP);
-        rect[1] = FactoryPassiveIoLayout.tileRowY(viewport, box, row, scroll)
-                + FactoryPassiveIoLayout.TILE_CHIP_Y;
-        return rect;
-    }
-
-    private static int chipIndex(FactoryPassiveIoLayout.Kind kind) {
-        return switch (kind) {
-            case CHIP_DIR -> 0;
-            case CHIP_FACE -> 1;
-            default -> 2;
-        };
     }
 
     private int rowScreenY(FactoryPassiveIoLayout layout, BlockBox box, int rule, int scroll) {
@@ -221,7 +194,7 @@ final class FactoryPassiveIoRender {
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, int scroll, @Nullable Hit hover) {
+            BlockView block, int scroll, @Nullable Hit hover, @Nullable Hit selected) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
@@ -229,13 +202,15 @@ final class FactoryPassiveIoRender {
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
                 bottom - bodyTop);
         for (int i = 0; i < block.rules().size(); i++) {
-            drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover);
+            drawRuleRow(graphics, viewport, box, block, block.rules().get(i), i, scroll, hover,
+                    selected);
         }
         drawAddRow(graphics, viewport, box, scroll, hover);
     }
 
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
+            BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover,
+            @Nullable Hit selected) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
@@ -253,10 +228,14 @@ final class FactoryPassiveIoRender {
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
                 textY, this.theme.textPrimary(), false);
-        drawChips(graphics, viewport, block, rule, y, chipIndex(hover, index));
+        drawChips(graphics, viewport, block, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
                 FactoryPassiveIoLayout.rateX(viewport) + FactoryPassiveIoLayout.RATE_W,
                 FactoryPassiveIoLayout.RATE_W);
+        if (isSelected(selected, box.index(), index)) {
+            outline(graphics, x, y, FactoryPassiveIoLayout.contentRight(viewport) - x,
+                    FactoryPassiveIoLayout.ROW_H);
+        }
     }
 
     private void drawChips(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
@@ -290,12 +269,14 @@ final class FactoryPassiveIoRender {
         int chip = FactoryPassiveIoLayout.CHIP;
         graphics.fill(x, y, x + chip, y + chip, this.theme.io().border());
         graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, background);
+        if (enabled && hovered) {
+            // 高亮垫在文字下面，避免半透明填充把字盖灰；位置严格按 chip 矩形，不另算。
+            graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, CHIP_HOVER);
+        }
         int textX = x + (chip - this.font.width(label)) / 2;
         graphics.drawString(this.font, label, textX, y + 2, textColor, false);
         if (!enabled) {
             graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, 0x55FFFFFF);
-        } else if (hovered) {
-            graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, CHIP_HOVER);
         }
     }
 
@@ -340,7 +321,8 @@ final class FactoryPassiveIoRender {
     }
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
-            BlockView block, int scroll, @Nullable Hit hover, boolean dragging) {
+            BlockView block, int scroll, @Nullable Hit hover, @Nullable Hit selected,
+            boolean dragging) {
         int x = FactoryPassiveIoLayout.rowAreaX(viewport);
         int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
@@ -359,12 +341,13 @@ final class FactoryPassiveIoRender {
                         && hover.block() == box.index(), dragging);
                 continue;
             }
-            drawTile(graphics, viewport, block, block.rules().get(i), i, tileX, tileY, hover);
+            drawTile(graphics, viewport, block, block.rules().get(i), box.index(), i, tileX,
+                    tileY, hover, selected);
         }
     }
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
-            int index, int x, int y, @Nullable Hit hover) {
+            int blockIndex, int index, int x, int y, @Nullable Hit hover, @Nullable Hit selected) {
         FactoryNineSlice.listTile(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
                 FactoryPassiveIoLayout.TILE_H);
         graphics.fill(x + 1, y + 1, x + 1 + TILE_DIR_STRIPE_W, y + 1 + TILE_DIR_STRIPE_H,
@@ -378,7 +361,7 @@ final class FactoryPassiveIoRender {
                 ellipsize(FactoryLabels.name(rule.spec().key()), TILE_NAME_W), nameX, y + 7,
                 this.theme.textPrimary(), false);
         int chipY = y + FactoryPassiveIoLayout.TILE_CHIP_Y;
-        int hoveredChip = chipHoverIndex(hover, index);
+        int hoveredChip = chipIndex(hover, blockIndex, index);
         drawChip(graphics, slotX, chipY, directionLabel(rule), directionColor(rule), 0xFFFFFFFF,
                 true, hoveredChip == 0);
         drawChip(graphics, slotX + FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP, chipY,
@@ -396,6 +379,10 @@ final class FactoryPassiveIoRender {
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 1, color,
                 false);
+        if (isSelected(selected, blockIndex, index)) {
+            outline(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
+                    FactoryPassiveIoLayout.TILE_H);
+        }
     }
 
     private void drawAddTile(GuiGraphics graphics, int x, int y, boolean hovered,
@@ -408,8 +395,16 @@ final class FactoryPassiveIoRender {
                 hovered || dragging ? this.theme.textValue() : this.theme.textDim(), false);
     }
 
-    private int chipIndex(@Nullable Hit hover, int ruleIndex) {
-        if (hover == null || hover.rule() != ruleIndex) {
+    /**
+     * 悬停的 chip 序号；必须同时匹配机器块与规则下标，否则不同机器的同序号 chip 会一起亮。
+     *
+     * @param hover      命中
+     * @param blockIndex 机器块下标
+     * @param ruleIndex  规则下标
+     * @return 0/1/2；没有命中 chip 时为 -1
+     */
+    private static int chipIndex(@Nullable Hit hover, int blockIndex, int ruleIndex) {
+        if (hover == null || hover.block() != blockIndex || hover.rule() != ruleIndex) {
             return -1;
         }
         return switch (hover.kind()) {
@@ -420,8 +415,34 @@ final class FactoryPassiveIoRender {
         };
     }
 
-    private int chipHoverIndex(@Nullable Hit hover, int ruleIndex) {
-        return chipIndex(hover, ruleIndex);
+    /**
+     * 判断某个规则卡是否被选中。
+     *
+     * @param selected   选中目标
+     * @param blockIndex 机器块下标
+     * @param ruleIndex  规则下标
+     * @return 是否选中
+     */
+    private static boolean isSelected(@Nullable Hit selected, int blockIndex, int ruleIndex) {
+        return selected != null && selected.block() == blockIndex
+                && selected.rule() == ruleIndex;
+    }
+
+    /**
+     * 画 1px 选中描边。
+     *
+     * @param graphics 画布
+     * @param x        左边缘
+     * @param y        上边缘
+     * @param width    宽
+     * @param height   高
+     */
+    private void outline(GuiGraphics graphics, int x, int y, int width, int height) {
+        int color = this.theme.textPrimary();
+        graphics.fill(x, y, x + width, y + 1, color);
+        graphics.fill(x, y + height - 1, x + width, y + height, color);
+        graphics.fill(x, y, x + 1, y + height, color);
+        graphics.fill(x + width - 1, y, x + width, y + height, color);
     }
 
     private void drawEmpty(GuiGraphics graphics, Viewport viewport, String text) {

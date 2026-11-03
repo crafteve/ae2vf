@@ -14,8 +14,8 @@ import net.minecraft.client.gui.GuiGraphics;
  * {@code FactorySearchEditBox}，底板必须画在控件之前（{@code drawBG}），否则会盖住文字。</p>
  */
 final class FactoryPassiveIoChrome {
-    /** 标题颜色：AE2 面板上的深靛色。 */
-    static final int TITLE_COLOR = 0xFF33445C;
+    /** 标题颜色：纯黑，跟正文一致。 */
+    static final int TITLE_COLOR = 0xFF000000;
     /** 反馈条背景。 */
     private static final int FEEDBACK_BG = 0xB0000000;
     /** 成功反馈字色。 */

@@ -14,10 +14,13 @@ import net.minecraft.network.chat.Component;
  */
 public class FactorySearchEditBox extends EditBox {
     private final FactoryGuiTheme theme;
+    /** 占位提示；聚焦或有内容时临时清掉，避免和输入文字叠在一起。 */
+    private final Component hint;
 
     public FactorySearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme, Component hint) {
         super(font, x, y, width, height, Component.empty());
         this.theme = theme;
+        this.hint = hint;
         setBordered(false);
         setTextColor(theme.textPrimary());
         setTextColorUneditable(theme.textDim());
@@ -38,6 +41,10 @@ public class FactorySearchEditBox extends EditBox {
 
     @Override
     public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // 原版 EditBox 只在 value 为空时画提示，不判断聚焦；这里把「聚焦」也算作正在使用，
+        // 否则光标和「搜索机器…」会同时出现在输入槽里。
+        boolean showHint = isVisible() && !isFocused() && getValue().isEmpty();
+        setHint(showHint ? this.hint : Component.empty());
         super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
 
         if (!isFocused() || !isVisible()) {

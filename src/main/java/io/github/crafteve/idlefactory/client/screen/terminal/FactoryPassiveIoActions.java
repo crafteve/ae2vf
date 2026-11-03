@@ -50,15 +50,16 @@ final class FactoryPassiveIoActions {
     }
 
     /**
-     * 面 chip：循环到下一个面。
+     * 面 chip：循环到下一个面；{@code backwards} 时反向循环。
      *
      * @param containerId 菜单容器 id
      * @param block       机器块
      * @param rule        规则
+     * @param backwards   是否反向
      */
     static void cycleFace(int containerId, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule) {
-        Direction next = nextFace(rule.spec().face());
+            FactoryPassiveIoModel.RuleRow rule, boolean backwards) {
+        Direction next = backwards ? previousFace(rule.spec().face()) : nextFace(rule.spec().face());
         probe("face", block, rule, String.valueOf(next));
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
                 FactoryRuleActionC2S.Action.UPDATE, block.machineId(), rule.side(),
@@ -130,6 +131,25 @@ final class FactoryPassiveIoActions {
         for (int i = 0; i < FACE_ORDER.length; i++) {
             if (FACE_ORDER[i] == current) {
                 return i + 1 < FACE_ORDER.length ? FACE_ORDER[i + 1] : null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 上一个面：右键 chip 用的反向循环。
+     *
+     * @param current 当前面；{@code null} 表示任意
+     * @return 上一个面；从任意反向会先到西
+     */
+    @Nullable
+    static Direction previousFace(@Nullable Direction current) {
+        if (current == null) {
+            return FACE_ORDER[FACE_ORDER.length - 1];
+        }
+        for (int i = 0; i < FACE_ORDER.length; i++) {
+            if (FACE_ORDER[i] == current) {
+                return i == 0 ? null : FACE_ORDER[i - 1];
             }
         }
         return null;

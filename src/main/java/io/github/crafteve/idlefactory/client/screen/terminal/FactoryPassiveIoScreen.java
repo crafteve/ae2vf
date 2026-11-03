@@ -24,6 +24,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
@@ -100,6 +101,14 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private boolean jeiDragging;
     /** 上一次日志签名，避免每秒刷一行表快照。 */
     private int lastLogSignature = -1;
+    /** 当前选中的规则卡：机器下标；-1 表示没有选中。 */
+    private int selectedBlock = -1;
+    /** 选中规则的侧；配合 key 在快照刷新后重新定位。 */
+    @Nullable
+    private IoSide selectedSide;
+    /** 选中规则的资源 key；规则可能因换边改变下标，用 key 定位比下标稳。 */
+    @Nullable
+    private AEKey selectedKey;
 
     /**
      * @param menu      菜单
@@ -127,6 +136,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     @Override
     protected void init() {
+        // 切终端高度 / 窗口尺寸都会重新走 init。Screen.init 不会清空旧控件，直接再 add
+        // 会多出一份搜索框和工具栏按钮，旧位置的控件继续渲染，看起来就是文字重影、
+        // 高亮串位。AE2 的 MEStorageScreen.reinitalize 也是先移除所有 children 再 init。
+        this.clearWidgets();
+        this.searchBox = null;
         TerminalStyle terminal = this.style.getTerminalStyle();
         // getPossibleRows 内部会自己减 header / bottom，这里只能传屏幕可用高度。
         int margin = AEConfig.instance().getTerminalMargin();
@@ -177,7 +191,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super.render(graphics, mouseX, mouseY, partialTick);
         FactoryPassiveIoChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
-        drawContent(graphics, hover);
+        drawContent(graphics, hover, selectedHit());
         if (this.feedbackTicks > 0 && this.layout != null) {
             FactoryPassiveIoChrome.drawFeedback(graphics, this.font, this.layout.viewport(),
                     this.feedback, this.feedbackOk);
@@ -194,7 +208,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      * @param graphics 画布
      * @param hover    当前命中
      */
-    private void drawContent(GuiGraphics graphics, @Nullable Hit hover) {
+    private void drawContent(GuiGraphics graphics, @Nullable Hit hover, @Nullable Hit selected) {
         FactoryPassiveIoRender content = this.render;
         FactoryPassiveIoLayout current = this.layout;
         if (content == null || current == null) {
@@ -204,7 +218,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         graphics.enableScissor(viewport.x(), viewport.y(),
                 viewport.x() + viewport.width(), viewport.y() + viewport.height());
         try {
-            content.draw(graphics, current, this.model.blocks(), scroll(), hover,
+            content.draw(graphics, current, this.model.blocks(), scroll(), hover, selected,
                     this.jeiDragging, emptyText());
         } finally {
             graphics.disableScissor();
@@ -263,6 +277,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     public void acceptTable(FactoryTableS2C payload) {
         this.model.accept(payload);
         rebuildLayout();
+        // 规则可能被别的界面删掉或换边；选中项找不到就清掉，避免高亮留在不存在的卡上。
+        selectedHit();
         int signature = payload.machines().size() * 37 + totalRules();
         if (signature != this.lastLogSignature) {
             this.lastLogSignature = signature;
@@ -410,7 +426,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     }
 
     /**
-     * 点击命中：chip 左键改参数，规则行右键删除。
+     * 点击命中：chip 左键正向循环、右键反向循环；规则卡左键选中，选中状态下右键删除。
+     *
+     * <p>右键以前直接删规则，连点 chip 都会把整张卡删掉；现在 chip 的右键只翻自己的选项列表，
+     * 只有已经高亮选中的规则卡才允许右键删除，避免误删。</p>
      *
      * @param hit    命中
      * @param button 鼠标键
@@ -420,25 +439,117 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             return;
         }
         BlockView block = this.model.blocks().get(hit.block());
-        if (button == 1) {
-            if (hit.rule() >= 0) {
-                FactoryPassiveIoActions.delete(this.menu.containerId, block,
-                        block.rules().get(hit.rule()));
-            }
-            return;
-        }
-        if (button != 0 || hit.rule() < 0) {
+        if (hit.rule() < 0 || hit.rule() >= block.rules().size()) {
             return;
         }
         RuleRow rule = block.rules().get(hit.rule());
+        if (button == 1) {
+            switch (hit.kind()) {
+                case CHIP_DIR -> FactoryPassiveIoActions.flip(this.menu.containerId, block, rule);
+                case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block,
+                        rule, true);
+                case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block,
+                        rule);
+                case RULE -> {
+                    if (isSelected(hit)) {
+                        FactoryPassiveIoActions.delete(this.menu.containerId, block, rule);
+                        clearSelection();
+                    } else {
+                        select(hit);
+                    }
+                }
+                default -> {
+                    // 机器行与新增行的右键不做事。
+                }
+            }
+            return;
+        }
+        if (button != 0) {
+            return;
+        }
         switch (hit.kind()) {
+            case RULE -> select(hit);
             case CHIP_DIR -> FactoryPassiveIoActions.flip(this.menu.containerId, block, rule);
-            case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block, rule);
-            case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block, rule);
+            case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block,
+                    rule, false);
+            case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block,
+                    rule);
             default -> {
-                // 规则行与机器行左键暂不动作。
+                // 机器行与新增行的左键不做事。
             }
         }
+    }
+
+    /**
+     * 选中一条规则卡，用「机器 + 侧 + key」记住，快照换序后还能找回。
+     *
+     * @param hit 规则命中
+     */
+    private void select(Hit hit) {
+        if (hit.rule() < 0 || hit.block() < 0 || hit.block() >= this.model.blocks().size()) {
+            return;
+        }
+        BlockView block = this.model.blocks().get(hit.block());
+        if (hit.rule() >= block.rules().size()) {
+            return;
+        }
+        RuleRow rule = block.rules().get(hit.rule());
+        this.selectedBlock = hit.block();
+        this.selectedSide = rule.side();
+        this.selectedKey = rule.spec().key();
+    }
+
+    private void clearSelection() {
+        this.selectedBlock = -1;
+        this.selectedSide = null;
+        this.selectedKey = null;
+    }
+
+    /**
+     * 命中是否就是当前选中的规则卡。
+     *
+     * @param hit 命中
+     * @return 是否选中
+     */
+    private boolean isSelected(Hit hit) {
+        if (hit.rule() < 0 || hit.block() != this.selectedBlock
+                || this.selectedKey == null || this.selectedSide == null) {
+            return false;
+        }
+        if (hit.block() >= this.model.blocks().size()) {
+            return false;
+        }
+        BlockView block = this.model.blocks().get(hit.block());
+        if (hit.rule() >= block.rules().size()) {
+            return false;
+        }
+        RuleRow rule = block.rules().get(hit.rule());
+        return rule.side() == this.selectedSide && rule.spec().key().equals(this.selectedKey);
+    }
+
+    /**
+     * 当前选中的规则卡在最新快照里的命中；规则没了就清掉选中。
+     *
+     * @return 命中；没有选中时为 {@code null}
+     */
+    @Nullable
+    private Hit selectedHit() {
+        if (this.selectedBlock < 0 || this.selectedKey == null || this.selectedSide == null) {
+            return null;
+        }
+        if (this.selectedBlock >= this.model.blocks().size()) {
+            clearSelection();
+            return null;
+        }
+        BlockView block = this.model.blocks().get(this.selectedBlock);
+        for (int i = 0; i < block.rules().size(); i++) {
+            RuleRow rule = block.rules().get(i);
+            if (rule.side() == this.selectedSide && rule.spec().key().equals(this.selectedKey)) {
+                return new Hit(FactoryPassiveIoLayout.Kind.RULE, this.selectedBlock, i);
+            }
+        }
+        clearSelection();
+        return null;
     }
 
     private void toggleView() {
