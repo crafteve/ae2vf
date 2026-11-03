@@ -62,7 +62,7 @@ public final class FactoryPassiveIoJeiTargets {
         Viewport viewport = layout.viewport();
         for (BlockBox box : layout.boxes()) {
             if (layout.view() == FactoryPassiveIoView.LIST) {
-                int x = FactoryPassiveIoLayout.rowAreaX(viewport) + FactoryPassiveIoLayout.PAD;
+                int x = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD;
                 int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
                 targets.add(new AddTarget(box.index(), new Rect2i(x, y,
                         FactoryPassiveIoLayout.contentRight(viewport) - x,

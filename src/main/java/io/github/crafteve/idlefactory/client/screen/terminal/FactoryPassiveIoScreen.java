@@ -56,6 +56,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private static final int CONTENT_PADDING = 4;
     /** 右侧滚动条占用的宽度；内容不能压到滚动条下面。 */
     private static final int SCROLLBAR_RESERVE = 20;
+    /** 工作区描边框宽：内容区再往里缩 2px，给描边让位。 */
+    private static final int WORK_FRAME = 2;
+    /** 描边框与顶栏搜索框之间的间距。 */
+    private static final int WORK_GAP = 2;
     /** 机器表请求节拍。 */
     private static final int REQUEST_INTERVAL = 20;
     /** 编辑反馈停留 tick。 */
@@ -170,9 +174,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
                 this.leftPos + this.imageWidth - 21,
                 this.topPos + header + this.rows * rowHeight(),
                 FactoryGuiTheme.current().panelBg());
-        // 给自绘滚动区加一圈 2px 描边，让它看起来浮在终端面板上；滚动条也包在框里。
-        FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, this.leftPos + 2,
-                this.topPos + header - 2, this.imageWidth - 4, this.rows * rowHeight() + 4);
+        // 给自绘滚动区加一圈 2px 描边，让它看起来浮在终端面板上。
+        // 框只包内容，不含左侧按钮、搜索框和右侧滚动条；顶部留 2px 与搜索框隔开。
+        Viewport frame = workAreaFrame();
+        FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
+                frame.height());
         FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
@@ -316,15 +322,29 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     }
 
     /**
-     * 当前内容视口。
+     * 当前内容视口（描边框以内）。
+     *
+     * <p>视口比描边框再缩进 2px，绘制与命中都从这里取；描边框本身不参与滚动。</p>
      *
      * @return 视口（屏幕坐标）
      */
     Viewport contentViewport() {
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
-        return new Viewport(this.leftPos + CONTENT_PADDING, this.topPos + header,
-                this.imageWidth - CONTENT_PADDING * 2 - SCROLLBAR_RESERVE,
-                this.rows * rowHeight());
+        return new Viewport(this.leftPos + CONTENT_PADDING + WORK_FRAME,
+                this.topPos + header + WORK_GAP + WORK_FRAME,
+                this.imageWidth - CONTENT_PADDING * 2 - SCROLLBAR_RESERVE - WORK_FRAME * 2,
+                this.rows * rowHeight() - WORK_GAP - WORK_FRAME * 2);
+    }
+
+    /**
+     * 工作区描边框外沿（包含描边，不含滚动条）。
+     *
+     * @return 描边框（屏幕坐标）
+     */
+    Viewport workAreaFrame() {
+        Viewport viewport = contentViewport();
+        return new Viewport(viewport.x() - WORK_FRAME, viewport.y() - WORK_FRAME,
+                viewport.width() + WORK_FRAME * 2, viewport.height() + WORK_FRAME * 2);
     }
 
     /** 当前滚动像素。 */

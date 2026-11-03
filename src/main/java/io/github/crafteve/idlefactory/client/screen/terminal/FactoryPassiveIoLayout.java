@@ -44,7 +44,7 @@ final class FactoryPassiveIoLayout {
     /** 磁贴高。 */
     static final int TILE_H = 34;
     /** 磁贴列间隔。 */
-    static final int TILE_GAP = 4;
+    static final int TILE_GAP = 3;
     /** 磁贴区内边距。 */
     static final int TILE_PAD = 3;
     /** 机器行徽标宽 / 高。 */
@@ -288,8 +288,18 @@ final class FactoryPassiveIoLayout {
     }
 
     /** 列表式行区域左边缘（屏幕坐标）。 */
+    /** 机器行左边缘（屏幕坐标）：让出左侧 3px 状态条。 */
     static int rowAreaX(Viewport viewport) {
         return viewport.x() + STATUS_W;
+    }
+
+    /**
+     * 规则 / 磁贴主体左边缘（屏幕坐标）。
+     *
+     * <p>状态条只画在机器行左侧，机器行以下把 3px 还给卡片，卡片可以铺到内容区最左边。</p>
+     */
+    static int bodyX(Viewport viewport) {
+        return viewport.x();
     }
 
     /** 块内容右边缘（屏幕坐标）。 */
@@ -299,7 +309,7 @@ final class FactoryPassiveIoLayout {
 
     /** 规则行图标凹槽 x。 */
     static int slotX(Viewport viewport) {
-        return rowAreaX(viewport) + PAD + DIR_STRIPE_W + GAP;
+        return bodyX(viewport) + PAD + DIR_STRIPE_W + GAP;
     }
 
     /** 规则行名字 x。 */
@@ -332,7 +342,7 @@ final class FactoryPassiveIoLayout {
 
     /** 磁贴 x。 */
     static int tileX(Viewport viewport, int column) {
-        return rowAreaX(viewport) + TILE_PAD + column * (TILE_W + TILE_GAP);
+        return bodyX(viewport) + TILE_PAD + column * (TILE_W + TILE_GAP);
     }
 
     /** 列表式某一行的屏幕 y。 */

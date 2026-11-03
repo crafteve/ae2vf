@@ -90,7 +90,8 @@ final class FactoryPassiveIoRender {
             if (bottom <= viewport.y() || top >= viewport.y() + viewport.height()) {
                 continue;
             }
-            drawStatusLine(graphics, viewport, block, top, bottom - top);
+            drawStatusLine(graphics, viewport, block, top,
+                    FactoryPassiveIoLayout.MACHINE_ROW_H);
             drawMachineRow(graphics, viewport, block, top);
             if (layout.view() == FactoryPassiveIoView.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
@@ -126,7 +127,7 @@ final class FactoryPassiveIoRender {
             case RULE -> {
                 if (layout.view() == FactoryPassiveIoView.LIST) {
                     int rowY = rowScreenY(layout, box, hover.rule(), scroll);
-                    graphics.fill(FactoryPassiveIoLayout.rowAreaX(viewport), rowY,
+                    graphics.fill(FactoryPassiveIoLayout.bodyX(viewport), rowY,
                             FactoryPassiveIoLayout.contentRight(viewport),
                             rowY + FactoryPassiveIoLayout.ROW_H, HOVER_FILL);
                 } else {
@@ -152,7 +153,7 @@ final class FactoryPassiveIoRender {
         Viewport viewport = layout.viewport();
         if (layout.view() == FactoryPassiveIoView.LIST) {
             int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
-            graphics.fill(FactoryPassiveIoLayout.rowAreaX(viewport) + FactoryPassiveIoLayout.PAD,
+            graphics.fill(FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD,
                     y + 1, FactoryPassiveIoLayout.contentRight(viewport), y + FactoryPassiveIoLayout.ADD_ROW_H - 1,
                     HOVER_FILL);
             return;
@@ -205,8 +206,8 @@ final class FactoryPassiveIoRender {
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover) {
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport);
-        int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
+        int x = FactoryPassiveIoLayout.bodyX(viewport);
+        int width = viewport.width();
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
@@ -220,7 +221,7 @@ final class FactoryPassiveIoRender {
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport);
+        int x = FactoryPassiveIoLayout.bodyX(viewport);
         graphics.fill(x + FactoryPassiveIoLayout.PAD, y,
                 x + FactoryPassiveIoLayout.PAD + FactoryPassiveIoLayout.DIR_STRIPE_W,
                 y + FactoryPassiveIoLayout.ROW_H, directionColor(rule));
@@ -312,7 +313,7 @@ final class FactoryPassiveIoRender {
 
     private void drawAddRow(GuiGraphics graphics, Viewport viewport, BlockBox box, int scroll,
             @Nullable Hit hover) {
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport) + FactoryPassiveIoLayout.PAD;
+        int x = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.PAD;
         int y = FactoryPassiveIoLayout.screenY(viewport, box.addTop(), scroll);
         int width = FactoryPassiveIoLayout.contentRight(viewport) - x;
         boolean hovered = hover != null && hover.kind() == FactoryPassiveIoLayout.Kind.ADD
@@ -326,8 +327,8 @@ final class FactoryPassiveIoRender {
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover, boolean dragging) {
-        int x = FactoryPassiveIoLayout.rowAreaX(viewport);
-        int width = viewport.width() - FactoryPassiveIoLayout.STATUS_W;
+        int x = FactoryPassiveIoLayout.bodyX(viewport);
+        int width = viewport.width();
         int bodyTop = FactoryPassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll);
         FactoryNineSlice.fill(graphics, FactoryGuiTextures.LIST_BODY, x, bodyTop, width,
