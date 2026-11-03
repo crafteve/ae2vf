@@ -46,8 +46,10 @@ final class FactoryPassiveIoRender {
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** chip 悬停提亮（白色 20%）。 */
     private static final int CHIP_HOVER = 0x33FFFFFF;
-    /** 磁贴里速率列宽。 */
-    private static final int TILE_RATE_W = 32;
+    /** 磁贴里速率列宽：chip 行之后剩下的宽度，不能和 chip 抢位置。 */
+    private static final int TILE_RATE_W = FactoryPassiveIoLayout.TILE_W
+            - (FactoryPassiveIoLayout.TILE_INSET + FactoryPassiveIoLayout.CHIP * 3
+                    + FactoryPassiveIoLayout.GAP * 2) - 2;
     /** 磁贴名字宽。 */
     private static final int TILE_NAME_W = FactoryPassiveIoLayout.TILE_W
             - FactoryPassiveIoLayout.TILE_NAME_X - 2;
@@ -272,34 +274,43 @@ final class FactoryPassiveIoRender {
 
     private void drawChips(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
             int y, int hoveredChip) {
-        int cy = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.CHIP) / 2;
+        int cy = y + FactoryPassiveIoLayout.CHIP_INSET_Y;
         drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 0), cy,
                 directionLabel(rule), directionColor(rule), 0xFFFFFFFF, true,
                 hoveredChip == 0);
         drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 1), cy, faceLabel(rule.spec()),
-                this.theme.slotBg(), this.theme.textPrimary(), true, hoveredChip == 1);
+                this.theme.bevelLight(), this.theme.textPrimary(), true, hoveredChip == 1);
         boolean item = rule.spec().key() instanceof AEItemKey;
         drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 2), cy, modeLabel(rule.spec()),
-                item ? modeColor(rule.spec()) : this.theme.slotBg(),
+                item ? modeColor(rule.spec()) : this.theme.bevelLight(),
                 item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
     }
 
     /**
-     * 画一枚 chip。
+     * 画一枚 chip：1px 立体边 + 本色内区，和卡片同一套光照方向。
      *
-     * @param graphics  画布
-     * @param x         左边缘
-     * @param y         上边缘
-     * @param label     单字标签
-     * @param background 底色
-     * @param textColor 字色
-     * @param enabled   是否可点
-     * @param hovered   是否悬停
+     * <p>边框用「上 / 左亮、下 / 右暗」而不是四边同一个深灰：三枚 chip 连在一起时，
+     * 平涂边框会让它们看起来像贴纸；有了明暗，chip 才像一颗按得下去的键。内区四周各留
+     * 1px，9px 中文才不会顶到边框。</p>
+     *
+     * @param graphics   画布
+     * @param x          左边缘
+     * @param y          上边缘
+     * @param label      单字标签
+     * @param background 内区底色
+     * @param textColor  字色
+     * @param enabled    是否可点
+     * @param hovered    是否悬停
      */
     private void drawChip(GuiGraphics graphics, int x, int y, String label, int background,
             int textColor, boolean enabled, boolean hovered) {
         int chip = FactoryPassiveIoLayout.CHIP;
-        graphics.fill(x, y, x + chip, y + chip, this.theme.io().border());
+        int light = this.theme.panelBorderLight();
+        int dark = this.theme.slotBorderDark();
+        graphics.fill(x, y, x + chip, y + 1, light);
+        graphics.fill(x, y + 1, x + 1, y + chip - 1, light);
+        graphics.fill(x, y + chip - 1, x + chip, y + chip, dark);
+        graphics.fill(x + chip - 1, y + 1, x + chip, y + chip - 1, dark);
         graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, background);
         if (enabled && hovered) {
             // 高亮垫在文字下面，避免半透明填充把字盖灰；位置严格按 chip 矩形，不另算。
@@ -365,19 +376,20 @@ final class FactoryPassiveIoRender {
         drawChip(graphics, slotX, chipY, directionLabel(rule), directionColor(rule), 0xFFFFFFFF,
                 true, hoveredChip == 0);
         drawChip(graphics, slotX + FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP, chipY,
-                faceLabel(rule.spec()), this.theme.slotBg(), this.theme.textPrimary(), true,
+                faceLabel(rule.spec()), this.theme.bevelLight(), this.theme.textPrimary(), true,
                 hoveredChip == 1);
         boolean item = rule.spec().key() instanceof AEItemKey;
         drawChip(graphics, slotX + (FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP) * 2,
                 chipY, modeLabel(rule.spec()),
-                item ? modeColor(rule.spec()) : this.theme.slotBg(),
+                item ? modeColor(rule.spec()) : this.theme.bevelLight(),
                 item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
         String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + FactoryPassiveIoLayout.TILE_W - 2;
         IoResult.Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? this.theme.statusIdle()
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
-        graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 1, color,
+        // 速率和 chip 行同一中线：13px chip 的正文在 +2。
+        graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 2, color,
                 false);
     }
 

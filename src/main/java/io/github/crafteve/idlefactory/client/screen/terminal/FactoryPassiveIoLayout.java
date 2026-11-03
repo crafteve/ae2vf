@@ -40,8 +40,10 @@ final class FactoryPassiveIoLayout {
     static final int SLOT = 18;
     /** 行内元素间距。 */
     static final int GAP = 1;
-    /** 三枚 chip 的边长。 */
-    static final int CHIP = 11;
+    /** 三枚 chip 的边长：1px 立体边 + 1px 内边距 + 9px 单字，中文才不贴边。 */
+    static final int CHIP = 13;
+    /** chip 在行内的纵向偏移：让 chip 里的字和行名同一基线，宁可下沿少 1px。 */
+    static final int CHIP_INSET_Y = (ROW_H - CHIP + 1) / 2;
     /** 速率列宽。 */
     static final int RATE_W = 38;
     /** 磁贴宽。 */
@@ -246,7 +248,7 @@ final class FactoryPassiveIoLayout {
             return new Hit(Kind.ADD, box.index(), -1);
         }
         int rowY = box.bodyTop() + rule * pitch;
-        int chipY = rowY + (ROW_H - CHIP) / 2;
+        int chipY = rowY + CHIP_INSET_Y;
         if (localY >= chipY && localY < chipY + CHIP) {
             if (inside(localX, chipX(this.viewport, 0), CHIP)) {
                 return new Hit(Kind.CHIP_DIR, box.index(), rule);
