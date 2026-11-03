@@ -54,7 +54,9 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     /** 内容区左右内边距。 */
     private static final int CONTENT_PADDING = 4;
     /** 右侧滚动条占用的宽度；内容不能压到滚动条下面。 */
-    private static final int SCROLLBAR_RESERVE = 20;
+    private static final int SCROLLBAR_RESERVE = 17;
+    /** 滚动条（滑块 + 滑槽）右移像素；滑槽是贴图，靠 {@code drawScrollbarGroove} 重画。 */
+    private static final int SCROLLBAR_SHIFT = 4;
     /** 工作区描边框宽：内容区再往里缩 3px，给亮边和 2px 间隙让位。 */
     private static final int WORK_FRAME = 3;
     /** 描边框与顶栏搜索框之间的间距。 */
@@ -137,6 +139,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.imageWidth = terminal.getScreenWidth();
         this.imageHeight = terminal.getScreenHeight(this.rows);
         super.init();
+        // AE2 只在 init 时按样式定位一次滚动条；内容区加宽后必须再右移一次。
+        this.scroll.shiftX(SCROLLBAR_SHIFT);
         // base_terminal.json 带一条 ME 终端的「条目数」文本，本界面不用它，必须显式隐藏。
         this.setTextHidden("entriesShown", true);
         this.render = new FactoryPassiveIoRender(this.font, FactoryGuiTheme.current());
@@ -161,10 +165,13 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。右侧 174 之后是
         // AE2 终端自带的滚动条滑轨（178~183），必须留着，否则滚动条只剩滑块没有轨道。
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
-        graphics.fill(this.leftPos + 2, this.topPos + header,
-                this.leftPos + this.imageWidth - 21,
+        int grooveX = this.scroll.grooveX();
+        graphics.fill(this.leftPos + 2, this.topPos + header, grooveX,
                 this.topPos + header + this.rows * rowHeight(),
                 FactoryGuiTheme.current().panelBg());
+        // 滑槽跟着滑块右移：填充盖掉了原位置的滑槽，这里用同一张终端贴图在新位置重画。
+        FactoryPassiveIoChrome.drawScrollbarGroove(graphics, grooveX,
+                this.topPos + header, this.rows * rowHeight(), this.imageWidth - 17);
         // 填充停在滑轨左侧，保留 AE2 终端贴图自带的滑轨与 Scrollbar 原始渲染。
         Viewport frame = workAreaFrame();
         FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),

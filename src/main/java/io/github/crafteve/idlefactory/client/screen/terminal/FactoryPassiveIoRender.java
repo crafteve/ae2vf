@@ -262,6 +262,12 @@ final class FactoryPassiveIoRender {
     private void drawRuleRow(GuiGraphics graphics, Viewport viewport, BlockBox box,
             RuleRow rule, int index, int scroll, @Nullable Hit hover) {
         int y = FactoryPassiveIoLayout.rowY(viewport, box, index, scroll);
+        // 行不再套卡片：奇数行铺一层比块体底亮的底，和偶数行交替，行间不留缝。
+        if (index % 2 == 1) {
+            graphics.fill(FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET,
+                    y, FactoryPassiveIoLayout.bodyX(viewport) + viewport.width() - 2,
+                    y + FactoryPassiveIoLayout.ROW_H, this.theme.bevelLight());
+        }
         int slotX = FactoryPassiveIoLayout.slotX(viewport);
         // 行不再套卡片，也不再画槽位底：图标直接落在机器卡片的浅色底上。
         int iconY = y + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.RULE_ICON) / 2;

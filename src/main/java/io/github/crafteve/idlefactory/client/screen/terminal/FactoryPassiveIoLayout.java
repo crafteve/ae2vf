@@ -14,15 +14,15 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * <p>块从内容顶部开始顺序铺开，坐标相对内容区（不叠加视口原点与滚动 Offset），绘制、命中、
  * tooltip 和 JEI 都从这里取同一份结果。滚动只在取值时加 {@code scroll}，不重建排版。</p>
  *
- * <p>块内结构（列表式）：机器行 20 → 规则行 20×n；磁贴式：机器行 20 → 磁贴区
+ * <p>块内结构（列表式）：机器行 20 → 规则行 16×n，行间不留缝、奇偶行交替着色；磁贴式：机器行 20 → 磁贴区
  * （上边紧贴机器行，下边留 2px 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，
  * 刚好容下 1px 外阴影。</p>
  */
 final class FactoryPassiveIoLayout {
-    /** 规则行高。 */
-    static final int ROW_H = 20;
-    /** 列表规则行之间的间距。 */
-    static final int ROW_GAP = 1;
+    /** 规则行高；16px 时 13px chip 上下各余 1~2px。 */
+    static final int ROW_H = 16;
+    /** 列表规则行之间的间距：行底交替着色，不再留缝。 */
+    static final int ROW_GAP = 0;
     /** 机器行高。 */
     static final int MACHINE_ROW_H = 20;
     /** 块间距：留 2px 刚好一件 1px 外阴影 + 1px 空隙。 */

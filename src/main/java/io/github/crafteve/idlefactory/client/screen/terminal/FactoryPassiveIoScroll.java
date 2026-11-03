@@ -5,11 +5,13 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import appeng.client.Point;
 import appeng.client.gui.widgets.Scrollbar;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.util.Mth;
 
 /**
@@ -20,6 +22,9 @@ import net.minecraft.util.Mth;
  * （{@link #scrollBy(FactoryPassiveIoLayout, int)}）都写同一个 {@code scroll}。</p>
  */
 final class FactoryPassiveIoScroll {
+    /** AE2 终端里滑槽相对滑块左边缘的偏移；滑槽画在滑块左侧 3px 起。 */
+    private static final int GROOVE_OFFSET = 3;
+
     private final Scrollbar bar;
     private int scroll;
 
@@ -33,6 +38,28 @@ final class FactoryPassiveIoScroll {
     /** 当前滚动像素。 */
     int value() {
         return this.scroll;
+    }
+
+    /**
+     * 把滚动条整体向右挪。
+     *
+     * <p>AE2 只在 init 时按样式定一次位置；内容区右边界改了之后，滑块要跟着滑槽一起挪，
+     * 否则滑块会压在内容上或脱离滑槽。</p>
+     *
+     * @param dx 右移像素
+     */
+    void shiftX(int dx) {
+        Rect2i bounds = this.bar.getBounds();
+        this.bar.setPosition(new Point(bounds.getX() + dx, bounds.getY()));
+    }
+
+    /**
+     * 滑槽左边缘（屏幕坐标）。
+     *
+     * @return 滑槽左边缘；滑槽固定画在滑块左侧 {@value #GROOVE_OFFSET}px
+     */
+    int grooveX() {
+        return this.bar.getBounds().getX() + GROOVE_OFFSET;
     }
 
     /**
