@@ -3,7 +3,14 @@ package io.github.crafteve.idlefactory;
 import io.github.crafteve.idlefactory.client.ModKeyMappings;
 import io.github.crafteve.idlefactory.client.screen.FactoryUiConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
+
+import appeng.client.gui.style.StyleManager;
+
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -56,5 +63,11 @@ public class IdleFactoryClient {
     @SubscribeEvent
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(ModMenus.FACTORY.get(), FactoryScreen::new);
+        event.<FactoryPassiveIoMenu, FactoryPassiveIoScreen>register(
+                ModMenus.PASSIVE_IO_TERMINAL.get(),
+                (FactoryPassiveIoMenu menu, Inventory inventory, Component title) ->
+                        new FactoryPassiveIoScreen(menu, inventory, title,
+                                StyleManager.loadStyleDoc(
+                                        "/screens/terminals/base_terminal.json")));
     }
 }
