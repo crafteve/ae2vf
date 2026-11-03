@@ -12,7 +12,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * 创造模式物品栏。
  *
- * <p>开发期只放本模组的三个物品，方便直接取用；后续有方块或更多物品再扩展。</p>
+ * <p>开发期只放本模组的四个物品，方便直接取用；后续有方块或更多物品再扩展。</p>
  */
 public final class ModCreativeTabs {
     /** 创造栏注册表。 */
@@ -26,6 +26,7 @@ public final class ModCreativeTabs {
                     .icon(() -> new ItemStack(ModItems.FACTORY_TERMINAL.get()))
                     .displayItems((parameters, output) -> {
                         output.accept(ModItems.FACTORY_TERMINAL.get());
+                        output.accept(ModItems.PASSIVE_IO_TERMINAL.get());
                         output.accept(ModItems.MACHINE_BINDING_WAND.get());
                         output.accept(ModItems.STORAGE_BINDING_WAND.get());
                     })

@@ -5,6 +5,7 @@
   "key.idlefactory.open_terminal": "打开工厂终端",
   "itemGroup.idlefactory": "放置工厂",
   "item.idlefactory.factory_terminal": "工厂终端",
+  "item.idlefactory.passive_io_terminal": "被动 IO 管理终端",
   "item.idlefactory.machine_binding_wand": "机器绑定杖",
   "item.idlefactory.storage_binding_wand": "存储绑定杖",
   "jei.idlefactory.fe.info.1": "FE（Forge Energy）",

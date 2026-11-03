@@ -25,6 +25,10 @@ public final class ModItems {
             ITEMS.register("factory_terminal",
                     () -> new FactoryTerminalItem(unstackable()));
 
+    /** 被动 IO 管理终端；右键界面在 P1 接入，当前只注册物品。 */
+    public static final DeferredHolder<Item, Item> PASSIVE_IO_TERMINAL =
+            ITEMS.register("passive_io_terminal", () -> new Item(unstackable()));
+
     /** 机器绑定杖。 */
     public static final DeferredHolder<Item, MachineBindingWandItem> MACHINE_BINDING_WAND =
             ITEMS.register("machine_binding_wand",
@@ -36,7 +40,7 @@ public final class ModItems {
                     () -> new StorageBindingWandItem(unstackable()));
 
     /**
-     * 三个物品共用的属性：不可堆叠，且不设置耐久。
+     * 四个物品共用的属性：不可堆叠，且不设置耐久。
      *
      * @return 新的物品属性
      */
