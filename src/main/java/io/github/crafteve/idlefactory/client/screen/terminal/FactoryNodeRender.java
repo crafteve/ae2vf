@@ -66,6 +66,12 @@ final class FactoryNodeRender {
             FactoryCard.draw(graphics, FactoryNodeLayout.cardX(viewport), top,
                     FactoryNodeLayout.cardWidth(viewport), box.bottom() - box.top(),
                     FactoryCard.Level.MACHINE, true);
+            if (hover != null && hover.node() == box.index()
+                    && (hover.kind() == Kind.NODE || hover.kind() == Kind.NAME)) {
+                // 卡片悬停铺满整张卡，但压在内容下面；按钮悬停只亮按钮自己。
+                graphics.fill(FactoryNodeLayout.cardX(viewport) + 1, top + 1,
+                        FactoryNodeLayout.cardRight(viewport) - 1, bottom - 1, HOVER_FILL);
+            }
             drawNodeRow(graphics, viewport, box, row, top, hover, pendingDelete);
             if (box.expanded()) {
                 drawMembers(graphics, viewport, box, row, scroll, hover);
@@ -96,26 +102,21 @@ final class FactoryNodeRender {
         }
 
         String name = ellipsize(row.name(), FactoryNodeLayout.nameWidth(viewport));
-        if (hover != null && (hover.kind() == Kind.NODE || hover.kind() == Kind.NAME)) {
-            graphics.fill(FactoryNodeLayout.nameX(viewport) - 1, top + 4,
-                    FactoryNodeLayout.troughX(viewport) - 2, top + 16, HOVER_FILL);
-        }
         graphics.drawString(this.font, name, FactoryNodeLayout.nameX(viewport), top + 6,
                 this.theme.textPrimary(), false);
         drawStatusHints(graphics, viewport, row, top);
 
-        drawProvider(graphics, viewport, top, hover);
+        drawProvider(graphics, viewport, top);
         int keyY = top + 1;
-        int keyCenterY = keyY + FactoryNodeLayout.KEY_H / 2;
+        int keyTextY = keyY + (FactoryNodeLayout.KEY_H - 8) / 2;
         boolean provider = row.view().provider().available();
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 provider && row.view().provider().blocking().isOn()
                         ? this.theme.statusRun() : this.theme.bevelLight(),
-                provider, hovered(hover, Kind.BLOCKING));
-        FactoryNodeIcons.blocking(graphics,
-                FactoryNodeLayout.keyX(viewport, 0) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
-                provider && row.view().provider().blocking().isOn()
+                provider, hovered(hover, box.index(), Kind.BLOCKING));
+        drawLabel(graphics, "阻", FactoryNodeLayout.keyX(viewport, 0), FactoryNodeLayout.KEY_W,
+                keyTextY, provider && row.view().provider().blocking().isOn()
                         ? 0xFFFFFFFF : this.theme.textPrimary());
 
         for (int i = 1; i <= 2; i++) {
@@ -123,28 +124,25 @@ final class FactoryNodeRender {
                     FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H, this.theme.bevelLight(),
                     false, false);
         }
-        FactoryNodeIcons.multiplier(graphics,
-                FactoryNodeLayout.keyX(viewport, 1) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
-                this.theme.textDim());
-        FactoryNodeIcons.dispatch(graphics,
-                FactoryNodeLayout.keyX(viewport, 2) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
-                this.theme.textDim());
+        drawLabel(graphics, "倍", FactoryNodeLayout.keyX(viewport, 1), FactoryNodeLayout.KEY_W,
+                keyTextY, this.theme.textDim());
+        drawLabel(graphics, "逐", FactoryNodeLayout.keyX(viewport, 2), FactoryNodeLayout.KEY_W,
+                keyTextY, this.theme.textDim());
 
         int actionX = FactoryNodeLayout.actionX(viewport);
         FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.PLUS_Y,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H, this.theme.bevelLight(),
-                true, hovered(hover, Kind.EDIT));
-        FactoryNodeIcons.plus(graphics, actionX + FactoryNodeLayout.ACTION_W / 2,
-                top + FactoryNodeLayout.PLUS_Y + FactoryNodeLayout.ACTION_H / 2,
-                this.theme.statusWarn());
+                true, hovered(hover, box.index(), Kind.EDIT));
+        drawLabel(graphics, "+", actionX, FactoryNodeLayout.ACTION_W,
+                top + FactoryNodeLayout.PLUS_Y + 1, this.theme.statusWarn());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
         FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.CROSS_Y,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
-                hovered(hover, Kind.DELETE));
-        FactoryNodeIcons.cross(graphics, actionX + FactoryNodeLayout.ACTION_W / 2,
-                top + FactoryNodeLayout.CROSS_Y + FactoryNodeLayout.ACTION_H / 2,
+                hovered(hover, box.index(), Kind.DELETE));
+        drawLabel(graphics, "×", actionX, FactoryNodeLayout.ACTION_W,
+                top + FactoryNodeLayout.CROSS_Y + 1,
                 armed ? 0xFFFFFFFF : this.theme.error());
     }
 
@@ -181,8 +179,7 @@ final class FactoryNodeRender {
         };
     }
 
-    private void drawProvider(GuiGraphics graphics, Viewport viewport, int top,
-            @Nullable Hit hover) {
+    private void drawProvider(GuiGraphics graphics, Viewport viewport, int top) {
         int x = FactoryNodeLayout.troughX(viewport);
         int y = top + 1;
         int right = FactoryNodeLayout.troughRight(viewport);
@@ -226,7 +223,7 @@ final class FactoryNodeRender {
                     FactoryNodeLayout.MEMBER_ROW_H - 2, this.theme.bevelLight(), true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);
-            FactoryNodeIcons.locate(graphics, locateX + FactoryNodeLayout.LOCATE / 2, y + 8,
+            drawLabel(graphics, "定", locateX, FactoryNodeLayout.LOCATE, y + 3,
                     this.theme.textPrimary());
         }
         if (box.totalMembers() > box.shownMembers()) {
@@ -238,8 +235,24 @@ final class FactoryNodeRender {
         }
     }
 
-    private boolean hovered(@Nullable Hit hover, Kind kind) {
-        return hover != null && hover.kind() == kind;
+    private boolean hovered(@Nullable Hit hover, int node, Kind kind) {
+        return hover != null && hover.node() == node && hover.kind() == kind;
+    }
+
+    /**
+     * 在键帽里居中画一个汉字或符号；和被动 IO 的 chip 同一种表达。
+     *
+     * @param graphics 画布
+     * @param text     单字
+     * @param x        键帽左边缘
+     * @param width    键帽宽
+     * @param y        文字基线
+     * @param color    颜色
+     */
+    private void drawLabel(GuiGraphics graphics, String text, int x, int width, int y,
+            int color) {
+        graphics.drawString(this.font, text, x + (width - this.font.width(text)) / 2, y, color,
+                false);
     }
 
     private String ellipsize(String text, int width) {

@@ -46,9 +46,9 @@ final class FactoryNodeLayout {
     /** provider 凹底宽高。 */
     static final int TROUGH_W = TROUGH_PAD * 2 + KEY_W * 3 + KEY_GAP * 2;
     static final int TROUGH_H = 18;
-    /** 编辑 / 删除键帽：上下叠放，各占半行。 */
-    static final int ACTION_W = 13;
-    static final int ACTION_H = 8;
+    /** 编辑 / 删除键帽：上下叠放的两枚小正方形。 */
+    static final int ACTION_W = 9;
+    static final int ACTION_H = 9;
     /** 编辑键相对节点行的上偏移；删除键接在它下面。 */
     static final int PLUS_Y = 1;
     static final int CROSS_Y = 10;
