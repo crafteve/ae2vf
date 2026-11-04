@@ -105,7 +105,8 @@ final class FactoryNodeRender {
         drawStatusHints(graphics, viewport, row, top);
 
         drawProvider(graphics, viewport, top, hover);
-        int keyY = top + 2;
+        int keyY = top + 1;
+        int keyCenterY = keyY + FactoryNodeLayout.KEY_H / 2;
         boolean provider = row.view().provider().available();
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
@@ -113,7 +114,7 @@ final class FactoryNodeRender {
                         ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, Kind.BLOCKING));
         FactoryNodeIcons.blocking(graphics,
-                FactoryNodeLayout.keyX(viewport, 0) + FactoryNodeLayout.KEY_W / 2, keyY + 8,
+                FactoryNodeLayout.keyX(viewport, 0) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
                 provider && row.view().provider().blocking().isOn()
                         ? 0xFFFFFFFF : this.theme.textPrimary());
 
@@ -123,27 +124,28 @@ final class FactoryNodeRender {
                     false, false);
         }
         FactoryNodeIcons.multiplier(graphics,
-                FactoryNodeLayout.keyX(viewport, 1) + FactoryNodeLayout.KEY_W / 2, keyY + 8,
+                FactoryNodeLayout.keyX(viewport, 1) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
                 this.theme.textDim());
         FactoryNodeIcons.dispatch(graphics,
-                FactoryNodeLayout.keyX(viewport, 2) + FactoryNodeLayout.KEY_W / 2, keyY + 8,
+                FactoryNodeLayout.keyX(viewport, 2) + FactoryNodeLayout.KEY_W / 2, keyCenterY,
                 this.theme.textDim());
 
-        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.editX(viewport), keyY,
-                FactoryNodeLayout.ACTION, FactoryNodeLayout.ACTION, this.theme.statusWarn(),
-                false, false);
-        FactoryNodeIcons.plus(graphics,
-                FactoryNodeLayout.editX(viewport) + FactoryNodeLayout.ACTION / 2, keyY + 8,
-                this.theme.textPrimary());
+        int actionX = FactoryNodeLayout.actionX(viewport);
+        FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.PLUS_Y,
+                FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H, this.theme.bevelLight(),
+                true, hovered(hover, Kind.EDIT));
+        FactoryNodeIcons.plus(graphics, actionX + FactoryNodeLayout.ACTION_W / 2,
+                top + FactoryNodeLayout.PLUS_Y + FactoryNodeLayout.ACTION_H / 2,
+                this.theme.statusWarn());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
-        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.deleteX(viewport), keyY,
-                FactoryNodeLayout.ACTION, FactoryNodeLayout.ACTION,
-                armed ? DELETE_ARMED : this.theme.error(), true,
+        FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.CROSS_Y,
+                FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
+                armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, Kind.DELETE));
-        FactoryNodeIcons.cross(graphics,
-                FactoryNodeLayout.deleteX(viewport) + FactoryNodeLayout.ACTION / 2, keyY + 8,
-                0xFFFFFFFF);
+        FactoryNodeIcons.cross(graphics, actionX + FactoryNodeLayout.ACTION_W / 2,
+                top + FactoryNodeLayout.CROSS_Y + FactoryNodeLayout.ACTION_H / 2,
+                armed ? 0xFFFFFFFF : this.theme.error());
     }
 
     private void drawBadge(GuiGraphics graphics, int x, int y, int count) {
@@ -220,11 +222,11 @@ final class FactoryNodeRender {
             FactoryNineSlice.icon(graphics, member.status().lamp(),
                     FactoryNodeLayout.memberDotX(viewport), y + 6, 3);
             int locateX = FactoryNodeLayout.locateX(viewport);
-            FactoryKeycap.draw(graphics, this.theme, locateX, y + 1, FactoryNodeLayout.ACTION,
+            FactoryKeycap.draw(graphics, this.theme, locateX, y + 1, FactoryNodeLayout.LOCATE,
                     FactoryNodeLayout.MEMBER_ROW_H - 2, this.theme.bevelLight(), true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);
-            FactoryNodeIcons.locate(graphics, locateX + FactoryNodeLayout.ACTION / 2, y + 8,
+            FactoryNodeIcons.locate(graphics, locateX + FactoryNodeLayout.LOCATE / 2, y + 8,
                     this.theme.textPrimary());
         }
         if (box.totalMembers() > box.shownMembers()) {

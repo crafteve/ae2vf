@@ -117,10 +117,14 @@ final class FactoryNodeProbe {
             case BLOCKING -> FactoryNodeLayout.keyX(viewport, 0) + 7;
             case MULTIPLIER -> FactoryNodeLayout.keyX(viewport, 1) + 7;
             case DISPATCH -> FactoryNodeLayout.keyX(viewport, 2) + 7;
-            case EDIT -> FactoryNodeLayout.editX(viewport) + 8;
-            case DELETE -> FactoryNodeLayout.deleteX(viewport) + 8;
+            case EDIT, DELETE -> FactoryNodeLayout.actionX(viewport) + 6;
             default -> FactoryNodeLayout.nameX(viewport) + 2;
         };
-        screen.mouseClicked(x, top + 10, 0);
+        int y = switch (kind) {
+            case EDIT -> top + FactoryNodeLayout.PLUS_Y + 4;
+            case DELETE -> top + FactoryNodeLayout.CROSS_Y + 4;
+            default -> top + 10;
+        };
+        screen.mouseClicked(x, y, 0);
     }
 }

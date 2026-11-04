@@ -37,17 +37,23 @@ final class FactoryNodeLayout {
     /** 堆叠徽标尺寸。 */
     static final int BADGE_W = 11;
     static final int BADGE_H = 9;
-    /** provider 键帽尺寸与间隔。 */
+    /** provider 键帽尺寸与间隔；高度撑满节点行。 */
     static final int KEY_W = 14;
-    static final int KEY_H = 16;
+    static final int KEY_H = 18;
     static final int KEY_GAP = 1;
     /** provider 凹底内边距。 */
     static final int TROUGH_PAD = 1;
     /** provider 凹底宽高。 */
     static final int TROUGH_W = TROUGH_PAD * 2 + KEY_W * 3 + KEY_GAP * 2;
     static final int TROUGH_H = 18;
-    /** 编辑 / 删除键帽。 */
-    static final int ACTION = 16;
+    /** 编辑 / 删除键帽：上下叠放，各占半行。 */
+    static final int ACTION_W = 13;
+    static final int ACTION_H = 8;
+    /** 编辑键相对节点行的上偏移；删除键接在它下面。 */
+    static final int PLUS_Y = 1;
+    static final int CROSS_Y = 10;
+    /** 机器行定位键边长。 */
+    static final int LOCATE = 16;
     /** 展开后的“还有 N 台”汇总行高。 */
     static final int MORE_ROW_H = 14;
     /** 展开时先显示几台机器，超出折叠。 */
@@ -233,7 +239,7 @@ final class FactoryNodeLayout {
                 if (localY >= rowY + MEMBER_ROW_H) {
                     return new Hit(Kind.MEMBER, box.index(), member);
                 }
-                if (inside(localX, locateX(this.viewport), ACTION)) {
+                if (inside(localX, locateX(this.viewport), LOCATE)) {
                     return new Hit(Kind.LOCATE, box.index(), member);
                 }
                 return new Hit(Kind.MEMBER, box.index(), member);
@@ -244,7 +250,7 @@ final class FactoryNodeLayout {
     }
 
     private static Hit hitNodeRow(Viewport viewport, NodeBox box, int localX, int localY) {
-        int keyY = box.top() + (NODE_ROW_H - KEY_H) / 2;
+        int keyY = box.top() + 1;
         if (localY >= keyY - 1 && localY < keyY + KEY_H + 1) {
             if (inside(localX, keyX(viewport, 0), KEY_W)) {
                 return new Hit(Kind.BLOCKING, box.index(), -1);
@@ -255,10 +261,12 @@ final class FactoryNodeLayout {
             if (inside(localX, keyX(viewport, 2), KEY_W)) {
                 return new Hit(Kind.DISPATCH, box.index(), -1);
             }
-            if (inside(localX, editX(viewport), ACTION)) {
+        }
+        if (inside(localX, actionX(viewport), ACTION_W)) {
+            if (inside(localY, box.top() + PLUS_Y, ACTION_H)) {
                 return new Hit(Kind.EDIT, box.index(), -1);
             }
-            if (inside(localX, deleteX(viewport), ACTION)) {
+            if (inside(localY, box.top() + CROSS_Y, ACTION_H)) {
                 return new Hit(Kind.DELETE, box.index(), -1);
             }
         }
@@ -294,12 +302,12 @@ final class FactoryNodeLayout {
 
     /** provider 凹底左边缘（屏幕坐标）。 */
     static int troughX(Viewport viewport) {
-        return editX(viewport) - 2 - TROUGH_W;
+        return actionX(viewport) - 2 - TROUGH_W;
     }
 
     /** provider 凹底右边缘。 */
     static int troughRight(Viewport viewport) {
-        return editX(viewport) - 2;
+        return actionX(viewport) - 2;
     }
 
     /** 第 index 枚 provider 键帽左边缘。 */
@@ -307,14 +315,9 @@ final class FactoryNodeLayout {
         return troughX(viewport) + TROUGH_PAD + index * (KEY_W + KEY_GAP);
     }
 
-    /** 编辑键左边缘。 */
-    static int editX(Viewport viewport) {
-        return deleteX(viewport) - 1 - ACTION;
-    }
-
-    /** 删除键左边缘。 */
-    static int deleteX(Viewport viewport) {
-        return cardRight(viewport) - 2 - ACTION;
+    /** 编辑 / 删除键列左边缘；两键上下叠放。 */
+    static int actionX(Viewport viewport) {
+        return cardRight(viewport) - 2 - ACTION_W;
     }
 
     /** 名字可用宽度。 */
@@ -344,7 +347,7 @@ final class FactoryNodeLayout {
 
     /** 机器行定位键左边缘。 */
     static int locateX(Viewport viewport) {
-        return memberX(viewport) + memberWidth(viewport) - 2 - ACTION;
+        return memberX(viewport) + memberWidth(viewport) - 2 - LOCATE;
     }
 
     /** 机器行状态点 x。 */
