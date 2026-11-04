@@ -20,8 +20,12 @@ import net.minecraft.nbt.CompoundTag;
  * 以后如果要做样板组，再把这些字段换成可选的规则集。</p>
  */
 public final class Machine {
+    /** 节点名字上限；界面输入、网络解码与写档共用同一个值。 */
+    public static final int MAX_NAME_LENGTH = 32;
+
     private static final String TAG_IO = "Io";
     private static final String TAG_PROVIDER = "Provider";
+    private static final String TAG_NAME = "Name";
 
     /** 机器身份与坐标。 */
     private final MachineRef ref;
@@ -29,6 +33,9 @@ public final class Machine {
     private final MachineIoGroup io;
     /** 这台机器的样板供应器数据。 */
     private final MachineProvider provider;
+    /** 玩家给节点起的名字；{@code null} 表示用方块名。 */
+    @Nullable
+    private String name;
 
     /**
      * 新建一台没有规则、没有样板的机器。
@@ -63,6 +70,31 @@ public final class Machine {
         return this.ref.id();
     }
 
+    /**
+     * 玩家给节点起的名字。
+     *
+     * <p>名字跟着机器记录走；1:1 节点阶段它同时是节点名。返回 {@code null} 表示没有自定义名字，
+     * 界面回退到方块名。</p>
+     *
+     * @return 自定义名字；未起名时为 {@code null}
+     */
+    @Nullable
+    public String name() {
+        return this.name;
+    }
+
+    /**
+     * 改节点名字；传入空串等于清除。
+     *
+     * <p>只做存储，不校验长度与字符——校验在 {@code MachineActions.rename} 一处做，
+     * 避免写入口和指令各有一套规则。</p>
+     *
+     * @param next 新名字；{@code null} 或空串表示清除
+     */
+    public void setName(@Nullable String next) {
+        this.name = next == null || next.isEmpty() ? null : next;
+    }
+
     /** 机器身份与坐标。 */
     public MachineRef ref() {
         return this.ref;
@@ -93,6 +125,9 @@ public final class Machine {
         CompoundTag tag = this.ref.save();
         tag.put(TAG_IO, this.io.save(registries));
         tag.put(TAG_PROVIDER, this.provider.save(registries));
+        if (this.name != null) {
+            tag.putString(TAG_NAME, this.name);
+        }
         return tag;
     }
 
@@ -115,6 +150,8 @@ public final class Machine {
         }
         MachineIoGroup io = MachineIoGroup.load(tag.getCompound(TAG_IO), registries, ref.id());
         MachineProvider provider = MachineProvider.load(tag.getCompound(TAG_PROVIDER), registries);
-        return new Machine(ref, io, provider);
+        Machine machine = new Machine(ref, io, provider);
+        machine.name = tag.contains(TAG_NAME) ? tag.getString(TAG_NAME) : null;
+        return machine;
     }
 }

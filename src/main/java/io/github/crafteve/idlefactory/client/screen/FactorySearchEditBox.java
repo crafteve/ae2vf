@@ -16,17 +16,37 @@ public class FactorySearchEditBox extends EditBox {
     private final FactoryGuiTheme theme;
     /** 占位提示；聚焦或有内容时临时清掉，避免和输入文字叠在一起。 */
     private final Component hint;
+    /** 提示文字颜色。 */
+    private final int hintColor;
 
     public FactorySearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme, Component hint) {
+        this(font, x, y, width, height, theme, hint, 0xFFFFFFFF, 0xFFE6EEF8);
+    }
+
+    /**
+     * @param font      字体
+     * @param x         左边缘
+     * @param y         上边缘
+     * @param width     宽
+     * @param height    高
+     * @param theme     主题
+     * @param hint      占位提示
+     * @param textColor 输入文字颜色
+     * @param hintColor 占位提示颜色
+     */
+    public FactorySearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme,
+            Component hint, int textColor, int hintColor) {
         super(font, x, y, width, height, Component.empty());
         this.theme = theme;
         this.hint = hint;
+        this.hintColor = hintColor;
         setBordered(false);
-        // AE2 的输入框底板是中等灰蓝，文字与提示都用亮色才看得清。
-        setTextColor(0xFFFFFFFF);
+        // AE2 的输入框底板是中等灰蓝，搜索框文字与提示都用亮色才看得清；
+        // 节点改名贴在浅色节点行上，改用黑字，避免和底色糊在一起。
+        setTextColor(textColor);
         setTextColorUneditable(0xFFD8D9DF);
         setTextShadow(false);
-        // 原版 hint 颜色写死成灰色，自己画亮色提示。
+        // 原版 hint 颜色写死成灰色，自己画可控颜色的提示。
         setHint(Component.empty());
         setMaxLength(64);
     }
@@ -49,7 +69,7 @@ public class FactorySearchEditBox extends EditBox {
         if (isVisible() && !isFocused() && getValue().isEmpty()) {
             Font font = Minecraft.getInstance().font;
             guiGraphics.drawString(font, this.hint.getString(), getX(), getY() + 1,
-                    0xFFE6EEF8, false);
+                    this.hintColor, false);
         }
 
         if (!isFocused() || !isVisible()) {

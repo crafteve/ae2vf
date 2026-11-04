@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.network;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
@@ -49,10 +50,26 @@ public final class ClientFactoryTableHandler {
      * @param payload 负载
      */
     public static void handleFeedback(FactoryEditFeedbackS2C payload) {
-        FactoryTableSink sink = currentSink(payload.containerId());
+        FactoryFeedbackSink sink = currentFeedbackSink(payload.containerId());
         if (sink != null) {
             sink.acceptEditFeedback(payload);
         }
+    }
+
+    /**
+     * 当前打开且容器 id 匹配的反馈接收口。
+     *
+     * <p>被动 IO 终端、节点终端与旧工作台都实现 {@link FactoryFeedbackSink}；这里不列举具体屏幕。</p>
+     *
+     * @param containerId 容器 id
+     * @return 接收口；没有匹配的界面时为 {@code null}
+     */
+    private static FactoryFeedbackSink currentFeedbackSink(int containerId) {
+        if (Minecraft.getInstance().screen instanceof FactoryFeedbackSink sink
+                && sink.containerId() == containerId) {
+            return sink;
+        }
+        return null;
     }
 
     /**

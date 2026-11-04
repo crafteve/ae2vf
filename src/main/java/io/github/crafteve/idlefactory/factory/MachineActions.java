@@ -94,6 +94,43 @@ public final class MachineActions {
     }
 
     /**
+     * 改节点名字；空串清除，恢复方块名。
+     *
+     * <p>名字只影响展示与搜索，不影响 IO 与派单，所以不唤醒执行器。校验只在这里做一次：
+     * 去首尾空白、长度不超过 {@link Machine#MAX_NAME_LENGTH}、拒绝控制字符。</p>
+     *
+     * @param factory   工厂
+     * @param machineId 机器 id
+     * @param raw       新名字；{@code null} 或空串表示清除
+     * @return 结果
+     */
+    public static Result rename(Factory factory, UUID machineId, @Nullable String raw) {
+        Optional<Machine> found = factory.config().machines().byId(machineId);
+        if (found.isEmpty()) {
+            return Result.err("找不到机器");
+        }
+        String next = raw == null ? "" : raw.trim();
+        if (next.length() > Machine.MAX_NAME_LENGTH) {
+            return Result.err("名字最多 " + Machine.MAX_NAME_LENGTH + " 个字符");
+        }
+        for (int i = 0; i < next.length(); i++) {
+            char c = next.charAt(i);
+            if (c < 0x20 || c == 0x7F) {
+                return Result.err("名字不能包含控制字符");
+            }
+        }
+        Machine machine = found.get();
+        machine.setName(next);
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        return Result.ok(next.isEmpty()
+                ? "已恢复方块名：[" + machine.ref().shortId() + "]"
+                : "已改名为「" + next + "」");
+    }
+
+    /**
      * 加一条输入/输出规则。
      *
      * @param factory   工厂

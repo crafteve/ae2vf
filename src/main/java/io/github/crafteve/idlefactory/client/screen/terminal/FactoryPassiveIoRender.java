@@ -8,6 +8,7 @@ import appeng.api.stacks.AEItemKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryCard;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.FactoryKeycap;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
@@ -44,8 +45,6 @@ final class FactoryPassiveIoRender {
     private static final int[] SCROLL_EDGE_SHADE = {0x45000000, 0x26000000, 0x10000000};
     /** 悬停底色（白色 12%）。 */
     private static final int HOVER_FILL = 0x1FFFFFFF;
-    /** chip 悬停提亮（白色 20%）。 */
-    private static final int CHIP_HOVER = 0x33FFFFFF;
     /** 磁贴里速率列宽：chip 行之后剩下的宽度，不能和 chip 抢位置。 */
     private static final int TILE_RATE_W = FactoryPassiveIoLayout.TILE_W
             - (FactoryPassiveIoLayout.TILE_INSET + FactoryPassiveIoLayout.CHIP * 3
@@ -337,22 +336,9 @@ final class FactoryPassiveIoRender {
     private void drawChip(GuiGraphics graphics, int x, int y, String label, int background,
             int textColor, boolean enabled, boolean hovered) {
         int chip = FactoryPassiveIoLayout.CHIP;
-        int light = this.theme.panelBorderLight();
-        int dark = this.theme.slotBorderDark();
-        graphics.fill(x, y, x + chip, y + 1, light);
-        graphics.fill(x, y + 1, x + 1, y + chip - 1, light);
-        graphics.fill(x, y + chip - 1, x + chip, y + chip, dark);
-        graphics.fill(x + chip - 1, y + 1, x + chip, y + chip - 1, dark);
-        graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, background);
-        if (enabled && hovered) {
-            // 高亮垫在文字下面，避免半透明填充把字盖灰；位置严格按 chip 矩形，不另算。
-            graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, CHIP_HOVER);
-        }
+        FactoryKeycap.draw(graphics, this.theme, x, y, chip, chip, background, enabled, hovered);
         int textX = x + (chip - this.font.width(label)) / 2;
         graphics.drawString(this.font, label, textX, y + 2, textColor, false);
-        if (!enabled) {
-            graphics.fill(x + 1, y + 1, x + chip - 1, y + chip - 1, 0x55FFFFFF);
-        }
     }
 
     private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,

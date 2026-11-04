@@ -5,6 +5,10 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
@@ -34,7 +38,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "25";
+    public static final String PROTOCOL_VERSION = "26";
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -100,6 +104,16 @@ public final class ModNetwork {
                 FactoryLinksRequestC2S::handle);
         registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
                 FactoryLinksS2C::handle);
+
+        // 节点管理终端：节点表请求 / 回包 / provider 设置 / 改名
+        registrar.playToServer(FactoryNodeTableRequestC2S.TYPE,
+                FactoryNodeTableRequestC2S.STREAM_CODEC, FactoryNodeTableRequestC2S::handle);
+        registrar.playToClient(FactoryNodeTableS2C.TYPE, FactoryNodeTableS2C.STREAM_CODEC,
+                FactoryNodeTableS2C::handle);
+        registrar.playToServer(FactoryNodeProviderC2S.TYPE,
+                FactoryNodeProviderC2S.STREAM_CODEC, FactoryNodeProviderC2S::handle);
+        registrar.playToServer(FactoryNodeRenameC2S.TYPE,
+                FactoryNodeRenameC2S.STREAM_CODEC, FactoryNodeRenameC2S::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }

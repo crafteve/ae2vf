@@ -2,7 +2,9 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import net.minecraft.resources.ResourceLocation;
 
+import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.probe.Health;
 
 /**
  * 一台机器的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
@@ -59,12 +61,27 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      * @return 状态种类
      */
     static Kind kindOf(FactorySnapshotBuilder.MachineView machine) {
-        return switch (machine.totalState()) {
+        return kindOf(machine.totalState(), machine.health(), machine.machineMissing());
+    }
+
+    /**
+     * 取一个节点 / 成员的状态种类。
+     *
+     * <p>节点终端与被动 IO 终端共用同一套映射：状态枚举、健康度与失联标记由服务端视图给出，
+     * 这里只做展示层归并，不再读世界。</p>
+     *
+     * @param state   服务端总状态
+     * @param health  观测结论
+     * @param missing 方块是否已经消失
+     * @return 状态种类
+     */
+    static Kind kindOf(FactorySnapshotBuilder.TotalState state, Health health, boolean missing) {
+        return switch (state) {
             case OFFLINE -> {
-                if (machine.machineMissing()) {
+                if (missing) {
                     yield Kind.OFFLINE;
                 }
-                yield switch (machine.health()) {
+                yield switch (health) {
                     case MISSING, NO_DIMENSION -> Kind.OFFLINE;
                     default -> Kind.UNLOADED;
                 };
@@ -122,6 +139,38 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      */
     public static FactoryStatus of(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
         return of(kindOf(machine), machine, theme);
+    }
+
+    /**
+     * 把一个节点映射成状态展示。
+     *
+     * @param node  节点视图
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus of(FactoryNodeSnapshotBuilder.NodeView node,
+            FactoryGuiTheme theme) {
+        Kind kind = kindOf(node.totalState(), node.health(), node.machineMissing());
+        return switch (kind) {
+            case OFFLINE -> new FactoryStatus("失联", theme.error(),
+                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
+            case UNLOADED -> new FactoryStatus("未载", theme.statusWarn(),
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+            case UNCONFIGURED -> new FactoryStatus("无规则", theme.statusIdle(),
+                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
+            case RUNNING -> new FactoryStatus("运行", theme.statusRun(),
+                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
+            case INPUT_OK -> new FactoryStatus("可输入", theme.statusRun(),
+                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
+            case WAITING_MATERIAL -> new FactoryStatus("仓库缺料", theme.statusWarn(),
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+            case INPUT_BLOCKED -> new FactoryStatus("输入堵塞", theme.statusWarn(),
+                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+            case IDLE -> new FactoryStatus("空闲", theme.statusIdle(),
+                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
+            case UNKNOWN -> new FactoryStatus("未知", theme.statusIdle(),
+                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
+        };
     }
 
     /**

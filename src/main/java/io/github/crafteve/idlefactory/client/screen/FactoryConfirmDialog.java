@@ -2,17 +2,34 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import org.jetbrains.annotations.Nullable;
 
-
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
- * 破坏性操作的确认浮层（当前用于删除机器）。
+ * 破坏性操作的确认浮层（删除机器 / 删除节点）。
  *
- * <p>不带输入框；确认后立即关闭并执行回调，结果由服务端反馈显示在底部状态条。Esc / 取消关闭，
- * 回车确认。浮层外点击一律吞掉，避免误触背后的表格。</p>
+ * <p>不带输入框；确认后立即关闭并执行回调，结果由服务端反馈显示。Esc / 取消关闭，回车确认。
+ * 浮层外点击一律吞掉，避免误触背后的列表。</p>
+ *
+ * <p>几何分两部分：{@link Bounds} 是浮层自身的位置，{@link #backdrop()} 是要压暗的父面板。
+ * 旧工作台从 {@link FactoryLayout} 推导，节点终端直接给屏幕矩形。</p>
  */
 public final class FactoryConfirmDialog {
+    /** 浮层尺寸。 */
+    private static final int WIDTH = 240;
+    private static final int HEIGHT = 84;
+
+    /**
+     * 一个矩形。
+     *
+     * @param x      左边缘
+     * @param y      上边缘
+     * @param width  宽
+     * @param height 高
+     */
+    public record Bounds(int x, int y, int width, int height) {
+    }
+
     private final Font font;
     private final FactoryGuiTheme theme;
 
@@ -23,7 +40,9 @@ public final class FactoryConfirmDialog {
     @Nullable
     private Runnable onConfirm;
     @Nullable
-    private FactoryLayout layout;
+    private Bounds dialog;
+    @Nullable
+    private Bounds backdrop;
 
     /**
      * @param font  字体
@@ -35,7 +54,7 @@ public final class FactoryConfirmDialog {
     }
 
     /**
-     * 打开确认浮层。
+     * 打开确认浮层（旧工作台入口）。
      *
      * @param title        标题
      * @param message      说明；可用 {@code \n} 分行
@@ -45,11 +64,29 @@ public final class FactoryConfirmDialog {
      */
     public void open(String title, String message, String confirmLabel, Runnable onConfirm,
             FactoryLayout layout) {
+        open(title, message, confirmLabel, onConfirm,
+                new Bounds(layout.confirmX(), layout.confirmY(), WIDTH, HEIGHT),
+                new Bounds(layout.panelX, layout.panelY, layout.panelW, layout.panelH));
+    }
+
+    /**
+     * 打开确认浮层。
+     *
+     * @param title        标题
+     * @param message      说明；可用 {@code \n} 分行
+     * @param confirmLabel 确认按钮文字
+     * @param onConfirm    确认回调
+     * @param dialog       浮层矩形
+     * @param backdrop     要压暗的父面板
+     */
+    public void open(String title, String message, String confirmLabel, Runnable onConfirm,
+            Bounds dialog, Bounds backdrop) {
         this.title = title;
         this.message = message;
         this.confirmLabel = confirmLabel;
         this.onConfirm = onConfirm;
-        this.layout = layout;
+        this.dialog = dialog;
+        this.backdrop = backdrop;
         this.open = true;
     }
 
@@ -65,12 +102,16 @@ public final class FactoryConfirmDialog {
     }
 
     /**
-     * 布局变化时更新引用。
+     * 布局变化时更新引用（旧工作台入口）。
      *
      * @param layout 新布局
      */
     public void rebind(FactoryLayout layout) {
-        this.layout = layout;
+        if (!this.open) {
+            return;
+        }
+        this.dialog = new Bounds(layout.confirmX(), layout.confirmY(), WIDTH, HEIGHT);
+        this.backdrop = new Bounds(layout.panelX, layout.panelY, layout.panelW, layout.panelH);
     }
 
     /**
@@ -81,32 +122,30 @@ public final class FactoryConfirmDialog {
      * @param mouseY   鼠标 y
      */
     public void draw(GuiGraphics graphics, int mouseX, int mouseY) {
-        if (!this.open || this.layout == null) {
+        Bounds box = this.dialog;
+        Bounds parent = this.backdrop;
+        if (!this.open || box == null || parent == null) {
             return;
         }
-        FactoryLayout l = this.layout;
-        int x = l.confirmX();
-        int y = l.confirmY();
-        int w = FactoryLayout.CONFIRM_W;
-        int h = FactoryLayout.CONFIRM_H;
-        graphics.fill(l.panelX, l.panelY, l.panelX + l.panelW, l.panelY + l.panelH,
-                0x90000000);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, x + 3, y + 3, w, h);
-        FactoryNineSlice.panel(graphics, x, y, w, h);
-        graphics.drawString(this.font, this.title, x + 12, y + 10,
+        graphics.fill(parent.x(), parent.y(), parent.x() + parent.width(),
+                parent.y() + parent.height(), 0x90000000);
+        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, box.x() + 3, box.y() + 3,
+                box.width(), box.height());
+        FactoryNineSlice.panel(graphics, box.x(), box.y(), box.width(), box.height());
+        graphics.drawString(this.font, this.title, box.x() + 12, box.y() + 10,
                 this.theme.textPrimary(), false);
 
-        int lineY = y + 28;
+        int lineY = box.y() + 28;
         for (String line : this.message.split("\n")) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, w - 24),
-                    x + 12, lineY, this.theme.textDim(), false);
+            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, box.width() - 24),
+                    box.x() + 12, lineY, this.theme.textDim(), false);
             lineY += 11;
         }
 
-        int buttonY = y + h - 26;
+        int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
         int cancelW = Math.max(40, this.font.width("取消") + 18);
-        int confirmX = x + w - 12 - confirmW;
+        int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;
         drawButton(graphics, cancelX, buttonY, cancelW, "取消", false, mouseX, mouseY);
         drawButton(graphics, confirmX, buttonY, confirmW, this.confirmLabel, true,
@@ -135,21 +174,17 @@ public final class FactoryConfirmDialog {
      * @return 是否消费
      */
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!this.open || this.layout == null) {
+        Bounds box = this.dialog;
+        if (!this.open || box == null) {
             return false;
         }
-        FactoryLayout l = this.layout;
-        int x = l.confirmX();
-        int y = l.confirmY();
-        int w = FactoryLayout.CONFIRM_W;
-        int h = FactoryLayout.CONFIRM_H;
-        if (!inside(mouseX, mouseY, x, y, w, h)) {
+        if (!inside(mouseX, mouseY, box.x(), box.y(), box.width(), box.height())) {
             return true;
         }
-        int buttonY = y + h - 26;
+        int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
         int cancelW = Math.max(40, this.font.width("取消") + 18);
-        int confirmX = x + w - 12 - confirmW;
+        int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;
         if (inside(mouseX, mouseY, cancelX, buttonY, cancelW, 18)) {
             close();

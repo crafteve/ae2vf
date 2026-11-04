@@ -6,6 +6,7 @@
   "itemGroup.idlefactory": "Idle Factory",
   "item.idlefactory.factory_terminal": "Factory Terminal",
   "item.idlefactory.passive_io_terminal": "Passive IO Management Terminal",
+  "item.idlefactory.node_terminal": "Node Management Terminal",
   "item.idlefactory.machine_binding_wand": "Machine Binding Wand",
   "item.idlefactory.storage_binding_wand": "Storage Binding Wand",
   "jei.idlefactory.fe.info.1": "FE (Forge Energy)",

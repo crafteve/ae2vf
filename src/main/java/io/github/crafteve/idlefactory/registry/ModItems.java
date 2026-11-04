@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.registry;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
 import io.github.crafteve.idlefactory.item.FactoryPassiveIoTerminalItem;
 import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
@@ -31,6 +32,11 @@ public final class ModItems {
             ITEMS.register("passive_io_terminal",
                     () -> new FactoryPassiveIoTerminalItem(unstackable()));
 
+    /** 节点管理终端；只管节点、成员与节点级动作。 */
+    public static final DeferredHolder<Item, FactoryNodeTerminalItem> NODE_TERMINAL =
+            ITEMS.register("node_terminal",
+                    () -> new FactoryNodeTerminalItem(unstackable()));
+
     /** 机器绑定杖。 */
     public static final DeferredHolder<Item, MachineBindingWandItem> MACHINE_BINDING_WAND =
             ITEMS.register("machine_binding_wand",
@@ -42,7 +48,7 @@ public final class ModItems {
                     () -> new StorageBindingWandItem(unstackable()));
 
     /**
-     * 四个物品共用的属性：不可堆叠，且不设置耐久。
+     * 全部物品共用的属性：不可堆叠，且不设置耐久。
      *
      * @return 新的物品属性
      */
