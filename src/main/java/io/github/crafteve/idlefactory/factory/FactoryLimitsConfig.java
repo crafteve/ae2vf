@@ -1,0 +1,196 @@
+package io.github.crafteve.idlefactory.factory;
+
+import net.neoforged.neoforge.common.ModConfigSpec;
+
+/**
+ * 工厂玩法上限与观测调优配置。
+ *
+ * <p>所有玩法上限默认 {@code -1}，表示不设上限；正数表示上限；{@code 0} 非法。
+ * 负数一律按「用硬上限」处理，也就是实际值 = {@code min(config, 硬上限)}。
+ * config 改小不会删已有数据，只阻止继续新增。</p>
+ *
+ * <p>硬上限不可关：它们同时是网络与存档解码的上限，用来防溢出与恶意包。
+ * {@link #observationBlockBudgetPerTick} 与 {@link #staleHealthTicks} 是调优项，
+ * 不是玩法上限，默认值非 -1。</p>
+ */
+public final class FactoryLimitsConfig {
+    /** 节点数硬上限。 */
+    public static final int HARD_MAX_NODES = 4096;
+    /** 单节点机器数硬上限。 */
+    public static final int HARD_MAX_MACHINES_PER_NODE = 256;
+    /** 单机器方块数硬上限。 */
+    public static final int HARD_MAX_BLOCKS_PER_MACHINE = 256;
+    /** 单节点方块数硬上限。 */
+    public static final int HARD_MAX_BLOCKS_PER_NODE = 4096;
+    /** 全工厂机器数硬上限。 */
+    public static final int HARD_MAX_TOTAL_MACHINES = 8192;
+    /** 全工厂方块数硬上限。 */
+    public static final int HARD_MAX_TOTAL_BLOCKS = 32768;
+    /** 每侧规则数硬上限。 */
+    public static final int HARD_MAX_RULES_PER_SIDE = 64;
+    /** 样板槽硬上限。 */
+    public static final int HARD_MAX_PATTERN_CAPACITY = 1024;
+    /** 倍率硬上限；与 {@code factory.node.Multiplier.HARD_MAX_FACTOR} 一致。 */
+    public static final int HARD_MAX_MULTIPLIER = 64;
+    /** 名字长度硬上限。 */
+    public static final int HARD_MAX_NAME_LENGTH = 32767;
+    /** 观测预算硬上限（每 tick 探测多少次）。 */
+    public static final int HARD_MAX_OBSERVATION_BUDGET = 256;
+    /** 健康过期阈值硬上限（tick）。 */
+    public static final int HARD_MAX_STALE_HEALTH_TICKS = 2400;
+
+    /** 观测预算默认值：每 tick 探测 64 个方块。 */
+    public static final int DEFAULT_OBSERVATION_BUDGET = 64;
+    /** 健康过期默认阈值：1200 tick（约 60 秒）。 */
+    public static final int DEFAULT_STALE_HEALTH_TICKS = 1200;
+
+    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
+
+    /** 节点数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_NODES = limited("maxNodes",
+            "节点数上限；-1 表示无上限。 / Max node count per factory; -1 = unlimited.",
+            HARD_MAX_NODES);
+    /** 单节点机器数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_MACHINES_PER_NODE = limited("maxMachinesPerNode",
+            "单节点机器数上限；-1 表示无上限。 / Max machines per node; -1 = unlimited.",
+            HARD_MAX_MACHINES_PER_NODE);
+    /** 单机器方块数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_BLOCKS_PER_MACHINE = limited("maxBlocksPerMachine",
+            "单机器方块数上限；-1 表示无上限。 / Max blocks per machine; -1 = unlimited.",
+            HARD_MAX_BLOCKS_PER_MACHINE);
+    /** 单节点方块数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_BLOCKS_PER_NODE = limited("maxBlocksPerNode",
+            "单节点方块数上限；-1 表示无上限。 / Max blocks per node; -1 = unlimited.",
+            HARD_MAX_BLOCKS_PER_NODE);
+    /** 全工厂机器数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_TOTAL_MACHINES = limited("maxTotalMachines",
+            "全工厂机器数上限；-1 表示无上限。 / Max machines per factory; -1 = unlimited.",
+            HARD_MAX_TOTAL_MACHINES);
+    /** 全工厂方块数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_TOTAL_BLOCKS = limited("maxTotalBlocks",
+            "全工厂方块数上限；-1 表示无上限。 / Max blocks per factory; -1 = unlimited.",
+            HARD_MAX_TOTAL_BLOCKS);
+    /** 每侧规则数上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_RULES_PER_SIDE = limited("maxRulesPerSide",
+            "输入或输出每侧规则数上限；-1 表示无上限。 / Max rules per side; -1 = unlimited.",
+            HARD_MAX_RULES_PER_SIDE);
+    /** 单节点样板槽上限；-1 表示无上限。 */
+    public static final ModConfigSpec.IntValue MAX_PATTERN_CAPACITY = limited("maxPatternCapacity",
+            "单节点样板槽上限；-1 表示无上限。 / Max pattern slots per node; -1 = unlimited.",
+            HARD_MAX_PATTERN_CAPACITY);
+    /** 固定/智能倍率上限；-1 表示用硬上限。 */
+    public static final ModConfigSpec.IntValue MAX_MULTIPLIER = limited("maxMultiplier",
+            "固定与智能倍率上限；-1 表示用硬上限。 / Max multiplier; -1 = hard cap.",
+            HARD_MAX_MULTIPLIER);
+    /** 节点名字长度上限；-1 表示用硬上限。 */
+    public static final ModConfigSpec.IntValue MAX_NAME_LENGTH = limited("maxNameLength",
+            "节点名字长度上限；-1 表示用硬上限。 / Max node name length; -1 = hard cap.",
+            HARD_MAX_NAME_LENGTH);
+
+    /** 每 tick 观测预算；调优项，热改下一 tick 生效。 */
+    public static final ModConfigSpec.IntValue OBSERVATION_BLOCK_BUDGET_PER_TICK = BUILDER
+            .comment("每 tick 最多探测多少方块；调优项，热改下一 tick 生效。 /",
+                    "Blocks probed per tick; tuning knob, applies on the next tick.")
+            .defineInRange("observationBlockBudgetPerTick", DEFAULT_OBSERVATION_BUDGET, 1,
+                    HARD_MAX_OBSERVATION_BUDGET);
+    /** 健康过期阈值；调优项，热改下一 tick 生效。 */
+    public static final ModConfigSpec.IntValue STALE_HEALTH_TICKS = BUILDER
+            .comment("方块健康超过多少 tick 未探测就算过期；调优项。 /",
+                    "Ticks without a probe before health is stale; tuning knob.")
+            .defineInRange("staleHealthTicks", DEFAULT_STALE_HEALTH_TICKS, 1,
+                    HARD_MAX_STALE_HEALTH_TICKS);
+
+    /** COMMON 配置规格；由 {@code IdleFactory} 注册。 */
+    public static final ModConfigSpec SPEC = BUILDER.build();
+
+    private FactoryLimitsConfig() {
+        // 纯配置容器，禁止实例化
+    }
+
+    /**
+     * 定义一个「-1 = 无上限」的整数项。
+     *
+     * @param name     配置键
+     * @param comment  中英双语注释
+     * @param hardCap  该项的硬上限
+     * @return 配置项
+     */
+    private static ModConfigSpec.IntValue limited(String name, String comment, int hardCap) {
+        return BUILDER.comment(comment)
+                .defineInRange(name, -1, -1, hardCap);
+    }
+
+    /**
+     * 把配置值折算成有效上限：负数用硬上限，正数取与硬上限的较小者。
+     *
+     * @param value   配置值
+     * @param hardCap 硬上限
+     * @return 有效上限
+     */
+    public static int effective(int value, int hardCap) {
+        if (value < 0) {
+            return hardCap;
+        }
+        return Math.min(value, hardCap);
+    }
+
+    /** @return 有效节点数上限 */
+    public static int maxNodes() {
+        return effective(MAX_NODES.get(), HARD_MAX_NODES);
+    }
+
+    /** @return 有效单节点机器数上限 */
+    public static int maxMachinesPerNode() {
+        return effective(MAX_MACHINES_PER_NODE.get(), HARD_MAX_MACHINES_PER_NODE);
+    }
+
+    /** @return 有效单机器方块数上限 */
+    public static int maxBlocksPerMachine() {
+        return effective(MAX_BLOCKS_PER_MACHINE.get(), HARD_MAX_BLOCKS_PER_MACHINE);
+    }
+
+    /** @return 有效单节点方块数上限 */
+    public static int maxBlocksPerNode() {
+        return effective(MAX_BLOCKS_PER_NODE.get(), HARD_MAX_BLOCKS_PER_NODE);
+    }
+
+    /** @return 有效全工厂机器数上限 */
+    public static int maxTotalMachines() {
+        return effective(MAX_TOTAL_MACHINES.get(), HARD_MAX_TOTAL_MACHINES);
+    }
+
+    /** @return 有效全工厂方块数上限 */
+    public static int maxTotalBlocks() {
+        return effective(MAX_TOTAL_BLOCKS.get(), HARD_MAX_TOTAL_BLOCKS);
+    }
+
+    /** @return 有效每侧规则数上限 */
+    public static int maxRulesPerSide() {
+        return effective(MAX_RULES_PER_SIDE.get(), HARD_MAX_RULES_PER_SIDE);
+    }
+
+    /** @return 有效单节点样板槽上限 */
+    public static int maxPatternCapacity() {
+        return effective(MAX_PATTERN_CAPACITY.get(), HARD_MAX_PATTERN_CAPACITY);
+    }
+
+    /** @return 有效倍率上限 */
+    public static int maxMultiplier() {
+        return effective(MAX_MULTIPLIER.get(), HARD_MAX_MULTIPLIER);
+    }
+
+    /** @return 有效名字长度上限 */
+    public static int maxNameLength() {
+        return effective(MAX_NAME_LENGTH.get(), HARD_MAX_NAME_LENGTH);
+    }
+
+    /** @return 当前观测预算 */
+    public static int observationBlockBudgetPerTick() {
+        return OBSERVATION_BLOCK_BUDGET_PER_TICK.get();
+    }
+
+    /** @return 当前健康过期阈值 */
+    public static int staleHealthTicks() {
+        return STALE_HEALTH_TICKS.get();
+    }
+}
