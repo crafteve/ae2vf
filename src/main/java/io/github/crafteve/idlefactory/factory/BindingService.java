@@ -1,13 +1,19 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
@@ -15,6 +21,9 @@ import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -35,19 +44,150 @@ final class BindingService {
     private final ObservationService observations;
     private final NodeLibraryService nodeLibrary;
     private final MachineLinkService machineLinks;
+    private final MinecraftServer server;
 
     /**
      * @param manager       工厂档案柜
      * @param observations  观测服务；服务端未就绪时为 {@code null}
      * @param nodeLibrary   节点库写入口（整组修改只落盘一次）
      * @param machineLinks  机器接线服务，提供删除出口
+     * @param server        服务端
      */
     BindingService(FactoryManager manager, @Nullable ObservationService observations,
-            NodeLibraryService nodeLibrary, MachineLinkService machineLinks) {
+            NodeLibraryService nodeLibrary, MachineLinkService machineLinks,
+            MinecraftServer server) {
         this.manager = manager;
         this.observations = observations;
         this.nodeLibrary = nodeLibrary;
         this.machineLinks = machineLinks;
+        this.server = server;
+    }
+
+    /**
+     * 一次草稿提交的结果。
+     *
+     * @param ok       是否成功
+     * @param nodeId   落到哪个节点；失败时为 {@code null}
+     * @param machines 本次新增机器数
+     * @param blocks   本次新增方块数
+     * @param message  给玩家看的一句话
+     */
+    public record BindingResult(boolean ok, @Nullable UUID nodeId, int machines, int blocks,
+            String message) {
+        static BindingResult err(String message) {
+            return new BindingResult(false, null, 0, 0, message);
+        }
+    }
+
+    /**
+     * 提交一份绑定草稿：全量校验通过后原子写入节点库；失败不改旧节点与索引。
+     *
+     * <p>顺序固定：LinkGate 快照 → 草稿内查重 → 逐块重查归属/类型/上限 → 内存构造候选
+     * Node（已有节点原对象不动）→ 只调一次 `add` / `replace` → `markDirty` 触发索引重建。
+     * 编辑已有节点只追加机器，绝不删除原有机器 / 方块。</p>
+     *
+     * @param factory 工厂
+     * @param draft   完整草稿
+     * @return 提交结果
+     */
+    public BindingResult commit(Factory factory, BindingDraft draft) {
+        if (draft.isEmpty()) {
+            return BindingResult.err("草稿为空");
+        }
+        LinkGate gate = LinkGate.of(this.manager);
+        Set<BlockKey> seen = new HashSet<>();
+        List<Machine> machines = new ArrayList<>(draft.machines().size());
+        ResourceLocation typeId = null;
+        int totalBlocks = 0;
+        for (BindingDraft.MachineDraft machineDraft : draft.machines()) {
+            if (machineDraft.blocks().isEmpty()) {
+                return BindingResult.err("有机器没有方块");
+            }
+            if (machineDraft.blocks().size() > FactoryLimitsConfig.maxBlocksPerMachine()) {
+                return BindingResult.err("单台机器方块数超过上限");
+            }
+            List<BlockKey> blocks = new ArrayList<>(machineDraft.blocks().size());
+            for (BlockKey block : machineDraft.blocks()) {
+                if (!seen.add(block)) {
+                    return BindingResult.err("草稿里有重复方块");
+                }
+                if (factory.config().nodes().machineAt(block).isPresent()) {
+                    return BindingResult.err("方块已属于节点：" + shortId(block));
+                }
+                LinkGate.ClaimCheck claim = gate.check(block, factory.id(), LinkRole.MACHINE);
+                if (claim.blocked()) {
+                    return BindingResult.err(LinkGateMessages.gateMessage(claim));
+                }
+                ServerLevel level = this.server.getLevel(block.dimension());
+                if (level == null || !level.isLoaded(block.pos())) {
+                    return BindingResult.err("方块所在区块未加载");
+                }
+                BlockEntity blockEntity = level.getBlockEntity(block.pos());
+                if (blockEntity == null) {
+                    return BindingResult.err("方块没有方块实体");
+                }
+                blocks.add(block);
+            }
+            ServerLevel typeLevel = this.server.getLevel(blocks.get(0).dimension());
+            if (typeLevel == null) {
+                return BindingResult.err("类型方块所在维度不存在");
+            }
+            ResourceLocation machineType = blockId(typeLevel, blocks.get(0).pos());
+            if (typeId == null) {
+                typeId = machineType;
+            } else if (!typeId.equals(machineType)) {
+                return BindingResult.err("节点内机器类型不一致");
+            }
+            machines.add(new Machine(UUID.randomUUID(), blocks));
+            totalBlocks += blocks.size();
+        }
+
+        Node candidate;
+        if (draft.nodeId() != null) {
+            Optional<Node> baseFound = factory.config().nodes().byId(draft.nodeId());
+            if (baseFound.isEmpty()) {
+                return BindingResult.err("目标节点不存在");
+            }
+            Node base = baseFound.get();
+            if (!base.typeBlockId().equals(typeId)) {
+                return BindingResult.err("机器类型与节点不一致");
+            }
+            candidate = base;
+            for (Machine machine : machines) {
+                candidate = candidate.withAddedMachine(machine);
+            }
+        } else {
+            candidate = new Node(UUID.randomUUID(), null, typeId, new NodeIoGroup(),
+                    new NodeProvider(), machines, 0L);
+        }
+
+        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
+        NodeLibrary.Result result = draft.nodeId() == null
+                ? batch.add(candidate) : batch.replace(candidate);
+        if (result != NodeLibrary.Result.ADDED && result != NodeLibrary.Result.REPLACED) {
+            return BindingResult.err(switch (result) {
+                case DUPLICATE -> "方块或 id 已被占用";
+                case CONFLICT -> "方块已属于别的节点";
+                case FULL -> "超过节点 / 机器 / 方块上限";
+                default -> "提交失败：" + result;
+            });
+        }
+        batch.close();
+        for (BlockKey block : seen) {
+            this.refreshObservation(block);
+        }
+        return new BindingResult(true, candidate.id(), machines.size(), totalBlocks,
+                "已绑定 " + machines.size() + " 台机器 / " + totalBlocks + " 个方块");
+    }
+
+    /**
+     * 方块位置的短描述，回执用。
+     *
+     * @param block 方块
+     * @return 如 {@code minecraft:overworld 1, 2, 3}
+     */
+    private static String shortId(BlockKey block) {
+        return block.dimension().location() + " " + block.pos().toShortString();
     }
 
     /**

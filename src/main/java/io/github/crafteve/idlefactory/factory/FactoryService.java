@@ -173,6 +173,36 @@ public final class FactoryService {
     }
 
     /**
+     * 提交一份绑定草稿；绑定杖客户端只发这一个入口。
+     *
+     * @param factory 工厂
+     * @param draft   完整草稿
+     * @return 提交结果
+     */
+    public static BindingResult commitBinding(Factory factory, BindingDraft draft) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return new BindingResult(false, null, 0, 0, "Idle Factory 尚未启动（服务端未就绪）");
+        }
+        BindingService.BindingResult result = machineToggle(runtime).commit(factory, draft);
+        return new BindingResult(result.ok(), result.nodeId(), result.machines(), result.blocks(),
+                result.message());
+    }
+
+    /**
+     * 一次草稿提交的结果；与 {@code BindingService.BindingResult} 同形，供网络包直接使用。
+     *
+     * @param ok       是否成功
+     * @param nodeId   落到哪个节点；失败时为 {@code null}
+     * @param machines 本次新增机器数
+     * @param blocks   本次新增方块数
+     * @param message  给玩家看的一句话
+     */
+    public record BindingResult(boolean ok, java.util.UUID nodeId, int machines, int blocks,
+            String message) {
+    }
+
+    /**
      * 按节点 id 删除整个节点；节点终端删除入口。
      *
      * @param factory 工厂
@@ -244,7 +274,7 @@ public final class FactoryService {
      */
     private static BindingService machineToggle(FactoryRuntime runtime) {
         return new BindingService(runtime.manager(), runtime.observations(),
-                machineLibrary(runtime), machineLinks(runtime));
+                machineLibrary(runtime), machineLinks(runtime), runtime.server());
     }
 
     /**

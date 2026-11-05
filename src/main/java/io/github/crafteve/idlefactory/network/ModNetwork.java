@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.network;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.network.payload.FactoryBindingCommitC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryBindingCommitS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
@@ -39,7 +41,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "28";
+    public static final String PROTOCOL_VERSION = "29";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -135,6 +137,12 @@ public final class ModNetwork {
                 FactoryNodeRenameC2S.STREAM_CODEC, FactoryNodeRenameC2S::handle);
         registrar.playToServer(FactoryNodeActionC2S.TYPE,
                 FactoryNodeActionC2S.STREAM_CODEC, FactoryNodeActionC2S::handle);
+
+        // 绑定杖草稿：一次提交 + 结果
+        registrar.playToServer(FactoryBindingCommitC2S.TYPE,
+                FactoryBindingCommitC2S.STREAM_CODEC, FactoryBindingCommitC2S::handle);
+        registrar.playToClient(FactoryBindingCommitS2C.TYPE,
+                FactoryBindingCommitS2C.STREAM_CODEC, FactoryBindingCommitS2C::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }
