@@ -16,7 +16,7 @@ import net.minecraft.world.level.Level;
 /**
  * 仓库里的一个容器方块。
  *
- * <p>id 由「维度 + 坐标」派生，和 {@code MachineRef} 一样是确定性的：同一个方块重复绑定会自然去重。</p>
+ * <p>id 由「维度 + 坐标」派生，和 {@code Machine} 一样是确定性的：同一个方块重复绑定会自然去重。</p>
  *
  * <p>{@code priority} 只在容器组内部比较：高的先填、低的先抽。默认 0。</p>
  *

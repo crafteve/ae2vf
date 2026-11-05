@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.machine;
+package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,20 +17,21 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 
 /**
- * 一台机器的 IO 规则：输入清单和输出清单。
+ * 一个节点的 IO 规则：输入清单和输出清单。
  *
- * <p>规则跟着机器走：删除机器才会丢规则。组本身没有独立 id，机器 id 就是它的身份。</p>
+ * <p>规则归节点，堆叠机器共用一套：规则作用于节点内每台在线机器的每个方块，不绑定具体方块。
+ * 组本身没有独立 id，节点 id 就是它的身份。</p>
  *
  * <p>同一个资源在同一侧只允许一条规则；输入和输出各自独立。</p>
  */
-public final class MachineIoGroup {
+public final class NodeIoGroup {
     /**
-     * 每侧规则上限：输入与输出各自最多多少条。
+     * 每侧规则数硬上限：输入与输出各自最多多少条。
      *
-     * <p>存档解码与写入共用这一个值。它同时是 {@code FactoryTableS2C} 的规则解码上限，
+     * <p>存档解码、网络解码与写入共用这一个值；config 只能把它调低，不能调高。
      * 改这里等于改线协议，必须同步递增 {@code ModNetwork.PROTOCOL_VERSION}。</p>
      */
-    public static final int MAX_RULES_PER_SIDE = 16;
+    public static final int MAX_RULES_PER_SIDE = 64;
 
     private static final String TAG_INPUTS = "Inputs";
     private static final String TAG_OUTPUTS = "Outputs";
@@ -80,7 +81,7 @@ public final class MachineIoGroup {
      *
      * @param source 源机器规则
      */
-    public void copyFrom(MachineIoGroup source) {
+    public void copyFrom(NodeIoGroup source) {
         this.inputs.clear();
         this.inputs.addAll(source.inputs);
         this.outputs.clear();
@@ -214,16 +215,16 @@ public final class MachineIoGroup {
      *
      * @param tag        存档标签
      * @param registries 注册表访问，物品组件解码需要
-     * @param machineId  机器 id，只用于超限告警
+     * @param ownerId    节点 id，只用于超限告警
      * @return IO 规则
      */
-    public static MachineIoGroup load(CompoundTag tag, HolderLookup.Provider registries,
-            UUID machineId) {
-        MachineIoGroup group = new MachineIoGroup();
+    public static NodeIoGroup load(CompoundTag tag, HolderLookup.Provider registries,
+            UUID ownerId) {
+        NodeIoGroup group = new NodeIoGroup();
         readSpecs(tag.getList(TAG_INPUTS, Tag.TAG_COMPOUND), registries, group.inputs,
-                machineId, "输入");
+                ownerId, "输入");
         readSpecs(tag.getList(TAG_OUTPUTS, Tag.TAG_COMPOUND), registries, group.outputs,
-                machineId, "输出");
+                ownerId, "输出");
         return group;
     }
 
@@ -245,11 +246,11 @@ public final class MachineIoGroup {
      * @param list       规则列表
      * @param registries 注册表访问
      * @param target     写入目标
-     * @param machineId  机器 id，只用于超限告警
+     * @param ownerId    节点 id，只用于超限告警
      * @param side       侧名（输入 / 输出），只用于超限告警
      */
     private static void readSpecs(ListTag list, HolderLookup.Provider registries,
-            List<ResourceSpec> target, UUID machineId, String side) {
+            List<ResourceSpec> target, UUID ownerId, String side) {
         int usable = Math.min(list.size(), MAX_RULES_PER_SIDE);
         for (int i = 0; i < usable; i++) {
             ResourceSpec spec = ResourceSpec.load(list.getCompound(i), registries);
@@ -258,8 +259,8 @@ public final class MachineIoGroup {
             }
         }
         if (list.size() > MAX_RULES_PER_SIDE) {
-            IdleFactory.LOGGER.warn("Idle Factory: 机器 {} 的{}规则超过上限 {}，已丢弃 {} 条",
-                    machineId, side, MAX_RULES_PER_SIDE, list.size() - MAX_RULES_PER_SIDE);
+            IdleFactory.LOGGER.warn("Idle Factory: 节点 {} 的{}规则超过上限 {}，已丢弃 {} 条",
+                    ownerId, side, MAX_RULES_PER_SIDE, list.size() - MAX_RULES_PER_SIDE);
         }
     }
 }

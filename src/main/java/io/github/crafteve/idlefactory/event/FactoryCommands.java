@@ -14,9 +14,10 @@ import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.MachineService;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
-import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
+import io.github.crafteve.idlefactory.factory.node.BlockingMode;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -75,7 +76,7 @@ public final class FactoryCommands {
     private static final SuggestionProvider<CommandSourceStack> FACE_SUGGESTIONS = (context, builder) -> {        builder.suggest(ResourceSpec.ANY, Component.literal("不限面，按顺序尝试所有面"));
         Direction[] directions = Direction.values();
         Factory factory = factoryFor(context.getSource());
-        MachineRef machine = machineFrom(context, factory);
+        Machine machine = machineFrom(context, factory);
         if (factory == null || machine == null) {
             for (Direction direction : directions) {
                 builder.suggest(direction.getName());
@@ -84,12 +85,13 @@ public final class FactoryCommands {
         }
 
         MinecraftServer server = context.getSource().getServer();
-        ServerLevel level = server.getLevel(machine.dimension());
-        boolean loaded = level != null && level.isLoaded(machine.pos());
+        BlockKey typeBlock = machine.typeBlock();
+        ServerLevel level = server.getLevel(typeBlock.dimension());
+        boolean loaded = level != null && level.isLoaded(typeBlock.pos());
         List<Direction> available = new ArrayList<>();
         List<Direction> unavailable = new ArrayList<>();
         for (Direction direction : directions) {
-            if (loaded && level.getCapability(Capabilities.ItemHandler.BLOCK, machine.pos(), direction) != null) {
+            if (loaded && level.getCapability(Capabilities.ItemHandler.BLOCK, typeBlock.pos(), direction) != null) {
                 available.add(direction);
             } else {
                 unavailable.add(direction);
@@ -369,9 +371,10 @@ public final class FactoryCommands {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
             if (factory != null) {
-                for (Machine machine : factory.config().machines().all()) {
-                    MachineRef target = machine.ref();
-                    builder.suggest(target.shortId(), machineTooltip(factory, target));
+                for (Node node : factory.config().nodes().all()) {
+                    for (Machine machine : node.machines()) {
+                        builder.suggest(machine.shortId(), machineTooltip(factory, machine));
+                    }
                 }
             }
             return builder.buildFuture();
@@ -387,9 +390,9 @@ public final class FactoryCommands {
     private static SuggestionProvider<CommandSourceStack> configuredItems(boolean input, CapabilityKind kind) {
         return (context, builder) -> {
             Factory factory = factoryFor(context.getSource());
-            MachineRef machine = machineFrom(context, factory);
+            Machine machine = machineFrom(context, factory);
             if (factory != null && machine != null) {
-                factory.config().machines().byId(machine.id()).ifPresent(entry -> {
+                factory.config().nodes().nodeOfMachine(machine.id()).ifPresent(entry -> {
                     var io = entry.io();
                     for (ResourceSpec spec : input ? io.inputs() : io.outputs()) {
                         if (AeKeySupport.kind(spec.key()) == kind) {
@@ -519,7 +522,7 @@ public final class FactoryCommands {
 
     /** 从已解析的命令上下文里读机器参数；读不到返回 {@code null}。 */
     @Nullable
-    private static MachineRef machineFrom(CommandContext<CommandSourceStack> context,
+    private static Machine machineFrom(CommandContext<CommandSourceStack> context,
             @Nullable Factory factory) {
         if (factory == null) {
             return null;
@@ -582,13 +585,13 @@ public final class FactoryCommands {
         return null;
     }
 
-    private static Component machineTooltip(Factory factory, MachineRef target) {
+    private static Component machineTooltip(Factory factory, Machine target) {
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
-        StringBuilder text = new StringBuilder(target.dimension().location().toString())
-                .append(' ').append(target.pos().toShortString());
+        StringBuilder text = new StringBuilder(target.typeBlock().dimension().location().toString())
+                .append(' ').append(target.typeBlock().pos().toShortString());
         if (observations != null) {
-            text.append('\n').append(observations.observe(target.blockKey()).health().describe());
+            text.append('\n').append(observations.observe(target.typeBlock()).health().describe());
         }
         return Component.literal(text.toString());
     }

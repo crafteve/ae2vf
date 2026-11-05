@@ -157,7 +157,7 @@ final class FactoryPassiveIoProbe {
                         .append(':').append(rule.spec().mode()).append(':').append(rule.rate());
             }
             IdleFactory.LOGGER.info("[ui-probe] block[{}] {} status={} missing={} rules={}{}",
-                    i, block.name(), block.status().text(), block.machine().machineMissing(),
+                    i, block.name(), block.status().text(), !block.machine().health().isOnline(),
                     block.rules().size(), rules);
         }
     }

@@ -8,12 +8,14 @@ import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.MachineRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
+
+import java.util.Optional;
 
 import net.minecraft.server.MinecraftServer;
 
@@ -63,8 +65,10 @@ final class FactoryObservationRunner {
     void tick() {
         this.observedKeys.clear();
         for (Factory factory : this.manager.all()) {
-            for (Machine machine : factory.config().machines().all()) {
-                this.observedKeys.add(machine.ref().blockKey());
+            for (Node node : factory.config().nodes().all()) {
+                for (Machine machine : node.machines()) {
+                    this.observedKeys.addAll(machine.blocks());
+                }
             }
             // 仓库容器和机器共用同一张方块级观测
             if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
@@ -91,27 +95,28 @@ final class FactoryObservationRunner {
     private void handleTransition(ObservationService.Transition transition) {
         long now = this.server.overworld().getGameTime();
         for (Factory factory : this.manager.all()) {
-            Machine machine = factory.config().machines()
-                    .byPosition(transition.key().dimension(), transition.key().pos());
-            if (machine == null) {
+            Optional<Node> nodeFound = factory.config().nodes().nodeAt(transition.key());
+            Optional<Machine> machineFound = factory.config().nodes().machineAt(transition.key());
+            if (nodeFound.isEmpty() || machineFound.isEmpty()) {
                 continue;
             }
-            MachineRef ref = machine.ref();
+            Node node = nodeFound.get();
+            Machine machine = machineFound.get();
             switch (transition.to()) {
                 case MISSING, NO_DIMENSION -> {
-                    if (factory.live().markMachineMissing(ref.id())) {
+                    if (factory.live().markMachineMissing(machine.id())) {
                         factory.live().stats().record(DiagEvent.of(now,
-                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, ref.id(),
-                                null, transition.to().describe() + "，机器仍留在机器库"));
+                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, machine.id(),
+                                null, transition.to().describe() + "，机器仍留在节点库"));
                         this.notices.missing(factory.id());
                     }
                 }
                 case PRESENT -> {
-                    boolean wasMissing = factory.live().clearMachineMissing(ref.id());
+                    boolean wasMissing = factory.live().clearMachineMissing(machine.id());
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
-                                DiagEvent.Category.MACH, ref.id(), null, "机器已恢复"));
-                        this.wakeMachine(factory, ref.id());
+                                DiagEvent.Category.MACH, machine.id(), null, "机器已恢复"));
+                        this.wakeMachine(factory, machine.id());
                         if (wasMissing) {
                             this.notices.restored(factory.id());
                         }
@@ -122,7 +127,7 @@ final class FactoryObservationRunner {
                 }
             }
             // 节点跟着观测走：方块不在就下架样板，回来再上架
-            this.nodeManager.setAvailable(machine.id(), transition.to() == Health.PRESENT);
+            this.nodeManager.setAvailable(node.id(), transition.to() == Health.PRESENT);
         }
         this.handleContainerTransition(transition, now);
     }

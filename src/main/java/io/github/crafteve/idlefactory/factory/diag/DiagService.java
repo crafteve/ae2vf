@@ -24,7 +24,9 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
@@ -81,7 +83,7 @@ public final class DiagService {
         }
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        List<Machine> machines = factory.config().machines().all();
+        List<Machine> machines = allMachines(factory);
 
         FactoryMessages.send(player, FactoryMessages.info("── 工厂 " + DiagRender.shortId(factory.id())
                 + " · 仓库" + (factory.live().storageOnline() ? "在线" : "离线")));
@@ -142,10 +144,10 @@ public final class DiagService {
 
         long now = observations.currentTick();
         int shown = 0;
-        for (Machine machine : factory.config().machines().all()) {
-            MachineRef ref = machine.ref();
-            Observation observation = observations.observe(ref.blockKey());
-            boolean missing = factory.live().isMachineMissing(ref.id());
+        for (Machine machine : allMachines(factory)) {
+            BlockKey ref = machine.typeBlock();
+            Observation observation = observations.observe(ref);
+            boolean missing = factory.live().isMachineMissing(machine.id());
             if (observation.health() == Health.PRESENT && !missing) {
                 continue;
             }
@@ -153,7 +155,7 @@ public final class DiagService {
                 FactoryMessages.send(player, FactoryMessages.info("… 还有更多，用 /idf factory info 查看"));
                 break;
             }
-            FactoryMessages.send(player, observationRow(ref, observation, missing, now));
+            FactoryMessages.send(player, observationRow(machine, ref, observation, missing, now));
             shown++;
         }
         if (shown == 0) {
@@ -162,8 +164,8 @@ public final class DiagService {
         return 1;
     }
 
-    private static Component observationRow(MachineRef ref, Observation observation,
-            boolean missing, long now) {
+    private static Component observationRow(Machine machine, BlockKey ref,
+            Observation observation, boolean missing, long now) {
         String where = ref.dimension().location() + " " + ref.pos().toShortString();
         DiagEvent.Level level = switch (observation.health()) {
             case PRESENT -> missing ? DiagEvent.Level.WARN : DiagEvent.Level.OK;
@@ -186,8 +188,21 @@ public final class DiagService {
         return Component.empty()
                 .append(DiagRender.levelTag(level))
                 .append(FactoryMessages.text(" ", FactoryMessages.INFO))
-                .append(FactoryMessages.hover(ref.shortId(), where))
+                .append(FactoryMessages.hover(machine.shortId(), where))
                 .append(FactoryMessages.text(" " + where + " · " + tail, FactoryMessages.INFO));
+    }
+
+    private static NodeIoGroup nodeIo(Factory factory, Machine machine) {
+        return factory.config().nodes().nodeOfMachine(machine.id())
+                .map(io -> io.io()).orElse(new NodeIoGroup());
+    }
+
+    private static List<Machine> allMachines(Factory factory) {
+        List<Machine> machines = new ArrayList<>();
+        for (Node node : factory.config().nodes().all()) {
+            machines.addAll(node.machines());
+        }
+        return machines;
     }
 
     private static Component statusRow(Factory factory, Machine machine, long now,
@@ -198,18 +213,19 @@ public final class DiagService {
         if (machineStats != null) {
             rate = machineStats.lastMoveTick() > 0L ? 1L : 0L;
         }
-        MachineRef ref = machine.ref();
+        BlockKey ref = machine.typeBlock();
+        NodeIoGroup io = nodeIo(factory, machine);
         String where = ref.dimension().location() + " " + ref.pos().toShortString();
         MutableComponent row = Component.empty()
-                .append(DiagRender.levelTag(machine.io().isEmpty()
+                .append(DiagRender.levelTag(io.isEmpty()
                         ? DiagEvent.Level.IDLE : DiagEvent.Level.OK))
                 .append(FactoryMessages.text(" ", FactoryMessages.INFO))
-                .append(FactoryMessages.hover(ref.shortId(), where))
+                .append(FactoryMessages.hover(machine.shortId(), where))
                 .append(FactoryMessages.text(" " + where + " · ", FactoryMessages.INFO))
-                .append(FactoryMessages.text(machine.io().inputs().size() + " 入 / "
-                        + machine.io().outputs().size() + " 出 · "
+                .append(FactoryMessages.text(io.inputs().size() + " 入 / "
+                        + io.outputs().size() + " 出 · "
                         + stats.totalRate() + "/s", FactoryMessages.INFO));
-        long sleepUntil = runtime.machineRunner().sleepUntil(ref.id());
+        long sleepUntil = runtime.machineRunner().sleepUntil(machine.id());
         if (sleepUntil > now) {
             row.append(FactoryMessages.text(" · 睡眠 " + seconds(sleepUntil - now) + "s",
                     FactoryMessages.DIM));
@@ -229,13 +245,13 @@ public final class DiagService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = FactoryRefs.machine(factory, machineRef);
+        Optional<Machine> target = FactoryRefs.machine(factory, machineRef);
         if (target.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
             FactoryMessages.send(player, FactoryMessages.info("用 /idf machine 查看机器库"));
             return 0;
         }
-        MachineRef machine = target.get();
+        Machine machine = target.get();
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
         long sleepUntil = runtime.machineRunner().sleepUntil(machine.id());
@@ -244,9 +260,10 @@ public final class DiagService {
         MutableComponent header = Component.empty()
                 .append(FactoryMessages.text("── ", FactoryMessages.DIM))
                 .append(FactoryMessages.hover(machine.shortId(),
-                        machine.dimension().location() + " " + machine.pos().toShortString()))
-                .append(FactoryMessages.text(" " + machine.dimension().location() + " "
-                        + machine.pos().toShortString(), FactoryMessages.INFO))
+                        machine.typeBlock().dimension().location() + " "
+                                + machine.typeBlock().pos().toShortString()))
+                .append(FactoryMessages.text(" " + machine.typeBlock().dimension().location() + " "
+                        + machine.typeBlock().pos().toShortString(), FactoryMessages.INFO))
                 .append(FactoryMessages.text(sleepUntil > now
                         ? " · 睡眠剩余 " + seconds(sleepUntil - now) + "s"
                         : " · 清醒", FactoryMessages.DIM));
@@ -363,13 +380,13 @@ public final class DiagService {
         if (factory == null) {
             return 0;
         }
-        Optional<MachineRef> target = FactoryRefs.machine(factory, machineRef);
+        Optional<Machine> target = FactoryRefs.machine(factory, machineRef);
         if (target.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + machineRef));
             FactoryMessages.send(player, FactoryMessages.info("用 /idf machine 查看机器库"));
             return 0;
         }
-        MachineRef machine = target.get();
+        Machine machine = target.get();
         Watch existing = WATCHES.get(player.getUUID());
         if (existing != null && existing.machineId.equals(machine.id())) {
             WATCHES.remove(player.getUUID());
@@ -524,7 +541,7 @@ public final class DiagService {
                 iterator.remove();
                 continue;
             }
-            Optional<MachineRef> machine = FactoryRefs.machine(factory.get(),
+            Optional<Machine> machine = FactoryRefs.machine(factory.get(),
                     DiagRender.shortId(watch.machineId));
             if (machine.isEmpty()) {
                 iterator.remove();

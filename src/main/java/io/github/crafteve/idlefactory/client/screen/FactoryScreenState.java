@@ -12,7 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
@@ -133,7 +133,7 @@ final class FactoryScreenState {
         this.machines = payload.machines();
         Set<UUID> currentIds = new HashSet<>();
         for (FactorySnapshotBuilder.MachineView machine : this.machines) {
-            currentIds.add(machine.ref().id());
+            currentIds.add(machine.machineId());
         }
         this.expandedStacks.retainAll(currentIds);
         if (this.expandedLibraryAnchor != null

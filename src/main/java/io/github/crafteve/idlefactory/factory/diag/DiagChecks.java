@@ -11,8 +11,9 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -78,8 +79,10 @@ public final class DiagChecks {
         boolean online = factory.live().storageOnline();
         FactoryRuntime runtime = FactoryRuntime.get();
         ObservationService observations = runtime == null ? null : runtime.observations();
-        for (Machine entry : factory.config().machines().all()) {
-            result.add(checkGroup(server, storage, online, entry.ref(), entry.io(), observations));
+        for (Node node : factory.config().nodes().all()) {
+            for (Machine entry : node.machines()) {
+                result.add(checkGroup(server, storage, online, entry, node.io(), observations));
+            }
         }
         return result;
     }
@@ -93,32 +96,38 @@ public final class DiagChecks {
      * @return 结果；机器不在机器库时为一条 ERROR
      */
     public static GroupCheck check(MinecraftServer server, Factory factory, UUID machineId) {
-        Optional<Machine> target = factory.config().machines().byId(machineId);
+        Optional<Node> nodeFound = factory.config().nodes().nodeOfMachine(machineId);
+        if (nodeFound.isEmpty()) {
+            return simple(machineId, DiagEvent.Level.ERROR, "机器已不在节点库");
+        }
+        Node node = nodeFound.get();
+        Optional<Machine> target = node.machineOf(machineId);
         if (target.isEmpty()) {
-            return simple(machineId, DiagEvent.Level.ERROR, "机器已不在机器库");
+            return simple(machineId, DiagEvent.Level.ERROR, "机器已不在节点库");
         }
         Machine entry = target.get();
         FactoryRuntime runtime = FactoryRuntime.get();
         return checkGroup(server, factory.live().storage(), factory.live().storageOnline(),
-                entry.ref(), entry.io(), runtime == null ? null : runtime.observations());
+                entry, node.io(), runtime == null ? null : runtime.observations());
     }
 
     private static GroupCheck checkGroup(MinecraftServer server, MEStorage storage, boolean online,
-            MachineRef machine, MachineIoGroup group, @Nullable ObservationService observations) {
-        ServerLevel level = server.getLevel(machine.dimension());
+            Machine machine, NodeIoGroup group, @Nullable ObservationService observations) {
+        BlockKey target = machine.typeBlock();
+        ServerLevel level = server.getLevel(target.dimension());
         if (level == null) {
             return simple(machine.id(), DiagEvent.Level.ERROR, "维度不存在");
         }
         if (observations != null) {
             // why 是现场体检：先刷新这一台，再看结论
-            Observation observation = observations.refresh(machine.blockKey());
+            Observation observation = observations.refresh(target);
             if (observation.health() == Health.UNLOADED) {
                 return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
             }
             if (observation.health() != Health.PRESENT) {
                 return simple(machine.id(), DiagEvent.Level.ERROR, observation.health().describe());
             }
-        } else if (!level.isLoaded(machine.pos())) {
+        } else if (!level.isLoaded(target.pos())) {
             return simple(machine.id(), DiagEvent.Level.WARN, "区块未加载");
         }
 
@@ -132,11 +141,11 @@ public final class DiagChecks {
         }
 
         for (ResourceSpec spec : group.inputs()) {
-            DiagEvent.Level level2 = checkInput(level, storage, online, machine, spec, problems);
+            DiagEvent.Level level2 = checkInput(level, storage, online, target.pos(), spec, problems);
             worst = worse(worst, level2);
         }
         for (ResourceSpec spec : group.outputs()) {
-            CheckResult check = checkOutput(level, storage, online, machine, spec, problems);
+            CheckResult check = checkOutput(level, storage, online, target.pos(), spec, problems);
             worst = worse(worst, check.level());
             outputIdle |= check.idle();
         }
@@ -158,20 +167,20 @@ public final class DiagChecks {
     }
 
     private static DiagEvent.Level checkInput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         return switch (AeKeySupport.kind(spec.key())) {
-            case ITEM -> checkItemInput(level, storage, online, machine, spec, problems);
-            case FLUID -> checkFluidInput(level, storage, online, machine, spec, problems);
-            case ENERGY -> checkEnergyInput(level, storage, online, machine, spec, problems);
+            case ITEM -> checkItemInput(level, storage, online, pos, spec, problems);
+            case FLUID -> checkFluidInput(level, storage, online, pos, spec, problems);
+            case ENERGY -> checkEnergyInput(level, storage, online, pos, spec, problems);
         };
     }
 
     private static CheckResult checkOutput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         return switch (AeKeySupport.kind(spec.key())) {
-            case ITEM -> checkItemOutput(level, storage, online, machine, spec, problems);
-            case FLUID -> checkFluidOutput(level, storage, online, machine, spec, problems);
-            case ENERGY -> checkEnergyOutput(level, storage, online, machine, spec, problems);
+            case ITEM -> checkItemOutput(level, storage, online, pos, spec, problems);
+            case FLUID -> checkFluidOutput(level, storage, online, pos, spec, problems);
+            case ENERGY -> checkEnergyOutput(level, storage, online, pos, spec, problems);
         };
     }
 
@@ -180,13 +189,13 @@ public final class DiagChecks {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkItemInput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
             problems.add("物品 id 无法解析：" + spec.key().getId());
             return DiagEvent.Level.ERROR;
         }
-        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, machine.pos(), spec.face());
+        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有物品能力");
             return DiagEvent.Level.ERROR;
@@ -210,13 +219,13 @@ public final class DiagChecks {
     }
 
     private static CheckResult checkItemOutput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         ItemStack preview = itemSample(spec.key());
         if (preview.isEmpty()) {
             problems.add("物品 id 无法解析：" + spec.key().getId());
             return new CheckResult(DiagEvent.Level.ERROR, false);
         }
-        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, machine.pos(), spec.face());
+        IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有物品能力");
             return new CheckResult(DiagEvent.Level.ERROR, false);
@@ -236,13 +245,13 @@ public final class DiagChecks {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkFluidInput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
             problems.add("流体 id 无法解析：" + spec.key().getId());
             return DiagEvent.Level.ERROR;
         }
-        IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, machine.pos(), spec.face());
+        IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有流体能力");
             return DiagEvent.Level.ERROR;
@@ -265,13 +274,13 @@ public final class DiagChecks {
     }
 
     private static CheckResult checkFluidOutput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
             problems.add("流体 id 无法解析：" + spec.key().getId());
             return new CheckResult(DiagEvent.Level.ERROR, false);
         }
-        IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, machine.pos(), spec.face());
+        IFluidHandler handler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有流体能力");
             return new CheckResult(DiagEvent.Level.ERROR, false);
@@ -291,8 +300,8 @@ public final class DiagChecks {
     // ------------------------------------------------------------------
 
     private static DiagEvent.Level checkEnergyInput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
-        IEnergyStorage handler = energyReceiver(level, machine.pos(), spec.face());
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
+        IEnergyStorage handler = energyReceiver(level, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有能量能力");
             return DiagEvent.Level.ERROR;
@@ -337,8 +346,8 @@ public final class DiagChecks {
     }
 
     private static CheckResult checkEnergyOutput(ServerLevel level, MEStorage storage, boolean online,
-            MachineRef machine, ResourceSpec spec, List<String> problems) {
-        IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, machine.pos(), spec.face());
+            BlockPos pos, ResourceSpec spec, List<String> problems) {
+        IEnergyStorage handler = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, spec.face());
         if (handler == null) {
             problems.add(faceLabel(spec) + "没有能量能力");
             return new CheckResult(DiagEvent.Level.ERROR, false);

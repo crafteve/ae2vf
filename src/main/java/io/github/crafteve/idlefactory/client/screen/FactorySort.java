@@ -196,10 +196,10 @@ public final class FactorySort {
                     String.CASE_INSENSITIVE_ORDER);
             case POSITION -> Comparator
                     .comparing((MachineView machine) ->
-                            machine.ref().dimension().location().toString())
-                    .thenComparingInt(machine -> machine.ref().pos().getX())
-                    .thenComparingInt(machine -> machine.ref().pos().getY())
-                    .thenComparingInt(machine -> machine.ref().pos().getZ());
+                            machine.dimension().location().toString())
+                    .thenComparingInt(machine -> machine.pos().getX())
+                    .thenComparingInt(machine -> machine.pos().getY())
+                    .thenComparingInt(machine -> machine.pos().getZ());
             case STATUS -> Comparator.comparingInt(machine -> stateRank(machine.totalState()));
             case LINE -> Comparator
                     .comparing((MachineView machine) -> machine.groupBlockId() == null)
@@ -211,7 +211,7 @@ public final class FactorySort {
                     ? Long.MAX_VALUE : machine.sinceMoveTicks());
         };
         Comparator<MachineView> tie =
-                Comparator.comparing(machine -> machine.ref().id().toString());
+                Comparator.comparing(machine -> machine.machineId().toString());
         List<MachineView> sorted = new ArrayList<>(views);
         sorted.sort(descending ? primary.reversed().thenComparing(tie) : primary.thenComparing(tie));
         return List.copyOf(sorted);

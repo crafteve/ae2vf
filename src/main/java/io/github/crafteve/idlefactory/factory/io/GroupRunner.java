@@ -8,7 +8,7 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
@@ -123,7 +123,7 @@ public final class GroupRunner {
      * @param now        当前服务端 tick，给变体索引算 TTL 与规则轮转
      * @return 本轮结果
      */
-    public static GroupRun run(MEStorage storage, ServerLevel level, BlockPos pos, MachineIoGroup group,
+    public static GroupRun run(MEStorage storage, ServerLevel level, BlockPos pos, NodeIoGroup group,
             @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation,
             @Nullable ItemVariantIndex variants, long now) {
         long fed = 0L;

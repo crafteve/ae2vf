@@ -582,7 +582,7 @@
 
 ## ADR-032 规则跟机器走，失联只标记，显式删除
 
-**状态**：已决定（2026-10-29）
+**状态**：已废弃（superseded by ADR-034 / ADR-035，2026-11-05）
 
 **决定**：
 
@@ -649,3 +649,60 @@
 - ADR-018（命令树以产线为主语）作废，指令改为 `/idf machine <id> input|output ...`。
 - ADR-020（仓库按资源类型建模）作废，`ResourceKey(kind, id)` 不再存在。
 - 后续若要让 FE 进 AE，直接复用 Applied Flux 的 key，不再自建 `AEKeyType`。
+
+---
+
+## ADR-034 节点 → 机器 → 方块三层数据模型
+
+**状态**：已决定（2026-11-05）
+
+**决定**：
+
+1. 数据模型固定为三层：`Node` → `Machine` → `BlockKey`。节点 id、机器 id 都是随机 UUID；`BlockKey` 只表示「维度 + 坐标」，不派生任何 id。
+2. 节点与机器都不存维度；维度挂在方块上。节点内机器可以跨维度，同一台机器内部方块也可以跨维度。任何方块不可用 → 整台机器 OFFLINE。
+3. 节点类型只认**主方块**：每台机器的 `blocks.get(0)` 是类型 / 展示方块，`Machine.typeBlock()` 固定返回它；单方块机器是退化情况，不单开分支。部件不参与类型判定。
+4. 节点内所有机器的 `blocks.get(0)` 类型 id 必须等于 `Node.typeBlockId`；唯一例外是「全离线自动迁移」（见 ADR-035）。
+5. `Node` 是浅不可变聚合：字段全部 final，结构变更返回新实例并让 `topologyRevision` 加一；`NodeIoGroup` / `NodeProvider` 是可变的，由新旧节点共享，加机器不复制规则与样板。
+6. `NodeLibrary` 维护 `byId`、`machineToNode`、`blockToOwner` 三张 O(1) 索引；写 API 只有 `add` / `replace` / `remove`，全部「先全量校验、再一次性写索引」，失败不改索引并返回结果枚举。
+7. 存档只写 `Nodes[]`；`NextSeq` 仍留在存档根级，不属于任何工厂记录。不写旧档迁移。
+8. 健康只有两套枚举：`MachineHealth{OFFLINE, ONLINE}` 与 `NodeHealth{OFFLINE, PARTIAL, ONLINE}`；方块级 `Health` 只用于诊断与 tooltip。「未探测」与「健康过期」是独立布尔，不塞进健康枚举。
+
+**理由**：
+
+- 「1 机器 = 1 节点 = 1 方块」无法表达堆叠与多方块；把节点单独建模后，规则与样板天然按节点共享。
+- 随机 id 让加 / 删方块不再改变机器身份，避免坐标派生 id 在多方块场景下反复漂移。
+- 三张索引把「按机器找节点」「按方块找归属」做成 O(1)，绑定提交与 IO 门禁都靠它。
+- 浅不可变让结构变更可原子替换，同时保留规则 / 样板的可变宿主，不复制大数据。
+
+**后果**：
+
+- `AGENTS.md` 1.2 / 2.2 / 3.1 中「机器库、每台机器带自己的 IO 规则」等表述已被本 ADR 取代；在 AGENTS 修订获批前以 ADR 为准。
+- 旧存档不兼容：旧世界加载为空是预期，测试世界重建。
+- 协议在 P1b 升到 27（视图带 nodeId / 健康 / probed / stale / 成员每块维度），P6 升到 28，P7 升到 29。
+
+---
+
+## ADR-035 规则 / provider 归节点，健康与类型迁移
+
+**状态**：已决定（2026-11-05）
+
+**决定**：
+
+1. IO 规则归节点（`NodeIoGroup`）：规则作用于节点内每台在线机器的每个方块，堆叠机器共用一套；节点 PARTIAL 时只跑 ONLINE 的机器。
+2. provider 归节点（`NodeProvider`）：一个节点一个 `PatternContainer`；阻挡、倍率、派单、样板、余量都是节点级配置。一次 `pushPattern` 只选一台 ONLINE 机器，整份货给它，收不下的进余量队列；余量条目绑定原机器 id，原机器没了退回 ME 网络，`MAX_PENDING = 64` 是硬顶。
+3. 机器健康：所有方块 PRESENT 才算 ONLINE；任一方块不可用即 OFFLINE。节点健康按机器聚合：全部在线 ONLINE、部分在线 PARTIAL、全部离线 OFFLINE。未探测按 OFFLINE 处理，用 `probed=false` 单独表达。
+4. 健康过期：方块 `probed && now - lastProbeTick > staleHealthTicks` 才算 stale；从未探测过时 `stale=false`，不能把 `lastProbeTick` 的 `-1` 哨兵算成过期。机器任一方块 stale 即 stale，节点任一机器 stale 即 stale。
+5. 全离线自动迁移：只有节点所有机器都 OFFLINE、所有 `blocks.get(0)` 都 PRESENT、blockId 非空且是同一个新 id、且与当前 `typeBlockId` 不同时才迁移；陈旧快照（stale）不参与迁移。部分换、类型不一致、方块是空气 → 不迁移。
+6. 派生值不存第二份：健康每次由「节点拓扑 + 方块观测快照」计算；`FactoryObservationRunner` 是 `withTypeBlockId` 的唯一写入点，`NodeHealthResolver` / `NodeTypeResolver` 是纯函数。
+
+**理由**：
+
+- 规则跟着机器走会让堆叠机器各配一套，玩家改一次要改 N 次；归节点后一次编辑全体生效。
+- provider 归节点才能保证「一份货只给一台机器」，避免 AE2 侧看到 N 个供应器重复广告。
+- 健康过期独立于「未探测」，可以区分「还没看过」与「看过但太旧」，避免拿过期健康做搬运判断。
+
+**后果**：
+
+- `FactoryLive.machineMissing` / 离线集合在 P2 由 `NodeHealthResolver` 派生取代；事件流只保留节点级与机器级 id。
+- IO 睡眠按机器 id，路由按 `BlockKey`；读路径只读观测缓存。
+- 文件改名在 P1c 完成：`MachineNode → NodeRuntime`、`MachineCraftService → NodeCraftService`、`MachinePatternInventory → NodePatternInventory`、`MachineTerminalGroup → NodeTerminalGroup`。

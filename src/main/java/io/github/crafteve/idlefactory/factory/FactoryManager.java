@@ -11,8 +11,8 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 
 /**
  * 工厂档案柜：内存里的索引。
@@ -27,11 +27,11 @@ public final class FactoryManager {
     /**
      * 从存档记录重建工厂。启动时调一次。
      *
-     * <p>P1 删除产线后只剩机器：把记录里的机器逐台灌进机器库即可。</p>
+     * <p>把记录里的节点逐个灌进节点库即可；节点自带机器与规则。</p>
      *
-     * <p>机器库拒绝登记（同 id 重复或超过 {@link MachineLibrary#MAX_MACHINES}）时保留先登记的
-     * 那条并打 warn：静默丢弃会让下一次 {@code markDirty → save} 永久抹掉这些机器，必须留下
-     * 可排查的痕迹。工厂记录本身因 id 或 owner 冲突被拒同样只记日志，保持「先登记的优先」。</p>
+     * <p>节点库拒绝登记（id / 机器 / 方块冲突或超过硬上限）时保留先登记的那条并打 warn：
+     * 静默丢弃会让下一次 {@code markDirty → save} 永久抹掉这些节点，必须留下可排查的痕迹。
+     * 工厂记录本身因 id 或 owner 冲突被拒同样只记日志，保持「先登记的优先」。</p>
      *
      * @param records 存档里的工厂记录
      */
@@ -42,12 +42,12 @@ public final class FactoryManager {
             FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
                     record.anchor());
             Factory factory = new Factory(record.id(), config);
-            for (Machine machine : record.machines()) {
-                MachineLibrary.AddResult added = factory.restoreMachine(machine);
-                if (added != MachineLibrary.AddResult.ADDED) {
+            for (Node node : record.nodes()) {
+                NodeLibrary.Result added = factory.restoreNode(node);
+                if (added != NodeLibrary.Result.ADDED) {
                     IdleFactory.LOGGER.warn(
-                            "Idle Factory: 载入工厂 {} 时机器 {} 未登记（{}），保留先登记的那台",
-                            record.id(), machine.ref().shortId(), addResultText(added));
+                            "Idle Factory: 载入工厂 {} 时节点 {} 未登记（{}），保留先登记的那个",
+                            record.id(), shortId(node), addResultText(added));
                 }
             }
             if (!add(factory)) {
@@ -59,17 +59,31 @@ public final class FactoryManager {
     }
 
     /**
-     * 机器未登记原因的中文文案，只用于日志。
+     * 节点未登记原因的中文文案，只用于日志。
      *
-     * @param result 机器库的加入结果
-     * @return 如「机器库已满」
+     * @param result 节点库的写入结果
+     * @return 如「节点库已满」
      */
-    private static String addResultText(MachineLibrary.AddResult result) {
+    private static String addResultText(NodeLibrary.Result result) {
         return switch (result) {
             case ADDED -> "已加入";
+            case REPLACED -> "已替换";
+            case REMOVED -> "已移除";
             case DUPLICATE -> "id 重复";
-            case FULL -> "机器库已满";
+            case CONFLICT -> "方块已被占用";
+            case FULL -> "节点库已满";
+            case NOT_FOUND -> "找不到节点";
         };
+    }
+
+    /**
+     * 取 id 的前 8 位，只用于日志。
+     *
+     * @param node 节点
+     * @return 短 id
+     */
+    private static String shortId(Node node) {
+        return node.id().toString().substring(0, 8);
     }
 
     /**
@@ -81,7 +95,7 @@ public final class FactoryManager {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
                         factory.config().storageAnchor(), factory.config().storageMode(),
-                        factory.config().machines().all()))
+                        factory.config().nodes().all()))
                 .toList();
     }
 

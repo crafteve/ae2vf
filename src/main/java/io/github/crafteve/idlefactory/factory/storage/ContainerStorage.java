@@ -15,7 +15,6 @@ import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -38,7 +37,6 @@ import appeng.api.config.Actionable;
 import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
-import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;

@@ -1,55 +1,57 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * 绑定杖的机器整组开关：左键一次连/断一整片同 id 机器。
+ * 绑定服务：把方块接入 / 移出工厂。
  *
- * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连，就补齐/取回整组。
- * 这样 Ctrl 连点两次不会出现一半连、一半断。</p>
+ * <p>P1b 只实现 {@code SINGLE} 语义——一次接入一个方块、生成「1 节点 1 机器 1 方块」，
+ * 保证数据切换后仍有入口；P7 再扩成绑定杖草稿的全量校验与原子提交。</p>
+ *
+ * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连，就补齐整组。
+ * 这样连点两次不会出现一半连、一半断。</p>
  *
  * <p>本类不持有运行时单例：档案柜、发布回调、观测服务与删除出口都从构造注入。</p>
  */
-final class MachineToggleService {
+final class BindingService {
     private final FactoryManager manager;
     @Nullable
     private final ObservationService observations;
-    private final MachineLibraryService machineLibrary;
+    private final NodeLibraryService nodeLibrary;
     private final MachineLinkService machineLinks;
 
     /**
      * @param manager       工厂档案柜
      * @param observations  观测服务；服务端未就绪时为 {@code null}
-     * @param machineLibrary 机器库写入口（整组修改只落盘一次）
+     * @param nodeLibrary   节点库写入口（整组修改只落盘一次）
      * @param machineLinks  机器接线服务，提供删除出口
      */
-    MachineToggleService(FactoryManager manager, @Nullable ObservationService observations,
-            MachineLibraryService machineLibrary, MachineLinkService machineLinks) {
+    BindingService(FactoryManager manager, @Nullable ObservationService observations,
+            NodeLibraryService nodeLibrary, MachineLinkService machineLinks) {
         this.manager = manager;
         this.observations = observations;
-        this.machineLibrary = machineLibrary;
+        this.nodeLibrary = nodeLibrary;
         this.machineLinks = machineLinks;
     }
 
     /**
      * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
-     *
-     * <p>整组 toggle 的判定是「所有目标都已连接」才断开；只要有一台没连，
-     * 就补齐/取回整组。这样 Ctrl 连点两次不会出现一半连、一半断。</p>
      *
      * @param player 发起请求的玩家
      * @param pos    目标机器
@@ -73,7 +75,6 @@ final class MachineToggleService {
             return 0;
         }
         // 本次操作现算一张占用表：先扫一遍档案，之后每个目标 O(1) 查表。
-        // 释放只允许「自己的 + 同角色」；别的工厂、自己另一个角色都拒绝。
         LinkGate gate = LinkGate.of(this.manager);
         LinkGate.ClaimCheck origin =
                 gate.check(BlockKey.of(level.dimension(), pos), factory.id(), LinkRole.MACHINE);
@@ -102,7 +103,8 @@ final class MachineToggleService {
         }
         boolean allConnected = true;
         for (BlockPos targetPos : targets) {
-            if (factory.config().machines().byPosition(level.dimension(), targetPos) == null) {
+            if (factory.config().nodes().machineAt(BlockKey.of(level.dimension(), targetPos))
+                    .isEmpty()) {
                 allConnected = false;
                 break;
             }
@@ -120,21 +122,22 @@ final class MachineToggleService {
         int added = 0;
         int skipped = 0;
         int full = 0;
-        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
+        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
         for (BlockPos targetPos : targets) {
-            Machine existing = factory.config().machines().byPosition(level.dimension(), targetPos);
-            if (existing != null) {
+            BlockKey block = BlockKey.of(level.dimension(), targetPos);
+            if (factory.config().nodes().machineAt(block).isPresent()) {
                 skipped++;
                 continue;
             }
-            MachineRef target = MachineRef.of(level.dimension(), targetPos);
-            switch (batch.add(target)) {
+            Node node = Node.of(null, blockId(level, targetPos), block);
+            switch (batch.add(node)) {
                 case ADDED -> {
-                    refreshObservation(target);
+                    refreshObservation(block);
                     added++;
                 }
-                case DUPLICATE -> skipped++;
+                case DUPLICATE, CONFLICT -> skipped++;
                 case FULL -> full++;
+                default -> skipped++;
             }
         }
         batch.close();
@@ -143,7 +146,8 @@ final class MachineToggleService {
             if (added > 0) {
                 FactoryMessages.barOk(player, "已连接机器 " + label);
             } else if (full > 0) {
-                FactoryMessages.barErr(player, "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台）");
+                FactoryMessages.barErr(player, "节点库已满（上限 "
+                        + FactoryLimitsConfig.maxNodes() + " 个节点）");
             } else {
                 FactoryMessages.barErr(player, "该机器已被连接 " + label);
             }
@@ -151,7 +155,7 @@ final class MachineToggleService {
         }
         if (added == 0) {
             FactoryMessages.barErr(player, full > 0
-                    ? "机器库已满（上限 " + MachineLibrary.MAX_MACHINES + " 台），未新增机器"
+                    ? "节点库已满（上限 " + FactoryLimitsConfig.maxNodes() + " 个节点），未新增节点"
                     : "没有新增机器（都已连接）");
             return 0;
         }
@@ -160,7 +164,7 @@ final class MachineToggleService {
             text += "，跳过 " + skipped + " 台";
         }
         if (full > 0) {
-            text += "，机器库已满跳过 " + full + " 台";
+            text += "，节点库已满跳过 " + full + " 台";
         }
         if (blockedOther > 0) {
             text += "，被别家占用 " + blockedOther + " 台";
@@ -179,15 +183,24 @@ final class MachineToggleService {
         int skippedRules = 0;
         int skipped = 0;
         int returned = 0;
-        MachineLibraryService.Batch batch = this.machineLibrary.begin(factory);
+        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
         for (BlockPos targetPos : targets) {
-            Machine machine = factory.config().machines().byPosition(level.dimension(), targetPos);
-            if (machine == null) {
+            BlockKey block = BlockKey.of(level.dimension(), targetPos);
+            Optional<Machine> machineFound = factory.config().nodes().machineAt(block);
+            if (machineFound.isEmpty()) {
                 skipped++;
                 continue;
             }
+            Machine machine = machineFound.get();
+            Optional<Node> nodeFound = factory.config().nodes().nodeOfMachine(machine.id());
+            if (nodeFound.isEmpty()) {
+                skipped++;
+                continue;
+            }
+            Node node = nodeFound.get();
             MachineLinkService.DeleteOutcome outcome = this.machineLinks.removeMachine(
-                    factory, machine, MachineLinkService.DeletePolicy.SKIP_WITH_RULES, player, batch);
+                    factory, node, machine, MachineLinkService.DeletePolicy.SKIP_WITH_RULES, player,
+                    batch);
             if (!outcome.deleted()) {
                 // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
                 skippedRules++;
@@ -250,13 +263,24 @@ final class MachineToggleService {
     }
 
     /**
-     * 立刻刷新一台机器的观测（接入之后调，别让界面看到 UNKNOWN）。
+     * 读方块 id；读不到时用空气占位，节点仍会建出来但类型判定会失败。
      *
-     * @param target 机器
+     * @param level 方块所在维度
+     * @param pos   方块坐标
+     * @return 方块 id
+     */
+    private static net.minecraft.resources.ResourceLocation blockId(ServerLevel level, BlockPos pos) {
+        return BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock());
+    }
+
+    /**
+     * 立刻刷新一个方块的观测（接入之后调，别让界面看到 UNKNOWN）。
+     *
+     * @param block 方块
      * @return 刷新后的观测；观测服务未就绪时为 {@code null}
      */
     @Nullable
-    private Observation refreshObservation(MachineRef target) {
-        return this.observations == null ? null : this.observations.refresh(target.blockKey());
+    private Observation refreshObservation(BlockKey block) {
+        return this.observations == null ? null : this.observations.refresh(block);
     }
 }

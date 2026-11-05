@@ -152,18 +152,18 @@ final class FactoryNodeModel {
      * @return 显示名
      */
     static String displayName(FactoryNodeSnapshotBuilder.NodeView view) {
-        return view.name() != null ? view.name() : FactoryLabels.blockName(view.blockId());
+        return view.name() != null ? view.name() : FactoryLabels.blockName(view.typeBlockId());
     }
 
     private static FactorySearchQuery.Fields fields(FactoryNodeSnapshotBuilder.NodeView view,
             String name, FactoryStatus status) {
-        String id = view.blockId() == null ? "" : view.blockId().toString();
-        String namespace = view.blockId() == null ? "" : view.blockId().getNamespace();
+        String id = view.typeBlockId().toString();
+        String namespace = view.typeBlockId().getNamespace();
         StringBuilder tooltip = new StringBuilder(status.text());
         FactoryNodeSnapshotBuilder.MemberView first =
                 view.members().isEmpty() ? null : view.members().get(0);
         if (first != null) {
-            tooltip.append('\n').append(first.dimension()).append(' ')
+            tooltip.append('\n').append(first.dimensionId()).append(' ')
                     .append(first.primaryPos() == null ? "" : first.primaryPos().toShortString());
         }
         tooltip.append("\n机器 ").append(view.machineCount()).append(" 台 · 方块 ")

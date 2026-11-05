@@ -6,7 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
+import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 
 import appeng.api.config.Actionable;
 import appeng.api.stacks.AEKey;
@@ -47,7 +47,7 @@ final class ProviderOverflow {
         if (amount <= 0L) {
             return;
         }
-        MachineProvider provider = node.machine().provider();
+        NodeProvider provider = node.node().provider();
         if (provider.addPending(new GenericStack(key, amount), face)) {
             node.markDataChanged();
             return;
@@ -59,7 +59,7 @@ final class ProviderOverflow {
                 + key.getDisplayName().getString() + (dropped ? "" : "，其余无处可放"));
         if (!dropped) {
             IdleFactory.LOGGER.warn("Idle Factory: 机器 [{}] 有余量无处可放：{} x{}",
-                    node.machine().ref().shortId(), key.getId(), left);
+                    node.node().id(), key.getId(), left);
         }
     }
 
@@ -74,18 +74,18 @@ final class ProviderOverflow {
      * @return 是否改动了要落盘的数据
      */
     static boolean flush(MachineNode node) {
-        MachineProvider provider = node.machine().provider();
+        NodeProvider provider = node.node().provider();
         if (provider.pendingCount() == 0) {
             return false;
         }
         ProviderFaceResolver.Faces faces = node.faces();
-        List<MachineProvider.Pending> entries = provider.pending();
+        List<NodeProvider.Pending> entries = provider.pending();
         // 与 pending 等长的镜像：谁被送走多少就扣多少，异常时它就是真实的剩余量。
-        List<MachineProvider.Pending> mirror = new ArrayList<>(entries);
+        List<NodeProvider.Pending> mirror = new ArrayList<>(entries);
         boolean insertedAny = false;
         try {
             for (int i = 0; i < entries.size(); i++) {
-                MachineProvider.Pending entry = entries.get(i);
+                NodeProvider.Pending entry = entries.get(i);
                 AEKey key = entry.stack().what();
                 long left = entry.stack().amount();
                 Direction face = entry.face();
@@ -95,7 +95,7 @@ final class ProviderOverflow {
                     // 先扣量再走下一步：第二次 insert 抛异常时，这一笔不能留在 pending 里重送。
                     if (inserted > 0L) {
                         left -= inserted;
-                        mirror.set(i, new MachineProvider.Pending(new GenericStack(key, left), face));
+                        mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left), face));
                     }
                     insertedAny |= inserted > 0L;
                 }
@@ -109,7 +109,7 @@ final class ProviderOverflow {
                         if (more > 0L) {
                             left -= more;
                         }
-                        mirror.set(i, new MachineProvider.Pending(new GenericStack(key, left), face));
+                        mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left), face));
                         insertedAny |= more > 0L;
                     }
                 }
@@ -136,14 +136,14 @@ final class ProviderOverflow {
      */
     static void drain(MachineNode node) {
         flush(node);
-        MachineProvider provider = node.machine().provider();
+        NodeProvider provider = node.node().provider();
         if (provider.pendingCount() == 0) {
             return;
         }
         MEStorage network = node.networkStorage();
-        List<MachineProvider.Pending> entries = provider.pending();
+        List<NodeProvider.Pending> entries = provider.pending();
         int failed = 0;
-        for (MachineProvider.Pending entry : entries) {
+        for (NodeProvider.Pending entry : entries) {
             AEKey key = entry.stack().what();
             long left = entry.stack().amount();
             if (network != null) {
@@ -164,7 +164,7 @@ final class ProviderOverflow {
         node.markDataChanged();
         if (failed > 0) {
             IdleFactory.LOGGER.warn("Idle Factory: 机器 [{}] 拆除时有 {} 条余量既送不回机器也无法落物",
-                    node.machine().ref().shortId(), failed);
+                    node.node().id(), failed);
         }
         node.report("拆除机器：退回 " + entries.size() + " 条余量"
                 + (failed > 0 ? "（" + failed + " 条无处可放，已记日志）" : ""));
@@ -181,7 +181,7 @@ final class ProviderOverflow {
      */
     static boolean dropAtMachine(MachineNode node, AEKey key, long amount) {
         ServerLevel level = node.machineLevel();
-        BlockPos pos = node.machine().ref().pos();
+        BlockPos pos = node.primaryMachine().typeBlock().pos();
         if (level == null || amount <= 0L || !level.isLoaded(pos)) {
             return false;
         }

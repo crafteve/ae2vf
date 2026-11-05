@@ -10,7 +10,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -60,13 +60,15 @@ public final class MachineRunner {
                 continue;
             }
             MEStorage storage = factory.live().storage();
-            for (Machine machine : factory.config().machines().all()) {
-                machines++;
-                if (this.state.peek(machine.id()) != null
-                        && isAwake(machine.id(), now)) {
-                    awake++;
+            for (Node node : factory.config().nodes().all()) {
+                for (Machine machine : node.machines()) {
+                    machines++;
+                    if (this.state.peek(machine.id()) != null
+                            && isAwake(machine.id(), now)) {
+                        awake++;
+                    }
+                    moved += tickMachine(server, factory, storage, node, machine, now, observations);
                 }
-                moved += tickMachine(server, factory, storage, machine, now, observations);
             }
         }
         // 探针：确认遍历的是机器库而不是产线。首轮与每 100 轮打一次，避免刷屏。
@@ -93,7 +95,7 @@ public final class MachineRunner {
      * @return 本轮搬动的数量
      */
     private long tickMachine(MinecraftServer server, Factory factory, MEStorage storage,
-            Machine machine, long now, @Nullable ObservationService observations) {
+            Node node, Machine machine, long now, @Nullable ObservationService observations) {
         RunnerState.MachineState machineState = this.state.machine(machine.id());
         if (machineState.sleeping) {
             if (now < machineState.wakeAt) {
@@ -104,8 +106,8 @@ public final class MachineRunner {
             machineState.sleepSince = -1L;
         }
 
-        MachineRef target = machine.ref();
-        if (factory.live().isMachineMissing(target.id())) {
+        BlockKey target = machine.typeBlock();
+        if (factory.live().isMachineMissing(machine.id())) {
             // 方块没了，机器仍在库；等方块回来时再唤醒
             sleepIfIdle(machineState, now);
             return 0L;
@@ -122,12 +124,12 @@ public final class MachineRunner {
         }
 
         LevelCapabilityCache caps = observations == null ? null : observations.capabilities(level);
-        long generation = observations == null ? 0L : observations.facesGeneration(target.blockKey());
+        long generation = observations == null ? 0L : observations.facesGeneration(target);
         ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                 id -> new ItemVariantIndex());
         GroupRunner.GroupRun result;
         try {
-            result = GroupRunner.run(storage, level, target.pos(), machine.io(), caps,
+            result = GroupRunner.run(storage, level, target.pos(), node.io(), caps,
                     machineState.routes, generation, factoryVariants, now);
         } catch (RuntimeException e) {
             // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
@@ -145,7 +147,7 @@ public final class MachineRunner {
         // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
         // 都算“路没问题”，清掉连续计数。详见 noteRejected。
         if (observations != null) {
-            BlockKey key = BlockKey.of(target.dimension(), target.pos());
+            BlockKey key = target;
             if (result.inputReason() == IoResult.Reason.REJECTED
                     || result.outputReason() == IoResult.Reason.REJECTED) {
                 observations.noteRejected(key);
@@ -153,7 +155,7 @@ public final class MachineRunner {
                 observations.noteSuccess(key);
             }
         }
-        DiagStats.MachineStats stats = factory.live().stats().machine(target.id());
+        DiagStats.MachineStats stats = factory.live().stats().machine(machine.id());
         // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
         stats.setRuleReasons(result.inputReasons(), result.outputReasons());
         if (result.movedAnything()) {
@@ -175,8 +177,8 @@ public final class MachineRunner {
      * <p>只读缓存，<b>不探测</b>：UNKNOWN 说明观测服务还没轮到这台机器，先跳过（机器保持醒着，
      * 几十 tick 内就会被探到）。这样 IO 永远不会绕过探测预算去打一个尖峰。</p>
      */
-    private static boolean runnable(ObservationService observations, MachineRef target) {
-        Observation observation = observations.observe(target.blockKey());
+    private static boolean runnable(ObservationService observations, BlockKey target) {
+        Observation observation = observations.observe(target);
         return observation.health().alive();
     }
 
@@ -215,7 +217,7 @@ public final class MachineRunner {
         }
         machineState.lastFailureLogAt = now;
         IdleFactory.LOGGER.warn("Idle Factory: 机器 {} 本轮 IO 异常，已跳过本轮",
-                machine.ref().shortId(), cause);
+                machine.shortId(), cause);
     }
 
     /**

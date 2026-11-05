@@ -63,12 +63,12 @@ final class FactoryPassiveIoModel {
 
         /** 机器 id；发规则动作要用。 */
         UUID machineId() {
-            return this.machine.ref().id();
+            return this.machine.machineId();
         }
 
         /** 机器显示名；失联时直接写「已失联」。 */
         String name() {
-            return this.machine.machineMissing()
+            return !this.machine.health().isOnline()
                     ? "已失联" : FactoryLabels.blockName(this.machine.blockId());
         }
     }

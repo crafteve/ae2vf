@@ -11,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
  *
  * <p>终端、指令、以后的 WebUI 都走这里。它只做装配与转发，权限（第一版只看 owner）与
  * 档案写入在下面几个职责类里：{@link FactoryLifecycleService}（生命周期）、
- * {@link MachineLinkService} / {@link MachineToggleService}（机器接线）、
+ * {@link MachineLinkService} / {@link BindingService}（机器接线）、
  * {@link StorageLinkService} / {@link StorageMaintenanceService} /
  * {@link StorageConsoleService}（仓库）。</p>
  *
@@ -26,7 +26,7 @@ public final class FactoryService {
 
     // ------------------------------------------------------------------
     // ---- 静态门面：装配服务实例并转发 ----
-    // 保留原有静态签名，调用方零改动；业务实现见 FactoryLifecycleService / MachineLinkService / MachineToggleService。
+    // 保留原有静态签名，调用方零改动；业务实现见 FactoryLifecycleService / MachineLinkService / BindingService。
     // ------------------------------------------------------------------
 
     /**
@@ -164,10 +164,10 @@ public final class FactoryService {
      * @param machineId 机器 id
      * @return 动作结果
      */
-    public static MachineActions.Result deleteMachineById(Factory factory, UUID machineId) {
+    public static NodeActions.Result deleteMachineById(Factory factory, UUID machineId) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            return MachineActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
+            return NodeActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
         }
         return machineLinks(runtime).deleteMachineById(factory, machineId);
     }
@@ -205,8 +205,8 @@ public final class FactoryService {
      * @param runtime 运行时
      * @return 服务实例
      */
-    private static MachineLibraryService machineLibrary(FactoryRuntime runtime) {
-        return new MachineLibraryService(runtime::markDirty);
+    private static NodeLibraryService machineLibrary(FactoryRuntime runtime) {
+        return new NodeLibraryService(runtime::markDirty);
     }
 
     /**
@@ -227,8 +227,8 @@ public final class FactoryService {
      * @param runtime 运行时
      * @return 服务实例
      */
-    private static MachineToggleService machineToggle(FactoryRuntime runtime) {
-        return new MachineToggleService(runtime.manager(), runtime.observations(),
+    private static BindingService machineToggle(FactoryRuntime runtime) {
+        return new BindingService(runtime.manager(), runtime.observations(),
                 machineLibrary(runtime), machineLinks(runtime));
     }
 

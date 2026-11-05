@@ -6,8 +6,8 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.MachineActions;
-import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
+import io.github.crafteve.idlefactory.factory.NodeActions;
+import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.FactoryNodeSnapshots;
 
@@ -69,11 +69,11 @@ public record FactoryNodeProviderC2S(int containerId, UUID nodeId, ProviderSetti
                 return;
             }
             Factory factory = found.get();
-            MachineActions.Result result = switch (payload.setting()) {
-                case BLOCKING -> MachineActions.setBlocking(factory, payload.nodeId(),
+            NodeActions.Result result = switch (payload.setting()) {
+                case BLOCKING -> NodeActions.setBlocking(factory, payload.nodeId(),
                         payload.value() == 0 ? BlockingMode.OFF : BlockingMode.ON);
-                case MULTIPLIER -> MachineActions.Result.err("倍增尚未接入");
-                case DISPATCH -> MachineActions.Result.err("逐台 / 轮询尚未接入");
+                case MULTIPLIER -> NodeActions.Result.err("倍增尚未接入");
+                case DISPATCH -> NodeActions.Result.err("逐台 / 轮询尚未接入");
             };
             feedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {

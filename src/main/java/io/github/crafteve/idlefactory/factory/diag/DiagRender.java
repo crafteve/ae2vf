@@ -12,7 +12,6 @@ import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
@@ -153,7 +152,7 @@ public final class DiagRender {
      * @param sleepSince 睡眠起点；-1 表示没在睡
      * @return 组件
      */
-    public static Component watchSummary(Factory factory, MachineRef machine, long now,
+    public static Component watchSummary(Factory factory, Machine machine, long now,
             long sleepUntil, long sleepSince) {
         DiagStats stats = factory.live().stats();
         List<Map.Entry<AEKey, Long>> rates = topRates(stats, 2);
@@ -181,7 +180,7 @@ public final class DiagRender {
 
         int blocked = stats.blockedMachines();
         row.append(FactoryMessages.text(" · 卡 " + blocked + "/"
-                        + factory.config().machines().size(),
+                        + factory.config().nodes().totalMachineCount(),
                 blocked > 0 ? FactoryMessages.WARN : FactoryMessages.INFO));
         row.append(FactoryMessages.text(" · IO " + formatMs(DiagService.ioCostAvgMs()),
                 FactoryMessages.DIM));
@@ -202,16 +201,17 @@ public final class DiagRender {
      * @return 若干行
      */
     public static List<Component> watchDetail(MinecraftServer server, Factory factory,
-            MachineRef machine, long now, long sleepUntil, long sleepSince) {
+            Machine machine, long now, long sleepUntil, long sleepSince) {
         List<Component> rows = new ArrayList<>();
         DiagStats stats = factory.live().stats();
 
         rows.add(Component.empty()
                 .append(FactoryMessages.text("[watch] ", FactoryMessages.DIM))
                 .append(FactoryMessages.hover(machine.shortId(),
-                        machine.dimension().location() + " " + machine.pos().toShortString()))
-                .append(FactoryMessages.text(" " + machine.dimension().location() + " "
-                        + machine.pos().toShortString() + " · "
+                        machine.typeBlock().dimension().location() + " "
+                                + machine.typeBlock().pos().toShortString()))
+                .append(FactoryMessages.text(" " + machine.typeBlock().dimension().location() + " "
+                        + machine.typeBlock().pos().toShortString() + " · "
                         + sleepText(now, sleepUntil, sleepSince), FactoryMessages.INFO)));
 
         rows.add(FactoryMessages.text("  入 " + ratesText(stats.rateIn())
@@ -226,8 +226,8 @@ public final class DiagRender {
 
     private static Component machineRow(Factory factory, UUID machineId, DiagStats stats,
             Map<UUID, String> reasons, long now) {
-        Machine entry = factory.config().machines().byId(machineId).orElse(null);
-        MachineRef machine = entry == null ? null : entry.ref();
+        Machine machine = factory.config().nodes().nodeOfMachine(machineId)
+                .flatMap(node -> node.machineOf(machineId)).orElse(null);
         String id = machine == null ? shortId(machineId) : machine.shortId();
         DiagStats.MachineStats groupStats = stats.machine(machineId);
 

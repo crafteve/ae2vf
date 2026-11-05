@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -10,27 +11,30 @@ import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
-import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 
 /**
  * 把工厂当前状态整理成「前端能直接用的东西」：配置（L0）+ 观测（L1）→ 视图（L3）。
  *
- * <p>它不依赖菜单、不依赖会话，谁要摘要都找它。第一版只产出一行可读文本与几个 record，
- * 等 S2C 快照包稳定后再换成 DTO。</p>
+ * <p>遍历顺序是节点 → 机器：一个节点下的每台机器摊平成一行，规则从节点读。视图带节点归属，
+ * v3 机器表用 {@code nodeId} 归组、用 {@code nodeMachineCount} 画机器数。</p>
  *
- * <p><b>这里不许探世界</b>：所有状态都从 {@link ObservationService} 的缓存里读。之所以能做到，
- * 是因为观测服务已经在 tick 里把该看的都看过了。</p>
+ * <p><b>这里不许探世界</b>：所有状态都从 {@link ObservationService} 的缓存里读。</p>
  */
 public final class FactorySnapshotBuilder {
     /** 界面上的总状态，由 WS + IO 推导。 */
@@ -67,25 +71,33 @@ public final class FactorySnapshotBuilder {
     /**
      * 一台机器在界面上的样子。
      *
-     * <p>P1 删除产线后视图里不再有「挂在哪些产线」「第几组」这类字段：机器就是工厂机器库里
-     * 的一台，界面按登记顺序铺开。</p>
+     * <p>机器视图带节点归属：{@code nodeId} / {@code nodeName} / {@code nodeIconBlockId} /
+     * {@code nodeMachineCount} 供 v3 按节点分组，{@code machineId} 与 {@code primaryBlock}
+     * 定位这台机器。健康只有 {@link MachineHealth} 两个值，{@code probed} 表示是否探测过，
+     * {@code stale} 表示探过但过期；「方块没了」不再单独开字段，由健康表达。</p>
      *
-     * @param ref       机器引用（坐标 + id）
-     * @param machineMissing 方块是否已经消失（观测事实）
-     * @param health    观测结论
-     * @param blockId   观测到的方块 id；未知时 {@code null}
-     * @param groupBlockId 分组用的方块 id：{@code blockId} 为空时回退到「最后一次看到的方块」，
-     *                  让区块卸载不会把界面上的组拆散
-     * @param beTypeId  方块实体类型 id；没有方块实体时为 {@code null}
-     * @param presence  无向能力
-     * @param ruleCount 配了几条规则
-     * @param inputs    输入规则（界面明细用）
-     * @param outputs   输出规则（界面明细用）
-     * @param inputRates  与 inputs 顺序一致的规则速率（数量/秒）
-     * @param outputRates 与 outputs 顺序一致的规则速率（数量/秒）
+     * @param nodeId         所属节点 id
+     * @param nodeName       节点名字；{@code null} 表示用方块名
+     * @param nodeIconBlockId 节点类型方块 id，节点卡片图标用
+     * @param nodeMachineCount 节点机器数
+     * @param machineId      机器 id
+     * @param primaryBlock   类型 / 展示方块（维度 + 坐标）
+     * @param blockCount     机器方块数
+     * @param health         机器健康
+     * @param probed         是否探测过
+     * @param stale          健康是否过期
+     * @param blockId        观测到的方块 id；未知时 {@code null}
+     * @param groupBlockId   分组用的方块 id：{@code blockId} 为空时回退到「最后一次看到的方块」
+     * @param beTypeId       方块实体类型 id；没有方块实体时为 {@code null}
+     * @param presence       无向能力
+     * @param ruleCount      节点配了几条规则
+     * @param inputs         输入规则（界面明细用）
+     * @param outputs        输出规则（界面明细用）
+     * @param inputRates     与 inputs 顺序一致的规则速率
+     * @param outputRates    与 outputs 顺序一致的规则速率
      * @param sinceMoveTicks 距上次成功搬运的 tick；-1 表示从没搬过
      * @param blockedTicks   连续阻塞的 tick；-1 表示当前没卡
-     * @param workState      Observation 的工作状态
+     * @param workState      观测的工作状态
      * @param inputFull      所有输入规则是否都无法接收
      * @param sinceInputMoveTicks 距上次成功输入的 tick；-1 表示从没输入
      * @param inputReason    输入侧原因
@@ -93,7 +105,10 @@ public final class FactorySnapshotBuilder {
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
-    public record MachineView(MachineRef ref, boolean machineMissing, Health health,
+    public record MachineView(UUID nodeId, @Nullable String nodeName,
+            @Nullable ResourceLocation nodeIconBlockId, int nodeMachineCount,
+            UUID machineId, BlockKey primaryBlock, int blockCount,
+            MachineHealth health, boolean probed, boolean stale,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
             @Nullable ResourceLocation beTypeId, Set<CapabilityKind> presence, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
@@ -124,6 +139,21 @@ public final class FactorySnapshotBuilder {
                 aligned.add(i < reasons.size() ? reasons.get(i) : IoResult.Reason.NO_ITEM);
             }
             return List.copyOf(aligned);
+        }
+
+        /** 机器所在维度。 */
+        public ResourceKey<Level> dimension() {
+            return this.primaryBlock.dimension();
+        }
+
+        /** 机器类型方块坐标。 */
+        public BlockPos pos() {
+            return this.primaryBlock.pos();
+        }
+
+        /** 是否在线。 */
+        public boolean online() {
+            return this.health.isOnline();
         }
 
         /** 输入侧总速率。 */
@@ -162,12 +192,12 @@ public final class FactorySnapshotBuilder {
         }
 
         /**
-         * View 层的总状态：WS 优先，UNKNOWN 时用 IO 输入能力回退。
+         * View 层的总状态：健康优先，UNKNOWN 时用 IO 输入能力回退。
          *
          * @return 总状态
          */
         public TotalState totalState() {
-            if (this.machineMissing || this.health != Health.PRESENT) {
+            if (!this.health.isOnline() || this.stale) {
                 return TotalState.OFFLINE;
             }
             if (this.ruleCount == 0) {
@@ -200,12 +230,11 @@ public final class FactorySnapshotBuilder {
     /**
      * 工厂健康度汇总。
      *
-     * @param total        机器总数
-     * @param active       参与 IO 的数量（方块在、未失联）
-     * @param unloaded     未加载
-     * @param missing      失联（含维度不存在）
+     * @param total   机器总数
+     * @param active  在线机器数
+     * @param offline 离线机器数
      */
-    public record FactoryHealth(int total, int active, int unloaded, int missing) {
+    public record FactoryHealth(int total, int active, int offline) {
 
         /**
          * 一行摘要，给 {@code info} / {@code diag} 的头部用。
@@ -214,88 +243,111 @@ public final class FactorySnapshotBuilder {
          */
         public String describe() {
             StringBuilder builder = new StringBuilder();
-            builder.append("机器 ").append(this.total).append(" 台 · 活跃 ").append(this.active);
-            if (this.unloaded > 0) {
-                builder.append(" · 未加载 ").append(this.unloaded);
-            }
-            if (this.missing > 0) {
-                builder.append(" · 失联 ").append(this.missing);
+            builder.append("机器 ").append(this.total).append(" 台 · 在线 ").append(this.active);
+            if (this.offline > 0) {
+                builder.append(" · 离线 ").append(this.offline);
             }
             return builder.toString();
         }
     }
 
     /**
-     * 机器库视图。
+     * 机器视图列表：节点 → 机器摊平，顺序沿用节点库与机器加入顺序。
      *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
      * @param now          当前服务端 tick
-     * @return 视图列表，按登记顺序
+     * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
             long now) {
-        List<MachineView> views = new ArrayList<>(factory.config().machines().size());
-        for (Machine machine : factory.config().machines().all()) {
-            MachineRef ref = machine.ref();
-            Observation observation = observations == null
-                    ? Observation.UNKNOWN : observations.observe(ref.blockKey());
-            MachineIoGroup io = machine.io();
+        List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
+        for (Node node : factory.config().nodes().all()) {
+            NodeIoGroup io = node.io();
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
+            for (Machine machine : node.machines()) {
+                BlockKey typeBlock = machine.typeBlock();
+                Observation observation = observations == null
+                        ? Observation.UNKNOWN : observations.observe(typeBlock);
+                MachineHealth health = machineHealth(machine, observations);
+                boolean probed = observation.health() != Health.UNKNOWN;
 
-            DiagStats.MachineStats stats = factory.live().stats().machineOrNull(ref.id());
-            List<Long> inputRates = new ArrayList<>(inputs.size());
-            for (ResourceSpec spec : inputs) {
-                inputRates.add(stats == null ? 0L
-                        : stats.rateIn(new RuleKey(true, spec.key(), spec.face(), spec.mode())));
-            }
-            List<Long> outputRates = new ArrayList<>(outputs.size());
-            for (ResourceSpec spec : outputs) {
-                outputRates.add(stats == null ? 0L
-                        : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
-            }
-            List<IoResult.Reason> inputReasons = new ArrayList<>(inputs.size());
-            for (ResourceSpec spec : inputs) {
-                inputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
-                        : stats.ruleReason(true, new RuleKey(true, spec.key(), spec.face(), spec.mode())));
-            }
-            List<IoResult.Reason> outputReasons = new ArrayList<>(outputs.size());
-            for (ResourceSpec spec : outputs) {
-                outputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
-                        : stats.ruleReason(false, new RuleKey(false, spec.key(), spec.face(), spec.mode())));
-            }
+                DiagStats.MachineStats stats = factory.live().stats().machineOrNull(machine.id());
+                List<Long> inputRates = new ArrayList<>(inputs.size());
+                for (ResourceSpec spec : inputs) {
+                    inputRates.add(stats == null ? 0L
+                            : stats.rateIn(new RuleKey(true, spec.key(), spec.face(), spec.mode())));
+                }
+                List<Long> outputRates = new ArrayList<>(outputs.size());
+                for (ResourceSpec spec : outputs) {
+                    outputRates.add(stats == null ? 0L
+                            : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
+                }
+                List<IoResult.Reason> inputReasons = new ArrayList<>(inputs.size());
+                for (ResourceSpec spec : inputs) {
+                    inputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                            : stats.ruleReason(true,
+                                    new RuleKey(true, spec.key(), spec.face(), spec.mode())));
+                }
+                List<IoResult.Reason> outputReasons = new ArrayList<>(outputs.size());
+                for (ResourceSpec spec : outputs) {
+                    outputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                            : stats.ruleReason(false,
+                                    new RuleKey(false, spec.key(), spec.face(), spec.mode())));
+                }
 
-            long sinceMove = stats != null && stats.lastMoveTick() > 0L
-                    ? Math.max(0L, now - stats.lastMoveTick()) : -1L;
-            long blocked = stats != null && stats.blockedSince() >= 0L
-                    ? Math.max(0L, now - stats.blockedSince()) : -1L;
-            long sinceInput = stats != null && stats.lastInputMoveTick() > 0L
-                    ? Math.max(0L, now - stats.lastInputMoveTick()) : -1L;
-            boolean inputFull = stats != null && stats.inputFull();
-            IoResult.Reason inputReason = stats == null
-                    ? IoResult.Reason.OK : stats.inputReason();
-            IoResult.Reason outputReason = stats == null
-                    ? IoResult.Reason.OK : stats.outputReason();
+                long sinceMove = stats != null && stats.lastMoveTick() > 0L
+                        ? Math.max(0L, now - stats.lastMoveTick()) : -1L;
+                long blocked = stats != null && stats.blockedSince() >= 0L
+                        ? Math.max(0L, now - stats.blockedSince()) : -1L;
+                long sinceInput = stats != null && stats.lastInputMoveTick() > 0L
+                        ? Math.max(0L, now - stats.lastInputMoveTick()) : -1L;
+                boolean inputFull = stats != null && stats.inputFull();
+                IoResult.Reason inputReason = stats == null
+                        ? IoResult.Reason.OK : stats.inputReason();
+                IoResult.Reason outputReason = stats == null
+                        ? IoResult.Reason.OK : stats.outputReason();
 
-            // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」，
-            // 不做可用性判断；可用性仍然读 health。
-            ResourceLocation groupBlockId = observation.blockId() != null
-                    ? observation.blockId() : observation.lastBlockId();
-            views.add(new MachineView(ref,
-                    factory.live().isMachineMissing(ref.id()),
-                    observation.health(),
-                    observation.blockId(),
-                    groupBlockId,
-                    observation.beTypeId(),
-                    observation.presence(),
-                    inputs.size() + outputs.size(),
-                    inputs, outputs, inputRates, outputRates,
-                    sinceMove, blocked, observation.workState(), inputFull,
-                    sinceInput, inputReason, outputReason,
-                    inputReasons, outputReasons));
+                // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」。
+                ResourceLocation groupBlockId = observation.blockId() != null
+                        ? observation.blockId() : observation.lastBlockId();
+                views.add(new MachineView(node.id(), node.name(), node.typeBlockId(),
+                        node.machineCount(), machine.id(), typeBlock, machine.blocks().size(),
+                        health, probed, false,
+                        observation.blockId(), groupBlockId, observation.beTypeId(),
+                        observation.presence(), inputs.size() + outputs.size(),
+                        inputs, outputs, inputRates, outputRates,
+                        sinceMove, blocked, observation.workState(), inputFull,
+                        sinceInput, inputReason, outputReason,
+                        inputReasons, outputReasons));
+            }
         }
         return views;
+    }
+
+    /**
+     * 计算一台机器的健康：所有方块 PRESENT 才算在线，否则离线。
+     *
+     * <p>P1b 只按观测结论聚合；P2 的 {@code NodeHealthResolver} 接管同一套语义，
+     * 判定公式保持不变。</p>
+     *
+     * @param machine      机器
+     * @param observations 观测服务；{@code null} 时按未探测（离线）处理
+     * @return 机器健康
+     */
+    private static MachineHealth machineHealth(Machine machine,
+            @Nullable ObservationService observations) {
+        if (observations == null) {
+            return MachineHealth.OFFLINE;
+        }
+        for (BlockKey block : machine.blocks()) {
+            Observation observation = observations.observe(block);
+            if (observation.health() != Health.PRESENT) {
+                return MachineHealth.OFFLINE;
+            }
+        }
+        return MachineHealth.ONLINE;
     }
 
     /**
@@ -330,26 +382,13 @@ public final class FactorySnapshotBuilder {
      */
     public static FactoryHealth health(Factory factory, List<MachineView> views) {
         int active = 0;
-        int unloaded = 0;
-        int missing = 0;
         for (MachineView view : views) {
-            switch (view.health()) {
-                case PRESENT -> {
-                    if (view.machineMissing()) {
-                        missing++;
-                    } else {
-                        active++;
-                    }
-                }
-                case UNLOADED -> unloaded++;
-                case MISSING, NO_DIMENSION -> missing++;
-                default -> {
-                    // UNKNOWN 不计入任何一档
-                }
+            if (view.health().isOnline()) {
+                active++;
             }
         }
-        int running = 0;
-        return new FactoryHealth(factory.config().machines().size(), active, unloaded, missing);
+        return new FactoryHealth(factory.config().nodes().totalMachineCount(), active,
+                views.size() - active);
     }
 
     /**

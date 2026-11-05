@@ -6,11 +6,12 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.machine.BlockingMode;
+import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
-import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.MachineNode;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -32,7 +33,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * 机器指令的逻辑层：{@code /idf machine ...} 的读写动作。
  *
  * <p>P1 删除产线后，原来挂在 {@code /idf line <line> manage ...} 下的 IO 规则操作改为直接以机器为主语；
- * 本类只做「解析引用 + 调 {@link MachineActions} + 拼聊天栏回执」，规则本身仍然跟着机器走。</p>
+ * 本类只做「解析引用 + 调 {@link NodeActions} + 拼聊天栏回执」，规则本身仍然跟着机器走。</p>
  *
  * <p>引用解析统一走 {@link FactoryRefs}，消息统一走 {@link FactoryMessages}。</p>
  */
@@ -55,28 +56,31 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        if (factory.config().machines().isEmpty()) {
+        int total = factory.config().nodes().totalMachineCount();
+        if (total == 0) {
             FactoryMessages.send(player, FactoryMessages.info(
                     "还没有机器。对准方块执行 /idf factory connect 接入"));
             return 1;
         }
-        FactoryMessages.send(player, FactoryMessages.info(
-                "机器 " + factory.config().machines().size() + " 台："));
+        FactoryMessages.send(player, FactoryMessages.info("机器 " + total + " 台："));
         int shown = 0;
-        for (Machine machine : factory.config().machines().all()) {
-            if (shown >= LIST_LIMIT) {
-                FactoryMessages.send(player, FactoryMessages.info(
-                        "… 还有 " + (factory.config().machines().size() - shown) + " 台"));
-                break;
+        for (Node node : factory.config().nodes().all()) {
+            for (Machine machine : node.machines()) {
+                if (shown >= LIST_LIMIT) {
+                    FactoryMessages.send(player, FactoryMessages.info(
+                            "… 还有 " + (total - shown) + " 台"));
+                    return 1;
+                }
+                BlockKey typeBlock = machine.typeBlock();
+                String where = typeBlock.dimension().location() + " "
+                        + typeBlock.pos().toShortString();
+                FactoryMessages.send(player, Component.empty()
+                        .append(FactoryMessages.hover(machine.shortId(), where))
+                        .append(FactoryMessages.text("  输入 " + node.io().inputs().size()
+                                + " / 输出 " + node.io().outputs().size() + " 条 · "
+                                + where, FactoryMessages.INFO)));
+                shown++;
             }
-            MachineRef ref = machine.ref();
-            String where = ref.dimension().location() + " " + ref.pos().toShortString();
-            FactoryMessages.send(player, Component.empty()
-                    .append(FactoryMessages.hover(ref.shortId(), where))
-                    .append(FactoryMessages.text("  输入 " + machine.io().inputs().size()
-                            + " / 输出 " + machine.io().outputs().size() + " 条 · "
-                            + where, FactoryMessages.INFO)));
-            shown++;
         }
         return 1;
     }
@@ -93,17 +97,18 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        MachineRef machine = requireMachine(player, factory, machineRef);
+        Machine machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
-        Optional<Machine> entry = factory.config().machines().byId(machine.id());
+        Optional<Node> entry = factory.config().nodes().nodeOfMachine(machine.id());
         if (entry.isEmpty()) {
-            FactoryMessages.send(player, FactoryMessages.err("这台机器不在机器库"));
+            FactoryMessages.send(player, FactoryMessages.err("这台机器不在节点库"));
             return 0;
         }
-        MachineIoGroup io = entry.get().io();
-        String where = machine.dimension().location() + " " + machine.pos().toShortString();
+        NodeIoGroup io = entry.get().io();
+        BlockKey typeBlock = machine.typeBlock();
+        String where = typeBlock.dimension().location() + " " + typeBlock.pos().toShortString();
         FactoryMessages.send(player, FactoryMessages.info(
                 "机器 [" + machine.shortId() + "] " + where));
         FactoryMessages.send(player, FactoryMessages.text(
@@ -280,11 +285,12 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        MachineRef machine = requireMachine(player, factory, machineRef);
+        Machine machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
-        return send(player, MachineActions.setBlocking(factory, machine.id(), mode));
+        return send(player, NodeActions.setBlocking(factory,
+                nodeId(factory, machine), mode));
     }
 
     /**
@@ -299,26 +305,27 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        MachineRef ref = requireMachine(player, factory, machineRef);
+        Machine ref = requireMachine(player, factory, machineRef);
         if (ref == null) {
             return 0;
         }
-        Optional<Machine> entry = factory.config().machines().byId(ref.id());
+        Optional<Node> entry = factory.config().nodes().nodeOfMachine(ref.id());
         if (entry.isEmpty()) {
-            FactoryMessages.send(player, FactoryMessages.err("这台机器不在机器库"));
+            FactoryMessages.send(player, FactoryMessages.err("这台机器不在节点库"));
             return 0;
         }
-        MachineProvider provider = entry.get().provider();
+        NodeProvider provider = entry.get().provider();
+        BlockKey typeBlock = ref.typeBlock();
         FactoryMessages.send(player, FactoryMessages.info(
-                "机器 [" + ref.shortId() + "] " + ref.dimension().location() + " "
-                        + ref.pos().toShortString()));
+                "机器 [" + ref.shortId() + "] " + typeBlock.dimension().location() + " "
+                        + typeBlock.pos().toShortString()));
         FactoryMessages.send(player, FactoryMessages.text(
                 "  阻挡: " + (provider.blocking().isOn() ? "开" : "关")
                         + " · 样板: " + provider.patternCount() + "/" + provider.capacity()
                         + " · 余量: " + provider.pendingCount() + " 条",
                 FactoryMessages.PLAIN));
         FactoryRuntime runtime = FactoryRuntime.get();
-        MachineNode node = runtime == null ? null : runtime.nodeManager().node(ref.id());
+        MachineNode node = runtime == null ? null : runtime.nodeManager().node(entry.get().id());
         FactoryMessages.send(player, FactoryMessages.text(
                 "  节点: " + describeNode(node), FactoryMessages.PLAIN));
         if (node != null) {
@@ -382,12 +389,12 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        MachineRef machine = requireMachine(player, factory, machineRef);
+        Machine machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
         // mode 传 null = 沿用旧命令默认（无组件物品模糊），界面会显式传精确。
-        return send(player, MachineActions.addRule(factory, machine.id(), side, key,
+        return send(player, NodeActions.addRule(factory, nodeId(factory, machine), side, key,
                 parseFace(face), null));
     }
 
@@ -396,11 +403,11 @@ public final class MachineService {
         if (factory == null) {
             return 0;
         }
-        MachineRef machine = requireMachine(player, factory, machineRef);
+        Machine machine = requireMachine(player, factory, machineRef);
         if (machine == null) {
             return 0;
         }
-        return send(player, MachineActions.removeRule(factory, machine.id(), side, key));
+        return send(player, NodeActions.removeRule(factory, nodeId(factory, machine), side, key));
     }
 
     @Nullable
@@ -420,8 +427,8 @@ public final class MachineService {
     }
 
     @Nullable
-    private static MachineRef requireMachine(ServerPlayer player, Factory factory, String ref) {
-        Optional<MachineRef> target = FactoryRefs.machine(factory, ref);
+    private static Machine requireMachine(ServerPlayer player, Factory factory, String ref) {
+        Optional<Machine> target = FactoryRefs.machine(factory, ref);
         if (target.isEmpty()) {
             FactoryMessages.send(player, FactoryMessages.err("找不到机器 " + ref));
             FactoryMessages.send(player, FactoryMessages.info(
@@ -475,7 +482,19 @@ public final class MachineService {
      * @param result 动作结果
      * @return 命令返回值：成功 {@code 1}，失败 {@code 0}
      */
-    private static int send(ServerPlayer player, MachineActions.Result result) {
+    /**
+     * 机器所属节点 id；调用方已确认机器存在，这里取不到时退回机器 id 只为不抛异常。
+     *
+     * @param factory 工厂
+     * @param machine 机器
+     * @return 节点 id
+     */
+    private static java.util.UUID nodeId(Factory factory, Machine machine) {
+        return factory.config().nodes().nodeOfMachine(machine.id())
+                .map(node -> node.id()).orElse(machine.id());
+    }
+
+    private static int send(ServerPlayer player, NodeActions.Result result) {
         FactoryMessages.send(player, result.ok()
                 ? FactoryMessages.ok(result.message())
                 : FactoryMessages.err(result.message()));

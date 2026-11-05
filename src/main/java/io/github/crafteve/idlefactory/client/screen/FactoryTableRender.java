@@ -70,22 +70,17 @@ final class FactoryTableRender {
         }
 
         int ready = 0;
-        int unloaded = 0;
+        int unprobed = 0;
         int missing = 0;
         for (FactoryMachineStack stack : table) {
             total += stack.count();
             for (FactorySnapshotBuilder.MachineView machine : stack.members()) {
-                if (machine.machineMissing()) {
+                if (!machine.probed()) {
+                    unprobed++;
+                } else if (machine.stale() || !machine.health().isOnline()) {
                     missing++;
                 } else {
-                    switch (machine.health()) {
-                        case PRESENT -> ready++;
-                        case UNLOADED -> unloaded++;
-                        case MISSING, NO_DIMENSION -> missing++;
-                        default -> {
-                            // UNKNOWN 不计
-                        }
-                    }
+                    ready++;
                 }
             }
         }
@@ -99,9 +94,9 @@ final class FactoryTableRender {
         footer.add(new FactoryUiText.TextPart(Integer.toString(ready),
                 this.context.theme().statusRun()));
         footer.add(new FactoryUiText.TextPart(" · ", this.context.theme().textPrimary()));
-        footer.add(new FactoryUiText.TextPart("未载 ", this.context.theme().error()));
-        footer.add(new FactoryUiText.TextPart(Integer.toString(unloaded),
-                this.context.theme().error()));
+        footer.add(new FactoryUiText.TextPart("未探测 ", this.context.theme().statusWarn()));
+        footer.add(new FactoryUiText.TextPart(Integer.toString(unprobed),
+                this.context.theme().statusWarn()));
         footer.add(new FactoryUiText.TextPart(" · ", this.context.theme().textPrimary()));
         footer.add(new FactoryUiText.TextPart("失联 ", this.context.theme().error()));
         footer.add(new FactoryUiText.TextPart(Integer.toString(missing),
@@ -146,21 +141,21 @@ final class FactoryTableRender {
         int iconX = l.columnX(FactoryLayout.COL_NAME) + 5;
         FactoryNineSlice.slot(graphics, iconX - 1, y + 4, FactoryLayout.CELL,
                 FactoryLayout.CELL);
-        ItemStack icon = anchor.machineMissing()
+        ItemStack icon = !anchor.health().isOnline()
                 ? new ItemStack(Items.BARRIER)
                 : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 iconX, y + 5);
 
-        String name = anchor.machineMissing()
+        String name = !anchor.health().isOnline()
                 ? "已失联" : FactoryLabels.blockName(anchor.blockId());
         int nameWidth = l.columnW(FactoryLayout.COL_NAME) - FactoryLayout.CELL - 10;
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(name, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 4,
                 this.context.theme().textPrimary(), false);
-        String where = anchor.ref().dimension().location() + " "
-                + anchor.ref().pos().toShortString();
+        String where = anchor.dimension().location() + " "
+                + anchor.pos().toShortString();
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(where, nameWidth),
                 iconX + FactoryLayout.CELL + 2, y + 14,

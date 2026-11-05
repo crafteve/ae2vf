@@ -357,8 +357,8 @@ final class FactoryTooltipRender {
             int shown = Math.min(3, stack.members().size());
             for (int i = 0; i < shown; i++) {
                 FactorySnapshotBuilder.MachineView member = stack.members().get(i);
-                lines.add(FactoryLabels.colored("  " + member.ref().dimension().location()
-                        + " " + member.ref().pos().toShortString(), tt.label()));
+                lines.add(FactoryLabels.colored("  " + member.dimension().location()
+                        + " " + member.pos().toShortString(), tt.label()));
             }
             if (stack.members().size() > shown) {
                 lines.add(FactoryLabels.colored(
@@ -366,8 +366,8 @@ final class FactoryTooltipRender {
             }
             lines.add(FactoryLabels.colored("单击卡片展开成员", tt.label()));
         } else {
-            lines.add(FactoryLabels.colored(anchor.ref().dimension().location()
-                    + " " + anchor.ref().pos().toShortString(), tt.label()));
+            lines.add(FactoryLabels.colored(anchor.dimension().location()
+                    + " " + anchor.pos().toShortString(), tt.label()));
         }
         graphics.renderComponentTooltip(this.context.font(), lines, mouseX, mouseY);
     }

@@ -86,7 +86,7 @@ final class FactoryMachineLibraryRender {
             FactoryStatus status = FactoryStatus.of(member, this.context.theme());
             FactoryNineSlice.icon(graphics, status.lamp(), cardX + 6, rowY + 4,
                     FactoryGuiTextures.STATUS_LAMP_SIZE);
-            graphics.drawString(this.context.font(), member.ref().pos().toShortString(),
+            graphics.drawString(this.context.font(), member.pos().toShortString(),
                     cardX + 18, rowY + 4, this.context.theme().textValue(), false);
             graphics.drawString(this.context.font(), status.text(), cardX + 78, rowY + 4,
                     status.color(), false);
@@ -143,7 +143,7 @@ final class FactoryMachineLibraryRender {
         int iconSlotY = cardY + 2;
         FactoryNineSlice.slot(graphics, iconSlotX, iconSlotY,
                 FactoryLayout.CELL, FactoryLayout.CELL);
-        ItemStack icon = anchor.machineMissing()
+        ItemStack icon = !anchor.health().isOnline()
                 ? new ItemStack(Items.BARRIER)
                 : FactoryLabels.blockStack(anchor.blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
@@ -163,7 +163,7 @@ final class FactoryMachineLibraryRender {
                 FactoryGuiTextures.STATUS_LAMP_SIZE);
 
         int nameWidth = Math.max(18, lampX - textX - 4);
-        String cardName = anchor.machineMissing()
+        String cardName = !anchor.health().isOnline()
                 ? "已失联" : FactoryLabels.blockName(anchor.blockId());
         graphics.drawString(this.context.font(),
                 this.context.font().plainSubstrByWidth(cardName, nameWidth),
@@ -171,8 +171,8 @@ final class FactoryMachineLibraryRender {
         graphics.drawString(this.context.font(), statusText, statusX, nameY,
                 status.color(), false);
 
-        String where = anchor.ref().dimension().location() + " "
-                + anchor.ref().pos().toShortString();
+        String where = anchor.dimension().location() + " "
+                + anchor.pos().toShortString();
         String rulesLabel = "规则 ";
         String rulesValue = Integer.toString(anchor.ruleCount());
         int rulesWidth = this.context.font().width(rulesLabel)

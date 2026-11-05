@@ -4,8 +4,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineLibrary;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 public final class Factory {
     /** 工厂唯一 id。 */
     private final UUID id;
-    /** 写档部分：拥有者、仓库地址与模式、机器库。 */
+    /** 写档部分：拥有者、仓库地址与模式、节点库。 */
     private final FactoryConfig config;
     /** 运行时部分：解析出的仓库、在线标记、诊断计数。 */
     private final FactoryLive live = new FactoryLive();
@@ -69,13 +69,13 @@ public final class Factory {
     }
 
     /**
-     * 读档用：把已经带规则的机器灌进机器库，不触发落盘。
+     * 读档用：把已经带规则的节点灌进节点库，不触发落盘。
      *
-     * @param machine 机器
+     * @param node 节点
      * @return 加入结果；id 重复或库满时不是 {@code ADDED}
      */
-    MachineLibrary.AddResult restoreMachine(Machine machine) {
-        return this.config.library().add(machine);
+    NodeLibrary.Result restoreNode(Node node) {
+        return this.config.library().add(node);
     }
 
     /**

@@ -474,13 +474,13 @@ public final class FactoryEditController implements FactoryScreenInteraction {
             return;
         }
         if (machine.ruleCount() == 0) {
-            sendDeleteMachine(machine.ref().id());
+            sendDeleteMachine(machine.machineId());
             return;
         }
-        String message = "机器 [" + machine.ref().shortId() + "] 还有 " + machine.ruleCount()
+        String message = "机器 [" + machine.machineId().toString().substring(0, 8) + "] 还有 " + machine.ruleCount()
                 + " 条 IO 配置。\n删除后规则无法恢复。";
         this.confirmDialog.open("删除机器", message, "删除",
-                () -> sendDeleteMachine(machine.ref().id()),
+                () -> sendDeleteMachine(machine.machineId()),
                 this.layout);
     }
 

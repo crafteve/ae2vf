@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.GridHelper;
@@ -28,24 +27,23 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 
 /**
- * 一台机器的虚拟节点：节点 owner、样板容器与派单入口。
+ * 一个节点的虚拟节点：节点 owner、样板容器与派单入口。
  *
- * <p>一个逻辑机器对应一个节点，所有节点都连到工厂 ME 锚点节点上；节点不在世界里
+ * <p>一个逻辑节点对应一个 AE2 节点，所有节点都连到工厂 ME 锚点节点上；节点不在世界里
  * （{@code setInWorldNode(false)}），所以没有面、不占频道、待机耗电为零。实现
- * {@link PatternContainer} 是为了让 AE2 样板访问终端按机器看到一个容器，实现
- * {@link IActionHost} 是为了派单时能给出「机器自己发起的操作」这个动作源。</p>
+ * {@link PatternContainer} 是为了让 AE2 样板访问终端按节点看到一个容器，实现
+ * {@link IActionHost} 是为了派单时能给出「节点自己发起的操作」这个动作源。</p>
  *
- * <p>节点不写自己的 NBT：重启后由 {@link NodeManager} 按机器记录和锚点重建。机器失联时节点
- * 保留，只是不再广告样板。</p>
+ * <p>节点不写自己的 NBT：重启后由 {@link NodeManager} 按节点记录和锚点重建。节点内的机器
+ * 掉线时节点保留，只是不再广告样板。</p>
  */
 public final class MachineNode
         implements IGridNodeListener<MachineNode>, PatternContainer, IActionHost {
-    /** 同一条节点告警的最短间隔（tick）：避免一台坏机器刷屏。 */
+    /** 同一条节点告警的最短间隔（tick）：避免一个坏节点刷屏。 */
     private static final long WARN_INTERVAL = 100L;
 
     private final MinecraftServer server;
     private final UUID factoryId;
-    private final Machine machine;
     private final IGridNode anchor;
     private final ServerLevel anchorLevel;
     private final Consumer<NodeManager.Notice> notice;
@@ -57,40 +55,42 @@ public final class MachineNode
     private final IManagedGridNode managed;
     private final IActionSource actionSource;
 
+    /** 节点记录；结构变化时由 {@link #updateNode(Node)} 换成新实例。 */
+    private Node node;
     /** 样板是否已变、等下一次节点 tick 统一刷新解码缓存。 */
     private boolean patternsDirty;
     /** 存档数据是否已变、等下一次节点 tick 统一标脏。 */
     private boolean dataDirty;
-    /** 机器方块是否在线（取观测结论，本类不自己探世界）。 */
+    /** 节点内是否至少有一台机器在线（取观测结论，本类不自己探世界）。 */
     private boolean available;
     private long nextWarnTick;
 
     /**
      * @param server      服务端实例，用来取机器所在维度
      * @param factoryId   所属工厂 id
-     * @param machine     机器记录
+     * @param node        节点记录
      * @param anchor      工厂 ME 锚点节点
      * @param anchorLevel 锚点所在维度，虚拟节点只借它做构造参数
-     * @param available   机器方块此刻是否在线
+     * @param available   节点内是否至少有一台机器在线
      * @param notice      节点告警出口
      */
-    MachineNode(MinecraftServer server, UUID factoryId, Machine machine, IGridNode anchor,
+    MachineNode(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
             ServerLevel anchorLevel, boolean available, Consumer<NodeManager.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
-        this.machine = machine;
+        this.node = node;
         this.anchor = anchor;
         this.anchorLevel = anchorLevel;
         this.available = available;
         this.notice = notice;
-        // 建节点时机器上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
+        // 建节点时节点上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
         this.patternsDirty = true;
 
         this.craft = new MachineCraftService(this);
         this.patternInventory = new MachinePatternInventory(this);
         this.faceResolver = new ProviderFaceResolver(this);
         this.returnSweep = new ProviderReturnSweep(this);
-        this.terminal = new MachineTerminalGroup(server, machine, available);
+        this.terminal = new MachineTerminalGroup(server, node, available);
 
         this.managed = GridHelper.createManagedNode(this, this)
                 .setInWorldNode(false)
@@ -109,7 +109,7 @@ public final class MachineNode
      */
     boolean attach(IGridNode anchor) {
         try {
-            this.managed.create(this.anchorLevel, this.machine.ref().pos());
+            this.managed.create(this.anchorLevel, primaryMachine().typeBlock().pos());
             IGridNode node = this.managed.getNode();
             if (node == null) {
                 // create 没抛异常却没给出节点：不回滚就会留下一个没人拆的半节点，
@@ -183,7 +183,7 @@ public final class MachineNode
      */
     boolean tick() {
         boolean changed = false;
-        if (this.machine.provider().pendingCount() > 0) {
+        if (this.node.provider().pendingCount() > 0) {
             changed |= ProviderOverflow.flush(this);
         }
         if (this.patternsDirty) {
@@ -261,9 +261,39 @@ public final class MachineNode
         return this.factoryId;
     }
 
-    /** 机器记录。 */
-    Machine machine() {
-        return this.machine;
+    /** 节点记录。 */
+    Node node() {
+        return this.node;
+    }
+
+    /**
+     * 节点里的代表机器：1:1 阶段就是唯一那台，堆叠 / 多方块落地后仍需一个「类型方块宿主」。
+     *
+     * @return 第一台机器
+     */
+    Machine primaryMachine() {
+        return this.node.machines().get(0);
+    }
+
+    /**
+     * 节点记录变化：名字等非结构变化时同步到运行时；同一个实例直接跳过。
+     *
+     * <p>结构变化会让 {@link #matches} 返回 false 并触发重建，走不到这里，所以这里不标
+     * {@code patternsDirty}，避免每 20 tick 白重建一次样板缓存。</p>
+     *
+     * @param next 新节点记录
+     */
+    void updateNode(Node next) {
+        if (this.node == next) {
+            return;
+        }
+        this.node = next;
+        this.terminal.updateNode(next);
+    }
+
+    /** 刷新样板终端分组名。 */
+    void refreshName() {
+        this.terminal.refreshName();
     }
 
     /** 建节点用的锚点，用来判断锚点是否换过。 */
@@ -271,10 +301,10 @@ public final class MachineNode
         return this.anchor;
     }
 
-    /** 机器所在维度；节点本身不依赖它，派单与回收用。 */
+    /** 节点类型方块所在维度；派单与回收用。 */
     @Nullable
     ServerLevel machineLevel() {
-        return this.server.getLevel(this.machine.ref().dimension());
+        return this.server.getLevel(primaryMachine().typeBlock().dimension());
     }
 
     /** 当前游戏时间，告警与回收节奏用。 */
@@ -292,7 +322,7 @@ public final class MachineNode
      */
     Level decodeLevel() {
         ServerLevel level = this.machineLevel();
-        if (level != null && level.isLoaded(this.machine.ref().pos())) {
+        if (level != null && level.isLoaded(primaryMachine().typeBlock().pos())) {
             return level;
         }
         return this.anchorLevel;
@@ -340,7 +370,7 @@ public final class MachineNode
      * @param message 短句
      */
     void report(String message) {
-        this.notice.accept(new NodeManager.Notice(this.factoryId, this.machine.id(), message));
+        this.notice.accept(new NodeManager.Notice(this.factoryId, this.node.id(), message));
     }
 
     /** 产物白名单：所有样板产物的 key 并集。 */
@@ -364,19 +394,20 @@ public final class MachineNode
             return;
         }
         this.nextWarnTick = now + WARN_INTERVAL;
-        IdleFactory.LOGGER.warn("Idle Factory 机器节点 [{}]：{}",
-                this.machine.ref().shortId(), message);
+        IdleFactory.LOGGER.warn("Idle Factory 节点 [{}]：{}",
+                this.node.id().toString().substring(0, 8), message);
     }
 
     /**
      * 这次对账描述的是不是本节点。
      *
      * @param spec 对账输入
-     * @return 工厂、机器与锚点都没变时为 {@code true}
+     * @return 工厂、节点 id、锚点与结构版本都没变时为 {@code true}
      */
     boolean matches(NodeManager.Spec spec) {
         return this.factoryId.equals(spec.factoryId())
-                && this.machine == spec.machine()
+                && this.node.id().equals(spec.node().id())
+                && this.node.topologyRevision() == spec.node().topologyRevision()
                 && this.anchor == spec.anchor();
     }
 

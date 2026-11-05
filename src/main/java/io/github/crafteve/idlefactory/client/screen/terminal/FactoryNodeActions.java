@@ -70,8 +70,8 @@ final class FactoryNodeActions {
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
-                || !minecraft.level.dimension().location().equals(member.member().dimension())) {
-            message("节点在 " + member.member().dimension() + " " + pos.toShortString());
+                || !minecraft.level.dimension().location().equals(member.member().dimensionId())) {
+            message("节点在 " + member.member().dimensionId() + " " + pos.toShortString());
             return;
         }
         FactoryLocateRenderer.show(minecraft.level.dimension(), pos);

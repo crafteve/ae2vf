@@ -9,8 +9,7 @@ import java.util.function.LongSupplier;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
@@ -123,8 +122,8 @@ final class FactoryLifecycleService {
             return 0;
         }
         int returned = 0;
-        for (Machine machine : factory.get().config().machines().all()) {
-            returned += this.machineLinks.returnPatterns(factory.get(), machine, player);
+        for (Node node : factory.get().config().nodes().all()) {
+            returned += this.machineLinks.returnPatterns(factory.get(), node, player);
         }
         this.manager.remove(factory.get().id());
         this.nodeManager.removeFactory(factory.get().id());
@@ -156,15 +155,15 @@ final class FactoryLifecycleService {
                 FactorySnapshotBuilder.machines(factory, this.observations,
                         player.serverLevel().getGameTime());
         if (machines.isEmpty()) {
-            FactoryMessages.info(player, "机器库为空：准星对准机器执行 /idf factory connect");
+            FactoryMessages.info(player, "节点库为空：准星对准机器执行 /idf factory connect");
             return 1;
         }
         FactoryMessages.info(player, FactorySnapshotBuilder.health(factory, machines).describe());
 
-        int missingCount = 0;
+        int offlineCount = 0;
         for (FactorySnapshotBuilder.MachineView view : machines) {
-            if (view.machineMissing()) {
-                missingCount++;
+            if (!view.health().isOnline()) {
+                offlineCount++;
             }
         }
         int shown = 0;
@@ -176,21 +175,21 @@ final class FactoryLifecycleService {
             sendMachineRow(player, view);
             shown++;
         }
-        if (missingCount > 0) {
-            FactoryMessages.info(player, "失联 " + missingCount + " 台 · 放回方块会自动恢复；删除请用机器库界面");
+        if (offlineCount > 0) {
+            FactoryMessages.info(player, "离线 " + offlineCount + " 台 · 放回方块会自动恢复；删除请用机器库界面");
         }
         return 1;
     }
 
     private static void sendMachineRow(ServerPlayer player, FactorySnapshotBuilder.MachineView view) {
-        MachineRef ref = view.ref();
-        String where = ref.dimension().location() + " " + ref.pos().toShortString();
+        String where = view.dimension().location() + " " + view.pos().toShortString();
         String status = FactorySnapshotBuilder.describe(view);
         StringBuilder hover = new StringBuilder(where).append('\n').append(status)
                 .append(" · 规则 ").append(view.ruleCount()).append(" 条");
         Component row = Component.empty()
                 .append(FactoryMessages.text("  ", FactoryMessages.INFO))
-                .append(FactoryMessages.hover(ref.shortId(), hover.toString()))
+                .append(FactoryMessages.hover(view.machineId().toString().substring(0, 8),
+                        hover.toString()))
                 .append(FactoryMessages.text(" " + where + "  " + status, FactoryMessages.INFO));
         FactoryMessages.send(player, row);
     }

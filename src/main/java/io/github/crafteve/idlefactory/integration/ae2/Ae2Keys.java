@@ -7,7 +7,6 @@ import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
-import appeng.api.stacks.AEKey;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.material.Fluid;

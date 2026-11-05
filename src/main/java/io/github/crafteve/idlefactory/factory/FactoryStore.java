@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
@@ -21,8 +21,8 @@ import net.minecraft.world.level.saveddata.SavedData;
 /**
  * 工厂档案的存档容器。
  *
- * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库地址与机器（含 IO 规则）。
- * 运行时数据（仓库在线、诊断、机器失联）一律不写。</p>
+ * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库地址与节点（含机器、
+ * IO 规则与 provider）。运行时数据（仓库在线、诊断、健康）一律不写。</p>
  *
  * <p>存档挂在主世界的 {@code DataStorage} 上，每个存档一份。</p>
  */
@@ -34,7 +34,7 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_OWNER = "Owner";
     private static final String TAG_ANCHOR = "Anchor";
     private static final String TAG_STORAGE_MODE = "StorageMode";
-    private static final String TAG_MACHINES = "Machines";
+    private static final String TAG_NODES = "Nodes";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
@@ -96,12 +96,12 @@ public final class FactoryStore extends SavedData {
                 entry.put(TAG_ANCHOR, record.anchor().save());
             }
             entry.putString(TAG_STORAGE_MODE, record.storageMode().name());
-            if (!record.machines().isEmpty()) {
-                ListTag machines = new ListTag();
-                for (Machine machine : record.machines()) {
-                    machines.add(machine.save(registries));
+            if (!record.nodes().isEmpty()) {
+                ListTag nodes = new ListTag();
+                for (Node node : record.nodes()) {
+                    nodes.add(node.save(registries));
                 }
-                entry.put(TAG_MACHINES, machines);
+                entry.put(TAG_NODES, nodes);
             }
             list.add(entry);
         }
@@ -123,16 +123,16 @@ public final class FactoryStore extends SavedData {
                     ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
                     : null;
             StorageMode storageMode = readMode(entry, anchor);
-            List<Machine> machines = new ArrayList<>();
-            ListTag machineList = entry.getList(TAG_MACHINES, Tag.TAG_COMPOUND);
-            for (int j = 0; j < machineList.size(); j++) {
-                Machine machine = Machine.load(machineList.getCompound(j), registries);
-                if (machine != null) {
-                    machines.add(machine);
+            List<Node> nodes = new ArrayList<>();
+            ListTag nodeList = entry.getList(TAG_NODES, Tag.TAG_COMPOUND);
+            for (int j = 0; j < nodeList.size(); j++) {
+                Node node = Node.load(nodeList.getCompound(j), registries);
+                if (node != null) {
+                    nodes.add(node);
                 }
             }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    storageMode, machines));
+                    storageMode, nodes));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -159,17 +159,18 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 一条存档记录：工厂身份、仓库地址与机器表。
+     * 一条存档记录：工厂身份、仓库地址与节点表。
      *
-     * <p>机器自己带 IO 规则；P1 删除产线后这里不再有产线表。</p>
+     * <p>节点自己带机器、IO 规则与 provider；{@code NextSeq} 仍是存档根级字段，
+     * 不属于任何工厂记录。</p>
      *
      * @param id          工厂 id
      * @param owner       拥有者玩家 uuid
      * @param anchor      仓库地址；未绑定为 {@code null}
      * @param storageMode 仓库接入模式（ME / 容器）
-     * @param machines    机器表（含 IO 规则）
+     * @param nodes       节点表（含机器、IO 规则与 provider）
      */
     public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            StorageMode storageMode, List<Machine> machines) {
+            StorageMode storageMode, List<Node> nodes) {
     }
 }

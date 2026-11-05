@@ -74,7 +74,7 @@ final class FactoryNodeTooltip {
                 + node.view().patternCount() + " 份"));
         if (!node.members().isEmpty()) {
             FactoryNodeSnapshotBuilder.MemberView first = node.members().get(0).member();
-            lines.add(line("位置", first.dimension() + " "
+            lines.add(line("位置", first.dimensionId() + " "
                     + (first.primaryPos() == null ? "未知" : first.primaryPos().toShortString())));
         }
         lines.add(Component.literal("点名字改名 · 点卡片展开 / 收起")
@@ -117,7 +117,7 @@ final class FactoryNodeTooltip {
         FactoryNodeSnapshotBuilder.MemberView view = member.member();
         List<Component> lines = new ArrayList<>(4);
         lines.add(Component.literal(member.label()).withStyle(ChatFormatting.BOLD));
-        lines.add(Component.literal(view.dimension() + " "
+        lines.add(Component.literal(view.dimensionId() + " "
                 + (view.primaryPos() == null ? "未知" : view.primaryPos().toShortString()))
                 .withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal(view.health().describe()).withStyle(ChatFormatting.GRAY));
@@ -132,7 +132,7 @@ final class FactoryNodeTooltip {
         FactoryNodeSnapshotBuilder.MemberView view = node.members().get(index).member();
         return List.of(
                 Component.literal("定位").withStyle(ChatFormatting.BOLD),
-                Component.literal(view.dimension() + " "
+                Component.literal(view.dimensionId() + " "
                         + (view.primaryPos() == null ? "未知" : view.primaryPos().toShortString()))
                         .withStyle(ChatFormatting.GRAY),
                 Component.literal("世界高亮 3 秒").withStyle(ChatFormatting.DARK_GRAY));

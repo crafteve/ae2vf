@@ -7,7 +7,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.factory.MachineActions;
+import io.github.crafteve.idlefactory.factory.NodeActions;
 import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
 import io.github.crafteve.idlefactory.network.FactoryTableSnapshots;
 
@@ -73,7 +73,7 @@ public record FactoryMachineActionC2S(int containerId, UUID machineId)
                 sendFeedback(player, payload.containerId(), false, "你还没有工厂");
                 return;
             }
-            MachineActions.Result result = FactoryService.deleteMachineById(
+            NodeActions.Result result = FactoryService.deleteMachineById(
                     factory.get(), payload.machineId());
             sendFeedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {

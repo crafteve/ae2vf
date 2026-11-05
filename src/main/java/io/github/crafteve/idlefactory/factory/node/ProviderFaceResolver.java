@@ -59,7 +59,7 @@ final class ProviderFaceResolver {
     @Nullable
     ServerLevel level() {
         ServerLevel level = this.node.machineLevel();
-        if (level == null || !level.isLoaded(this.node.machine().ref().pos())) {
+        if (level == null || !level.isLoaded(this.node.primaryMachine().typeBlock().pos())) {
             return null;
         }
         return level;
@@ -115,7 +115,7 @@ final class ProviderFaceResolver {
      */
     @Nullable
     private Direction ruleFace(AEKey key) {
-        List<ResourceSpec> inputs = this.node.machine().io().inputs();
+        List<ResourceSpec> inputs = this.node.node().io().inputs();
         Direction fuzzy = null;
         for (ResourceSpec spec : inputs) {
             if (spec.face() == null) {
@@ -150,7 +150,7 @@ final class ProviderFaceResolver {
         private Faces(ProviderFaceResolver owner, ServerLevel level) {
             this.owner = owner;
             this.level = level;
-            this.pos = owner.node.machine().ref().pos();
+            this.pos = owner.node.primaryMachine().typeBlock().pos();
             this.blockEntity = level.getBlockEntity(this.pos);
         }
 

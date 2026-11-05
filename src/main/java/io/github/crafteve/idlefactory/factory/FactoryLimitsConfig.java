@@ -1,5 +1,12 @@
 package io.github.crafteve.idlefactory.factory;
 
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Multiplier;
+import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.factory.node.NodeProvider;
+
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
@@ -15,25 +22,25 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  */
 public final class FactoryLimitsConfig {
     /** 节点数硬上限。 */
-    public static final int HARD_MAX_NODES = 4096;
+    public static final int HARD_MAX_NODES = NodeLibrary.HARD_MAX_NODES;
     /** 单节点机器数硬上限。 */
-    public static final int HARD_MAX_MACHINES_PER_NODE = 256;
+    public static final int HARD_MAX_MACHINES_PER_NODE = NodeLibrary.HARD_MAX_MACHINES_PER_NODE;
     /** 单机器方块数硬上限。 */
-    public static final int HARD_MAX_BLOCKS_PER_MACHINE = 256;
+    public static final int HARD_MAX_BLOCKS_PER_MACHINE = Machine.HARD_MAX_BLOCKS;
     /** 单节点方块数硬上限。 */
-    public static final int HARD_MAX_BLOCKS_PER_NODE = 4096;
+    public static final int HARD_MAX_BLOCKS_PER_NODE = NodeLibrary.HARD_MAX_BLOCKS_PER_NODE;
     /** 全工厂机器数硬上限。 */
-    public static final int HARD_MAX_TOTAL_MACHINES = 8192;
+    public static final int HARD_MAX_TOTAL_MACHINES = NodeLibrary.HARD_MAX_TOTAL_MACHINES;
     /** 全工厂方块数硬上限。 */
-    public static final int HARD_MAX_TOTAL_BLOCKS = 32768;
+    public static final int HARD_MAX_TOTAL_BLOCKS = NodeLibrary.HARD_MAX_TOTAL_BLOCKS;
     /** 每侧规则数硬上限。 */
-    public static final int HARD_MAX_RULES_PER_SIDE = 64;
+    public static final int HARD_MAX_RULES_PER_SIDE = NodeIoGroup.MAX_RULES_PER_SIDE;
     /** 样板槽硬上限。 */
-    public static final int HARD_MAX_PATTERN_CAPACITY = 1024;
+    public static final int HARD_MAX_PATTERN_CAPACITY = NodeProvider.MAX_CAPACITY;
     /** 倍率硬上限；与 {@code factory.node.Multiplier.HARD_MAX_FACTOR} 一致。 */
-    public static final int HARD_MAX_MULTIPLIER = 64;
+    public static final int HARD_MAX_MULTIPLIER = Multiplier.HARD_MAX_FACTOR;
     /** 名字长度硬上限。 */
-    public static final int HARD_MAX_NAME_LENGTH = 32767;
+    public static final int HARD_MAX_NAME_LENGTH = Node.HARD_MAX_NAME_LENGTH;
     /** 观测预算硬上限（每 tick 探测多少次）。 */
     public static final int HARD_MAX_OBSERVATION_BUDGET = 256;
     /** 健康过期阈值硬上限（tick）。 */

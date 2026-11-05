@@ -59,8 +59,8 @@ final class FactoryPassiveIoTooltip {
         lines.add(Component.literal(block.name()).withStyle(ChatFormatting.BOLD));
         lines.add(Component.literal(block.status().text()).withStyle(
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
-        lines.add(Component.literal(block.machine().ref().dimension().location()
-                + " " + block.machine().ref().pos().toShortString()).withStyle(ChatFormatting.GRAY));
+        lines.add(Component.literal(block.machine().dimension().location()
+                + " " + block.machine().pos().toShortString()).withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal("规则 " + block.rules().size() + " 条")
                 .withStyle(ChatFormatting.GRAY));
         return lines;

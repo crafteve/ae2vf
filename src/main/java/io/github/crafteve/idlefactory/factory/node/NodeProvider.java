@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.machine;
+package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,23 +15,23 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 机器的样板供应器数据：阻挡开关、样板槽、待发送余量。
+ * 节点的样板供应器数据：阻挡、倍率、派单、样板槽与待发送余量。
  *
- * <p>一个逻辑机器就是一个样板容器，槽位跟着机器记录走，所以这些字段的宿主是
- * {@link Machine} 而不是运行时节点。样本槽按容量存成定长列表，空槽用
- * {@link ItemStack#EMPTY} 占位，槽位下标就是样板访问终端看到的槽位。</p>
+ * <p>provider 归节点：一个节点一个样板容器，槽位与余量跟着节点记录走，堆叠机器共用。
+ * 样板槽按容量存成定长列表，空槽用 {@link ItemStack#EMPTY} 占位，槽位下标就是样板访问终端
+ * 看到的槽位。</p>
  *
  * <p>对外只给不可变视图或副本；写入口只有本类显式的 set / add / take 方法，调用方拿不到
  * 内部可变列表。</p>
  */
-public final class MachineProvider {
+public final class NodeProvider {
     /** 默认样板槽数。 */
     public static final int DEFAULT_CAPACITY = 9;
     /** 每次扩容增加的槽数。 */
     public static final int CAPACITY_STEP = 9;
-    /** 样板槽上限。 */
+    /** 样板槽硬上限；config 只能调低。 */
     public static final int MAX_CAPACITY = 1024;
-    /** 余量队列最多保留几条；正常一份样板最多几条输入，超了说明状态异常。 */
+    /** 余量队列硬顶，不可由 config 调整；满了退回 ME 网络。 */
     public static final int MAX_PENDING = 64;
 
     private static final String TAG_BLOCKING = "Blocking";
@@ -42,15 +42,22 @@ public final class MachineProvider {
     private static final String TAG_FACE = "Face";
     private static final String TAG_MODE = "Mode";
     private static final String TAG_MODE_PINNED = "ModePinned";
+    private static final String TAG_MULTIPLIER_MODE = "MultiplierMode";
+    private static final String TAG_MULTIPLIER_FACTOR = "MultiplierFactor";
+    private static final String TAG_DISPATCH = "Dispatch";
     /** 余量条目的面：-1 表示还没定面。 */
     private static final byte FACE_UNSET = -1;
 
     /** 阻挡开关。 */
     private BlockingMode blocking = BlockingMode.OFF;
     /** 主动 / 被动模式。 */
-    private MachineMode mode = MachineMode.PASSIVE;
+    private ProviderMode mode = ProviderMode.PASSIVE;
     /** 玩家是否手动切过模式；手动切过之后不再按样板自动切换。 */
     private boolean modePinned;
+    /** 倍率：关 / 固定 / 智能。 */
+    private Multiplier multiplier = Multiplier.off();
+    /** 派单模式：顺序 / 轮询；新节点默认轮询。 */
+    private DispatchMode dispatch = DispatchMode.ROUND_ROBIN;
     /** 样板槽容量；{@code patterns.size()} 永远等于它。 */
     private int capacity = DEFAULT_CAPACITY;
     /** 样板槽，定长、空槽为 {@link ItemStack#EMPTY}。 */
@@ -59,7 +66,7 @@ public final class MachineProvider {
     private final List<Pending> pending = new ArrayList<>();
 
     /** 新建空供应器：默认 9 槽、不阻挡、没有余量。 */
-    public MachineProvider() {
+    public NodeProvider() {
         fill(this.patterns, DEFAULT_CAPACITY);
     }
 
@@ -106,7 +113,7 @@ public final class MachineProvider {
     }
 
     /** 主动 / 被动模式。 */
-    public MachineMode mode() {
+    public ProviderMode mode() {
         return this.mode;
     }
 
@@ -121,7 +128,7 @@ public final class MachineProvider {
      * @param next 新模式
      * @return 模式是否真的变了
      */
-    public boolean selectMode(MachineMode next) {
+    public boolean selectMode(ProviderMode next) {
         boolean changed = !this.modePinned || this.mode != next;
         this.modePinned = true;
         this.mode = next;
@@ -134,11 +141,39 @@ public final class MachineProvider {
      * @return 模式是否因这次写入变化
      */
     public boolean autoActivateOnPattern() {
-        if (this.modePinned || this.mode == MachineMode.ACTIVE) {
+        if (this.modePinned || this.mode == ProviderMode.ACTIVE) {
             return false;
         }
-        this.mode = MachineMode.ACTIVE;
+        this.mode = ProviderMode.ACTIVE;
         return true;
+    }
+
+    /** 倍率：关 / 固定 / 智能。 */
+    public Multiplier multiplier() {
+        return this.multiplier;
+    }
+
+    /**
+     * 改倍率。
+     *
+     * @param next 新倍率；{@code null} 按不倍率处理
+     */
+    public void setMultiplier(@Nullable Multiplier next) {
+        this.multiplier = next == null ? Multiplier.off() : next;
+    }
+
+    /** 派单模式：顺序 / 轮询。 */
+    public DispatchMode dispatch() {
+        return this.dispatch;
+    }
+
+    /**
+     * 改派单模式。
+     *
+     * @param next 新模式；{@code null} 按轮询处理
+     */
+    public void setDispatch(@Nullable DispatchMode next) {
+        this.dispatch = next == null ? DispatchMode.ROUND_ROBIN : next;
     }
 
     /** 样板槽容量。 */
@@ -274,6 +309,10 @@ public final class MachineProvider {
         tag.putString(TAG_BLOCKING, this.blocking.name());
         tag.putString(TAG_MODE, this.mode.name());
         tag.putBoolean(TAG_MODE_PINNED, this.modePinned);
+        // 倍率拆成两个键，和计划里的存档字段一致；倍数本身由 Multiplier 负责夹在硬上限内。
+        tag.putString(TAG_MULTIPLIER_MODE, this.multiplier.mode().name());
+        tag.putInt(TAG_MULTIPLIER_FACTOR, this.multiplier.factor());
+        tag.putString(TAG_DISPATCH, this.dispatch.name());
         tag.putInt(TAG_CAPACITY, this.capacity);
 
         ListTag patternList = new ListTag();
@@ -297,18 +336,22 @@ public final class MachineProvider {
     /**
      * 从 NBT 读回来。
      *
-     * <p>旧档没有 {@code Provider} 复合标签时按默认值读：不阻挡、9 槽、空样板、空余量，
-     * 不写迁移代码。</p>
+     * <p>旧档没有 {@code Provider} 复合标签时按默认值读：不阻挡、不倍率、轮询派单、9 槽、
+     * 空样板、空余量，不写迁移代码。</p>
      *
      * @param tag        存档标签；可以是空标签
      * @param registries 注册表访问
      * @return 供应器数据
      */
-    public static MachineProvider load(CompoundTag tag, HolderLookup.Provider registries) {
-        MachineProvider provider = new MachineProvider();
+    public static NodeProvider load(CompoundTag tag, HolderLookup.Provider registries) {
+        NodeProvider provider = new NodeProvider();
         provider.blocking = BlockingMode.read(tag.getString(TAG_BLOCKING));
-        provider.mode = MachineMode.read(tag.getString(TAG_MODE));
+        provider.mode = ProviderMode.read(tag.getString(TAG_MODE));
         provider.modePinned = tag.getBoolean(TAG_MODE_PINNED);
+        provider.multiplier = new Multiplier(MultiplierMode.read(tag.getString(TAG_MULTIPLIER_MODE)),
+                tag.contains(TAG_MULTIPLIER_FACTOR)
+                        ? tag.getInt(TAG_MULTIPLIER_FACTOR) : Multiplier.MIN_FACTOR);
+        provider.dispatch = DispatchMode.read(tag.getString(TAG_DISPATCH));
 
         ListTag patternList = tag.getList(TAG_PATTERNS, Tag.TAG_COMPOUND);
         List<ItemStack> loaded = new ArrayList<>(patternList.size());

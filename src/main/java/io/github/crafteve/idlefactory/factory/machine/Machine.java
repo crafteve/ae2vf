@@ -1,157 +1,197 @@
 package io.github.crafteve.idlefactory.factory.machine;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 
-import net.minecraft.core.HolderLookup;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 
 /**
- * 机器库里的一个真实机器：身份 + 位置 + 这台机器的 IO 规则 + 样板供应器数据。
+ * 一台机器：随机 id + 它占用的全部方块。
  *
- * <p>{@link MachineRef} 负责“哪台机器”，{@link MachineIoGroup} 负责“搬什么”，
- * {@link MachineProvider} 负责“主动合成要什么”；本类只是把它们绑在一起。规则与样板都跟着
- * 机器走：只有删除机器才会丢。</p>
+ * <p>机器不存维度：维度挂在每个 {@link BlockKey} 上，同一台机器内部的方块允许跨维度。
+ * 第 0 个方块是类型 / 展示方块（多方块机器的主方块），单方块机器就是唯一方块；所有需要
+ * 「这台机器是什么」的地方都用 {@link #typeBlock()}，不再区分有没有主方块。</p>
  *
- * <p>一台机器当前只有一个 {@link MachineIoGroup} 和一个 {@link MachineProvider}；
- * 以后如果要做样板组，再把这些字段换成可选的规则集。</p>
+ * <p>机器不可变：加 / 删方块返回新实例，机器 id 不变。规则与样板不在这里，它们归节点。</p>
+ *
+ * @param id     机器 id，随机生成，与方块位置无关
+ * @param blocks 机器占用的方块，第 0 个是类型方块；至少一个
  */
-public final class Machine {
-    /** 节点名字上限；界面输入、网络解码与写档共用同一个值。 */
-    public static final int MAX_NAME_LENGTH = 32;
+public record Machine(UUID id, List<BlockKey> blocks) {
+    /** 单台机器的方块数硬上限，不可由 config 关掉。 */
+    public static final int HARD_MAX_BLOCKS = 256;
 
-    private static final String TAG_IO = "Io";
-    private static final String TAG_PROVIDER = "Provider";
-    private static final String TAG_NAME = "Name";
-
-    /** 机器身份与坐标。 */
-    private final MachineRef ref;
-    /** 这台机器的 IO 规则。 */
-    private final MachineIoGroup io;
-    /** 这台机器的样板供应器数据。 */
-    private final MachineProvider provider;
-    /** 玩家给节点起的名字；{@code null} 表示用方块名。 */
-    @Nullable
-    private String name;
+    private static final String TAG_ID = "Id";
+    private static final String TAG_BLOCKS = "Blocks";
+    private static final String TAG_DIMENSION = "Dimension";
+    private static final String TAG_POS = "Pos";
 
     /**
-     * 新建一台没有规则、没有样板的机器。
+     * 规范化方块列表：复制成不可变列表，并守住「至少一个方块」的不变量。
      *
-     * @param ref 机器身份
+     * @param id     机器 id
+     * @param blocks 方块列表
      */
-    public Machine(MachineRef ref) {
-        this(ref, new MachineIoGroup(), new MachineProvider());
+    public Machine {
+        blocks = List.copyOf(blocks);
+        if (blocks.isEmpty()) {
+            throw new IllegalArgumentException("机器至少要有一个方块");
+        }
     }
 
     /**
-     * @param ref 机器身份
-     * @param io  IO 规则
+     * 按单个方块新建机器；id 随机，和坐标没有派生关系。
+     *
+     * @param dimension 方块所在维度
+     * @param pos       方块坐标
+     * @return 新机器
      */
-    public Machine(MachineRef ref, MachineIoGroup io) {
-        this(ref, io, new MachineProvider());
+    public static Machine of(ResourceKey<Level> dimension, BlockPos pos) {
+        return new Machine(UUID.randomUUID(), List.of(BlockKey.of(dimension, pos)));
     }
 
     /**
-     * @param ref      机器身份
-     * @param io       IO 规则
-     * @param provider 样板供应器数据
+     * 类型 / 展示方块：{@code blocks.get(0)}。
+     *
+     * <p>单方块机器就是唯一方块，多方块机器就是主方块。所有图标、类型判定与定位都读它。</p>
+     *
+     * @return 类型方块
      */
-    public Machine(MachineRef ref, MachineIoGroup io, MachineProvider provider) {
-        this.ref = ref;
-        this.io = io;
-        this.provider = provider;
-    }
-
-    /** 机器 id；等于 {@code ref.id()}。 */
-    public UUID id() {
-        return this.ref.id();
+    public BlockKey typeBlock() {
+        return this.blocks.get(0);
     }
 
     /**
-     * 玩家给节点起的名字。
+     * 按方块位置找这台机器里的方块下标。
      *
-     * <p>名字跟着机器记录走；1:1 节点阶段它同时是节点名。返回 {@code null} 表示没有自定义名字，
-     * 界面回退到方块名。</p>
-     *
-     * @return 自定义名字；未起名时为 {@code null}
+     * @param key 方块位置
+     * @return 下标；不属于这台机器时为 -1
      */
-    @Nullable
-    public String name() {
-        return this.name;
+    public int indexOf(BlockKey key) {
+        return this.blocks.indexOf(key);
     }
 
     /**
-     * 改节点名字；传入空串等于清除。
+     * 加一个方块；已存在时返回自身。
      *
-     * <p>只做存储，不校验长度与字符——校验在 {@code MachineActions.rename} 一处做，
-     * 避免写入口和指令各有一套规则。</p>
-     *
-     * @param next 新名字；{@code null} 或空串表示清除
+     * @param key 新方块
+     * @return 新机器
      */
-    public void setName(@Nullable String next) {
-        this.name = next == null || next.isEmpty() ? null : next;
-    }
-
-    /** 机器身份与坐标。 */
-    public MachineRef ref() {
-        return this.ref;
-    }
-
-    /** 这台机器的 IO 规则。 */
-    public MachineIoGroup io() {
-        return this.io;
-    }
-
-    /** 这台机器的样板供应器数据。 */
-    public MachineProvider provider() {
-        return this.provider;
-    }
-
-    /** 规则总数。 */
-    public int ruleCount() {
-        return this.io.ruleCount();
+    public Machine withAddedBlock(BlockKey key) {
+        if (this.blocks.contains(key)) {
+            return this;
+        }
+        List<BlockKey> next = new ArrayList<>(this.blocks);
+        next.add(key);
+        return new Machine(this.id, next);
     }
 
     /**
-     * 序列化成 NBT：机器身份 + IO 规则 + 样板供应器数据。
+     * 删一个方块；删完就没有方块时返回自身（机器至少一个方块）。
      *
-     * @param registries 注册表访问，物品组件编码需要
+     * @param key 要删的方块
+     * @return 新机器
+     */
+    public Machine withRemovedBlock(BlockKey key) {
+        if (this.blocks.size() <= 1 || !this.blocks.contains(key)) {
+            return this;
+        }
+        List<BlockKey> next = new ArrayList<>(this.blocks);
+        next.remove(key);
+        return new Machine(this.id, next);
+    }
+
+    /**
+     * 换第 0 个方块（类型方块）。
+     *
+     * @param key 新类型方块
+     * @return 新机器；列表为空时返回自身
+     */
+    public Machine withTypeBlock(BlockKey key) {
+        if (this.blocks.isEmpty()) {
+            return this;
+        }
+        List<BlockKey> next = new ArrayList<>(this.blocks);
+        next.set(0, key);
+        return new Machine(this.id, next);
+    }
+
+    /** 给界面和指令用的短 id（前 8 位）。 */
+    public String shortId() {
+        return this.id.toString().substring(0, 8);
+    }
+
+    /**
+     * 序列化成 NBT：id + 每个方块的维度与坐标。
+     *
      * @return 新标签
      */
-    public CompoundTag save(HolderLookup.Provider registries) {
-        CompoundTag tag = this.ref.save();
-        tag.put(TAG_IO, this.io.save(registries));
-        tag.put(TAG_PROVIDER, this.provider.save(registries));
-        if (this.name != null) {
-            tag.putString(TAG_NAME, this.name);
+    public CompoundTag save() {
+        CompoundTag tag = new CompoundTag();
+        tag.putUUID(TAG_ID, this.id);
+        ListTag list = new ListTag();
+        for (BlockKey block : this.blocks) {
+            CompoundTag entry = new CompoundTag();
+            entry.putString(TAG_DIMENSION, block.dimension().location().toString());
+            entry.putLong(TAG_POS, block.pos().asLong());
+            list.add(entry);
         }
+        tag.put(TAG_BLOCKS, list);
         return tag;
     }
 
     /**
-     * 从 NBT 读回来；id 与维度+坐标不一致时丢弃。
+     * 从 NBT 读回来；缺 id、缺方块或维度名非法时丢弃。
      *
-     * @param tag        存档标签
-     * @param registries 注册表访问，物品组件解码需要
-     * @return 机器；字段缺失或 id 不一致时返回 {@code null}
+     * <p>坏方块逐个丢弃：方块读不出来只丢方块，读完一个不剩才丢弃整台机器。</p>
+     *
+     * @param tag 存档标签
+     * @return 机器；无法恢复时为 {@code null}
      */
     @Nullable
-    public static Machine load(CompoundTag tag, HolderLookup.Provider registries) {
-        MachineRef ref = MachineRef.load(tag);
-        if (ref == null) {
+    public static Machine load(CompoundTag tag) {
+        if (!tag.hasUUID(TAG_ID)) {
             return null;
         }
-        UUID derived = BlockKey.of(ref.dimension(), ref.pos()).id();
-        if (!derived.equals(ref.id())) {
+        ListTag list = tag.getList(TAG_BLOCKS, Tag.TAG_COMPOUND);
+        List<BlockKey> blocks = new ArrayList<>(list.size());
+        for (int i = 0; i < list.size(); i++) {
+            BlockKey key = readBlock(list.getCompound(i));
+            if (key != null && !blocks.contains(key)) {
+                blocks.add(key);
+            }
+        }
+        if (blocks.isEmpty()) {
             return null;
         }
-        MachineIoGroup io = MachineIoGroup.load(tag.getCompound(TAG_IO), registries, ref.id());
-        MachineProvider provider = MachineProvider.load(tag.getCompound(TAG_PROVIDER), registries);
-        Machine machine = new Machine(ref, io, provider);
-        machine.name = tag.contains(TAG_NAME) ? tag.getString(TAG_NAME) : null;
-        return machine;
+        return new Machine(tag.getUUID(TAG_ID), blocks);
+    }
+
+    /**
+     * 读一个方块条目。
+     *
+     * @param entry 方块标签
+     * @return 方块位置；字段缺失或维度名非法时为 {@code null}
+     */
+    @Nullable
+    private static BlockKey readBlock(CompoundTag entry) {
+        ResourceLocation dimension = ResourceLocation.tryParse(entry.getString(TAG_DIMENSION));
+        if (dimension == null || !entry.contains(TAG_POS)) {
+            return null;
+        }
+        return BlockKey.of(ResourceKey.create(Registries.DIMENSION, dimension),
+                BlockPos.of(entry.getLong(TAG_POS)));
     }
 }

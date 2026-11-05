@@ -12,7 +12,6 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
 
 import appeng.api.networking.IGridNode;
 
@@ -20,16 +19,16 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * 全部虚拟机器节点的对账表：该有的建出来，不该有的拆掉，其余每 tick 推一次。
+ * 全部虚拟节点节点的对账表：该有的建出来，不该有的拆掉，其余每 tick 推一次。
  *
- * <p>它不认识 {@code Factory}，只吃运行时拼好的 {@link Spec}：这样节点层不反向依赖工厂层。
- * 建节点分帧（每 tick 上限 {@link #MAX_CREATES_PER_TICK}），因为几百个节点同时连进一个锚点
- * 会在一 tick 内触发同样多次网络重算。</p>
+ * <p>键是节点 id：一个节点一个 AE2 节点 / PatternContainer，成员机器只是节点里的方块集合。
+ * 它不认识 {@code Factory}，只吃运行时拼好的 {@link Spec}：这样节点层不反向依赖工厂层。
+ * 建节点分帧（每 tick 上限 {@link #MAX_CREATES_PER_TICK}）。</p>
  */
 public final class NodeManager {
     /** 每 tick 最多建几个节点。 */
     public static final int MAX_CREATES_PER_TICK = 128;
-    /** 每 tick 最多做几次产物回收扫描；超出的机器顺延到下一 tick。 */
+    /** 每 tick 最多做几次产物回收扫描；超出的节点顺延到下一 tick。 */
     public static final int MAX_SWEEPS_PER_TICK = 64;
 
     private final MinecraftServer server;
@@ -60,12 +59,12 @@ public final class NodeManager {
      * <p>由运行时按「工厂是 ME 模式、锚点节点能解析出来」筛好后交进来，节点层不自己找锚点。</p>
      *
      * @param factoryId   所属工厂 id
-     * @param machine     机器记录
+     * @param node        节点记录
      * @param anchor      工厂 ME 锚点节点
      * @param anchorLevel 锚点所在维度
-     * @param available   机器方块此刻是否在线
+     * @param available   节点此刻是否有可用的在线机器
      */
-    public record Spec(UUID factoryId, Machine machine, IGridNode anchor, ServerLevel anchorLevel,
+    public record Spec(UUID factoryId, Node node, IGridNode anchor, ServerLevel anchorLevel,
             boolean available) {
     }
 
@@ -73,10 +72,10 @@ public final class NodeManager {
      * 一条节点层告警，由运行时转进工厂的事件流。
      *
      * @param factoryId 所属工厂 id
-     * @param machineId 机器 id
+     * @param nodeId    节点 id
      * @param message   给玩家看的短句
      */
-    public record Notice(UUID factoryId, UUID machineId, String message) {
+    public record Notice(UUID factoryId, UUID nodeId, String message) {
     }
 
     /** 请求下一 tick 提前对账一次。 */
@@ -95,20 +94,20 @@ public final class NodeManager {
     }
 
     /**
-     * 按机器 id 取节点。
+     * 按节点 id 取运行时节点。
      *
-     * @param machineId 机器 id
+     * @param nodeId 节点 id
      * @return 节点；没建出来时为 {@code null}
      */
     @Nullable
-    public MachineNode node(UUID machineId) {
-        return this.nodes.get(machineId);
+    public MachineNode node(UUID nodeId) {
+        return this.nodes.get(nodeId);
     }
 
     /**
      * 对账：拆掉不该有的，排上该建的。
      *
-     * <p>锚点节点实例变了就整台机器重建——旧节点还挂在旧网格上，没法就地迁移。</p>
+     * <p>锚点节点实例变了、结构版本变了就整个重建——旧节点还挂在旧网格上，没法就地迁移。</p>
      *
      * @param specs 期望存在的节点
      */
@@ -116,7 +115,7 @@ public final class NodeManager {
         this.reconcileRequested = false;
         Map<UUID, Spec> wanted = new LinkedHashMap<>();
         for (Spec spec : specs) {
-            wanted.put(spec.machine().id(), spec);
+            wanted.put(spec.node().id(), spec);
         }
 
         Iterator<Map.Entry<UUID, MachineNode>> iterator = this.nodes.entrySet().iterator();
@@ -136,18 +135,20 @@ public final class NodeManager {
 
         this.createQueue.clear();
         for (Spec spec : wanted.values()) {
-            if (!this.nodes.containsKey(spec.machine().id())) {
+            if (!this.nodes.containsKey(spec.node().id())) {
                 this.createQueue.add(spec);
             }
         }
         for (Spec spec : wanted.values()) {
-            MachineNode node = this.nodes.get(spec.machine().id());
+            MachineNode node = this.nodes.get(spec.node().id());
             if (node != null) {
                 try {
+                    // 名字 / 规则等非结构变化不重建节点，但要刷新到运行时。
+                    node.updateNode(spec.node());
                     node.setAvailable(spec.available());
                 } catch (RuntimeException e) {
                     node.logThrottled(this.server.overworld().getGameTime(),
-                            "更新可用性异常：" + e);
+                            "更新节点异常：" + e);
                 }
             }
         }
@@ -168,7 +169,7 @@ public final class NodeManager {
                     sweepBudget--;
                 }
             } catch (RuntimeException e) {
-                // 单个节点炸掉不能影响别的机器，也不能把 tick 抛出去。
+                // 单个节点炸掉不能影响别的节点，也不能把 tick 抛出去。
                 node.logThrottled(now, "节点 tick 异常：" + e);
             }
         }
@@ -178,12 +179,12 @@ public final class NodeManager {
     }
 
     /**
-     * 拆掉一台机器的节点，并把余量还回网络；机器删除走这里。
+     * 拆掉一个节点的运行时，并把余量还回网络；节点删除走这里。
      *
-     * @param machineId 机器 id
+     * @param nodeId 节点 id
      */
-    public void removeMachine(UUID machineId) {
-        MachineNode node = this.nodes.remove(machineId);
+    public void removeNode(UUID nodeId) {
+        MachineNode node = this.nodes.remove(nodeId);
         if (node != null) {
             try {
                 node.detachReturning();
@@ -195,8 +196,6 @@ public final class NodeManager {
 
     /**
      * 拆掉一个工厂的全部节点，并把余量还回网络；只有工厂记录会被删除时才用。
-     *
-     * <p>仓库模式切换不删机器记录，交给下一轮对账走 {@link MachineNode#detach()}。</p>
      *
      * @param factoryId 工厂 id
      */
@@ -216,25 +215,37 @@ public final class NodeManager {
     }
 
     /**
-     * 让一台机器重新向 CPU 广告样板；模式切换后调用。
+     * 让一个节点重新向 CPU 广告样板；模式 / 倍率切换后调用。
      *
-     * @param machineId 机器 id
+     * @param nodeId 节点 id
      */
-    public void refreshPatterns(UUID machineId) {
-        MachineNode node = this.nodes.get(machineId);
+    public void refreshPatterns(UUID nodeId) {
+        MachineNode node = this.nodes.get(nodeId);
         if (node != null) {
             node.requestPatternUpdate();
         }
     }
 
     /**
-     * 更新一台机器的可用性；机器方块出现 / 消失时由观测迁移驱动。
+     * 改名后刷新样板终端分组名。
      *
-     * @param machineId 机器 id
+     * @param nodeId 节点 id
+     */
+    public void refreshName(UUID nodeId) {
+        MachineNode node = this.nodes.get(nodeId);
+        if (node != null) {
+            node.refreshName();
+        }
+    }
+
+    /**
+     * 更新一个节点的可用性；节点内机器出现 / 消失时由观测迁移驱动。
+     *
+     * @param nodeId    节点 id
      * @param available 现在是否可用
      */
-    public void setAvailable(UUID machineId, boolean available) {
-        MachineNode node = this.nodes.get(machineId);
+    public void setAvailable(UUID nodeId, boolean available) {
+        MachineNode node = this.nodes.get(nodeId);
         if (node != null) {
             node.setAvailable(available);
         }
@@ -244,11 +255,11 @@ public final class NodeManager {
      * 发一条节点告警给运行时。
      *
      * @param factoryId 工厂 id
-     * @param machineId 机器 id
+     * @param nodeId    节点 id
      * @param message   文案
      */
-    void report(UUID factoryId, UUID machineId, String message) {
-        this.notice.accept(new Notice(factoryId, machineId, message));
+    void report(UUID factoryId, UUID nodeId, String message) {
+        this.notice.accept(new Notice(factoryId, nodeId, message));
     }
 
     /** 停机：拆掉全部节点，不碰存档数据。 */
@@ -261,7 +272,7 @@ public final class NodeManager {
                 node.shutdown();
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 停机拆节点失败 [{}]：{}",
-                        node.machine().ref().shortId(), e.toString());
+                        node.node().id(), e.toString());
             }
         }
     }
@@ -276,16 +287,16 @@ public final class NodeManager {
         while (budget > 0 && !this.createQueue.isEmpty()) {
             budget--;
             Spec spec = this.createQueue.poll();
-            if (this.nodes.containsKey(spec.machine().id())) {
+            if (this.nodes.containsKey(spec.node().id())) {
                 continue;
             }
             MachineNode node;
             try {
-                node = new MachineNode(this.server, spec.factoryId(), spec.machine(),
+                node = new MachineNode(this.server, spec.factoryId(), spec.node(),
                         spec.anchor(), spec.anchorLevel(), spec.available(), this.notice);
             } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 构造机器节点失败 [{}]：{}",
-                        spec.machine().ref().shortId(), e.toString());
+                IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",
+                        spec.node().id(), e.toString());
                 continue;
             }
             try {
@@ -296,7 +307,7 @@ public final class NodeManager {
                 node.logThrottled(now, "建节点异常：" + e);
                 continue;
             }
-            this.nodes.put(spec.machine().id(), node);
+            this.nodes.put(spec.node().id(), node);
         }
     }
 }

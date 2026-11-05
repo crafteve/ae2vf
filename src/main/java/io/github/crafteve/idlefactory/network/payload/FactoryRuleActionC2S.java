@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.MachineActions;
+import io.github.crafteve.idlefactory.factory.NodeActions;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
@@ -99,7 +99,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
                 sendFeedback(player, payload.containerId(), false, "你还没有工厂");
                 return;
             }
-            MachineActions.Result result = dispatch(factory.get(), payload);
+            NodeActions.Result result = dispatch(factory.get(), payload);
             sendFeedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {
                 FactoryTableSnapshots.send(player, payload.containerId());
@@ -107,15 +107,15 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
         });
     }
 
-    private static MachineActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
+    private static NodeActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
         return switch (payload.action()) {
-            case ADD -> MachineActions.addRule(factory, payload.machineId(),
+            case ADD -> NodeActions.addRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case UPDATE -> MachineActions.updateRule(factory, payload.machineId(),
+            case UPDATE -> NodeActions.updateRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case MOVE -> MachineActions.moveRule(factory, payload.machineId(),
+            case MOVE -> NodeActions.moveRule(factory, payload.machineId(),
                     payload.side(), payload.key(), payload.targetSide());
-            case REMOVE -> MachineActions.removeRule(factory, payload.machineId(),
+            case REMOVE -> NodeActions.removeRule(factory, payload.machineId(),
                     payload.side(), payload.key());
         };
     }

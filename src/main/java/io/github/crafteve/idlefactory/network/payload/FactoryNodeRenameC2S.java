@@ -6,8 +6,8 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.MachineActions;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.NodeActions;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.FactoryNodeSnapshots;
 
@@ -22,7 +22,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 客户端改节点名字。
  *
- * <p>只传原始文本；长度、空白与控制字符由 {@link MachineActions#rename} 统一校验，服务端
+ * <p>只传原始文本；长度、空白与控制字符由 {@link NodeActions#rename} 统一校验，服务端
  * 重校验客户端输入。</p>
  *
  * @param containerId 菜单容器 id
@@ -64,7 +64,7 @@ public record FactoryNodeRenameC2S(int containerId, UUID nodeId, String name)
                 feedback(player, payload.containerId(), false, "你还没有工厂");
                 return;
             }
-            MachineActions.Result result = MachineActions.rename(found.get(), payload.nodeId(),
+            NodeActions.Result result = NodeActions.rename(found.get(), payload.nodeId(),
                     payload.name());
             feedback(player, payload.containerId(), result.ok(), result.message());
             if (result.ok()) {
@@ -89,13 +89,13 @@ public record FactoryNodeRenameC2S(int containerId, UUID nodeId, String name)
     private static void write(RegistryFriendlyByteBuf buf, FactoryNodeRenameC2S payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeUUID(payload.nodeId());
-        buf.writeUtf(payload.name(), Machine.MAX_NAME_LENGTH);
+        buf.writeUtf(payload.name(), Node.HARD_MAX_NAME_LENGTH);
     }
 
     private static FactoryNodeRenameC2S read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
         UUID nodeId = buf.readUUID();
-        String name = buf.readUtf(Machine.MAX_NAME_LENGTH);
+        String name = buf.readUtf(Node.HARD_MAX_NAME_LENGTH);
         return new FactoryNodeRenameC2S(containerId, nodeId, name);
     }
 }

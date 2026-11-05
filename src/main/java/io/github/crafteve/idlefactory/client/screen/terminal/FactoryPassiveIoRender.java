@@ -222,7 +222,7 @@ final class FactoryPassiveIoRender {
         int slotX = FactoryPassiveIoLayout.headerX(viewport);
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        ItemStack icon = block.machine().machineMissing()
+        ItemStack icon = !block.machine().health().isOnline()
                 ? new ItemStack(Items.BARRIER) : FactoryLabels.blockStack(block.machine().blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);

@@ -244,12 +244,12 @@ public final class FactoryRuntime {
         Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
         if (factory == null) {
             IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",
-                    notice.machineId(), notice.message());
+                    notice.nodeId(), notice.message());
             return;
         }
         long now = this.server.overworld().getGameTime();
         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
-                DiagEvent.Category.MACH, notice.machineId(), null, notice.message()));
+                DiagEvent.Category.MACH, notice.nodeId(), null, notice.message()));
     }
 
     @SubscribeEvent

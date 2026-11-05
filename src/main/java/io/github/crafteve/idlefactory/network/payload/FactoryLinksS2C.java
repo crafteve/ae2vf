@@ -6,7 +6,9 @@ import java.util.List;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
@@ -36,8 +38,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> machines)
         implements CustomPacketPayload {
-    /** 机器列表上限，与机器表快照一致。 */
-    public static final int MAX_MACHINES = 512;
+    /** 机器列表解码上限，与节点库的全工厂机器硬上限一致。 */
+    public static final int MAX_MACHINES = io.github.crafteve.idlefactory.factory.node.NodeLibrary.HARD_MAX_TOTAL_MACHINES;
     /** 仓库坐标上限，与容器上限一致。 */
     public static final int MAX_STORAGE = 16;
 
@@ -77,10 +79,12 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
             }
         }
         List<Link> machines = new ArrayList<>();
-        for (var machine : factory.config().machines().all()) {
-            MachineRef ref = machine.ref();
-            if (!factory.live().isMachineMissing(ref.id())) {
-                machines.add(new Link(ref.dimension(), ref.pos()));
+        for (Node node : factory.config().nodes().all()) {
+            for (Machine machine : node.machines()) {
+                BlockKey typeBlock = machine.typeBlock();
+                if (!factory.live().isMachineMissing(machine.id())) {
+                    machines.add(new Link(typeBlock.dimension(), typeBlock.pos()));
+                }
             }
         }
         return new FactoryLinksS2C(factory.config().storageMode(), storage, machines);

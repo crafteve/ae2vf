@@ -5,7 +5,6 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
 
 import net.minecraft.server.level.ServerPlayer;
 
@@ -29,11 +28,11 @@ public final class FactoryRefs {
      * @param ref     短 id，可为 {@code null}
      * @return 机器身份；找不到或前缀有歧义时为空
      */
-    public static Optional<MachineRef> machine(@Nullable Factory factory, @Nullable String ref) {
+    public static Optional<Machine> machine(@Nullable Factory factory, @Nullable String ref) {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        return factory.config().machines().byShortId(ref).map(Machine::ref);
+        return factory.config().nodes().machineByShortId(ref);
     }
 
     /**

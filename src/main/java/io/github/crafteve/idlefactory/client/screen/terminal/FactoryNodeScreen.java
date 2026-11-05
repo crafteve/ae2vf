@@ -427,7 +427,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
                 FactoryGuiTheme.current(), Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
         this.renameBox.setValue(node.view().name() == null ? "" : node.view().name());
-        this.renameBox.setMaxLength(io.github.crafteve.idlefactory.factory.machine.Machine.MAX_NAME_LENGTH);
+        this.renameBox.setMaxLength(io.github.crafteve.idlefactory.factory.FactoryLimitsConfig.maxNameLength());
         this.renameBox.setFocused(true);
         this.renamingNode = node.nodeId();
     }

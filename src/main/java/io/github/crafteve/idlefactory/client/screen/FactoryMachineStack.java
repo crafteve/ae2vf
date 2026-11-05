@@ -12,7 +12,7 @@ import java.util.function.Function;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.machine.MachineIoGroup;
+import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import net.minecraft.resources.ResourceLocation;
@@ -42,7 +42,7 @@ import net.minecraft.resources.ResourceLocation;
  */
 record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
         @Nullable ResourceLocation blockId,
-        @Nullable ResourceLocation beTypeId, MachineIoGroup.Signature signature,
+        @Nullable ResourceLocation beTypeId, NodeIoGroup.Signature signature,
         FactoryStatus.Kind statusKind, int statusCount,
         List<ResourceSpec> inputs, List<ResourceSpec> outputs,
         List<Long> inputRates, List<Long> outputRates) {
@@ -60,7 +60,7 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
 
     /** 分组键：同键才能并成一行。 */
     private record StackKey(@Nullable ResourceLocation blockId, @Nullable ResourceLocation beTypeId,
-            MachineIoGroup.Signature signature) {
+            NodeIoGroup.Signature signature) {
     }
 
     /**
@@ -122,8 +122,8 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
      * @param view 机器视图
      * @return 签名
      */
-    static MachineIoGroup.Signature signatureOf(FactorySnapshotBuilder.MachineView view) {
-        return new MachineIoGroup.Signature(Set.copyOf(view.inputs()), Set.copyOf(view.outputs()));
+    static NodeIoGroup.Signature signatureOf(FactorySnapshotBuilder.MachineView view) {
+        return new NodeIoGroup.Signature(Set.copyOf(view.inputs()), Set.copyOf(view.outputs()));
     }
 
     private static List<FactoryMachineStack> group(List<FactorySnapshotBuilder.MachineView> views,
@@ -150,7 +150,8 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
      */
     private static FactoryStatus.Kind dominant(Map<FactoryStatus.Kind, Integer> counts) {
         for (FactoryStatus.Kind urgent : List.of(FactoryStatus.Kind.OFFLINE,
-                FactoryStatus.Kind.INPUT_BLOCKED, FactoryStatus.Kind.UNLOADED)) {
+                FactoryStatus.Kind.INPUT_BLOCKED, FactoryStatus.Kind.UNPROBED,
+                FactoryStatus.Kind.STALE)) {
             if (counts.containsKey(urgent)) {
                 return urgent;
             }
@@ -194,7 +195,7 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
 
     /** 组身份：锚点机器 id。 */
     UUID anchorId() {
-        return anchor().ref().id();
+        return anchor().machineId();
     }
 
     /** 台数。 */
@@ -237,7 +238,7 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
      * @return 状态文字、颜色与贴图
      */
     FactoryStatus status(FactoryGuiTheme theme) {
-        return FactoryStatus.of(this.statusKind, anchor(), theme);
+        return FactoryStatus.of(this.statusKind, theme);
     }
 
     /**

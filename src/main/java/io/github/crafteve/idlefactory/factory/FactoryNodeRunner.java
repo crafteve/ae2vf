@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.Health;
@@ -92,10 +94,20 @@ final class FactoryNodeRunner {
             if (anchorNode == null) {
                 continue;
             }
-            for (Machine machine : factory.config().machines().all()) {
-                boolean available = this.observations.observe(machine.ref().blockKey()).health()
-                        == Health.PRESENT;
-                specs.add(new NodeManager.Spec(factory.id(), machine, anchorNode, level, available));
+            for (Node node : factory.config().nodes().all()) {
+                boolean available = true;
+                for (Machine machine : node.machines()) {
+                    for (BlockKey block : machine.blocks()) {
+                        if (this.observations.observe(block).health() != Health.PRESENT) {
+                            available = false;
+                            break;
+                        }
+                    }
+                    if (!available) {
+                        break;
+                    }
+                }
+                specs.add(new NodeManager.Spec(factory.id(), node, anchorNode, level, available));
             }
         }
         this.nodeManager.reconcile(specs);

@@ -12,7 +12,9 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.machine.MachineRef;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
@@ -80,9 +82,13 @@ public final class LinkRegistry {
         this.byChunk.clear();
         List<Conflict> conflicts = new ArrayList<>();
         for (Factory factory : manager.all()) {
-            for (var machine : factory.config().machines().all()) {
-                MachineRef ref = machine.ref();
-                put(factory.id(), LinkRole.MACHINE, ref.dimension(), ref.pos(), conflicts);
+            for (Node node : factory.config().nodes().all()) {
+                for (Machine machine : node.machines()) {
+                    for (BlockKey block : machine.blocks()) {
+                        put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos(),
+                                conflicts);
+                    }
+                }
             }
             StorageAnchor anchor = factory.config().storageAnchor();
             if (anchor instanceof MeAnchor me) {

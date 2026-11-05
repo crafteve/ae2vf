@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.factory.machine.MachineMode;
-import io.github.crafteve.idlefactory.factory.machine.MachineProvider;
+import io.github.crafteve.idlefactory.factory.node.ProviderMode;
+import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
@@ -52,13 +52,13 @@ final class MachineCraftService implements ICraftingProvider {
     @Override
     public List<IPatternDetails> getAvailablePatterns() {
         // 被动模式只是「样板存着但不参与合成」：节点保留，样板访问终端仍能上传，只是 CPU 看不到。
-        return this.node.isAvailable() && this.node.machine().provider().mode() == MachineMode.ACTIVE
+        return this.node.isAvailable() && this.node.node().provider().mode() == ProviderMode.ACTIVE
                 ? this.patterns : List.of();
     }
 
     @Override
     public boolean pushPattern(IPatternDetails details, KeyCounter[] inputHolder) {
-        MachineProvider provider = this.node.machine().provider();
+        NodeProvider provider = this.node.node().provider();
         if (this.isBusy() || !this.node.isAvailable() || !this.node.isNodeOnline()) {
             return false;
         }
@@ -119,7 +119,7 @@ final class MachineCraftService implements ICraftingProvider {
 
     @Override
     public boolean isBusy() {
-        return this.node.machine().provider().pendingCount() > 0;
+        return this.node.node().provider().pendingCount() > 0;
     }
 
     /** 机器上所有样板的输入 key 并集。 */
@@ -143,7 +143,7 @@ final class MachineCraftService implements ICraftingProvider {
      * <p>样板槽变化后调：AE2 的合成服务在节点注册时拍快照，不刷新的话 CPU 看到的永远是旧的。</p>
      */
     void rebuild() {
-        MachineProvider provider = this.node.machine().provider();
+        NodeProvider provider = this.node.node().provider();
         Level level = this.node.decodeLevel();
         List<IPatternDetails> decoded = new ArrayList<>();
         Set<AEKey> inputs = new HashSet<>();
