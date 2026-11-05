@@ -128,6 +128,7 @@ public final class BindingDraftController {
             UUID existing = blockToNode.get(block);
             draft = new BindingDraft(draft.mode(), existing, List.of());
             machineOpen = false;
+            syncComponent();
         }
         if (draft.mode() == BindingMode.SINGLE) {
             actionBar("先蹲下滚轮切到堆叠 / 多方块模式", ChatFormatting.YELLOW);
@@ -365,13 +366,13 @@ public final class BindingDraftController {
         handSlot = slot;
     }
 
-    /** 清空草稿与组件镜像。 */
+    /** 清空草稿，并把物品组件里的那一份也移除。 */
     public static void clear() {
-        if (!draft.isEmpty() || draft.nodeId() != null) {
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                removeComponent(minecraft.player.getMainHandItem());
-            }
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null
+                && minecraft.player.getMainHandItem().getItem()
+                instanceof MachineBindingWandItem) {
+            minecraft.player.getMainHandItem().remove(ModDataComponents.BINDING_DRAFT.get());
         }
         draft = empty(draft.mode());
         machineOpen = false;
@@ -386,7 +387,7 @@ public final class BindingDraftController {
         dimension = null;
     }
 
-    /** 把草稿镜像到主手物品组件；非持久化、非同步。 */
+    /** 把草稿写进主手绑定杖的组件；persistent 是预期行为，登录 / 换手时会被清空。 */
     private static void syncComponent() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
@@ -397,12 +398,6 @@ public final class BindingDraftController {
             return;
         }
         stack.set(ModDataComponents.BINDING_DRAFT.get(), draft);
-    }
-
-    private static void removeComponent(ItemStack stack) {
-        if (stack.getItem() instanceof MachineBindingWandItem) {
-            stack.remove(ModDataComponents.BINDING_DRAFT.get());
-        }
     }
 
     private static BindingDraft empty(BindingMode mode) {

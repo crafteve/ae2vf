@@ -742,7 +742,7 @@
 
 **决定**：
 
-1. 不做服务端会话、不做 TTL；草稿的权威副本是客户端静态缓存，同时镜像到绑定杖的**非 persistent、非 network-synchronized** 物品组件，供 tooltip 与重开界面恢复。
+1. 不做服务端会话、不做 TTL；草稿的权威副本是客户端静态缓存，并镜像到绑定杖的物品组件。组件带 persistent Codec，会随物品栈落盘——这是预期行为，不是需要规避的东西；1.21.1 的 `DataComponentType.Builder.build()` 强制要求 Codec，不存在无 Codec 的组件。
 2. 草稿结构：模式 `SINGLE / STACK / MULTIBLOCK / STACKED_MULTIBLOCK`、可选 `nodeId`（{@code null} 表示新建节点）、机器列表与每台机器的方块列表。
 3. 手势：SINGLE 普通左右键保持 1:1 toggle；STACK / MULTIBLOCK / STACKED_MULTIBLOCK 用蹲下右键开草稿、蹲下右键空气提交、蹲下左键空气取消；左键方块从草稿移除。
 4. 草稿不跨登录保留：登录 / 登出 / 换维度 / 换手 / 把杖放进容器时清空。
@@ -760,7 +760,8 @@
 **后果**：
 
 - 协议 29 新增 `FactoryBindingCommitC2S/S2C`；草稿模式与方块逐块编码，上限受 `HARD_WIRE_ENTRIES`。
-- `ModDataComponents.BINDING_DRAFT` 只做客户端镜像，不参与存档与网络。
+- `ModDataComponents.BINDING_DRAFT` 带 persistent Codec，草稿会随物品栈落盘；但它不参与绑定校验，服务端只信提交包。
+- “不跨登录保留”由客户端保证：登录 / 登出 / 换维度 / 换手 / 把杖放进容器时清空草稿并移除组件。
 - 世界蹲下右键编辑已有节点依赖最近一次机器表里的「方块 → 节点」映射；没有映射时退回节点终端的编辑入口。
 
 ---

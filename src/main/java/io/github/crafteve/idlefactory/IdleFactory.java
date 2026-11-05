@@ -27,7 +27,7 @@ public class IdleFactory {
         ModMenus.MENUS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
-        // 绑定杖草稿组件：非 persistent、非 network-synchronized
+        // 绑定杖草稿组件：随物品栈落盘，客户端负责在登录 / 换手时清空
         ModDataComponents.COMPONENTS.register(modEventBus);
 
         // 网络包注册（P0 只有通道自检包）
