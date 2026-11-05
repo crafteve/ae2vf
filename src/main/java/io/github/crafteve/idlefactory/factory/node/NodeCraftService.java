@@ -41,6 +41,15 @@ final class NodeCraftService implements ICraftingProvider {
     private Set<AEKey> patternInputs = Set.of();
     /** 所有样板产物的并集，回收白名单只有这些。 */
     private Set<AEKey> products = Set.of();
+    /**
+     * 智能倍率的静态容量缓存：样板 → 探测当时的可装份数。
+     *
+     * <p>键是样板本身，值是「一台机器能装几份」的上限，不是实时空位；机器逐渐变满后这个值
+     * 可能偏大，收不下的部分走余量，不做每次 push 重探测。</p>
+     */
+    private final java.util.Map<ItemStack, Integer> smartCache = new java.util.HashMap<>();
+    /** 缓存对应的节点拓扑版本；结构变化后整体作废。 */
+    private long smartCacheRevision = -1L;
 
     /**
      * @param node 所属机器节点
@@ -94,8 +103,9 @@ final class NodeCraftService implements ICraftingProvider {
             Map<AEKey, ProviderFaceResolver.Faces.Target> selections =
                     new LinkedHashMap<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
+                // 只要能收 1 个就选它：固定倍率大于容量时，多出的部分进余量而不是整单失败。
                 ProviderFaceResolver.Faces.Target target =
-                        faces.select(entry.getKey(), entry.getValue());
+                        faces.select(entry.getKey(), 1L);
                 if (target == null) {
                     return false;
                 }
@@ -154,6 +164,10 @@ final class NodeCraftService implements ICraftingProvider {
     void rebuild() {
         NodeProvider provider = this.node.node().provider();
         Level level = this.node.decodeLevel();
+        if (this.smartCacheRevision != this.node.node().topologyRevision()) {
+            this.smartCache.clear();
+            this.smartCacheRevision = this.node.node().topologyRevision();
+        }
         List<IPatternDetails> decoded = new ArrayList<>();
         Set<AEKey> inputs = new HashSet<>();
         Set<AEKey> outputs = new HashSet<>();
@@ -167,7 +181,15 @@ final class NodeCraftService implements ICraftingProvider {
             if (details == null) {
                 continue;
             }
-            decoded.add(details);
+            int factor = resolveFactor(provider, stack, details);
+            ScaledPatternDetails scaled = ScaledPatternDetails.scale(details, factor);
+            if (scaled == null) {
+                // 乘法溢出：跳过并记日志，不产生负数数量。
+                this.node.logThrottled(this.node.gameTime(),
+                        "样板倍率溢出，已跳过：" + details.getDefinition().getId());
+                continue;
+            }
+            decoded.add(scaled);
             for (IPatternDetails.IInput input : details.getInputs()) {
                 for (GenericStack possible : input.getPossibleInputs()) {
                     inputs.add(possible.what().dropSecondary());
@@ -181,6 +203,101 @@ final class NodeCraftService implements ICraftingProvider {
         this.patternInputs = Set.copyOf(inputs);
         this.products = Set.copyOf(outputs);
         this.publish();
+    }
+
+    /**
+     * 解析一张样板这次使用的倍数。
+     *
+     * @param provider 节点 provider
+     * @param stack    样板物品，智能缓存键
+     * @param details  原始样板
+     * @return 倍数；智能探测失败回退 1
+     */
+    private int resolveFactor(NodeProvider provider, ItemStack stack, IPatternDetails details) {
+        return switch (provider.multiplier().mode()) {
+            case OFF -> 1;
+            case FIXED -> provider.multiplier().resolve(0);
+            case SMART -> this.smartCapacity(stack, details);
+        };
+    }
+
+    /**
+     * 智能倍率：按「一台机器能装几份」二分探测，缓存静态上限。
+     *
+     * <p>只用 {@code Actionable.SIMULATE}，绝不写入机器状态；多个输入要求同一倍数都能装下，
+     * 等价于取最小值。探测失败（没有在线机器 / 没有可收面）回退 ×1。</p>
+     *
+     * @param stack   样板物品
+     * @param details 原始样板
+     * @return 可装份数，至少 1
+     */
+    private int smartCapacity(ItemStack stack, IPatternDetails details) {
+        ItemStack key = stack.copyWithCount(1);
+        Integer cached = this.smartCache.get(key);
+        if (cached != null) {
+            return Math.max(1, cached);
+        }
+        int capacity = probeCapacity(details);
+        this.smartCache.put(key, capacity);
+        return capacity;
+    }
+
+    /**
+     * 二分探测一台机器能装几份。
+     *
+     * @param details 原始样板
+     * @return 可装份数；探测不可用时为 1
+     */
+    private int probeCapacity(IPatternDetails details) {
+        List<Machine> online = this.node.onlineMachines();
+        if (online.isEmpty()) {
+            return 1;
+        }
+        ProviderFaceResolver.Faces faces = this.node.faces(online.get(0));
+        if (faces == null) {
+            return 1;
+        }
+        int low = 1;
+        int high = Multiplier.HARD_MAX_FACTOR;
+        int best = 0;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            if (canFit(details, faces, mid)) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
+        }
+        return Math.max(1, best);
+    }
+
+    /**
+     * 这份样板按倍数能不能全部塞进这台机器（模拟插入）。
+     *
+     * @param details 原始样板
+     * @param faces   目标机器的面快照
+     * @param factor  倍数
+     * @return 所有输入都能收下时为 {@code true}
+     */
+    private static boolean canFit(IPatternDetails details, ProviderFaceResolver.Faces faces,
+            int factor) {
+        for (IPatternDetails.IInput input : details.getInputs()) {
+            GenericStack[] possible = input.getPossibleInputs();
+            if (possible.length == 0) {
+                continue;
+            }
+            long amount;
+            try {
+                amount = Math.multiplyExact(possible[0].amount(), (long) factor);
+            } catch (ArithmeticException e) {
+                return false;
+            }
+            if (faces.select(possible[0].what(), amount) == null) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**

@@ -241,6 +241,11 @@ public final class NodeRuntime
         this.returnSweep.activate(this.gameTime());
     }
 
+    /** 标记样板需要重新解码（倍率 / 样板槽变化）；下一次节点 tick 统一重建。 */
+    void markPatternsDirty() {
+        this.patternsDirty = true;
+    }
+
     /**
      * 告诉 CPU 重新读一遍这台机器的样板；节点没接进网络时静默跳过。
      */
