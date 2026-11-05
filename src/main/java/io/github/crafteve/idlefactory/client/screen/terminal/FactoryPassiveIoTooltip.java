@@ -50,6 +50,10 @@ final class FactoryPassiveIoTooltip {
             case ADD -> List.of(
                     Component.literal("从 JEI 拖到这里新建行"),
                     Component.literal("新规则默认作为输入").withStyle(ChatFormatting.GRAY));
+            case DELETE -> List.of(
+                    Component.literal("删除节点").withStyle(ChatFormatting.RED),
+                    Component.literal("再点一次确认；含规则 / 样板会一起删除")
+                            .withStyle(ChatFormatting.GRAY));
             default -> rule(block, block.rules().get(hit.rule()));
         };
     }
@@ -61,6 +65,9 @@ final class FactoryPassiveIoTooltip {
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
         lines.add(Component.literal(block.machine().dimension().location()
                 + " " + block.machine().pos().toShortString()).withStyle(ChatFormatting.GRAY));
+        lines.add(Component.literal("机器 " + block.machineCount() + " 台 · 方块 "
+                + block.blockCount() + " 个" + (block.multiblock() ? "（多方块）" : ""))
+                .withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal("规则 " + block.rules().size() + " 条")
                 .withStyle(ChatFormatting.GRAY));
         return lines;

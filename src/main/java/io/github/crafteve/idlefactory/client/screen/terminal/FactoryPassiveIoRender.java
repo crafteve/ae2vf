@@ -208,6 +208,14 @@ final class FactoryPassiveIoRender {
      * @param top         机器行上边缘（屏幕坐标）
      * @param blockBottom 机器大卡片下边缘（屏幕坐标）
      */
+    /** 在给定矩形里居中画一段单行文字。 */
+    private void drawCentered(GuiGraphics graphics, String text, int x, int width, int y,
+            int height, int color) {
+        int textX = x + (width - this.font.width(text)) / 2;
+        int textY = y + (height - this.font.lineHeight) / 2 + 1;
+        graphics.drawString(this.font, text, textX, textY, color, false);
+    }
+
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top, int blockBottom) {
         int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
@@ -230,13 +238,22 @@ final class FactoryPassiveIoRender {
         int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
         int badge2X = contentRight - 4 - 2 - FactoryPassiveIoLayout.BADGE_W;
         int badge1X = badge2X - 2 - FactoryPassiveIoLayout.BADGE_W;
+        String count = block.machineCount() > 1 ? "×" + block.machineCount() : "";
+        int countW = count.isEmpty() ? 0 : this.font.width(count) + 2;
         graphics.drawString(this.font,
-                ellipsize(block.name(), badge1X - 2 - nameX), nameX, top + 6,
+                ellipsize(block.name(), badge1X - 2 - nameX - countW), nameX, top + 6,
                 this.theme.textPrimary(), false);
+        if (!count.isEmpty()) {
+            graphics.drawString(this.font, count, badge1X - 2 - this.font.width(count),
+                    top + 6, this.theme.statusRun(), false);
+        }
         dashedRect(graphics, badge1X, top + 4, FactoryPassiveIoLayout.BADGE_W,
                 FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
-        dashedRect(graphics, badge2X, top + 4, FactoryPassiveIoLayout.BADGE_W,
-                FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
+        // 第二枚徽章改成节点删除按钮：第一次点击进入待确认，再点一次才发删节点。
+        graphics.fill(badge2X, top + 4, badge2X + FactoryPassiveIoLayout.BADGE_W,
+                top + 4 + FactoryPassiveIoLayout.BADGE_H, this.theme.slotBg());
+        this.drawCentered(graphics, "×", badge2X, FactoryPassiveIoLayout.BADGE_W, top + 4,
+                FactoryPassiveIoLayout.BADGE_H, this.theme.error());
         FactoryNineSlice.icon(graphics, block.status().lamp(), contentRight - 5, top + 8, 3);
     }
 

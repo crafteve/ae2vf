@@ -170,6 +170,46 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
+     * 节点全部离线时的状态展示；给按节点聚合的卡片用。
+     *
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus offline(FactoryGuiTheme theme) {
+        return of(Kind.OFFLINE, theme);
+    }
+
+    /**
+     * 节点部分在线时的状态展示；给按节点聚合的卡片用。
+     *
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus partial(FactoryGuiTheme theme) {
+        return of(Kind.PARTIAL, theme);
+    }
+
+    /**
+     * 节点健康过期时的状态展示；给按节点聚合的卡片用。
+     *
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus stale(FactoryGuiTheme theme) {
+        return of(Kind.STALE, theme);
+    }
+
+    /**
+     * 节点未探测时的状态展示；给按节点聚合的卡片用。
+     *
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus unprobed(FactoryGuiTheme theme) {
+        return of(Kind.UNPROBED, theme);
+    }
+
+    /**
      * 机器状态文字；搜索字段与 tooltip 共用。
      *
      * @param machine 机器视图

@@ -110,7 +110,9 @@ final class FactoryPassiveIoLayout {
         /** 模式 chip。 */
         CHIP_MODE,
         /** 机器卡片的空白区：行缝、规则之后、空机器的卡底；拖入资源即在这里新建规则。 */
-        ADD
+        ADD,
+        /** 节点卡片右上角的删除按钮。 */
+        DELETE
     }
 
     /**
@@ -238,6 +240,10 @@ final class FactoryPassiveIoLayout {
                 if (localY >= box.top() + MACHINE_ROW_H) {
                     return null;
                 }
+                int deleteX = deleteX(this.viewport);
+                if (localX >= deleteX && localX < deleteX + BADGE_W) {
+                    return new Hit(Kind.DELETE, box.index(), -1);
+                }
                 return new Hit(Kind.MACHINE, box.index(), -1);
             }
             return this.view == FactoryPassiveIoView.LIST
@@ -330,6 +336,11 @@ final class FactoryPassiveIoLayout {
     /** 块内容右边缘（屏幕坐标）。 */
     static int contentRight(Viewport viewport) {
         return viewport.x() + viewport.width() - PAD;
+    }
+
+    /** 节点删除按钮左边缘（屏幕坐标）；与渲染里的第二枚徽章同位。 */
+    static int deleteX(Viewport viewport) {
+        return contentRight(viewport) - 4 - 2 - BADGE_W;
     }
 
     /** 规则行图标凹槽 x：卡片内缩 + 内边距。 */
