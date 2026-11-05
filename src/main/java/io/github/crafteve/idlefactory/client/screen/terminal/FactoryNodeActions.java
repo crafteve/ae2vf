@@ -1,9 +1,14 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
-import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
+import io.github.crafteve.idlefactory.factory.BindingMode;
+import io.github.crafteve.idlefactory.factory.node.DispatchMode;
+import io.github.crafteve.idlefactory.factory.node.Multiplier;
+import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
 
@@ -53,7 +58,7 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void delete(int containerId, NodeRow node) {
-        PacketDistributor.sendToServer(new FactoryMachineActionC2S(containerId, node.nodeId()));
+        PacketDistributor.sendToServer(new FactoryNodeActionC2S(containerId, node.nodeId()));
     }
 
     /**
@@ -77,19 +82,60 @@ final class FactoryNodeActions {
         FactoryLocateRenderer.show(minecraft.level.dimension(), pos);
     }
 
-    /** 编辑会话占位。 */
-    static void editReserved() {
-        message("编辑会话待接入：需要绑定杖与节点会话");
+    /**
+     * 进入编辑草稿：把节点 id 写进绑定杖草稿，后续蹲下右键追加机器。
+     *
+     * @param containerId 菜单容器 id
+     * @param node        节点
+     */
+    static void edit(int containerId, NodeRow node) {
+        if (!(Minecraft.getInstance().player != null
+                && Minecraft.getInstance().player.getMainHandItem().getItem()
+                instanceof io.github.crafteve.idlefactory.item.MachineBindingWandItem)) {
+            message("主手拿绑定杖才能编辑节点");
+            return;
+        }
+        BindingDraftController.startEdit(node.nodeId());
     }
 
-    /** 倍增占位。 */
-    static void multiplierReserved() {
-        message("倍增待接入：样板倍率");
+    /**
+     * 循环倍率：关 → ×2 → ×4 → ×8 → 智能 → 关。
+     *
+     * @param containerId 菜单容器 id
+     * @param node        节点
+     */
+    static void cycleMultiplier(int containerId, NodeRow node) {
+        Multiplier current = node.view().provider().multiplier();
+        MultiplierMode mode;
+        int factor;
+        if (current.mode() == MultiplierMode.OFF) {
+            mode = MultiplierMode.FIXED;
+            factor = 2;
+        } else if (current.mode() == MultiplierMode.FIXED && current.factor() < 8) {
+            mode = MultiplierMode.FIXED;
+            factor = current.factor() + 2;
+        } else if (current.mode() == MultiplierMode.FIXED) {
+            mode = MultiplierMode.SMART;
+            factor = 1;
+        } else {
+            mode = MultiplierMode.OFF;
+            factor = 1;
+        }
+        PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
+                FactoryNodeProviderC2S.ProviderSetting.MULTIPLIER, mode.ordinal(), factor));
     }
 
-    /** 逐台 / 轮询占位。 */
-    static void dispatchReserved() {
-        message("逐台 / 轮询待接入：多机派单策略");
+    /**
+     * 切换派单：顺序 ↔ 轮询。
+     *
+     * @param containerId 菜单容器 id
+     * @param node        节点
+     */
+    static void toggleDispatch(int containerId, NodeRow node) {
+        DispatchMode next = node.view().provider().dispatch() == DispatchMode.ROUND_ROBIN
+                ? DispatchMode.SEQUENTIAL : DispatchMode.ROUND_ROBIN;
+        PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
+                FactoryNodeProviderC2S.ProviderSetting.DISPATCH, next.ordinal(), 1));
     }
 
     private static void message(String text) {

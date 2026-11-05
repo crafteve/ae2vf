@@ -282,6 +282,10 @@ public final class DiagService {
                 .append(FactoryMessages.text(sleepUntil > now
                         ? " · 睡眠剩余 " + seconds(sleepUntil - now) + "s"
                         : " · 清醒", FactoryMessages.DIM));
+        factory.config().nodes().nodeOfMachine(machine.id()).ifPresent(node ->
+                header.append(FactoryMessages.text(" · 节点 ["
+                        + node.id().toString().substring(0, 8) + "] 机器 " + node.machineCount()
+                        + " 台 · 方块 " + node.blockCount() + " 个", FactoryMessages.DIM)));
         FactoryMessages.send(player, header);
         FactoryMessages.send(player, DiagRender.check(
                 DiagChecks.check(runtime.server(), factory, machine.id()), now));

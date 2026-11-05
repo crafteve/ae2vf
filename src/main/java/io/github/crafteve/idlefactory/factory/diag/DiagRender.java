@@ -221,6 +221,10 @@ public final class DiagRender {
                 FactoryMessages.PLAIN));
 
         rows.add(machineRow(factory, machine.id(), stats, Map.of(), now));
+        factory.config().nodes().nodeOfMachine(machine.id()).ifPresent(node -> rows.add(
+                FactoryMessages.text(" 节点 [" + node.id().toString().substring(0, 8)
+                        + "] 机器 " + node.machineCount() + " 台 · 方块 " + node.blockCount()
+                        + " 个 · 规则 " + node.ruleCount() + " 条", FactoryMessages.DIM)));
         return rows;
     }
 

@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.node.Node;
 
 import net.minecraft.server.level.ServerPlayer;
 
@@ -33,6 +34,20 @@ public final class FactoryRefs {
             return Optional.empty();
         }
         return factory.config().nodes().machineByShortId(ref);
+    }
+
+    /**
+     * 按短 id 找节点。
+     *
+     * @param factory 工厂，可为 {@code null}
+     * @param ref     短 id，可为 {@code null}
+     * @return 节点；找不到或前缀有歧义时为空
+     */
+    public static Optional<Node> node(@Nullable Factory factory, @Nullable String ref) {
+        if (factory == null || ref == null || ref.isBlank()) {
+            return Optional.empty();
+        }
+        return factory.config().nodes().byShortId(ref);
     }
 
     /**

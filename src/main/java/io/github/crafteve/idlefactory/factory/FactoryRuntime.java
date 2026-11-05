@@ -250,7 +250,7 @@ public final class FactoryRuntime {
         }
         long now = this.server.overworld().getGameTime();
         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
-                DiagEvent.Category.MACH, notice.nodeId(), null, notice.message()));
+                DiagEvent.Category.MACH, null, notice.nodeId(), null, notice.message()));
     }
 
     @SubscribeEvent

@@ -85,6 +85,18 @@ public final class BindingDraftController {
     }
 
     /**
+     * 从节点终端进入编辑：草稿清空并把 nodeId 指向目标节点。
+     *
+     * @param nodeId 节点 id
+     */
+    public static void startEdit(UUID nodeId) {
+        draft = new BindingDraft(BindingMode.STACK, nodeId, List.of());
+        machineOpen = false;
+        syncComponent();
+        actionBar("编辑节点：蹲下右键加机器，蹲下右键空气提交", ChatFormatting.AQUA);
+    }
+
+    /**
      * 右键方块。
      *
      * @param context 使用上下文

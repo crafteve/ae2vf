@@ -120,19 +120,32 @@ final class FactoryNodeRender {
                 keyTextY, provider && row.view().provider().blocking().isOn()
                         ? 0xFFFFFFFF : this.theme.textPrimary());
 
-        for (int i = 1; i <= 2; i++) {
-            FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, i), keyY,
-                    FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H, this.theme.bevelLight(),
-                    false, false);
-        }
-        drawLabel(graphics, "倍", FactoryNodeLayout.keyX(viewport, 1), FactoryNodeLayout.KEY_W,
-                keyTextY, this.theme.textDim());
-        drawLabel(graphics, "逐", FactoryNodeLayout.keyX(viewport, 2), FactoryNodeLayout.KEY_W,
-                keyTextY, this.theme.textDim());
+        var multiplier = row.view().provider().multiplier();
+        boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.factory.node.MultiplierMode.OFF;
+        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 1), keyY,
+                FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
+                multiplierActive ? this.theme.statusRun() : this.theme.bevelLight(),
+                provider, hovered(hover, box.index(), Kind.MULTIPLIER));
+        drawLabel(graphics, multiplierLabel(multiplier), FactoryNodeLayout.keyX(viewport, 1),
+                FactoryNodeLayout.KEY_W, keyTextY,
+                multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
+
+        boolean roundRobin = row.view().provider().dispatch()
+                == io.github.crafteve.idlefactory.factory.node.DispatchMode.ROUND_ROBIN;
+        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
+                FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
+                roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
+                provider, hovered(hover, box.index(), Kind.DISPATCH));
+        drawLabel(graphics, roundRobin ? "轮" : "序", FactoryNodeLayout.keyX(viewport, 2),
+                FactoryNodeLayout.KEY_W, keyTextY,
+                roundRobin ? 0xFFFFFFFF : this.theme.textDim());
 
         int actionX = FactoryNodeLayout.actionX(viewport);
+        boolean editing = row.nodeId().equals(
+                io.github.crafteve.idlefactory.client.BindingDraftController.draft().nodeId());
         FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.PLUS_Y,
-                FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H, this.theme.bevelLight(),
+                FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
+                editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
         drawLabel(graphics, "+", actionX, FactoryNodeLayout.ACTION_W,
                 top + FactoryNodeLayout.PLUS_Y + 1, this.theme.statusWarn());
@@ -145,6 +158,16 @@ final class FactoryNodeRender {
         drawLabel(graphics, "×", actionX, FactoryNodeLayout.ACTION_W,
                 top + FactoryNodeLayout.CROSS_Y + 1,
                 armed ? 0xFFFFFFFF : this.theme.error());
+    }
+
+    /** 倍率键帽文字：关 / ×N / 智。 */
+    private static String multiplierLabel(
+            io.github.crafteve.idlefactory.factory.node.Multiplier multiplier) {
+        return switch (multiplier.mode()) {
+            case OFF -> "倍";
+            case FIXED -> multiplier.factor() >= 8 ? "8" : Integer.toString(multiplier.factor());
+            case SMART -> "智";
+        };
     }
 
     private void drawBadge(GuiGraphics graphics, int x, int y, int count) {

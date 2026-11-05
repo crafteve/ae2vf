@@ -384,9 +384,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
                             !node.view().provider().blocking().isOn());
                 }
             }
-            case MULTIPLIER -> FactoryNodeActions.multiplierReserved();
-            case DISPATCH -> FactoryNodeActions.dispatchReserved();
-            case EDIT -> FactoryNodeActions.editReserved();
+            case MULTIPLIER -> FactoryNodeActions.cycleMultiplier(this.menu.containerId, node);
+            case DISPATCH -> FactoryNodeActions.toggleDispatch(this.menu.containerId, node);
+            case EDIT -> FactoryNodeActions.edit(this.menu.containerId, node);
             case DELETE -> requestDelete(node);
             case MEMBER -> {
                 // 机器行主体不做事，定位在行尾准星上。

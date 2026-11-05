@@ -13,6 +13,9 @@ import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.MachineService;
+import io.github.crafteve.idlefactory.factory.NodeService;
+import io.github.crafteve.idlefactory.factory.node.DispatchMode;
+import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -139,6 +142,7 @@ public final class FactoryCommands {
                                 context -> FactoryService.delete(player(context)))))
                 .then(factory())
                 .then(machine(event))
+                .then(node())
                 .then(storage(event))
                 .then(diag());
     }
@@ -250,6 +254,116 @@ public final class FactoryCommands {
                         .then(Commands.literal("energy")
                                 .executes(audit("machine." + side + ".remove",
                                         context -> removeEnergySpec(context, input)))));
+    }
+
+    /**
+     * {@code /idf node ...}：节点信息、改名、阻挡、倍率、派单与成员增删。
+     *
+     * @return 命令树
+     */
+    private static LiteralArgumentBuilder<CommandSourceStack> node() {
+        LiteralArgumentBuilder<CommandSourceStack> remove = Commands.literal("remove")
+                .then(Commands.argument("machine", StringArgumentType.word())
+                        .suggests(nodeMachines())
+                        .executes(audit("node.member.remove",
+                                context -> NodeService.memberRemove(player(context),
+                                        nodeRef(context),
+                                        StringArgumentType.getString(context, "machine")))));
+        LiteralArgumentBuilder<CommandSourceStack> member = Commands.literal("member")
+                .then(Commands.literal("add")
+                        .executes(audit("node.member.add",
+                                context -> NodeService.memberAdd(player(context),
+                                        nodeRef(context)))))
+                .then(remove);
+        LiteralArgumentBuilder<CommandSourceStack> multiplier = Commands.literal("multiplier")
+                .then(Commands.literal("off")
+                        .executes(audit("node.multiplier",
+                                context -> NodeService.multiplier(player(context),
+                                        nodeRef(context), MultiplierMode.OFF, 1))))
+                .then(Commands.literal("smart")
+                        .executes(audit("node.multiplier",
+                                context -> NodeService.multiplier(player(context),
+                                        nodeRef(context), MultiplierMode.SMART, 1))))
+                .then(Commands.literal("fixed")
+                        .then(Commands.argument("factor", IntegerArgumentType.integer(1, 64))
+                                .executes(audit("node.multiplier",
+                                        context -> NodeService.multiplier(player(context),
+                                                nodeRef(context), MultiplierMode.FIXED,
+                                                IntegerArgumentType.getInteger(context,
+                                                        "factor"))))));
+        LiteralArgumentBuilder<CommandSourceStack> dispatch = Commands.literal("dispatch")
+                .then(Commands.literal("sequential")
+                        .executes(audit("node.dispatch",
+                                context -> NodeService.dispatch(player(context), nodeRef(context),
+                                        DispatchMode.SEQUENTIAL))))
+                .then(Commands.literal("roundrobin")
+                        .executes(audit("node.dispatch",
+                                context -> NodeService.dispatch(player(context), nodeRef(context),
+                                        DispatchMode.ROUND_ROBIN))));
+        LiteralArgumentBuilder<CommandSourceStack> blocking = Commands.literal("blocking")
+                .then(Commands.literal("on")
+                        .executes(audit("node.blocking",
+                                context -> NodeService.blocking(player(context), nodeRef(context),
+                                        BlockingMode.ON))))
+                .then(Commands.literal("off")
+                        .executes(audit("node.blocking",
+                                context -> NodeService.blocking(player(context), nodeRef(context),
+                                        BlockingMode.OFF))));
+        LiteralArgumentBuilder<CommandSourceStack> rename = Commands.literal("rename")
+                .then(Commands.argument("name", StringArgumentType.greedyString())
+                        .executes(audit("node.rename",
+                                context -> NodeService.rename(player(context), nodeRef(context),
+                                        StringArgumentType.getString(context, "name")))));
+        LiteralArgumentBuilder<CommandSourceStack> info = Commands.literal("info")
+                .executes(context -> NodeService.info(player(context), nodeRef(context)));
+        return Commands.literal("node")
+                .executes(context -> NodeService.list(player(context)))
+                .then(Commands.argument("node", StringArgumentType.word())
+                        .suggests(allNodes())
+                        .executes(context -> NodeService.info(player(context), nodeRef(context)))
+                        .then(info)
+                        .then(rename)
+                        .then(blocking)
+                        .then(multiplier)
+                        .then(dispatch)
+                        .then(member));
+    }
+
+    /** 节点短 id 补全。 */
+    private static SuggestionProvider<CommandSourceStack> allNodes() {
+        return (context, builder) -> {
+            Factory factory = factoryFor(context.getSource());
+            if (factory != null) {
+                for (var node : factory.config().nodes().all()) {
+                    builder.suggest(NodeService.shortId(node.id()),
+                            Component.literal(NodeService.describe(node)));
+                }
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    /** 当前节点下的机器短 id 补全。 */
+    private static SuggestionProvider<CommandSourceStack> nodeMachines() {
+        return (context, builder) -> {
+            Factory factory = factoryFor(context.getSource());
+            String ref = argText(context, "node");
+            if (factory != null && ref != null) {
+                FactoryRefs.node(factory, ref).ifPresent(node -> {
+                    for (var machine : node.machines()) {
+                        builder.suggest(machine.shortId(),
+                                Component.literal("节点机器 " + machine.shortId()));
+                    }
+                });
+            }
+            return builder.buildFuture();
+        };
+    }
+
+    /** 读 node 参数；读不到返回空串。 */
+    private static String nodeRef(CommandContext<CommandSourceStack> context) {
+        String value = argText(context, "node");
+        return value == null ? "" : value;
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> storage(RegisterCommandsEvent event) {

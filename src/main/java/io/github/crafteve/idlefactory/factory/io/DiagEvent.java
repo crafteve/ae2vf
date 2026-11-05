@@ -19,11 +19,12 @@ import org.jetbrains.annotations.Nullable;
  * @param level      等级
  * @param category   类别
  * @param machineId  关联机器，可为 {@code null}
+ * @param nodeId     关联节点，可为 {@code null}；与 machineId 分开
  * @param resourceId 关联资源，可为 {@code null}
  * @param text       纯文本描述
  */
 public record DiagEvent(long tick, Level level, Category category,
-        @Nullable UUID machineId,
+        @Nullable UUID machineId, @Nullable UUID nodeId,
         @Nullable String resourceId, String text) {
 
     /** 等级。{@link #IDLE} 专门表示「闲着，不是坏了」。 */
@@ -63,6 +64,24 @@ public record DiagEvent(long tick, Level level, Category category,
      */
     public static DiagEvent of(long tick, Level level, Category category,
             @Nullable UUID machineId, @Nullable String resourceId, String text) {
-        return new DiagEvent(tick, level, category, machineId, resourceId, text);
+        return new DiagEvent(tick, level, category, machineId, null, resourceId, text);
+    }
+
+    /**
+     * 造一条带节点 id 的事件。
+     *
+     * @param tick       发生时间
+     * @param level      等级
+     * @param category   类别
+     * @param machineId  机器；可为 {@code null}
+     * @param nodeId     节点；可为 {@code null}
+     * @param resourceId 资源
+     * @param text       描述
+     * @return 事件
+     */
+    public static DiagEvent of(long tick, Level level, Category category,
+            @Nullable UUID machineId, @Nullable UUID nodeId, @Nullable String resourceId,
+            String text) {
+        return new DiagEvent(tick, level, category, machineId, nodeId, resourceId, text);
     }
 }

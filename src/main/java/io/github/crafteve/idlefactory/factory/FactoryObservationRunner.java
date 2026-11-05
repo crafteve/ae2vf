@@ -193,13 +193,15 @@ final class FactoryObservationRunner {
                 case MISSING, NO_DIMENSION -> {
                     factory.live().stats().record(DiagEvent.of(now,
                             DiagEvent.Level.ERROR, DiagEvent.Category.MACH, machine.id(),
-                            null, transition.to().describe() + "，机器仍留在节点库"));
+                            nodeFound.get().id(), null,
+                            transition.to().describe() + "，机器仍留在节点库"));
                     this.notices.missing(factory.id());
                 }
                 case PRESENT -> {
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
-                                DiagEvent.Category.MACH, machine.id(), null, "机器已恢复"));
+                                DiagEvent.Category.MACH, machine.id(), nodeFound.get().id(), null,
+                                "机器已恢复"));
                         this.nodeIoRunner.wake(machine.id());
                         this.notices.restored(factory.id());
                     }
