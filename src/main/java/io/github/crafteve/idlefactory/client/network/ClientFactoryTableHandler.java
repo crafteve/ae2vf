@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.network;
 
+import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
@@ -26,6 +27,10 @@ public final class ClientFactoryTableHandler {
      * @param payload 负载
      */
     public static void handle(FactoryTableS2C payload) {
+        // 即使界面没开也记住方块 → 节点，供世界里的蹲下右键编辑已有节点用。
+        for (var machine : payload.machines()) {
+            BindingDraftController.rememberNode(machine.primaryBlock(), machine.nodeId());
+        }
         FactoryTableSink sink = currentSink(payload.containerId());
         if (sink != null) {
             sink.acceptTable(payload);

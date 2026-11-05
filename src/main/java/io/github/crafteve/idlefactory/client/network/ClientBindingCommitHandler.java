@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.network;
 
+import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.network.payload.FactoryBindingCommitS2C;
 
 import net.minecraft.client.Minecraft;
@@ -26,6 +27,7 @@ public final class ClientBindingCommitHandler {
      */
     public static void handle(FactoryBindingCommitS2C payload) {
         last = payload;
+        BindingDraftController.handleResult(payload);
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) {
             return;

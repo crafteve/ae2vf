@@ -66,8 +66,10 @@ public record FactoryBindingCommitC2S(int containerId, BindingDraft draft)
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            if (!(player.containerMenu instanceof FactoryNodeMenu menu)
-                    || menu.containerId != payload.containerId()) {
+            // 世界里直接提交时 containerId 为 0；界面里提交才校验菜单 id。
+            if (payload.containerId() != 0
+                    && (!(player.containerMenu instanceof FactoryNodeMenu menu)
+                    || menu.containerId != payload.containerId())) {
                 return;
             }
             FactoryRuntime runtime = FactoryRuntime.get();

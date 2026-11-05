@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
@@ -52,7 +53,8 @@ public final class ClientWandInput {
         }
         Action action;
         if (event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem) {
-            action = Action.MACHINE_TOGGLE;
+            BindingDraftController.onLeftClickBlock(event.getPos());
+            return;
         } else if (event.getEntity().getMainHandItem().getItem()
                 instanceof StorageBindingWandItem) {
             action = Action.STORAGE_TOGGLE;
@@ -73,13 +75,21 @@ public final class ClientWandInput {
         if (minecraft.screen != null || minecraft.player == null) {
             return;
         }
-        if (!(minecraft.player.getMainHandItem().getItem() instanceof StorageBindingWandItem)) {
+        boolean machineWand = minecraft.player.getMainHandItem().getItem()
+                instanceof MachineBindingWandItem;
+        boolean storageWand = minecraft.player.getMainHandItem().getItem()
+                instanceof StorageBindingWandItem;
+        if (!machineWand && !storageWand) {
             return;
         }
         if (!Screen.hasShiftDown()) {
             return;
         }
         event.setCanceled(true);
+        if (machineWand) {
+            BindingDraftController.cycleMode(false);
+            return;
+        }
         PacketDistributor.sendToServer(new FactoryWandActionC2S(Action.MODE_SWITCH, null, false));
         requestCooldown = 10;
     }
@@ -108,6 +118,30 @@ public final class ClientWandInput {
     }
 
     /**
+     * 左键空气：蹲下取消绑定草稿。
+     *
+     * @param event 左键空气事件
+     */
+    @SubscribeEvent
+    static void onLeftClickEmpty(PlayerInteractEvent.LeftClickEmpty event) {
+        if (event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem) {
+            BindingDraftController.onLeftClickAir();
+        }
+    }
+
+    /**
+     * 右键空气：蹲下右键提交 / 结束当前机器。
+     *
+     * @param event 右键空气事件
+     */
+    @SubscribeEvent
+    static void onRightClickEmpty(PlayerInteractEvent.RightClickEmpty event) {
+        if (event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem) {
+            BindingDraftController.onRightClickAir();
+        }
+    }
+
+    /**
      * 手持绑定杖时定期请求链接快照。
      *
      * @param event 客户端 tick
@@ -118,6 +152,7 @@ public final class ClientWandInput {
         if (minecraft.player == null) {
             return;
         }
+        BindingDraftController.tick(minecraft);
         if (requestCooldown > 0) {
             requestCooldown--;
             return;
@@ -142,6 +177,7 @@ public final class ClientWandInput {
     static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         ClientFactoryLinks.clear();
         FactoryLinkRenderer.clearCache();
+        BindingDraftController.clearAll();
         requestCooldown = 0;
     }
 
@@ -154,6 +190,7 @@ public final class ClientWandInput {
     static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientFactoryLinks.clear();
         FactoryLinkRenderer.clearCache();
+        BindingDraftController.clearAll();
     }
 
     private static void send(Action action, BlockPos pos) {

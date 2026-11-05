@@ -249,11 +249,26 @@ final class BindingService {
                 break;
             }
         }
-        return allConnected
-                ? disconnectMachineTargets(player, factory, level, targets, chain,
-                        filter.blockedOther(), filter.blockedRole())
-                : connectMachineTargets(player, factory, level, targets, chain,
-                        filter.blockedOther(), filter.blockedRole());
+        if (allConnected) {
+            // 普通左右键只对「未接入」或「1 机器节点」生效；堆叠 / 多方块节点的成员只提示编辑。
+            for (BlockPos targetPos : targets) {
+                Optional<Machine> machine = factory.config().nodes()
+                        .machineAt(BlockKey.of(level.dimension(), targetPos));
+                if (machine.isEmpty()) {
+                    continue;
+                }
+                Optional<Node> node = factory.config().nodes().nodeOfMachine(machine.get().id());
+                if (node.isPresent() && node.get().machineCount() > 1) {
+                    FactoryMessages.barErr(player,
+                            "堆叠 / 多方块节点成员只支持蹲下右键编辑或终端删除");
+                    return 0;
+                }
+            }
+            return disconnectMachineTargets(player, factory, level, targets, chain,
+                    filter.blockedOther(), filter.blockedRole());
+        }
+        return connectMachineTargets(player, factory, level, targets, chain,
+                filter.blockedOther(), filter.blockedRole());
     }
 
     private int connectMachineTargets(ServerPlayer player, Factory factory,

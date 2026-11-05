@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.item;
 
+import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 
 import net.minecraft.client.gui.screens.Screen;
@@ -26,7 +27,7 @@ public class MachineBindingWandItem extends Item {
     }
 
     /**
-     * 右键机器：先于方块交互发 toggle 请求，阻止机器 GUI。
+     * 右键机器：草稿手势或 1:1 toggle，先于方块交互，阻止机器 GUI。
      *
      * @param stack   物品
      * @param context 使用上下文
@@ -38,10 +39,7 @@ public class MachineBindingWandItem extends Item {
             return InteractionResult.PASS;
         }
         if (context.getLevel().isClientSide) {
-            PacketDistributor.sendToServer(new FactoryWandActionC2S(
-                    FactoryWandActionC2S.Action.MACHINE_TOGGLE,
-                    context.getClickedPos(), Screen.hasControlDown()));
-            return InteractionResult.SUCCESS;
+            return BindingDraftController.onUseBlock(context);
         }
         return InteractionResult.CONSUME;
     }
