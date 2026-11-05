@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.factory.node;
 
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -7,6 +11,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
@@ -63,6 +68,10 @@ public final class NodeRuntime
     private boolean dataDirty;
     /** 节点内是否至少有一台机器在线（取观测结论，本类不自己探世界）。 */
     private boolean available;
+    /** 逐机器在线标记；由运行时按观测结论注入，provider 派单只挑在线机器。 */
+    private final Map<UUID, Boolean> machineOnline = new HashMap<>();
+    /** 轮询派单游标；只存内存，不写档。 */
+    private int dispatchCursor;
     private long nextWarnTick;
 
     /**
@@ -296,6 +305,84 @@ public final class NodeRuntime
         this.terminal.refreshName();
     }
 
+    /**
+     * 按观测结论注入逐机器在线标记。
+     *
+     * @param online 在线机器 id 集合
+     */
+    void setOnlineMachines(Set<UUID> online) {
+        this.machineOnline.clear();
+        for (UUID id : online) {
+            this.machineOnline.put(id, Boolean.TRUE);
+        }
+    }
+
+    /**
+     * 这台机器此刻是否在线。
+     *
+     * @param machineId 机器 id
+     * @return 在线时为 {@code true}
+     */
+    boolean isMachineOnline(UUID machineId) {
+        return this.machineOnline.containsKey(machineId);
+    }
+
+    /**
+     * 按节点机器顺序列出在线机器。
+     *
+     * @return 在线机器列表
+     */
+    List<Machine> onlineMachines() {
+        List<Machine> online = new java.util.ArrayList<>();
+        for (Machine machine : this.node.machines()) {
+            if (this.machineOnline.containsKey(machine.id())) {
+                online.add(machine);
+            }
+        }
+        return online;
+    }
+
+    /**
+     * 按派单模式挑一台在线机器；一次派单只会用这一台。
+     *
+     * @return 目标机器；没有在线机器时为 {@code null}
+     */
+    @Nullable
+    Machine pickMachine() {
+        List<Machine> online = this.onlineMachines();
+        if (online.isEmpty()) {
+            return null;
+        }
+        if (this.node.provider().dispatch() == DispatchMode.SEQUENTIAL) {
+            return online.get(0);
+        }
+        int index = Math.floorMod(this.dispatchCursor, online.size());
+        this.dispatchCursor = index + 1;
+        return online.get(index);
+    }
+
+    /**
+     * 按机器 id 取成员。
+     *
+     * @param machineId 机器 id
+     * @return 机器；不属于本节点时为 {@code null}
+     */
+    @Nullable
+    Machine machine(UUID machineId) {
+        return this.node.machineOf(machineId).orElse(null);
+    }
+
+    /**
+     * 取某个方块所在的服务端世界。
+     *
+     * @param block 方块
+     * @return 世界；维度不存在时为 {@code null}
+     */
+    @Nullable
+    ServerLevel levelOf(BlockKey block) {
+        return this.server.getLevel(block.dimension());
+    }
+
     /** 建节点用的锚点，用来判断锚点是否换过。 */
     IGridNode anchor() {
         return this.anchor;
@@ -339,13 +426,14 @@ public final class NodeRuntime
     }
 
     /**
-     * 开一次派单 / 回收用的六面快照。
+     * 开一次派单 / 回收用的面快照：覆盖整台机器的所有方块，类型方块优先。
      *
-     * @return 快照；机器所在区块没加载时为 {@code null}
+     * @param machine 机器
+     * @return 快照；没有任何方块加载时为 {@code null}
      */
     @Nullable
-    ProviderFaceResolver.Faces faces() {
-        return this.faceResolver.snapshot();
+    ProviderFaceResolver.Faces faces(Machine machine) {
+        return this.faceResolver.snapshot(machine);
     }
 
     /**

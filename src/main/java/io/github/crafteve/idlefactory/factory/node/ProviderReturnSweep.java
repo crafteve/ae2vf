@@ -8,6 +8,8 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+
 import net.minecraft.core.Direction;
 
 /**
@@ -86,22 +88,30 @@ public final class ProviderReturnSweep {
             this.idle(now);
             return;
         }
-        ProviderFaceResolver.Faces faces = this.node.faces();
         MEStorage network = this.node.networkStorage();
-        if (faces == null || network == null) {
+        if (network == null) {
             this.storageFaces = 0;
             this.idle(now);
             return;
         }
         int facesWithStorage = 0;
         boolean harvested = false;
-        for (Direction face : FACES) {
-            MEStorage storage = faces.storage(face);
-            if (storage == null || storage == network) {
+        // 回收扫整台机器的所有方块；一台派单机器可能只是节点里的一个成员。
+        for (Machine machine : this.node.onlineMachines()) {
+            ProviderFaceResolver.Faces faces = this.node.faces(machine);
+            if (faces == null) {
                 continue;
             }
-            facesWithStorage++;
-            harvested |= this.sweepFace(storage, network, products);
+            for (ProviderFaceResolver.Faces.Slot slot : faces.slots()) {
+                for (Direction face : FACES) {
+                    MEStorage storage = faces.storage(slot, face);
+                    if (storage == null || storage == network) {
+                        continue;
+                    }
+                    facesWithStorage++;
+                    harvested |= this.sweepFace(storage, network, products);
+                }
+            }
         }
         this.storageFaces = facesWithStorage;
         if (harvested) {

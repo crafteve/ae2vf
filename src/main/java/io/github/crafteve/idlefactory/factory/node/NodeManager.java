@@ -1,11 +1,14 @@
 package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -41,6 +44,8 @@ public final class NodeManager {
     private final ArrayDeque<Spec> createQueue = new ArrayDeque<>();
     /** 工厂侧要求提前对账的标记。 */
     private boolean reconcileRequested;
+    /** 本轮到账的逐机器在线集合，建节点时用。 */
+    private final Map<UUID, Set<UUID>> onlineByNode = new HashMap<>();
 
     /**
      * @param server      服务端实例
@@ -109,10 +114,13 @@ public final class NodeManager {
      *
      * <p>锚点节点实例变了、结构版本变了就整个重建——旧节点还挂在旧网格上，没法就地迁移。</p>
      *
-     * @param specs 期望存在的节点
+     * @param specs          期望存在的节点
+     * @param onlineMachines 节点 id → 在线机器 id 集合
      */
-    public void reconcile(List<Spec> specs) {
+    public void reconcile(List<Spec> specs, Map<UUID, Set<UUID>> onlineMachines) {
         this.reconcileRequested = false;
+        this.onlineByNode.clear();
+        this.onlineByNode.putAll(onlineMachines);
         Map<UUID, Spec> wanted = new LinkedHashMap<>();
         for (Spec spec : specs) {
             wanted.put(spec.node().id(), spec);
@@ -146,6 +154,8 @@ public final class NodeManager {
                     // 名字 / 规则等非结构变化不重建节点，但要刷新到运行时。
                     node.updateNode(spec.node());
                     node.setAvailable(spec.available());
+                    node.setOnlineMachines(this.onlineByNode.getOrDefault(spec.node().id(),
+                            Set.of()));
                 } catch (RuntimeException e) {
                     node.logThrottled(this.server.overworld().getGameTime(),
                             "更新节点异常：" + e);
@@ -299,6 +309,7 @@ public final class NodeManager {
                         spec.node().id(), e.toString());
                 continue;
             }
+            node.setOnlineMachines(this.onlineByNode.getOrDefault(spec.node().id(), Set.of()));
             try {
                 if (!node.attach(spec.anchor())) {
                     continue;

@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -40,6 +41,7 @@ public final class NodeProvider {
     private static final String TAG_PENDING = "Pending";
     private static final String TAG_STACK = "Stack";
     private static final String TAG_FACE = "Face";
+    private static final String TAG_MACHINE_ID = "MachineId";
     private static final String TAG_MODE = "Mode";
     private static final String TAG_MODE_PINNED = "ModePinned";
     private static final String TAG_MULTIPLIER_MODE = "MultiplierMode";
@@ -73,28 +75,32 @@ public final class NodeProvider {
     /**
      * 一份还没送进机器的余量。
      *
-     * @param stack 资源与数量；数量恒大于 0
-     * @param face  上次送进去的面；{@code null} 表示面未定
+     * <p>条目绑定原机器：只回填那一台，不拆分到别的机器；原机器被删了才退回 ME 网络。</p>
+     *
+     * @param stack     资源与数量；数量恒大于 0
+     * @param machineId 原机器 id；{@code null} 表示旧数据没记机器
+     * @param face      上次送进去的面；{@code null} 表示面未定
      */
-    public record Pending(GenericStack stack, @Nullable Direction face) {
+    public record Pending(GenericStack stack, @Nullable UUID machineId, @Nullable Direction face) {
         /**
-         * 换一个面，数量不变。
+         * 换一个面，数量与机器不变。
          *
          * @param next 新面；{@code null} 表示面未定
          * @return 新条目
          */
         public Pending withFace(@Nullable Direction next) {
-            return new Pending(this.stack, next);
+            return new Pending(this.stack, this.machineId, next);
         }
 
         /**
-         * 换数量，面不变。
+         * 换数量，机器与面不变。
          *
          * @param amount 新数量
          * @return 新条目
          */
         public Pending withAmount(long amount) {
-            return new Pending(new GenericStack(this.stack.what(), amount), this.face);
+            return new Pending(new GenericStack(this.stack.what(), amount), this.machineId,
+                    this.face);
         }
     }
 
@@ -261,15 +267,17 @@ public final class NodeProvider {
     /**
      * 追加一条余量。
      *
-     * @param stack 资源与数量；数量不为正时忽略
-     * @param face  塞不进去的面；{@code null} 表示面未定
+     * @param stack     资源与数量；数量不为正时忽略
+     * @param machineId 原机器 id；{@code null} 表示不绑定机器
+     * @param face      塞不进去的面；{@code null} 表示面未定
      * @return 是否入队；队列已满时返回 {@code false}
      */
-    public boolean addPending(GenericStack stack, @Nullable Direction face) {
+    public boolean addPending(GenericStack stack, @Nullable UUID machineId,
+            @Nullable Direction face) {
         if (stack.amount() <= 0L || this.pending.size() >= MAX_PENDING) {
             return false;
         }
-        this.pending.add(new Pending(stack, face));
+        this.pending.add(new Pending(stack, machineId, face));
         return true;
     }
 
@@ -327,6 +335,9 @@ public final class NodeProvider {
             entryTag.put(TAG_STACK, GenericStack.writeTag(registries, entry.stack()));
             entryTag.putByte(TAG_FACE, entry.face() == null
                     ? FACE_UNSET : (byte) entry.face().get3DDataValue());
+            if (entry.machineId() != null) {
+                entryTag.putUUID(TAG_MACHINE_ID, entry.machineId());
+            }
             pendingList.add(entryTag);
         }
         tag.put(TAG_PENDING, pendingList);
@@ -387,7 +398,9 @@ public final class NodeProvider {
             byte rawFace = entryTag.getByte(TAG_FACE);
             Direction face = rawFace >= 0 && rawFace < 6
                     ? Direction.from3DDataValue(rawFace) : null;
-            provider.pending.add(new Pending(stack, face));
+            UUID machineId = entryTag.hasUUID(TAG_MACHINE_ID)
+                    ? entryTag.getUUID(TAG_MACHINE_ID) : null;
+            provider.pending.add(new Pending(stack, machineId, face));
         }
         return provider;
     }

@@ -1,7 +1,12 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -79,6 +84,7 @@ final class FactoryNodeRunner {
      */
     private void reconcile() {
         List<NodeManager.Spec> specs = new ArrayList<>();
+        Map<UUID, Set<UUID>> onlineMachines = new HashMap<>();
         for (Factory factory : this.manager.all()) {
             if (factory.config().storageMode() != StorageMode.ME) {
                 continue;
@@ -108,8 +114,22 @@ final class FactoryNodeRunner {
                     }
                 }
                 specs.add(new NodeManager.Spec(factory.id(), node, anchorNode, level, available));
+                Set<UUID> online = new HashSet<>();
+                for (Machine machine : node.machines()) {
+                    boolean machineOnline = true;
+                    for (BlockKey block : machine.blocks()) {
+                        if (this.observations.observe(block).health() != Health.PRESENT) {
+                            machineOnline = false;
+                            break;
+                        }
+                    }
+                    if (machineOnline) {
+                        online.add(machine.id());
+                    }
+                }
+                onlineMachines.put(node.id(), online);
             }
         }
-        this.nodeManager.reconcile(specs);
+        this.nodeManager.reconcile(specs, onlineMachines);
     }
 }

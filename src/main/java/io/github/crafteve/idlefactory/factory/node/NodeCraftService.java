@@ -7,8 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.factory.node.ProviderMode;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
+import io.github.crafteve.idlefactory.factory.node.ProviderMode;
 
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
@@ -18,7 +19,6 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.core.definitions.AEItems;
-import appeng.helpers.patternprovider.PatternProviderTarget;
 
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
@@ -65,7 +65,12 @@ final class NodeCraftService implements ICraftingProvider {
         if (!this.patterns.contains(details) || !details.supportsPushInputsToExternalInventory()) {
             return false;
         }
-        ProviderFaceResolver.Faces faces = this.node.faces();
+        // 一次派单只挑一台在线机器，整份货给它；不拆分到别的机器。
+        Machine machine = this.node.pickMachine();
+        if (machine == null) {
+            return false;
+        }
+        ProviderFaceResolver.Faces faces = this.node.faces(machine);
         if (faces == null) {
             return false;
         }
@@ -86,26 +91,30 @@ final class NodeCraftService implements ICraftingProvider {
             if (needed.isEmpty()) {
                 return false;
             }
-            Map<AEKey, Direction> selections = new LinkedHashMap<>(needed.size());
+            Map<AEKey, ProviderFaceResolver.Faces.Target> selections =
+                    new LinkedHashMap<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
-                Direction face = faces.select(entry.getKey(), entry.getValue());
-                if (face == null) {
+                ProviderFaceResolver.Faces.Target target =
+                        faces.select(entry.getKey(), entry.getValue());
+                if (target == null) {
                     return false;
                 }
-                selections.put(entry.getKey(), face);
+                selections.put(entry.getKey(), target);
             }
             details.pushInputsToExternalInventory(inputHolder, (key, amount) -> {
                 if (amount <= 0L) {
                     return;
                 }
-                Direction face = selections.get(key);
-                PatternProviderTarget target = face == null ? null : faces.target(face);
-                long inserted = target == null ? 0L : target.insert(key, amount, Actionable.MODULATE);
+                ProviderFaceResolver.Faces.Target target = selections.get(key);
+                long inserted = target == null
+                        ? 0L : faces.insert(target, key, amount, Actionable.MODULATE);
                 if (inserted > 0L) {
                     committed[0] = true;
                 }
                 if (inserted < amount) {
-                    ProviderOverflow.push(this.node, key, amount - inserted, face);
+                    // 收不下的进余量，绑定原机器；不回退成失败，避免 CPU 复制。
+                    ProviderOverflow.push(this.node, machine.id(), key, amount - inserted,
+                            target == null ? null : target.face());
                 }
             });
             committed[0] = true;

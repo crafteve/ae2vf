@@ -2,17 +2,18 @@ package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 
 import appeng.api.config.Actionable;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.storage.MEStorage;
-import appeng.helpers.patternprovider.PatternProviderTarget;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -38,17 +39,19 @@ final class ProviderOverflow {
     /**
      * 记一条刚被接受、但没塞进机器的零头。
      *
-     * @param node   机器节点
-     * @param key    资源
-     * @param amount 数量；不为正时忽略
-     * @param face   这次用的面；{@code null} 表示面未定
+     * @param node      节点
+     * @param machineId 原机器 id
+     * @param key       资源
+     * @param amount    数量；不为正时忽略
+     * @param face      这次用的面；{@code null} 表示面未定
      */
-    static void push(NodeRuntime node, AEKey key, long amount, @Nullable Direction face) {
+    static void push(NodeRuntime node, UUID machineId, AEKey key, long amount,
+            @Nullable Direction face) {
         if (amount <= 0L) {
             return;
         }
         NodeProvider provider = node.node().provider();
-        if (provider.addPending(new GenericStack(key, amount), face)) {
+        if (provider.addPending(new GenericStack(key, amount), machineId, face)) {
             node.markDataChanged();
             return;
         }
@@ -78,7 +81,6 @@ final class ProviderOverflow {
         if (provider.pendingCount() == 0) {
             return false;
         }
-        ProviderFaceResolver.Faces faces = node.faces();
         List<NodeProvider.Pending> entries = provider.pending();
         // 与 pending 等长的镜像：谁被送走多少就扣多少，异常时它就是真实的剩余量。
         List<NodeProvider.Pending> mirror = new ArrayList<>(entries);
@@ -89,28 +91,46 @@ final class ProviderOverflow {
                 AEKey key = entry.stack().what();
                 long left = entry.stack().amount();
                 Direction face = entry.face();
-                if (faces != null && face != null) {
-                    PatternProviderTarget target = faces.target(face);
-                    long inserted = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
+                Machine machine = entry.machineId() == null
+                        ? node.primaryMachine() : node.machine(entry.machineId());
+                if (machine == null) {
+                    // 原机器没了：退回 ME 网络，网络也收不下才掉落兜底；不转给别的机器。
+                    long returned = returnToNetwork(node, key, left);
+                    long unplaced = left - returned;
+                    if (unplaced > 0L) {
+                        dropAtMachine(node, key, unplaced);
+                    }
+                    mirror.set(i, new NodeProvider.Pending(new GenericStack(key, 0L),
+                            entry.machineId(), face));
+                    insertedAny = true;
+                    continue;
+                }
+                ProviderFaceResolver.Faces faces = node.faces(machine);
+                if (faces != null) {
+                    // 先按规则面 / 类型方块选一个目标；收不下再换下一个目标试一次。
+                    ProviderFaceResolver.Faces.Target target = faces.select(key, left);
+                    long inserted = target == null
+                            ? 0L : faces.insert(target, key, left, Actionable.MODULATE);
                     // 先扣量再走下一步：第二次 insert 抛异常时，这一笔不能留在 pending 里重送。
                     if (inserted > 0L) {
                         left -= inserted;
-                        mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left), face));
+                        face = target.face();
+                        mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left),
+                                entry.machineId(), face));
                     }
                     insertedAny |= inserted > 0L;
-                }
-                if (left > 0L && faces != null) {
-                    Direction next = faces.select(key, left);
-                    if (next != null) {
-                        PatternProviderTarget target = faces.target(next);
-                        long more = target == null ? 0L : target.insert(key, left, Actionable.MODULATE);
-                        // 两条 insert 共用同一个 left / face：换面后剩余量按新面记。
-                        face = next;
-                        if (more > 0L) {
-                            left -= more;
+                    if (left > 0L) {
+                        ProviderFaceResolver.Faces.Target next = faces.select(key, left);
+                        if (next != null) {
+                            long more = faces.insert(next, key, left, Actionable.MODULATE);
+                            face = next.face();
+                            if (more > 0L) {
+                                left -= more;
+                            }
+                            mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left),
+                                    entry.machineId(), face));
+                            insertedAny |= more > 0L;
                         }
-                        mirror.set(i, new NodeProvider.Pending(new GenericStack(key, left), face));
-                        insertedAny |= more > 0L;
                     }
                 }
             }
