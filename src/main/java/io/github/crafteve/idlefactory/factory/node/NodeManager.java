@@ -36,7 +36,7 @@ public final class NodeManager {
     private final Runnable dataChanged;
     /** 节点告警出口。 */
     private final Consumer<Notice> notice;
-    private final Map<UUID, MachineNode> nodes = new LinkedHashMap<>();
+    private final Map<UUID, NodeRuntime> nodes = new LinkedHashMap<>();
     /** 待建节点；每次对账整体替换。 */
     private final ArrayDeque<Spec> createQueue = new ArrayDeque<>();
     /** 工厂侧要求提前对账的标记。 */
@@ -100,7 +100,7 @@ public final class NodeManager {
      * @return 节点；没建出来时为 {@code null}
      */
     @Nullable
-    public MachineNode node(UUID nodeId) {
+    public NodeRuntime node(UUID nodeId) {
         return this.nodes.get(nodeId);
     }
 
@@ -118,9 +118,9 @@ public final class NodeManager {
             wanted.put(spec.node().id(), spec);
         }
 
-        Iterator<Map.Entry<UUID, MachineNode>> iterator = this.nodes.entrySet().iterator();
+        Iterator<Map.Entry<UUID, NodeRuntime>> iterator = this.nodes.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<UUID, MachineNode> entry = iterator.next();
+            Map.Entry<UUID, NodeRuntime> entry = iterator.next();
             Spec spec = wanted.get(entry.getKey());
             if (spec == null || !entry.getValue().matches(spec)) {
                 try {
@@ -140,7 +140,7 @@ public final class NodeManager {
             }
         }
         for (Spec spec : wanted.values()) {
-            MachineNode node = this.nodes.get(spec.node().id());
+            NodeRuntime node = this.nodes.get(spec.node().id());
             if (node != null) {
                 try {
                     // 名字 / 规则等非结构变化不重建节点，但要刷新到运行时。
@@ -161,7 +161,7 @@ public final class NodeManager {
 
         boolean changed = false;
         int sweepBudget = MAX_SWEEPS_PER_TICK;
-        for (MachineNode node : this.nodes.values()) {
+        for (NodeRuntime node : this.nodes.values()) {
             try {
                 changed |= node.tick();
                 if (sweepBudget > 0 && node.returnSweep().isDue(now)) {
@@ -184,7 +184,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void removeNode(UUID nodeId) {
-        MachineNode node = this.nodes.remove(nodeId);
+        NodeRuntime node = this.nodes.remove(nodeId);
         if (node != null) {
             try {
                 node.detachReturning();
@@ -200,9 +200,9 @@ public final class NodeManager {
      * @param factoryId 工厂 id
      */
     public void removeFactory(UUID factoryId) {
-        Iterator<Map.Entry<UUID, MachineNode>> iterator = this.nodes.entrySet().iterator();
+        Iterator<Map.Entry<UUID, NodeRuntime>> iterator = this.nodes.entrySet().iterator();
         while (iterator.hasNext()) {
-            MachineNode node = iterator.next().getValue();
+            NodeRuntime node = iterator.next().getValue();
             if (node.factoryId().equals(factoryId)) {
                 try {
                     node.detachReturning();
@@ -220,7 +220,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void refreshPatterns(UUID nodeId) {
-        MachineNode node = this.nodes.get(nodeId);
+        NodeRuntime node = this.nodes.get(nodeId);
         if (node != null) {
             node.requestPatternUpdate();
         }
@@ -232,7 +232,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void refreshName(UUID nodeId) {
-        MachineNode node = this.nodes.get(nodeId);
+        NodeRuntime node = this.nodes.get(nodeId);
         if (node != null) {
             node.refreshName();
         }
@@ -245,7 +245,7 @@ public final class NodeManager {
      * @param available 现在是否可用
      */
     public void setAvailable(UUID nodeId, boolean available) {
-        MachineNode node = this.nodes.get(nodeId);
+        NodeRuntime node = this.nodes.get(nodeId);
         if (node != null) {
             node.setAvailable(available);
         }
@@ -265,9 +265,9 @@ public final class NodeManager {
     /** 停机：拆掉全部节点，不碰存档数据。 */
     public void destroyAll() {
         this.createQueue.clear();
-        List<MachineNode> remaining = new ArrayList<>(this.nodes.values());
+        List<NodeRuntime> remaining = new ArrayList<>(this.nodes.values());
         this.nodes.clear();
-        for (MachineNode node : remaining) {
+        for (NodeRuntime node : remaining) {
             try {
                 node.shutdown();
             } catch (RuntimeException e) {
@@ -290,9 +290,9 @@ public final class NodeManager {
             if (this.nodes.containsKey(spec.node().id())) {
                 continue;
             }
-            MachineNode node;
+            NodeRuntime node;
             try {
-                node = new MachineNode(this.server, spec.factoryId(), spec.node(),
+                node = new NodeRuntime(this.server, spec.factoryId(), spec.node(),
                         spec.anchor(), spec.anchorLevel(), spec.available(), this.notice);
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",

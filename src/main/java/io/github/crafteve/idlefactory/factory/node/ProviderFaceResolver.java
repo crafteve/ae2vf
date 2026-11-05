@@ -42,12 +42,12 @@ final class ProviderFaceResolver {
     private static final Runnable NOOP = () -> {
     };
 
-    private final MachineNode node;
+    private final NodeRuntime node;
 
     /**
      * @param node 所属机器节点
      */
-    ProviderFaceResolver(MachineNode node) {
+    ProviderFaceResolver(NodeRuntime node) {
         this.node = node;
     }
 
@@ -234,7 +234,7 @@ final class ProviderFaceResolver {
     }
 
     /** 给 {@link Faces} 读动作源。 */
-    MachineNode node() {
+    NodeRuntime node() {
         return this.node;
     }
 }

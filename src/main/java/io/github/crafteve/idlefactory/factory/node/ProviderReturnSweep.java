@@ -31,7 +31,7 @@ public final class ProviderReturnSweep {
     /** 固定顺序的六面。 */
     private static final Direction[] FACES = Direction.values();
 
-    private final MachineNode node;
+    private final NodeRuntime node;
     /** 下一次允许扫描的 tick。 */
     private long nextSweepTick;
     /** 活跃期截止 tick。 */
@@ -48,7 +48,7 @@ public final class ProviderReturnSweep {
     /**
      * @param node 所属机器节点
      */
-    ProviderReturnSweep(MachineNode node) {
+    ProviderReturnSweep(NodeRuntime node) {
         this.node = node;
     }
 

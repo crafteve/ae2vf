@@ -37,8 +37,8 @@ import net.minecraft.world.level.Level;
  * <p>节点不写自己的 NBT：重启后由 {@link NodeManager} 按节点记录和锚点重建。节点内的机器
  * 掉线时节点保留，只是不再广告样板。</p>
  */
-public final class MachineNode
-        implements IGridNodeListener<MachineNode>, PatternContainer, IActionHost {
+public final class NodeRuntime
+        implements IGridNodeListener<NodeRuntime>, PatternContainer, IActionHost {
     /** 同一条节点告警的最短间隔（tick）：避免一个坏节点刷屏。 */
     private static final long WARN_INTERVAL = 100L;
 
@@ -47,11 +47,11 @@ public final class MachineNode
     private final IGridNode anchor;
     private final ServerLevel anchorLevel;
     private final Consumer<NodeManager.Notice> notice;
-    private final MachineCraftService craft;
-    private final MachinePatternInventory patternInventory;
+    private final NodeCraftService craft;
+    private final NodePatternInventory patternInventory;
     private final ProviderFaceResolver faceResolver;
     private final ProviderReturnSweep returnSweep;
-    private final MachineTerminalGroup terminal;
+    private final NodeTerminalGroup terminal;
     private final IManagedGridNode managed;
     private final IActionSource actionSource;
 
@@ -74,7 +74,7 @@ public final class MachineNode
      * @param available   节点内是否至少有一台机器在线
      * @param notice      节点告警出口
      */
-    MachineNode(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
+    NodeRuntime(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
             ServerLevel anchorLevel, boolean available, Consumer<NodeManager.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
@@ -86,11 +86,11 @@ public final class MachineNode
         // 建节点时节点上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
         this.patternsDirty = true;
 
-        this.craft = new MachineCraftService(this);
-        this.patternInventory = new MachinePatternInventory(this);
+        this.craft = new NodeCraftService(this);
+        this.patternInventory = new NodePatternInventory(this);
         this.faceResolver = new ProviderFaceResolver(this);
         this.returnSweep = new ProviderReturnSweep(this);
-        this.terminal = new MachineTerminalGroup(server, node, available);
+        this.terminal = new NodeTerminalGroup(server, node, available);
 
         this.managed = GridHelper.createManagedNode(this, this)
                 .setInWorldNode(false)
@@ -448,7 +448,7 @@ public final class MachineNode
     }
 
     @Override
-    public void onSaveChanges(MachineNode owner, IGridNode node) {
+    public void onSaveChanges(NodeRuntime owner, IGridNode node) {
         // 节点自己不带 NBT（重启按机器记录重建），这里没有要落的盘；存档走 dataChanged 汇总。
     }
 }

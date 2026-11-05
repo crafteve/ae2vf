@@ -33,8 +33,8 @@ import net.minecraft.world.level.Level;
  * <p>样板解码结果、输入的 key 集合（阻挡判定用）与产物 key 集合（回收白名单用）都缓存在这里，
  * 只在样板变化或机器上下线时重建；CPU 的合成规划直接读缓存，不会每 tick 解码样板。</p>
  */
-final class MachineCraftService implements ICraftingProvider {
-    private final MachineNode node;
+final class NodeCraftService implements ICraftingProvider {
+    private final NodeRuntime node;
     /** 当前能用的样板；机器方块不在时对外仍报空。 */
     private List<IPatternDetails> patterns = List.of();
     /** 所有样板输入的并集，已去掉组件（AE2 的阻挡判定按这个比较）。 */
@@ -45,7 +45,7 @@ final class MachineCraftService implements ICraftingProvider {
     /**
      * @param node 所属机器节点
      */
-    MachineCraftService(MachineNode node) {
+    NodeCraftService(NodeRuntime node) {
         this.node = node;
     }
 

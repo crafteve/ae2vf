@@ -24,7 +24,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * 类型方块在不在；样板数量这类每 tick 都会动的数不进分组。名字优先用节点名，否则带节点短 id，
  * 保证每个节点自成一组，不会被终端按相同分组并成一行。</p>
  */
-final class MachineTerminalGroup {
+final class NodeTerminalGroup {
     private final MinecraftServer server;
     private Node node;
     private final long sortOrder;
@@ -40,7 +40,7 @@ final class MachineTerminalGroup {
      * @param node      节点记录
      * @param available 节点内是否至少有一台机器在线
      */
-    MachineTerminalGroup(MinecraftServer server, Node node, boolean available) {
+    NodeTerminalGroup(MinecraftServer server, Node node, boolean available) {
         this.server = server;
         this.node = node;
         this.available = available;

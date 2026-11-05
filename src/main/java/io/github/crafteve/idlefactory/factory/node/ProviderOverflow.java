@@ -43,7 +43,7 @@ final class ProviderOverflow {
      * @param amount 数量；不为正时忽略
      * @param face   这次用的面；{@code null} 表示面未定
      */
-    static void push(MachineNode node, AEKey key, long amount, @Nullable Direction face) {
+    static void push(NodeRuntime node, AEKey key, long amount, @Nullable Direction face) {
         if (amount <= 0L) {
             return;
         }
@@ -73,7 +73,7 @@ final class ProviderOverflow {
      * @param node 机器节点
      * @return 是否改动了要落盘的数据
      */
-    static boolean flush(MachineNode node) {
+    static boolean flush(NodeRuntime node) {
         NodeProvider provider = node.node().provider();
         if (provider.pendingCount() == 0) {
             return false;
@@ -134,7 +134,7 @@ final class ProviderOverflow {
      *
      * @param node 机器节点
      */
-    static void drain(MachineNode node) {
+    static void drain(NodeRuntime node) {
         flush(node);
         NodeProvider provider = node.node().provider();
         if (provider.pendingCount() == 0) {
@@ -179,7 +179,7 @@ final class ProviderOverflow {
      * @return 是否真的掉出去了；区块没加载、数量不为正，或该资源没有掉落物形态
      *         （流体 / 能量）时返回 {@code false}，调用方必须把它记进诊断
      */
-    static boolean dropAtMachine(MachineNode node, AEKey key, long amount) {
+    static boolean dropAtMachine(NodeRuntime node, AEKey key, long amount) {
         ServerLevel level = node.machineLevel();
         BlockPos pos = node.primaryMachine().typeBlock().pos();
         if (level == null || amount <= 0L || !level.isLoaded(pos)) {
@@ -205,7 +205,7 @@ final class ProviderOverflow {
      * @param amount 数量
      * @return 实际插入的数量
      */
-    private static long returnToNetwork(MachineNode node, AEKey key, long amount) {
+    private static long returnToNetwork(NodeRuntime node, AEKey key, long amount) {
         MEStorage network = node.networkStorage();
         if (network == null) {
             return 0L;

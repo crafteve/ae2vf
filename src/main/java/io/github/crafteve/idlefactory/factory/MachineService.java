@@ -12,7 +12,7 @@ import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
-import io.github.crafteve.idlefactory.factory.node.MachineNode;
+import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
@@ -325,7 +325,7 @@ public final class MachineService {
                         + " · 余量: " + provider.pendingCount() + " 条",
                 FactoryMessages.PLAIN));
         FactoryRuntime runtime = FactoryRuntime.get();
-        MachineNode node = runtime == null ? null : runtime.nodeManager().node(entry.get().id());
+        NodeRuntime node = runtime == null ? null : runtime.nodeManager().node(entry.get().id());
         FactoryMessages.send(player, FactoryMessages.text(
                 "  节点: " + describeNode(node), FactoryMessages.PLAIN));
         if (node != null) {
@@ -347,7 +347,7 @@ public final class MachineService {
      * @param now  当前游戏时间
      * @return 给玩家看的短句
      */
-    private static String describeSweep(MachineNode node, long now) {
+    private static String describeSweep(NodeRuntime node, long now) {
         if (node.returnSweep().lastSweepTick() == 0L) {
             return "还没扫过";
         }
@@ -373,7 +373,7 @@ public final class MachineService {
      * @param node 节点；未建时为 {@code null}
      * @return 给玩家看的短句
      */
-    private static String describeNode(@Nullable MachineNode node) {
+    private static String describeNode(@Nullable NodeRuntime node) {
         if (node == null) {
             return "未建（仓库不是 ME 模式，或锚点解析不出 ME 节点）";
         }

@@ -13,13 +13,13 @@ import io.github.crafteve.idlefactory.factory.node.NodeProvider;
  * 样板」的过滤规则翻译成 AE2 的库存接口。写入后由节点统一刷新解码缓存并提示存档，避免终端
  * 一次搬多格时反复解码。</p>
  */
-final class MachinePatternInventory implements InternalInventory {
-    private final MachineNode node;
+final class NodePatternInventory implements InternalInventory {
+    private final NodeRuntime node;
 
     /**
      * @param node 所属机器节点
      */
-    MachinePatternInventory(MachineNode node) {
+    NodePatternInventory(NodeRuntime node) {
         this.node = node;
     }
 
