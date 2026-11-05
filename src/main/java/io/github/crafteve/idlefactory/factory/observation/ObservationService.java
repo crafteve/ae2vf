@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.IntSupplier;
 
 import io.github.crafteve.idlefactory.factory.capability.FaceCache;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -37,10 +38,12 @@ import net.minecraft.world.level.Level;
  * <p>预算与退避是刻意的：平时排队的只有“有事的”（新的、刚脏过、失联、未加载），
  * 长期安静的 PRESENT 会一路退到 10 分钟一探——稳态下每 tick 的探测次数只和事件数
  * 相关，和对象总数解耦。</p>
+ *
+ * <p>预算由 {@code FactoryRuntime} 以 {@link IntSupplier} 注入，每次取预算都读当前 config，
+ * 热改下一 tick 生效。探测顺序由调用方给的 {@code BlockKey} 序列决定（脏 > 在线机器 > 其余）。
+ * 本类只探测、记 {@code observedAtTick}、吐 {@link Health}，<b>不判断 stale</b>。</p>
  */
 public final class ObservationService {
-    /** 每 tick 最多主动探测几个到期条目。 */
-    private static final int PROBE_BUDGET_PER_TICK = 8;
     /**
      * 每 tick 最多处理几个「被失效事件标脏」的条目。
      *
@@ -61,6 +64,10 @@ public final class ObservationService {
     private static final int FACE_FREEZE_MAX_REFRESHES = 5;
 
     private final MinecraftServer server;
+    /** 每 tick 探测预算；由运行时注入，读当前 config。 */
+    private final IntSupplier probeBudget;
+    /** 本 tick 已经探过的位置，避免脏优先与轮转重复探测。 */
+    private final Set<BlockKey> probedThisTick = new HashSet<>();
     /** 键 → 观测。插入顺序稳定，便于诊断输出。 */
     private final Map<BlockKey, Observation> observations = new LinkedHashMap<>();
     /**
@@ -94,22 +101,37 @@ public final class ObservationService {
     private int probesLastTick;
 
     /**
-     * @param server 服务端实例
+     * @param server      服务端实例
+     * @param probeBudget 每 tick 探测预算供应器，读当前 config
      */
-    public ObservationService(MinecraftServer server) {
+    public ObservationService(MinecraftServer server, IntSupplier probeBudget) {
         this.server = server;
+        this.probeBudget = probeBudget;
+    }
+
+    /**
+     * 这个位置是否被事件标脏、等下一 tick 优先重探。
+     *
+     * @param key 位置
+     * @return 在待消化集合里时为 {@code true}
+     */
+    public boolean isDirty(BlockKey key) {
+        return this.dirty.contains(key);
     }
 
     /**
      * 每 tick 推进一次。
      *
-     * @param referenced 当前所有工厂引用到的位置；不在里面的观测会被清掉（mark-sweep）
+     * @param ordered 当前所有被引用位置，按优先级排序（脏 > 在线机器 > 其余）；
+     *                不在里面的观测会被清掉（mark-sweep）
      */
-    public void tick(Set<BlockKey> referenced) {
+    public void tick(List<BlockKey> ordered) {
         this.tick++;
         this.probesLastTick = 0;
+        this.probedThisTick.clear();
+        Set<BlockKey> referenced = new HashSet<>(ordered);
 
-        for (BlockKey key : referenced) {
+        for (BlockKey key : ordered) {
             this.observations.computeIfAbsent(key, ignored -> new Observation());
         }
 
@@ -127,21 +149,26 @@ public final class ObservationService {
             // 能力失效事件不改变方块 id，光复探抓不到它，必须在这里显式清。
             this.faceCache.invalidate(key);
             probe(key, observation);
+            this.probedThisTick.add(key);
             this.probesLastTick++;
             dirtyBudget--;
         }
 
-        // 2) 到期复探
-        int budget = PROBE_BUDGET_PER_TICK;
-        for (Map.Entry<BlockKey, Observation> entry : this.observations.entrySet()) {
+        // 2) 到期复探：按调用方排好的顺序，预算读当前 config
+        int budget = Math.max(0, this.probeBudget.getAsInt());
+        for (BlockKey key : ordered) {
             if (budget <= 0) {
                 break;
             }
-            Observation observation = entry.getValue();
-            if (observation.nextProbeTick() > this.tick) {
+            if (this.probedThisTick.contains(key)) {
                 continue;
             }
-            probe(entry.getKey(), observation);
+            Observation observation = this.observations.get(key);
+            if (observation == null || observation.nextProbeTick() > this.tick) {
+                continue;
+            }
+            probe(key, observation);
+            this.probedThisTick.add(key);
             budget--;
             this.probesLastTick++;
         }

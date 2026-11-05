@@ -163,11 +163,13 @@ public final class FactoryNodeSnapshotBuilder {
             for (Machine machine : node.machines()) {
                 MachineHealth health = MachineHealth.OFFLINE;
                 boolean probed = false;
+                boolean memberStale = false;
                 ResourceLocation blockId = null;
                 for (FactorySnapshotBuilder.MachineView view : machineViews) {
                     if (view.machineId().equals(machine.id())) {
                         health = view.health();
                         probed = view.probed();
+                        memberStale = view.stale();
                         blockId = view.blockId();
                         state = view.totalState();
                         break;
@@ -176,11 +178,14 @@ public final class FactoryNodeSnapshotBuilder {
                 if (!probed) {
                     allProbed = false;
                 }
+                if (memberStale) {
+                    anyStale = true;
+                }
                 if (health.isOnline()) {
                     anyOnline = true;
                 }
                 members.add(new MemberView(machine.id(), machine.blocks(), blockId, health, probed,
-                        false));
+                        memberStale));
             }
             NodeHealth health = nodeHealth(members);
             if (!anyOnline) {

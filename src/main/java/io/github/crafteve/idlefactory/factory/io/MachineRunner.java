@@ -107,11 +107,6 @@ public final class MachineRunner {
         }
 
         BlockKey target = machine.typeBlock();
-        if (factory.live().isMachineMissing(machine.id())) {
-            // 方块没了，机器仍在库；等方块回来时再唤醒
-            sleepIfIdle(machineState, now);
-            return 0L;
-        }
         if (observations != null && !runnable(observations, target)) {
             sleepIfIdle(machineState, now);
             return 0L;

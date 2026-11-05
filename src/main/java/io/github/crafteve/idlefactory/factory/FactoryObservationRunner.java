@@ -1,36 +1,42 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.MachineRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
+import io.github.crafteve.idlefactory.factory.node.NodeTypeResolver;
+import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
 import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
 
-import java.util.Optional;
-
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 
 /**
- * 观测输入与迁移消费：每 tick 把「被引用的位置集合」交给观测服务，再消费它吐出的状态迁移。
+ * 观测输入与健康消费：每 tick 把「被引用的方块」按优先级排成序列交给观测服务，
+ * 再用观测快照解析节点 / 机器健康与类型迁移。
  *
- * <p>集合每 tick 重建，因为配置随时可能变（接入、断开、删线）。规模是「机器总数」，
- * 百台级下这点分配可以忽略；真要省再上脏标记。</p>
+ * <p>优先级：本 tick 标脏的方块 &gt; 在线机器的方块 &gt; 其余。序列、观测 map 与三个分类列表
+ * 都是复用字段，不每 tick 为全库重新分配。</p>
  *
- * <p>故意从工厂记录拼、不从占用表拼：表键是不可逆的统一 id，反解坐标还得回工厂拿——
- * 绕一圈回到原点。不如直接遍历源头，零重复数据。占用表专职门禁，引用集专职观测，
- * 各干各的。</p>
- *
- * <p>迁移的处理只有三件事：记事件、维护 {@code machineMissing}、唤醒机器；通知计数交给
- * {@link FactoryNoticeHandler}，节点可用性交给 {@link NodeManager}。</p>
+ * <p>本类是 {@code withTypeBlockId} 的<b>唯一写入点</b>：只有
+ * {@link NodeTypeResolver#migrationTarget} 成立时才替换节点，并通过 {@code publish} 落盘。
+ * 健康不存副本，每次由 {@link NodeHealthResolver} 从观测快照现算。</p>
  */
 final class FactoryObservationRunner {
     private final MinecraftServer server;
@@ -39,8 +45,18 @@ final class FactoryObservationRunner {
     private final MachineRunner machineRunner;
     private final NodeManager nodeManager;
     private final FactoryNoticeHandler notices;
-    /** 每 tick 复用的「被引用位置集合」，避免反复分配。 */
-    private final Set<BlockKey> observedKeys = new HashSet<>();
+    /** 档案变更出口：类型迁移时落盘并触发对账。 */
+    private final Runnable publish;
+
+    /** 每 tick 复用的三个优先级桶与合成序列。 */
+    private final List<BlockKey> dirtyKeys = new ArrayList<>();
+    private final List<BlockKey> onlineKeys = new ArrayList<>();
+    private final List<BlockKey> restKeys = new ArrayList<>();
+    private final List<BlockKey> orderedKeys = new ArrayList<>();
+    /** 去重集合：同一方块可能被多台机器 / 多个工厂引用。 */
+    private final Set<BlockKey> seen = new HashSet<>();
+    /** 每 tick 复用的方块观测投影。 */
+    private final Map<BlockKey, BlockObservation> blockObservations = new HashMap<>();
 
     /**
      * @param server        服务端
@@ -49,43 +65,115 @@ final class FactoryObservationRunner {
      * @param machineRunner 执行器，用于恢复时唤醒机器
      * @param nodeManager   虚拟节点管理器，用于同步可用性
      * @param notices       失联/恢复通知聚合器
+     * @param publish       档案变更出口
      */
     FactoryObservationRunner(MinecraftServer server, FactoryManager manager,
             ObservationService observations, MachineRunner machineRunner,
-            NodeManager nodeManager, FactoryNoticeHandler notices) {
+            NodeManager nodeManager, FactoryNoticeHandler notices, Runnable publish) {
         this.server = server;
         this.manager = manager;
         this.observations = observations;
         this.machineRunner = machineRunner;
         this.nodeManager = nodeManager;
         this.notices = notices;
+        this.publish = publish;
     }
 
-    /** 观测一轮：重建被引用的位置集合，交给观测服务，再消费它吐出的状态迁移。 */
+    /** 观测一轮：排好序列 → 观测 → 解析健康与类型迁移 → 消费状态迁移。 */
     void tick() {
-        this.observedKeys.clear();
-        for (Factory factory : this.manager.all()) {
-            for (Node node : factory.config().nodes().all()) {
-                for (Machine machine : node.machines()) {
-                    this.observedKeys.addAll(machine.blocks());
-                }
-            }
-            // 仓库容器和机器共用同一张方块级观测
-            if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
-                for (ContainerRef container : anchor.containers()) {
-                    this.observedKeys.add(container.blockKey());
-                }
-            }
-        }
-        this.observations.tick(this.observedKeys);
+        this.collectKeys();
+        this.observations.tick(this.orderedKeys);
+        this.snapshotBlocks();
+        this.resolveNodes();
         for (ObservationService.Transition transition : this.observations.drainTransitions()) {
             this.handleTransition(transition);
         }
         this.notices.flush(this.server, this.manager);
     }
 
+    /** 收集被引用的方块并按优先级分桶。 */
+    private void collectKeys() {
+        this.dirtyKeys.clear();
+        this.onlineKeys.clear();
+        this.restKeys.clear();
+        this.orderedKeys.clear();
+        this.seen.clear();
+        for (Factory factory : this.manager.all()) {
+            for (Node node : factory.config().nodes().all()) {
+                for (Machine machine : node.machines()) {
+                    boolean online = true;
+                    for (BlockKey block : machine.blocks()) {
+                        if (this.observations.observe(block).health() != Health.PRESENT) {
+                            online = false;
+                            break;
+                        }
+                    }
+                    for (BlockKey block : machine.blocks()) {
+                        if (!this.seen.add(block)) {
+                            continue;
+                        }
+                        if (this.observations.isDirty(block)) {
+                            this.dirtyKeys.add(block);
+                        } else if (online) {
+                            this.onlineKeys.add(block);
+                        } else {
+                            this.restKeys.add(block);
+                        }
+                    }
+                }
+            }
+            // 仓库容器和机器共用同一张方块级观测
+            if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
+                for (ContainerRef container : anchor.containers()) {
+                    if (this.seen.add(container.blockKey())) {
+                        this.restKeys.add(container.blockKey());
+                    }
+                }
+            }
+        }
+        this.orderedKeys.addAll(this.dirtyKeys);
+        this.orderedKeys.addAll(this.onlineKeys);
+        this.orderedKeys.addAll(this.restKeys);
+    }
+
+    /** 把观测服务的结果投影成 {@link BlockObservation}，复用同一张 map。 */
+    private void snapshotBlocks() {
+        this.blockObservations.clear();
+        for (BlockKey key : this.orderedKeys) {
+            Observation observation = this.observations.observe(key);
+            this.blockObservations.put(key, new BlockObservation(observation.blockId(),
+                    observation.health(), observation.health() != Health.UNKNOWN,
+                    observation.observedAtTick()));
+        }
+    }
+
+    /** 解析每个节点的健康与类型迁移。 */
+    private void resolveNodes() {
+        long now = this.observations.currentTick();
+        long staleTicks = FactoryLimitsConfig.staleHealthTicks();
+        for (Factory factory : this.manager.all()) {
+            for (Node node : factory.config().nodes().all()) {
+                Node current = node;
+                Optional<ResourceLocation> migration = NodeTypeResolver.migrationTarget(current,
+                        this.blockObservations, now, staleTicks);
+                if (migration.isPresent()) {
+                    Node migrated = current.withTypeBlockId(migration.get());
+                    if (factory.config().library().replace(migrated)
+                            == io.github.crafteve.idlefactory.factory.node.NodeLibrary.Result.REPLACED) {
+                        current = migrated;
+                        this.publish.run();
+                    }
+                }
+                NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,
+                        this.blockObservations, now, staleTicks);
+                this.nodeManager.setAvailable(current.id(),
+                        snapshot.health() != NodeHealth.OFFLINE);
+            }
+        }
+    }
+
     /**
-     * 消费一次状态迁移：记事件、维护 machineMissing、必要时唤醒机器。
+     * 消费一次状态迁移：记事件，恢复时唤醒机器。
      *
      * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
      * 未加载只在 {@code diag observe} 里看得到。</p>
@@ -100,43 +188,32 @@ final class FactoryObservationRunner {
             if (nodeFound.isEmpty() || machineFound.isEmpty()) {
                 continue;
             }
-            Node node = nodeFound.get();
             Machine machine = machineFound.get();
             switch (transition.to()) {
                 case MISSING, NO_DIMENSION -> {
-                    if (factory.live().markMachineMissing(machine.id())) {
-                        factory.live().stats().record(DiagEvent.of(now,
-                                DiagEvent.Level.ERROR, DiagEvent.Category.MACH, machine.id(),
-                                null, transition.to().describe() + "，机器仍留在节点库"));
-                        this.notices.missing(factory.id());
-                    }
+                    factory.live().stats().record(DiagEvent.of(now,
+                            DiagEvent.Level.ERROR, DiagEvent.Category.MACH, machine.id(),
+                            null, transition.to().describe() + "，机器仍留在节点库"));
+                    this.notices.missing(factory.id());
                 }
                 case PRESENT -> {
-                    boolean wasMissing = factory.live().clearMachineMissing(machine.id());
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, machine.id(), null, "机器已恢复"));
-                        this.wakeMachine(factory, machine.id());
-                        if (wasMissing) {
-                            this.notices.restored(factory.id());
-                        }
+                        this.machineRunner.wake(machine.id());
+                        this.notices.restored(factory.id());
                     }
                 }
                 default -> {
                     // UNLOADED / UNKNOWN 不记
                 }
             }
-            // 节点跟着观测走：方块不在就下架样板，回来再上架
-            this.nodeManager.setAvailable(node.id(), transition.to() == Health.PRESENT);
         }
         this.handleContainerTransition(transition, now);
     }
 
     /**
      * 容器迁移：记一条仓库事件。
-     *
-     * <p>容器和机器共用观测表，但它们的消费方式不同：机器标记失联，容器只能被
-     * {@code storage prune} 清理。所以这里只负责让「箱子没了」在事件流里看得见。</p>
      *
      * @param transition 迁移
      * @param now        当前游戏时间
@@ -160,15 +237,5 @@ final class FactoryObservationRunner {
                         "容器 [" + ref.shortId() + "] " + transition.to().describe()));
             }
         }
-    }
-
-    /**
-     * 唤醒一台机器。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     */
-    private void wakeMachine(Factory factory, UUID machineId) {
-        this.machineRunner.wake(machineId);
     }
 }

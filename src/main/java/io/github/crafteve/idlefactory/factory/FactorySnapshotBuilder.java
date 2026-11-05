@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,9 +17,11 @@ import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
+import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
@@ -262,16 +266,22 @@ public final class FactorySnapshotBuilder {
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
             long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
+        long healthNow = observations == null ? 0L : observations.currentTick();
+        long staleTicks = FactoryLimitsConfig.staleHealthTicks();
         for (Node node : factory.config().nodes().all()) {
             NodeIoGroup io = node.io();
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
+            NodeHealthResolver.Snapshot nodeHealth = NodeHealthResolver.resolve(node,
+                    blockObservations(node, observations), healthNow, staleTicks);
             for (Machine machine : node.machines()) {
                 BlockKey typeBlock = machine.typeBlock();
                 Observation observation = observations == null
                         ? Observation.UNKNOWN : observations.observe(typeBlock);
-                MachineHealth health = machineHealth(machine, observations);
-                boolean probed = observation.health() != Health.UNKNOWN;
+                NodeHealthResolver.MachineState state = nodeHealth.machine(machine.id());
+                MachineHealth health = state == null ? MachineHealth.OFFLINE : state.health();
+                boolean probed = state != null && state.probed();
+                boolean stale = state != null && state.stale();
 
                 DiagStats.MachineStats stats = factory.live().stats().machineOrNull(machine.id());
                 List<Long> inputRates = new ArrayList<>(inputs.size());
@@ -314,7 +324,7 @@ public final class FactorySnapshotBuilder {
                         ? observation.blockId() : observation.lastBlockId();
                 views.add(new MachineView(node.id(), node.name(), node.typeBlockId(),
                         node.machineCount(), machine.id(), typeBlock, machine.blocks().size(),
-                        health, probed, false,
+                        health, probed, stale,
                         observation.blockId(), groupBlockId, observation.beTypeId(),
                         observation.presence(), inputs.size() + outputs.size(),
                         inputs, outputs, inputRates, outputRates,
@@ -327,27 +337,27 @@ public final class FactorySnapshotBuilder {
     }
 
     /**
-     * 计算一台机器的健康：所有方块 PRESENT 才算在线，否则离线。
+     * 把一个节点的方块观测投影成 {@link BlockObservation} 表，交给健康解析器。
      *
-     * <p>P1b 只按观测结论聚合；P2 的 {@code NodeHealthResolver} 接管同一套语义，
-     * 判定公式保持不变。</p>
+     * <p>快照是请求驱动的，不在 tick 热路径上，这里按节点现建一张小表；tick 热路径的复用表
+     * 在 {@code FactoryObservationRunner}。</p>
      *
-     * @param machine      机器
-     * @param observations 观测服务；{@code null} 时按未探测（离线）处理
-     * @return 机器健康
+     * @param node         节点
+     * @param observations 观测服务；{@code null} 时全部按未探测
+     * @return 方块观测表
      */
-    private static MachineHealth machineHealth(Machine machine,
+    private static Map<BlockKey, BlockObservation> blockObservations(Node node,
             @Nullable ObservationService observations) {
-        if (observations == null) {
-            return MachineHealth.OFFLINE;
-        }
-        for (BlockKey block : machine.blocks()) {
-            Observation observation = observations.observe(block);
-            if (observation.health() != Health.PRESENT) {
-                return MachineHealth.OFFLINE;
+        Map<BlockKey, BlockObservation> map = new HashMap<>();
+        for (Machine machine : node.machines()) {
+            for (BlockKey block : machine.blocks()) {
+                Observation observation = observations == null
+                        ? Observation.UNKNOWN : observations.observe(block);
+                map.put(block, new BlockObservation(observation.blockId(), observation.health(),
+                        observation.health() != Health.UNKNOWN, observation.observedAtTick()));
             }
         }
-        return MachineHealth.ONLINE;
+        return map;
     }
 
     /**

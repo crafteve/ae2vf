@@ -256,7 +256,6 @@ final class MachineLinkService {
         if (blocked) {
             return new DeleteOutcome(false, rules, 0, false);
         }
-        factory.live().clearMachineMissing(machine.id());
         int returned = returnPatterns(factory, node, receiver);
         boolean nodeDeleted = node.machineCount() <= 1;
         if (nodeDeleted) {

@@ -147,7 +147,7 @@ public final class DiagService {
         for (Machine machine : allMachines(factory)) {
             BlockKey ref = machine.typeBlock();
             Observation observation = observations.observe(ref);
-            boolean missing = factory.live().isMachineMissing(machine.id());
+            boolean missing = healthOf(factory, machine) == Health.MISSING;
             if (observation.health() == Health.PRESENT && !missing) {
                 continue;
             }
@@ -190,6 +190,21 @@ public final class DiagService {
                 .append(FactoryMessages.text(" ", FactoryMessages.INFO))
                 .append(FactoryMessages.hover(machine.shortId(), where))
                 .append(FactoryMessages.text(" " + where + " · " + tail, FactoryMessages.INFO));
+    }
+
+    /**
+     * 机器类型方块的观测健康；未探测时按 UNKNOWN。
+     *
+     * @param factory 工厂
+     * @param machine 机器
+     * @return 方块健康
+     */
+    private static Health healthOf(Factory factory, Machine machine) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null || runtime.observations() == null) {
+            return Health.UNKNOWN;
+        }
+        return runtime.observations().observe(machine.typeBlock()).health();
     }
 
     private static NodeIoGroup nodeIo(Factory factory, Machine machine) {

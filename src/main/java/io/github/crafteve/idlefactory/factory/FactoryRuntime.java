@@ -209,7 +209,8 @@ public final class FactoryRuntime {
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
         // 观测先于仓库解析：容器仓库要借观测做面窄化与可用性判断
-        this.observations = new ObservationService(this.server);
+        this.observations = new ObservationService(this.server,
+                FactoryLimitsConfig::observationBlockBudgetPerTick);
         this.storageResolver = new DispatchingStorageResolver(
                 new Ae2StorageResolver(this.server),
                 new ContainerStorageResolver(this.server, this.observations));
@@ -220,7 +221,7 @@ public final class FactoryRuntime {
         }
         FactoryObservationRunner observationRunner = new FactoryObservationRunner(
                 this.server, this.manager, this.observations, this.machineRunner,
-                this.nodeManager, this.notices);
+                this.nodeManager, this.notices, this::markDirty);
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
                 this.server, this.manager, this.observations, this.nodeManager);
         this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.machineRunner,
