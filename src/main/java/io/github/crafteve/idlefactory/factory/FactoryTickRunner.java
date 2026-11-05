@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.factory;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
-import io.github.crafteve.idlefactory.factory.io.MachineRunner;
+import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
@@ -35,7 +35,7 @@ final class FactoryTickRunner {
 
     private final MinecraftServer server;
     private final FactoryManager manager;
-    private final MachineRunner machineRunner;
+    private final NodeIoRunner nodeIoRunner;
     private final ObservationService observations;
     private final StorageResolver storageResolver;
     private final FactoryObservationRunner observationRunner;
@@ -47,18 +47,18 @@ final class FactoryTickRunner {
     /**
      * @param server            服务端
      * @param manager           工厂档案柜
-     * @param machineRunner     执行器
+     * @param nodeIoRunner     执行器
      * @param observations      观测服务
      * @param storageResolver   仓库解析器
      * @param observationRunner 观测输入与迁移消费
      * @param nodeRunner        虚拟节点推进
      */
-    FactoryTickRunner(MinecraftServer server, FactoryManager manager, MachineRunner machineRunner,
+    FactoryTickRunner(MinecraftServer server, FactoryManager manager, NodeIoRunner nodeIoRunner,
             ObservationService observations, StorageResolver storageResolver,
             FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner) {
         this.server = server;
         this.manager = manager;
-        this.machineRunner = machineRunner;
+        this.nodeIoRunner = nodeIoRunner;
         this.observations = observations;
         this.storageResolver = storageResolver;
         this.observationRunner = observationRunner;
@@ -91,7 +91,7 @@ final class FactoryTickRunner {
 
         if (this.tickCounter % this.ioInterval == 0) {
             long start = System.nanoTime();
-            this.machineRunner.tick(this.server, this.manager, this.observations);
+            this.nodeIoRunner.tick(this.server, this.manager, this.observations);
             DiagService.recordIoCost(System.nanoTime() - start);
         }
 

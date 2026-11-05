@@ -139,7 +139,7 @@ public final class DiagService {
                         + " · 本 tick 探测 " + stats.probesLastTick()
                         + " · 待消化 " + stats.dirtyPending()
                         + " · 面表冻结 " + observations.frozenFacesCount()));
-        int routes = runtime.machineRunner().totalRouteCount();
+        int routes = runtime.nodeIoRunner().totalRouteCount();
         FactoryMessages.send(player, FactoryMessages.info("面路由 " + routes + " 条（搬通过的面）"));
 
         long now = observations.currentTick();
@@ -240,7 +240,7 @@ public final class DiagService {
                 .append(FactoryMessages.text(io.inputs().size() + " 入 / "
                         + io.outputs().size() + " 出 · "
                         + stats.totalRate() + "/s", FactoryMessages.INFO));
-        long sleepUntil = runtime.machineRunner().sleepUntil(machine.id());
+        long sleepUntil = runtime.nodeIoRunner().sleepUntil(machine.id());
         if (sleepUntil > now) {
             row.append(FactoryMessages.text(" · 睡眠 " + seconds(sleepUntil - now) + "s",
                     FactoryMessages.DIM));
@@ -269,8 +269,8 @@ public final class DiagService {
         Machine machine = target.get();
         FactoryRuntime runtime = FactoryRuntime.get();
         long now = now(runtime.server());
-        long sleepUntil = runtime.machineRunner().sleepUntil(machine.id());
-        long sleepSince = runtime.machineRunner().sleepSince(machine.id());
+        long sleepUntil = runtime.nodeIoRunner().sleepUntil(machine.id());
+        long sleepSince = runtime.nodeIoRunner().sleepSince(machine.id());
 
         MutableComponent header = Component.empty()
                 .append(FactoryMessages.text("── ", FactoryMessages.DIM))
@@ -566,8 +566,8 @@ public final class DiagService {
                 continue;
             }
             watch.nextPush = now + watch.intervalTicks;
-            long sleepUntil = runtime.machineRunner().sleepUntil(machine.get().id());
-            long sleepSince = runtime.machineRunner().sleepSince(machine.get().id());
+            long sleepUntil = runtime.nodeIoRunner().sleepUntil(machine.get().id());
+            long sleepSince = runtime.nodeIoRunner().sleepSince(machine.get().id());
             if (watch.detail) {
                 for (Component row : DiagRender.watchDetail(server, factory.get(), machine.get(),
                         now, sleepUntil, sleepSince)) {

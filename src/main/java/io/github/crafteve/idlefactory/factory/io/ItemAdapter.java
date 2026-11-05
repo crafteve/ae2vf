@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
  * 机器的物品接口。
  *
  * <p>一个实例只认一个精确变体（{@code sample} 的组件也参与比较）。模糊规则由
- * {@link GroupRunner} 展开成多个实例，每个变体走一遍同样的事务逻辑。</p>
+ * {@link MachineIoRunner} 展开成多个实例，每个变体走一遍同样的事务逻辑。</p>
  */
 public final class ItemAdapter implements ResourceAdapter {
     /** 扫机器槽位时的上限，避免超大库存一次遍历几千格。 */

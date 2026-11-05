@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.MachineRunner;
+import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
@@ -39,7 +39,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 final class MachineLinkService {
     private final FactoryManager manager;
     private final NodeManager nodeManager;
-    private final MachineRunner machineRunner;
+    private final NodeIoRunner nodeIoRunner;
     private final NodeLibraryService nodeLibrary;
     @Nullable
     private final ObservationService observations;
@@ -48,17 +48,17 @@ final class MachineLinkService {
     /**
      * @param manager       工厂档案柜
      * @param nodeManager   虚拟节点管理器
-     * @param machineRunner 执行器
+     * @param nodeIoRunner 执行器
      * @param nodeLibrary   节点库写入口（落盘由它统一触发）
      * @param observations  观测服务；服务端未就绪时为 {@code null}
      * @param server        服务端
      */
     MachineLinkService(FactoryManager manager, NodeManager nodeManager,
-            MachineRunner machineRunner, NodeLibraryService nodeLibrary,
+            NodeIoRunner nodeIoRunner, NodeLibraryService nodeLibrary,
             @Nullable ObservationService observations, MinecraftServer server) {
         this.manager = manager;
         this.nodeManager = nodeManager;
-        this.machineRunner = machineRunner;
+        this.nodeIoRunner = nodeIoRunner;
         this.nodeLibrary = nodeLibrary;
         this.observations = observations;
         this.server = server;
@@ -270,7 +270,7 @@ final class MachineLinkService {
             this.nodeManager.refreshPatterns(node.id());
         }
         // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
-        this.machineRunner.forget(machine.id());
+        this.nodeIoRunner.forget(machine.id());
         return new DeleteOutcome(true, rules, returned, nodeDeleted);
     }
 

@@ -9,7 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
-import io.github.crafteve.idlefactory.factory.io.MachineRunner;
+import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -42,7 +42,7 @@ final class FactoryObservationRunner {
     private final MinecraftServer server;
     private final FactoryManager manager;
     private final ObservationService observations;
-    private final MachineRunner machineRunner;
+    private final NodeIoRunner nodeIoRunner;
     private final NodeManager nodeManager;
     private final FactoryNoticeHandler notices;
     /** 档案变更出口：类型迁移时落盘并触发对账。 */
@@ -62,18 +62,18 @@ final class FactoryObservationRunner {
      * @param server        服务端
      * @param manager       工厂档案柜
      * @param observations  观测服务
-     * @param machineRunner 执行器，用于恢复时唤醒机器
+     * @param nodeIoRunner 执行器，用于恢复时唤醒机器
      * @param nodeManager   虚拟节点管理器，用于同步可用性
      * @param notices       失联/恢复通知聚合器
      * @param publish       档案变更出口
      */
     FactoryObservationRunner(MinecraftServer server, FactoryManager manager,
-            ObservationService observations, MachineRunner machineRunner,
+            ObservationService observations, NodeIoRunner nodeIoRunner,
             NodeManager nodeManager, FactoryNoticeHandler notices, Runnable publish) {
         this.server = server;
         this.manager = manager;
         this.observations = observations;
-        this.machineRunner = machineRunner;
+        this.nodeIoRunner = nodeIoRunner;
         this.nodeManager = nodeManager;
         this.notices = notices;
         this.publish = publish;
@@ -200,7 +200,7 @@ final class FactoryObservationRunner {
                     if (transition.from() != Health.UNKNOWN) {
                         factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
                                 DiagEvent.Category.MACH, machine.id(), null, "机器已恢复"));
-                        this.machineRunner.wake(machine.id());
+                        this.nodeIoRunner.wake(machine.id());
                         this.notices.restored(factory.id());
                     }
                 }

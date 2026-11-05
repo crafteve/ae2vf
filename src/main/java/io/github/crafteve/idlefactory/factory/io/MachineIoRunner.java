@@ -34,7 +34,7 @@ import appeng.api.stacks.AEItemKey;
  * 单规则 8、单机器 16，输入/输出按侧分配，防止变体爆炸时一次打满；规则处理顺序按 tick
  * 轮转，避免后面的规则被饿死。</p>
  */
-public final class GroupRunner {
+public final class MachineIoRunner {
     /**
      * 一次组级搬运的结果。
      *
@@ -51,7 +51,7 @@ public final class GroupRunner {
      * @param inputReasons 逐输入规则的本轮原因，供界面显示每条规则的诊断
      * @param outputReasons 逐输出规则的本轮原因
      */
-    public record GroupRun(long fed, long pulled,
+    public record BlockRun(long fed, long pulled,
             Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
             Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
             IoResult.Reason lastReason, boolean inputFull,
@@ -59,7 +59,7 @@ public final class GroupRunner {
             Map<RuleKey, IoResult.Reason> inputReasons,
             Map<RuleKey, IoResult.Reason> outputReasons) {
 
-        public GroupRun {
+        public BlockRun {
             // 逐规则原因会被快照读取，先冻结成只读，避免调用方后续改动影响已发出的视图。
             inputReasons = Map.copyOf(inputReasons);
             outputReasons = Map.copyOf(outputReasons);
@@ -105,7 +105,7 @@ public final class GroupRunner {
         return IoResult.Reason.OK;
     }
 
-    private GroupRunner() {
+    private MachineIoRunner() {
         // 纯静态工具类
     }
 
@@ -120,12 +120,13 @@ public final class GroupRunner {
      * @param routes     面路由表；{@code null} 时每次扫面
      * @param generation 观测层的面表代数
      * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
-     * @param now        当前服务端 tick，给变体索引算 TTL 与规则轮转
-     * @return 本轮结果
+     * @param now          当前服务端 tick，给变体索引算 TTL 与规则轮转
+     * @param sharedBudget 本台机器本 tick 共享的变体预算；每个方块按序扣减
+     * @return 本方块结果
      */
-    public static GroupRun run(MEStorage storage, ServerLevel level, BlockPos pos, NodeIoGroup group,
-            @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes, long generation,
-            @Nullable ItemVariantIndex variants, long now) {
+    public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
+            NodeIoGroup group, @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes,
+            long generation, @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
         Map<AEKey, Long> fedByKey = new LinkedHashMap<>();
@@ -144,9 +145,10 @@ public final class GroupRunner {
         // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
         // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
         boolean outputUsesVariants = usesVariants(outputs);
-        int[] inputBudget = {outputUsesVariants
+        int sideAllowance = outputUsesVariants
                 ? ItemCandidates.MAX_VARIANTS_PER_INPUT_TICK
-                : ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
+                : ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK;
+        int[] inputBudget = {Math.min(sideAllowance, Math.max(0, sharedBudget[0]))};
         int inputQuota = inputBudget[0];
 
         // 规则按 tick 轮转起点：同一侧的多条模糊规则共享本侧额度时，后面的规则不会被前面的永久挤掉。
@@ -215,9 +217,11 @@ public final class GroupRunner {
         }
 
         int inputUsed = inputQuota - inputBudget[0];
-        // 输出实际额度 = 16 - 输入实际用量。输入在输出能花预算时最多 12，所以天然保底 4；
-        // 输入拿满 16 只发生在输出侧没有模糊物品规则时，此时输出不会扣预算。
-        int[] outputBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK - inputUsed};
+        sharedBudget[0] = Math.max(0, sharedBudget[0] - inputUsed);
+        // 输出实际额度 = 16 - 输入实际用量，再与本台机器剩余共享预算取小。
+        int[] outputBudget = {
+                Math.min(ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK - inputUsed, sharedBudget[0])};
+        int outputQuota = outputBudget[0];
 
         int outputStart = outputs.isEmpty() ? 0 : (int) Math.floorMod(now + 1L, (long) outputs.size());
         for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
@@ -270,13 +274,116 @@ public final class GroupRunner {
             }
         }
 
+        int outputUsed = outputQuota - outputBudget[0];
+        sharedBudget[0] = Math.max(0, sharedBudget[0] - outputUsed);
+
         boolean inputFull = anyInputRule && !anyInputAccepted;
         IoResult.Reason lastReason = combine(inputReason, outputReason);
-        return new GroupRun(fed, pulled, fedByKey, pulledByKey,
+        return new BlockRun(fed, pulled, fedByKey, pulledByKey,
                 fedByRule, pulledByRule, lastReason, inputFull,
                 inputReason == null ? IoResult.Reason.OK : inputReason,
                 outputReason == null ? IoResult.Reason.OK : outputReason,
                 inputReasons, outputReasons);
+    }
+
+    /**
+     * 一台机器跨所有方块聚合后的本轮结果。
+     *
+     * <p>数量、速率与逐规则原因都按机器聚合：同一规则在多个方块上跑出的量相加，原因取最坏。
+     * 输入堵塞只在<b>所有</b>方块都判「无法接收」时成立；任一方块还能收就不算堵塞。</p>
+     *
+     * @param fed          补进机器的总数
+     * @param pulled       从机器抽出的总数
+     * @param fedByKey     按资源拆分的补料量
+     * @param pulledByKey  按资源拆分的抽取量
+     * @param fedByRule    按规则拆分的补料量
+     * @param pulledByRule 按规则拆分的抽取量
+     * @param lastReason   没搬动时的最后一个原因
+     * @param inputFull    所有方块的输入规则都无法接收
+     * @param inputReason  输入侧原因
+     * @param outputReason 输出侧原因
+     * @param inputReasons 逐输入规则原因
+     * @param outputReasons 逐输出规则原因
+     */
+    public record MachineRun(long fed, long pulled,
+            Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
+            Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
+            IoResult.Reason lastReason, boolean inputFull,
+            IoResult.Reason inputReason, IoResult.Reason outputReason,
+            Map<RuleKey, IoResult.Reason> inputReasons,
+            Map<RuleKey, IoResult.Reason> outputReasons) {
+
+        public MachineRun {
+            inputReasons = Map.copyOf(inputReasons);
+            outputReasons = Map.copyOf(outputReasons);
+        }
+
+        /** 一共搬了多少。 */
+        public long moved() {
+            return this.fed + this.pulled;
+        }
+
+        /** 这一轮是否搬了东西。 */
+        public boolean movedAnything() {
+            return this.fed + this.pulled > 0L;
+        }
+
+        /**
+         * 把多个方块的结果合成一台机器的结果。
+         *
+         * @param runs 各方块结果
+         * @return 机器结果
+         */
+        public static MachineRun combine(List<BlockRun> runs) {
+            long fed = 0L;
+            long pulled = 0L;
+            Map<AEKey, Long> fedByKey = new LinkedHashMap<>();
+            Map<AEKey, Long> pulledByKey = new LinkedHashMap<>();
+            Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
+            Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
+            Map<RuleKey, IoResult.Reason> inputReasons = new LinkedHashMap<>();
+            Map<RuleKey, IoResult.Reason> outputReasons = new LinkedHashMap<>();
+            IoResult.Reason inputReason = IoResult.Reason.OK;
+            IoResult.Reason outputReason = IoResult.Reason.OK;
+            IoResult.Reason lastReason = IoResult.Reason.OK;
+            boolean inputFull = !runs.isEmpty();
+            for (BlockRun run : runs) {
+                fed += run.fed();
+                pulled += run.pulled();
+                mergeAe(fedByKey, run.fedByKey());
+                mergeAe(pulledByKey, run.pulledByKey());
+                mergeRule(fedByRule, run.fedByRule());
+                mergeRule(pulledByRule, run.pulledByRule());
+                mergeReasons(inputReasons, run.inputReasons());
+                mergeReasons(outputReasons, run.outputReasons());
+                inputReason = worse(inputReason, run.inputReason());
+                outputReason = worse(outputReason, run.outputReason());
+                lastReason = worse(lastReason, run.lastReason());
+                inputFull &= run.inputFull();
+            }
+            return new MachineRun(fed, pulled, fedByKey, pulledByKey, fedByRule, pulledByRule,
+                    lastReason, inputFull, inputReason, outputReason, inputReasons, outputReasons);
+        }
+
+        private static void mergeAe(Map<AEKey, Long> target, Map<AEKey, Long> source) {
+            for (Map.Entry<AEKey, Long> entry : source.entrySet()) {
+                target.merge(entry.getKey(), entry.getValue(), Long::sum);
+            }
+        }
+
+        private static void mergeRule(Map<RuleKey, Long> target, Map<RuleKey, Long> source) {
+            for (Map.Entry<RuleKey, Long> entry : source.entrySet()) {
+                target.merge(entry.getKey(), entry.getValue(), Long::sum);
+            }
+        }
+
+        private static void mergeReasons(Map<RuleKey, IoResult.Reason> target,
+                Map<RuleKey, IoResult.Reason> source) {
+            for (Map.Entry<RuleKey, IoResult.Reason> entry : source.entrySet()) {
+                target.merge(entry.getKey(), entry.getValue(),
+                        (left, right) -> worse(left, right));
+            }
+        }
     }
 
     /**

@@ -5,7 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.diag.DiagService;
 import io.github.crafteve.idlefactory.factory.io.DiagEvent;
-import io.github.crafteve.idlefactory.factory.io.MachineRunner;
+import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -46,7 +46,7 @@ public final class FactoryRuntime {
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
-    private final MachineRunner machineRunner = new MachineRunner();
+    private final NodeIoRunner nodeIoRunner = new NodeIoRunner();
     /**
      * 全服占用索引：统一 id → 认领。
      *
@@ -96,7 +96,7 @@ public final class FactoryRuntime {
         }
         runtime.save();
         runtime.nodeManager.destroyAll();
-        runtime.machineRunner.clear();
+        runtime.nodeIoRunner.clear();
         DiagService.clearWatches();
         runtime.storageResolver = null;
         runtime.observations = null;
@@ -133,8 +133,8 @@ public final class FactoryRuntime {
     }
 
     /** IO 执行器。 */
-    public MachineRunner machineRunner() {
-        return this.machineRunner;
+    public NodeIoRunner nodeIoRunner() {
+        return this.nodeIoRunner;
     }
 
     /** 观测服务；服务端未就绪时为 {@code null}。 */
@@ -220,11 +220,11 @@ public final class FactoryRuntime {
             factory.refreshStorage(this.storageResolver);
         }
         FactoryObservationRunner observationRunner = new FactoryObservationRunner(
-                this.server, this.manager, this.observations, this.machineRunner,
+                this.server, this.manager, this.observations, this.nodeIoRunner,
                 this.nodeManager, this.notices, this::markDirty);
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
                 this.server, this.manager, this.observations, this.nodeManager);
-        this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.machineRunner,
+        this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
                 this.observations, this.storageResolver, observationRunner, nodeRunner);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }

@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -112,7 +114,31 @@ public final class RunnerState {
          * 正是要避免的刷屏。删机器时随整条状态一起清掉（{@code forget}）。</p>
          */
         public long lastFailureLogAt = -1L;
-        /** 这台机器的面路由表。 */
-        public final RouteTable routes = new RouteTable();
+        /** 这台机器每个方块各自的面路由表；同一台机器可跨维度，所以按方块隔离。 */
+        private final Map<BlockKey, RouteTable> routes = new HashMap<>();
+
+        /**
+         * 取一个方块的面路由表，没有就建。
+         *
+         * @param block 方块位置
+         * @return 路由表
+         */
+        public RouteTable routes(BlockKey block) {
+            return this.routes.computeIfAbsent(block, ignored -> new RouteTable());
+        }
+
+        /** 丢掉全部方块的路由表。 */
+        public void clearRoutes() {
+            this.routes.clear();
+        }
+
+        /** 全部方块的路由条数合计。 */
+        public int routeCount() {
+            int total = 0;
+            for (RouteTable table : this.routes.values()) {
+                total += table.size();
+            }
+            return total;
+        }
     }
 }

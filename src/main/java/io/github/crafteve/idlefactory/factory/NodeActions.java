@@ -410,8 +410,8 @@ public final class NodeActions {
             return;
         }
         for (var machine : node.get().machines()) {
-            runtime.machineRunner().forgetRoutes(machine.id());
-            runtime.machineRunner().wake(machine.id());
+            runtime.nodeIoRunner().forgetRoutes(machine.id());
+            runtime.nodeIoRunner().wake(machine.id());
         }
     }
 

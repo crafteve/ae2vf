@@ -217,7 +217,7 @@ public final class FactoryService {
      */
     private static MachineLinkService machineLinks(FactoryRuntime runtime) {
         return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
-                runtime.machineRunner(), machineLibrary(runtime), runtime.observations(),
+                runtime.nodeIoRunner(), machineLibrary(runtime), runtime.observations(),
                 runtime.server());
     }
 

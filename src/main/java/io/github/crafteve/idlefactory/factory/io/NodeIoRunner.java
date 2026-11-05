@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.factory.io;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,11 +30,11 @@ import net.minecraft.server.level.ServerLevel;
  * 睡着的机器每 {@link RunnerState#WAKE_INTERVAL} tick 醒一次。{@code start} / 配置变更会手动唤醒。</p>
  *
  * <p><b>门禁读观测，不读世界</b>：一台机器只有「没被观测标记失联」且「观测结论是 PRESENT」
- * 才会进 {@link GroupRunner}。失联的、未加载的一律直接睡，零世界查询。</p>
+ * 才会进 {@link MachineIoRunner}。失联的、未加载的一律直接睡，零世界查询。</p>
  *
  * <p>路由表按机器隔离：一台机器的面路由不会影响另一台。</p>
  */
-public final class MachineRunner {
+public final class NodeIoRunner {
     /** 探针打印间隔（tick）：首轮必打，之后每这么多轮打一次。 */
     private static final long PROBE_INTERVAL = 100L;
 
@@ -60,7 +62,11 @@ public final class MachineRunner {
                 continue;
             }
             MEStorage storage = factory.live().storage();
-            for (Node node : factory.config().nodes().all()) {
+            List<Node> nodes = factory.config().nodes().all();
+            // 节点 IO 轮转：每轮从不同的节点开始，避免固定顺序总是先喂第一个节点。
+            int start = nodes.isEmpty() ? 0 : (int) Math.floorMod(this.rounds, (long) nodes.size());
+            for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
+                Node node = nodes.get((start + nodeIndex) % nodes.size());
                 for (Machine machine : node.machines()) {
                     machines++;
                     if (this.state.peek(machine.id()) != null
@@ -106,29 +112,38 @@ public final class MachineRunner {
             machineState.sleepSince = -1L;
         }
 
+        // 门禁：机器所有方块都必须 PRESENT；任一方块不可用整台机器不跑。
+        if (observations != null) {
+            for (BlockKey block : machine.blocks()) {
+                if (!runnable(observations, block)) {
+                    sleepIfIdle(machineState, now);
+                    return 0L;
+                }
+            }
+        }
+
         BlockKey target = machine.typeBlock();
-        if (observations != null && !runnable(observations, target)) {
-            sleepIfIdle(machineState, now);
-            return 0L;
-        }
-
-        ServerLevel level = server.getLevel(target.dimension());
-        if (level == null || !level.isLoaded(target.pos())) {
-            // 未加载不代表机器没了，保持醒着，下一轮再看
-            return 0L;
-        }
-
-        LevelCapabilityCache caps = observations == null ? null : observations.capabilities(level);
-        long generation = observations == null ? 0L : observations.facesGeneration(target);
         ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                 id -> new ItemVariantIndex());
-        GroupRunner.GroupRun result;
+        // 变体预算按机器共享：一台机器的所有方块共用一个池，避免多方块把预算放大 N 倍。
+        int[] sharedBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
+        List<MachineIoRunner.BlockRun> runs = new ArrayList<>(machine.blocks().size());
         try {
-            result = GroupRunner.run(storage, level, target.pos(), node.io(), caps,
-                    machineState.routes, generation, factoryVariants, now);
+            for (BlockKey block : machine.blocks()) {
+                ServerLevel level = server.getLevel(block.dimension());
+                if (level == null || !level.isLoaded(block.pos())) {
+                    // 未加载不代表机器没了，保持醒着，下一轮再看
+                    return 0L;
+                }
+                LevelCapabilityCache caps = observations == null
+                        ? null : observations.capabilities(level);
+                long generation = observations == null ? 0L : observations.facesGeneration(block);
+                runs.add(MachineIoRunner.runBlock(storage, level, block.pos(), node.io(), caps,
+                        machineState.routes(block), generation, factoryVariants, now, sharedBudget));
+            }
         } catch (RuntimeException e) {
             // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
-            // GroupRunner 内部被调用，异常穿出去会带崩整个服务端 tick。更糟的是 IoTransfer
+            // MachineIoRunner 内部被调用，异常穿出去会带崩整个服务端 tick。更糟的是 IoTransfer
             // 已经先从仓库扣了料（IoTransfer:49）才交给机器（:55），异常意味着「已扣未给」，
             // 这台机器本轮只能按「未搬动」处理：记节流 warn、走 sleepIfIdle、直接返回，
             // 下一轮照常重试，其余机器不受影响。
@@ -138,6 +153,7 @@ public final class MachineRunner {
             sleepIfIdle(machineState, now);
             return 0L;
         }
+        MachineIoRunner.MachineRun result = MachineIoRunner.MachineRun.combine(runs);
         // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
         // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
         // 都算“路没问题”，清掉连续计数。详见 noteRejected。
@@ -257,7 +273,7 @@ public final class MachineRunner {
     public void forgetRoutes(UUID machineId) {
         RunnerState.MachineState state = this.state.peek(machineId);
         if (state != null) {
-            state.routes.clearAll();
+            state.clearRoutes();
         }
     }
 
@@ -269,7 +285,7 @@ public final class MachineRunner {
      */
     public int routeCount(UUID machineId) {
         RunnerState.MachineState state = this.state.peek(machineId);
-        return state == null ? 0 : state.routes.size();
+        return state == null ? 0 : state.routeCount();
     }
 
     /**
