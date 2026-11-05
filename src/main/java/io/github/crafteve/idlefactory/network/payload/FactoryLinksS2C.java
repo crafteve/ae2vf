@@ -6,6 +6,7 @@ import java.util.List;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -112,7 +113,8 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
     private static FactoryLinksS2C read(RegistryFriendlyByteBuf buf) {
         StorageMode mode = buf.readEnum(StorageMode.class);
         List<Link> storage = readLinks(buf, MAX_STORAGE);
-        List<Link> machines = readLinks(buf, MAX_MACHINES);
+        List<Link> machines = readLinks(buf,
+                ModNetwork.wireLimit(io.github.crafteve.idlefactory.factory.FactoryLimitsConfig.maxTotalMachines()));
         return new FactoryLinksS2C(mode, storage, machines);
     }
 

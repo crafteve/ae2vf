@@ -5,6 +5,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
@@ -38,7 +39,15 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "27";
+    public static final String PROTOCOL_VERSION = "28";
+
+    /**
+     * 线协议固定的条目硬上限（每个包）。
+     *
+     * <p>它不是玩法上限：解码时用 {@code min(有效配置值, HARD_WIRE_ENTRIES)}，防止恶意
+     * 超大包把服务端内存打爆。玩法上限在 {@code FactoryLimitsConfig}。</p>
+     */
+    public static final int HARD_WIRE_ENTRIES = 32768;
 
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
@@ -54,6 +63,16 @@ public final class ModNetwork {
      */
     public static void register(IEventBus modEventBus) {
         modEventBus.addListener(ModNetwork::onRegisterPayloadHandlers);
+    }
+
+    /**
+     * 把有效配置上限夹到线协议硬上限。
+     *
+     * @param effective 有效配置上限
+     * @return 解码可用的条目上限
+     */
+    public static int wireLimit(int effective) {
+        return Math.min(effective, HARD_WIRE_ENTRIES);
     }
 
     /** 当前注册器；仅用于调试与后续扩展，注册阶段之外可能为 null。 */
@@ -114,6 +133,8 @@ public final class ModNetwork {
                 FactoryNodeProviderC2S.STREAM_CODEC, FactoryNodeProviderC2S::handle);
         registrar.playToServer(FactoryNodeRenameC2S.TYPE,
                 FactoryNodeRenameC2S.STREAM_CODEC, FactoryNodeRenameC2S::handle);
+        registrar.playToServer(FactoryNodeActionC2S.TYPE,
+                FactoryNodeActionC2S.STREAM_CODEC, FactoryNodeActionC2S::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }

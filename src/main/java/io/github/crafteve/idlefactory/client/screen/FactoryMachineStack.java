@@ -193,6 +193,11 @@ record FactoryMachineStack(List<FactorySnapshotBuilder.MachineView> members,
         return this.members.get(0);
     }
 
+    /** 组身份：锚点节点 id；规则动作按节点发。 */
+    UUID anchorNodeId() {
+        return anchor().nodeId();
+    }
+
     /** 组身份：锚点机器 id。 */
     UUID anchorId() {
         return anchor().machineId();

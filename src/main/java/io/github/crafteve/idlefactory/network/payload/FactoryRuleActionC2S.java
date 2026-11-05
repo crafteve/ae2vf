@@ -39,14 +39,14 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param containerId 菜单容器 id
  * @param action      动作
- * @param machineId   机器 id
+ * @param nodeId      节点 id
  * @param side        输入 / 输出；MOVE 时是「从哪一侧搬走」
  * @param key         资源
  * @param face        面；{@code null} 表示不限；删除与 MOVE 忽略
  * @param mode        匹配模式；删除与 MOVE 忽略
  * @param targetSide  MOVE 的目标侧；其它动作传 {@code null}
  */
-public record FactoryRuleActionC2S(int containerId, Action action, UUID machineId,
+public record FactoryRuleActionC2S(int containerId, Action action, UUID nodeId,
         IoSide side, AEKey key, @Nullable Direction face,
         MatchMode mode, @Nullable IoSide targetSide) implements CustomPacketPayload {
 
@@ -60,9 +60,9 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             StreamCodec.of(FactoryRuleActionC2S::write, FactoryRuleActionC2S::read);
 
     /** 不带目标侧的便捷构造：ADD / UPDATE / REMOVE 用。 */
-    public FactoryRuleActionC2S(int containerId, Action action, UUID machineId, IoSide side,
+    public FactoryRuleActionC2S(int containerId, Action action, UUID nodeId, IoSide side,
             AEKey key, @Nullable Direction face, MatchMode mode) {
-        this(containerId, action, machineId, side, key, face, mode, null);
+        this(containerId, action, nodeId, side, key, face, mode, null);
     }
 
     @Override
@@ -109,13 +109,13 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
 
     private static NodeActions.Result dispatch(Factory factory, FactoryRuleActionC2S payload) {
         return switch (payload.action()) {
-            case ADD -> NodeActions.addRule(factory, payload.machineId(),
+            case ADD -> NodeActions.addRule(factory, payload.nodeId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case UPDATE -> NodeActions.updateRule(factory, payload.machineId(),
+            case UPDATE -> NodeActions.updateRule(factory, payload.nodeId(),
                     payload.side(), payload.key(), payload.face(), payload.mode());
-            case MOVE -> NodeActions.moveRule(factory, payload.machineId(),
+            case MOVE -> NodeActions.moveRule(factory, payload.nodeId(),
                     payload.side(), payload.key(), payload.targetSide());
-            case REMOVE -> NodeActions.removeRule(factory, payload.machineId(),
+            case REMOVE -> NodeActions.removeRule(factory, payload.nodeId(),
                     payload.side(), payload.key());
         };
     }
@@ -129,7 +129,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
     private static void write(RegistryFriendlyByteBuf buf, FactoryRuleActionC2S payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeByte(payload.action().ordinal());
-        buf.writeUUID(payload.machineId());
+        buf.writeUUID(payload.nodeId());
         buf.writeByte(payload.side().ordinal());
         ResourceKeyCodec.write(buf, payload.key());
         buf.writeBoolean(payload.face() != null);
@@ -150,7 +150,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             throw new DecoderException("invalid rule action: " + actionOrdinal);
         }
         Action action = Action.values()[actionOrdinal];
-        UUID machineId = buf.readUUID();
+        UUID nodeId = buf.readUUID();
         int sideOrdinal = buf.readUnsignedByte();
         if (sideOrdinal >= IoSide.values().length) {
             throw new DecoderException("invalid io side: " + sideOrdinal);
@@ -178,7 +178,7 @@ public record FactoryRuleActionC2S(int containerId, Action action, UUID machineI
             }
             targetSide = IoSide.values()[targetOrdinal];
         }
-        return new FactoryRuleActionC2S(containerId, action, machineId, side, key, face, mode,
+        return new FactoryRuleActionC2S(containerId, action, nodeId, side, key, face, mode,
                 targetSide);
     }
 

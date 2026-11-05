@@ -61,9 +61,14 @@ final class FactoryPassiveIoModel {
             rules = List.copyOf(rules);
         }
 
-        /** 机器 id；发规则动作要用。 */
+        /** 机器 id；发机器级动作要用。 */
         UUID machineId() {
             return this.machine.machineId();
+        }
+
+        /** 节点 id；规则动作按节点发。 */
+        UUID nodeId() {
+            return this.machine.nodeId();
         }
 
         /** 机器显示名；失联时直接写「已失联」。 */

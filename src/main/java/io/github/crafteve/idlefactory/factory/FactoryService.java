@@ -173,6 +173,21 @@ public final class FactoryService {
     }
 
     /**
+     * 按节点 id 删除整个节点；节点终端删除入口。
+     *
+     * @param factory 工厂
+     * @param nodeId  节点 id
+     * @return 动作结果
+     */
+    public static NodeActions.Result deleteNodeById(Factory factory, UUID nodeId) {
+        FactoryRuntime runtime = FactoryRuntime.get();
+        if (runtime == null) {
+            return NodeActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
+        }
+        return machineLinks(runtime).deleteNodeById(factory, nodeId);
+    }
+
+    /**
      * 机器 toggle：已连接就断开，未连接就连接；连锁按整组 toggle。
      *
      * @param player 发起请求的玩家

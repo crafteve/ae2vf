@@ -343,6 +343,34 @@ final class MachineLinkService {
     }
 
     /**
+     * 按节点 id 删除整个节点；界面节点卡片的删除入口。
+     *
+     * @param factory 工厂
+     * @param nodeId  节点 id
+     * @return 动作结果
+     */
+    public NodeActions.Result deleteNodeById(Factory factory, UUID nodeId) {
+        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        if (found.isEmpty()) {
+            return NodeActions.Result.err("找不到节点");
+        }
+        Node node = found.get();
+        int returned = returnPatterns(factory, node, null);
+        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
+        if (!batch.remove(nodeId)) {
+            return NodeActions.Result.err("节点已不在节点库");
+        }
+        batch.close();
+        this.nodeManager.removeNode(nodeId);
+        for (Machine machine : node.machines()) {
+            this.nodeIoRunner.forget(machine.id());
+        }
+        String patternText = returned > 0 ? "（退回 " + returned + " 块样板）" : "";
+        return NodeActions.Result.ok("已删除节点 [" + nodeId.toString().substring(0, 8) + "]"
+                + patternText);
+    }
+
+    /**
      * 按机器 id 在所有节点里找机器。
      *
      * @param factory   工厂

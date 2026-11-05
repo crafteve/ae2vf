@@ -348,7 +348,7 @@ public final class FactoryEditController implements FactoryScreenInteraction {
     private void sendRuleAction(FactoryRuleActionC2S.Action action, FactoryMachineStack stack,
             IoSide side, AEKey key, @Nullable Direction face, @Nullable MatchMode mode) {
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(
-                this.screen.getMenu().containerId, action, stack.anchorId(), side, key, face,
+                this.screen.getMenu().containerId, action, stack.anchorNodeId(), side, key, face,
                 mode == null ? MatchMode.EXACT : mode));
     }
 

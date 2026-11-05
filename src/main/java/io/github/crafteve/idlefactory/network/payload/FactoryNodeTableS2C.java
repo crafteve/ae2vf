@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientNodeTableHandler;
+import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -17,6 +18,7 @@ import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 
@@ -47,7 +49,8 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         implements CustomPacketPayload {
 
     /** 单个成员最多几个方块；与机器方块硬上限一致。 */
-    public static final int MAX_BLOCKS_PER_MEMBER = io.github.crafteve.idlefactory.factory.machine.Machine.HARD_MAX_BLOCKS;
+    public static final int MAX_BLOCKS_PER_MEMBER =
+            io.github.crafteve.idlefactory.factory.machine.Machine.HARD_MAX_BLOCKS;
 
     /** 包类型：{@code idlefactory:node_table}。 */
     public static final Type<FactoryNodeTableS2C> TYPE =
@@ -97,7 +100,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         boolean hasFactory = buf.readBoolean();
         boolean meStorage = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int count = readCount(buf, NodeLibrary.HARD_MAX_NODES, "nodes");
+        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes()), "nodes");
         List<FactoryNodeSnapshotBuilder.NodeView> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
@@ -146,7 +149,8 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         Multiplier multiplier = new Multiplier(readEnum(buf, MultiplierMode.values(), "multiplier mode"),
                 buf.readVarInt());
         DispatchMode dispatch = readEnum(buf, DispatchMode.values(), "dispatch");
-        int memberCount = readCount(buf, NodeLibrary.HARD_MAX_MACHINES_PER_NODE, "members");
+        int memberCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode()),
+                "members");
         List<FactoryNodeSnapshotBuilder.MemberView> members = new ArrayList<>(memberCount);
         for (int i = 0; i < memberCount; i++) {
             members.add(readMember(buf));
@@ -173,7 +177,8 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
 
     private static FactoryNodeSnapshotBuilder.MemberView readMember(RegistryFriendlyByteBuf buf) {
         UUID machineId = buf.readUUID();
-        int blockCount = readCount(buf, MAX_BLOCKS_PER_MEMBER, "blocks");
+        int blockCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxBlocksPerMachine()),
+                "blocks");
         List<BlockKey> blocks = new ArrayList<>(blockCount);
         for (int i = 0; i < blockCount; i++) {
             ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);

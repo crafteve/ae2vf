@@ -45,7 +45,7 @@ final class FactoryPassiveIoActions {
         IoSide target = rule.side() == IoSide.INPUT ? IoSide.OUTPUT : IoSide.INPUT;
         probe("flip", block, rule, "-> " + target);
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.MOVE, block.machineId(), rule.side(),
+                FactoryRuleActionC2S.Action.MOVE, block.nodeId(), rule.side(),
                 rule.spec().key(), rule.spec().face(), rule.spec().mode(), target));
     }
 
@@ -62,7 +62,7 @@ final class FactoryPassiveIoActions {
         Direction next = backwards ? previousFace(rule.spec().face()) : nextFace(rule.spec().face());
         probe("face", block, rule, String.valueOf(next));
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.UPDATE, block.machineId(), rule.side(),
+                FactoryRuleActionC2S.Action.UPDATE, block.nodeId(), rule.side(),
                 rule.spec().key(), next, rule.spec().mode()));
     }
 
@@ -82,7 +82,7 @@ final class FactoryPassiveIoActions {
                 ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
         probe("mode", block, rule, next.name());
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.UPDATE, block.machineId(), rule.side(),
+                FactoryRuleActionC2S.Action.UPDATE, block.nodeId(), rule.side(),
                 rule.spec().key(), rule.spec().face(), next));
     }
 
@@ -97,7 +97,7 @@ final class FactoryPassiveIoActions {
             FactoryPassiveIoModel.RuleRow rule) {
         probe("delete", block, rule, "");
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.REMOVE, block.machineId(), rule.side(),
+                FactoryRuleActionC2S.Action.REMOVE, block.nodeId(), rule.side(),
                 rule.spec().key(), rule.spec().face(), rule.spec().mode()));
     }
 
@@ -113,7 +113,7 @@ final class FactoryPassiveIoActions {
         IdleFactory.LOGGER.info("[ui-probe] add block={} machine={} key={} mode={}",
                 block.name(), block.machineId(), key.getId(), mode);
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.ADD, block.machineId(), IoSide.INPUT, key, null,
+                FactoryRuleActionC2S.Action.ADD, block.nodeId(), IoSide.INPUT, key, null,
                 mode));
     }
 

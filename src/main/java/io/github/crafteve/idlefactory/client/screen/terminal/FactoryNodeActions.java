@@ -32,7 +32,7 @@ final class FactoryNodeActions {
      */
     static void setBlocking(int containerId, NodeRow node, boolean on) {
         PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
-                FactoryNodeProviderC2S.ProviderSetting.BLOCKING, on ? 1 : 0));
+                FactoryNodeProviderC2S.ProviderSetting.BLOCKING, on ? 1 : 0, 0));
     }
 
     /**
