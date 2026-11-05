@@ -706,3 +706,98 @@
 - `FactoryLive.machineMissing` / 离线集合在 P2 由 `NodeHealthResolver` 派生取代；事件流只保留节点级与机器级 id。
 - IO 睡眠按机器 id，路由按 `BlockKey`；读路径只读观测缓存。
 - 文件改名在 P1c 完成：`MachineNode → NodeRuntime`、`MachineCraftService → NodeCraftService`、`MachinePatternInventory → NodePatternInventory`、`MachineTerminalGroup → NodeTerminalGroup`。
+
+---
+
+## ADR-036 样板倍率：固定 / 智能，乘法和容量探测
+
+**状态**：已决定（2026-11-05）
+
+**决定**：
+
+1. 倍率是节点级配置，模式 `OFF / FIXED / SMART`；`FIXED` 带固定倍数，`SMART` 在派单前探测。
+2. 倍率乘法一律用 `Math.multiplyExact`，倍率硬上限 `Multiplier.HARD_MAX_FACTOR = 64`；溢出或超过硬上限的样板跳过并记日志，绝不产生负数数量。
+3. 智能倍率只用 `Actionable.SIMULATE` 探测「一台机器能装几份」：二分找最大 k，多个输入要求同一 k 都能装下（等价取最小），夹在 1..硬上限；探测失败回退 ×1。
+4. 缓存键 = 样板 + 节点拓扑版本；缓存的是探测当时的静态上限 kMax，不是实时空位。机器逐渐变满后 kMax 可能偏大，收不下的部分进余量，不重探测、不重复扣料。
+5. 一次 `pushPattern` 只选一台 ONLINE 机器，整份货给它；固定倍率 N 大于容量时多出的进余量，输入输出同倍。
+6. 探测与实际 push 之间机器状态变了：按「已提交」处理，收不下的进余量，不回退成 push 失败（避免 CPU 复制）。
+
+**理由**：
+
+- 倍率让 AE2 一次看到 N 份样板，减少 CPU 调度次数；但数量必须防溢出，否则样板会变成负数并复制资源。
+- 智能倍率按「一台机器能装几份」而不是「整个节点能装几份」，与「一次货只给一台机器」的不变量一致。
+- 缓存静态上限避免每次 push 重探测，代价只是余量队列偶尔多几条。
+
+**后果**：
+
+- `factory/node/ScaledPatternDetails` 包装 `IPatternDetails`，输入 / 输出 / multiplier 同倍放大。
+- `NodeCraftService` 负责选机器、选面、部分插入与余量入队。
+- 端到端倍率验收留到 P12 统一游戏内测试。
+
+---
+
+## ADR-037 绑定杖草稿：客户端权威 + 服务端原子提交
+
+**状态**：已决定（2026-11-05）
+
+**决定**：
+
+1. 不做服务端会话、不做 TTL；草稿的权威副本是客户端静态缓存，同时镜像到绑定杖的**非 persistent、非 network-synchronized** 物品组件，供 tooltip 与重开界面恢复。
+2. 草稿结构：模式 `SINGLE / STACK / MULTIBLOCK / STACKED_MULTIBLOCK`、可选 `nodeId`（{@code null} 表示新建节点）、机器列表与每台机器的方块列表。
+3. 手势：SINGLE 普通左右键保持 1:1 toggle；STACK / MULTIBLOCK / STACKED_MULTIBLOCK 用蹲下右键开草稿、蹲下右键空气提交、蹲下左键空气取消；左键方块从草稿移除。
+4. 草稿不跨登录保留：登录 / 登出 / 换维度 / 换手 / 把杖放进容器时清空。
+5. 客户端只做简单核验（主手、重复块、堆叠同 id）；服务端按玩家工厂与 `LinkGate` 逐块重查，不读组件、不信坐标。
+6. 服务端提交顺序固定：`LinkGate` 快照 + 本地 `Set` 查重 → 全量校验（归属 / 类型 / 上限 / 节点归属）→ 内存构造候选 `Node`（已有节点原对象不动）→ 只调一次 `NodeLibrary.add/replace` → `markDirty` 触发 `LinkRegistry.rebuild`。失败只丢候选，旧节点与索引不变。
+7. 编辑已有节点只追加机器，绝不删除原有机器 / 方块。
+8. 不校验距离；不做防作弊。
+
+**理由**：
+
+- 服务端会话需要超时、注销与并发清理，收益只有「防止重放」；草稿一次提交本身已经幂等性受限，不如把校验做在提交包里。
+- 组件不持久化、不同步，正好满足「不跨登录保留」且不污染存档。
+- 候选 Node + 原子 add/replace 让失败路径不需要回滚，旧节点完全不受影响。
+
+**后果**：
+
+- 协议 29 新增 `FactoryBindingCommitC2S/S2C`；草稿模式与方块逐块编码，上限受 `HARD_WIRE_ENTRIES`。
+- `ModDataComponents.BINDING_DRAFT` 只做客户端镜像，不参与存档与网络。
+- 世界蹲下右键编辑已有节点依赖最近一次机器表里的「方块 → 节点」映射；没有映射时退回节点终端的编辑入口。
+
+---
+
+## ADR-038 config 上限与不可关的硬上限
+
+**状态**：已决定（2026-11-05）
+
+**决定**：
+
+1. 玩法上限全部进 `FactoryLimitsConfig`（COMMON），默认 `-1` 表示无上限；正数表示上限；`0` 非法。注释中英双语。
+2. 有效值 = `min(config, 硬上限)`；config 负数视为「用硬上限」。config 改小不删已有数据，只阻止继续新增。
+3. 硬上限不可关：节点数 4096、单节点机器 256、单机器方块 256、单节点方块 4096、全工厂机器 8192、全工厂方块 32768、每侧规则 64、样板槽 1024、倍率 64、名字长度 32767。
+4. 观测预算与健康过期是调优项：`observationBlockBudgetPerTick` 默认 64、硬顶 256；`staleHealthTicks` 默认 1200、硬顶 2400；热改下一 tick 生效。
+5. 网络解码固定 `HARD_WIRE_ENTRIES = 32768`（条目/包），解码用 `min(有效值, HARD_WIRE_ENTRIES)`；它不是玩法上限。
+6. `MAX_PENDING = 64` 是硬常量，不进 config；余量满了退回 ME 网络，网络也收不下才按现有掉落兜底并记日志。
+
+**理由**：
+
+- 玩法上限可调，但服务端内存与线协议不能被恶意包或误配置击穿，所以硬上限单独存在。
+- `-1 = 无上限` 让默认行为保持「不限制」，同时保留调优空间。
+
+**后果**：
+
+- `FactoryLimitsConfig` 的硬上限常量引用各数据类自己的常量（`NodeLibrary` / `Machine` / `NodeIoGroup` / `NodeProvider` / `Multiplier` / `Node`），避免两处数字漂移。
+- 观测预算由 `FactoryRuntime` 以 `IntSupplier` 注入 `ObservationService`，观测层不直接读配置。
+
+---
+
+## AGENTS.md 修订提案（待用户批准，不直接修改）
+
+以下条目已被 ADR-034 / ADR-035 取代，建议在下一轮文档更新中修改 `AGENTS.md`：
+
+1. `1.2 核心设定`「机器库（每台机器带自己的 IO 规则）」→「节点库：节点 → 机器 → 方块；IO 规则与 provider 归节点，堆叠机器共用」。
+2. `2.2 三层信息`「机器库」→「`NodeLibrary` + `Machine`」；IO 规则宿主由机器改为节点。
+3. `3.1 规模与性能`「机器表 512、规则每侧 16、观测 8 次/tick」→「节点 / 机器 / 方块上限见 `FactoryLimitsConfig` 与硬上限表；观测预算默认 64/tick，可配」。
+4. `3.3 便利性`指令以机器为主语 → 增加「`/idf node ...` 以节点为主语；`/idf machine ...` 仍按机器定位但规则作用于节点」。
+5. `6.2 坑` 第 16 条「机器失联只进 `FactoryLive.machineMissing`」→「健康由观测快照现算，`probed` / `stale` 与健康独立；`FactoryLive` 不再存失联集合」。
+
+在修订获批前，以 ADR 为准。
