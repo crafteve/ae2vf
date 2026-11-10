@@ -25,7 +25,7 @@ import net.minecraft.resources.ResourceLocation;
  * 把工厂的节点库整理成节点管理终端直接可用的视图。
  *
  * <p>视图按节点 → 成员 → 方块三层建模：{@code NodeView} 带节点健康、类型方块、{@code probed}
- * 与 {@code stale}；{@code MemberView} 带机器健康与「每块都写维度 + 坐标」的方块表。
+ * 与 {@code stale}；{@code MemberView} 带机器健康与唯一的方块位置。
  * 健康由观测快照机械聚合：P1b 只区分在线 / 离线，P2 换成 {@code NodeHealthResolver}。</p>
  */
 public final class FactoryNodeSnapshotBuilder {

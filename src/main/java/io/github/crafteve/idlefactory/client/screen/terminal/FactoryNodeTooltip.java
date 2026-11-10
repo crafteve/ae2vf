@@ -73,7 +73,7 @@ final class FactoryNodeTooltip {
         if (!node.members().isEmpty()) {
             FactoryNodeSnapshotBuilder.MemberView first = node.members().get(0).member();
             lines.add(line("位置", first.dimensionId() + " "
-                    + (first.primaryPos() == null ? "未知" : first.primaryPos().toShortString())));
+                    + first.primaryPos().toShortString()));
         }
         lines.add(Component.literal("点名字改名 · 点卡片展开 / 收起")
                 .withStyle(ChatFormatting.DARK_GRAY));

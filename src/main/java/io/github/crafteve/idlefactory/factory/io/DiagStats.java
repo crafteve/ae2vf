@@ -16,11 +16,6 @@ public final class DiagStats {
     /** 每台机器的统计。 */
     private final Map<UUID, MachineStats> machines = new HashMap<>();
 
-    /** 清空。 */
-    public void clear() {
-        this.machines.clear();
-    }
-
     /**
      * 取一台机器的统计，没有就建。
      *

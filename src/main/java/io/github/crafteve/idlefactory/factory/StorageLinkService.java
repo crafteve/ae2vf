@@ -45,30 +45,10 @@ final class StorageLinkService {
         this.storageResolver = storageResolver;
     }
 
-    // ---- 06. 清空与切换仓库（clearStorage / switchStorageMode） ----
-    // 负责清空仓库地址与 ME / 容器模式切换；clearStorage 由确认流程调用，switchStorageMode 由绑定杖调用。
+    // ---- 06. 模式切换与仓库 toggle（switchStorageMode / toggleStorage） ----
+    // 两条入口都由绑定杖触发。清空仓库链接原本还有一条聊天确认流程，随 /idf 指令一起删除；
+    // 现在要解除绑定只能靠绑定杖对同一个方块再 toggle 一次。
     // ------------------------------------------------------------------
-
-    /**
-     * 清空当前仓库地址，保留模式。
-     *
-     * @param player 发起请求的玩家
-     * @return 清空为 {@code 1}
-     */
-    int clearStorage(ServerPlayer player) {
-        Factory factory = owned(player);
-        if (factory == null) {
-            return 0;
-        }
-        if (factory.config().storageAnchor() == null) {
-            FactoryMessages.barErr(player, "当前没有仓库链接");
-            return 0;
-        }
-        factory.bindStorage(null, this.storageResolver);
-        this.publish.run();
-        FactoryMessages.barOk(player, "已清空仓库链接（当前 " + FactoryMessages.modeLabel(factory.config().storageMode()) + " 模式）");
-        return 1;
-    }
 
     /**
      * 切换 ME / 容器模式；有链接时拒绝。

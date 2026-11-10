@@ -68,21 +68,6 @@ public final class FactoryService {
     }
 
     /**
-     * 按机器 id 删除；界面确认后走这个入口。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     * @return 动作结果
-     */
-    public static NodeActions.Result deleteMachineById(Factory factory, UUID machineId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return NodeActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
-        }
-        return machineLinks(runtime).deleteMachineById(factory, machineId);
-    }
-
-    /**
      * 提交一份绑定草稿；绑定杖客户端只发这一个入口。
      *
      * @param factory 工厂

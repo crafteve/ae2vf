@@ -52,19 +52,6 @@ final class MachineLinkService {
     }
 
     /**
-     * 删除策略：决定「有 IO 规则」的机器怎么处理。
-     *
-     * <p>指令删除后只剩两种语义：按 id 删除（确认过了）与连锁断开（有规则就跳过）。
-     * 原本的「首次删除只提示确认」是命令行的两段式交互，随指令一起消失。</p>
-     */
-    enum DeletePolicy {
-        /** 已确认：有规则也删。 */
-        CONFIRMED,
-        /** 连锁断开：有规则就跳过，规则不能批量丢。 */
-        SKIP_WITH_RULES
-    }
-
-    /**
      * 一次删除尝试的结果。
      *
      * @param deleted     是否真的删掉了；{@code false} 只表示「因策略要求未删」
@@ -84,19 +71,15 @@ final class MachineLinkService {
      * @param factory  工厂
      * @param node     机器所属节点
      * @param machine  机器
-     * @param policy   删除策略
      * @param receiver 样板优先接收者；{@code null} 表示找工厂拥有者
      * @param batch    本次操作的节点库批量句柄
-     * @return 结果；{@code deleted=false} 表示策略要求跳过
+     * @return 结果；{@code deleted=false} 表示机器还有规则、被跳过
      */
     DeleteOutcome removeMachine(Factory factory, Node node, Machine machine,
-            DeletePolicy policy, @Nullable ServerPlayer receiver, NodeLibraryService.Batch batch) {
+            @Nullable ServerPlayer receiver, NodeLibraryService.Batch batch) {
         int rules = node.ruleCount();
-        boolean blocked = switch (policy) {
-            case SKIP_WITH_RULES -> rules > 0;
-            case CONFIRMED -> false;
-        };
-        if (blocked) {
+        // 规则不能批量丢：有规则的机器一律跳过，由玩家先清规则或直接删整个节点。
+        if (rules > 0) {
             return new DeleteOutcome(false, rules, 0, false);
         }
         int returned = returnPatterns(factory, node, receiver);
@@ -115,44 +98,6 @@ final class MachineLinkService {
         // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
         this.nodeIoRunner.forget(machine.id());
         return new DeleteOutcome(true, rules, returned, nodeDeleted);
-    }
-
-    /**
-     * 删除成功后的回执文案；命令与界面共用以保证逐字一致。
-     *
-     * @param machine 被删掉的机器
-     * @param outcome 删除结果
-     * @return 如「已删除机器 [ab12cd34]（2 条 IO 规则已删除）（退回 1 块样板）」
-     */
-    private static String deletedText(Machine machine, DeleteOutcome outcome) {
-        String rulesText = outcome.rules() > 0 ? "（" + outcome.rules() + " 条 IO 规则已删除）" : "";
-        String patternText = outcome.patterns() > 0 ? "（退回 " + outcome.patterns() + " 块样板）" : "";
-        String nodeText = outcome.nodeDeleted() ? "（节点已删除）" : "";
-        return "已删除机器 [" + machine.shortId() + "]" + nodeText + rulesText + patternText;
-    }
-
-    /**
-     * 按机器 id 删除；界面确认后走这个入口。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     * @return 动作结果
-     */
-    public NodeActions.Result deleteMachineById(Factory factory, UUID machineId) {
-        Optional<Machine> direct = findMachine(factory, machineId);
-        if (direct.isEmpty()) {
-            return NodeActions.Result.err("找不到机器");
-        }
-        Machine target = direct.get();
-        Optional<Node> nodeFound = factory.config().nodes().nodeOfMachine(machineId);
-        if (nodeFound.isEmpty()) {
-            return NodeActions.Result.err("机器不属于任何节点");
-        }
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        DeleteOutcome outcome = removeMachine(factory, nodeFound.get(), target,
-                DeletePolicy.CONFIRMED, null, batch);
-        batch.close();
-        return NodeActions.Result.ok(deletedText(target, outcome));
     }
 
     /**
@@ -181,23 +126,6 @@ final class MachineLinkService {
         String patternText = returned > 0 ? "（退回 " + returned + " 块样板）" : "";
         return NodeActions.Result.ok("已删除节点 [" + nodeId.toString().substring(0, 8) + "]"
                 + patternText);
-    }
-
-    /**
-     * 按机器 id 在所有节点里找机器。
-     *
-     * @param factory   工厂
-     * @param machineId 机器 id
-     * @return 机器；找不到时为空
-     */
-    private static Optional<Machine> findMachine(Factory factory, UUID machineId) {
-        for (Node node : factory.config().nodes().all()) {
-            Optional<Machine> machine = node.machineOf(machineId);
-            if (machine.isPresent()) {
-                return machine;
-            }
-        }
-        return Optional.empty();
     }
 
     /**

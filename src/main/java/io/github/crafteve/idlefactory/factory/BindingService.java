@@ -337,8 +337,7 @@ final class BindingService {
             }
             Node node = nodeFound.get();
             MachineLinkService.DeleteOutcome outcome = this.machineLinks.removeMachine(
-                    factory, node, machine, MachineLinkService.DeletePolicy.SKIP_WITH_RULES, player,
-                    batch);
+                    factory, node, machine, player, batch);
             if (!outcome.deleted()) {
                 // 连锁不删有规则的机器：规则丢了没法撤销，交给界面逐台确认。
                 skippedRules++;
@@ -354,7 +353,7 @@ final class BindingService {
                 FactoryMessages.barOk(player,
                         "已删除链接 " + label + FactoryMessages.patternSuffix(returned));
             } else if (skippedRules > 0) {
-                FactoryMessages.barErr(player, "该机器仍有 IO 配置，请在机器库界面删除 " + label);
+                FactoryMessages.barErr(player, "该机器仍有 IO 配置，先清空规则再断开 " + label);
             } else {
                 FactoryMessages.barErr(player, "没有可删除的链接");
             }
@@ -362,7 +361,7 @@ final class BindingService {
         }
         if (deleted == 0) {
             if (skippedRules > 0) {
-                FactoryMessages.barErr(player, "跳过了 " + skippedRules + " 台有 IO 配置的机器，请在机器库界面删除");
+                FactoryMessages.barErr(player, "跳过了 " + skippedRules + " 台有 IO 配置的机器，先清空规则再断开");
             } else {
                 FactoryMessages.barErr(player, "没有可删除的链接");
             }

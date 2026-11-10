@@ -164,7 +164,7 @@ final class FactoryNodeModel {
                 view.members().isEmpty() ? null : view.members().get(0);
         if (first != null) {
             tooltip.append('\n').append(first.dimensionId()).append(' ')
-                    .append(first.primaryPos() == null ? "" : first.primaryPos().toShortString());
+                    .append(first.primaryPos().toShortString());
         }
         tooltip.append("\n机器 ").append(view.machineCount())
                 .append(" 台 · 规则 ").append(view.ruleCount())

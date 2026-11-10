@@ -367,7 +367,7 @@ public final class NodeActions {
     }
 
     /**
-     * 倍率的中文描述，供回执与 tooltip 复用。
+     * 倍率的中文描述，供回执复用。
      *
      * @param multiplier 倍率
      * @return 如「关」「×4」「智能」
