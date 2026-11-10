@@ -8,17 +8,24 @@ import appeng.menu.locator.ItemMenuHostLocator;
 
 import io.github.crafteve.idlefactory.menu.wand.WandMenuHost;
 
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * 机器绑定杖：1:1 toggle 与草稿编辑的入口物品。
  *
- * <p>不可堆叠、无耐久。它自己不做任何交互判断：右键手势在客户端
- * {@code client.wand.WandGesture}，服务端判定在 {@code factory.WandService}。实现
- * {@link IMenuItem} 只是让 AE2 能按物品定位器还原草稿面板的宿主，物品类仍不引用
- * {@code client.*}。</p>
+ * <p>不可堆叠、无耐久。右键手势在客户端 {@code client.wand.WandGesture}，服务端判定在
+ * {@code factory.WandService}。实现 {@link IMenuItem} 只是让 AE2 能按物品定位器还原草稿面板的
+ * 宿主，物品类仍不引用 {@code client.*}。</p>
+ *
+ * <p>唯一需要物品自己做的事：在 {@link #onItemUseFirst} 里替服务端挡掉方块的
+ * {@code useItemOn}。客户端 {@code PlayerInteractEvent.RightClickBlock} 的取消只终止本地预测，
+ * {@code ServerboundUseItemOnPacket} 仍会发出；没有这一步，机器 GUI 会抢在手势之前打开。</p>
  */
 public class MachineBindingWandItem extends Item implements IMenuItem {
     /**
@@ -26,6 +33,29 @@ public class MachineBindingWandItem extends Item implements IMenuItem {
      */
     public MachineBindingWandItem(Properties properties) {
         super(properties);
+    }
+
+    /**
+     * 右键方块：服务端抢在方块 {@code useItemOn} 之前消费掉这次交互，阻止机器 / 容器 GUI。
+     *
+     * <p>客户端的事件层已经把这次右键交给 {@code WandGesture} 并取消了预测；服务端没有
+     * 事件订阅，只能靠物品在这里返回 {@link InteractionResult#CONSUME}。旧实现同样是在这个钩子
+     * 里先于 GUI 执行的。</p>
+     *
+     * @param stack   物品
+     * @param context 使用上下文
+     * @return 客户端成功、服务端消费；副手交给原版
+     */
+    @Override
+    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
+        if (context.getHand() != InteractionHand.MAIN_HAND) {
+            return InteractionResult.PASS;
+        }
+        if (context.getLevel().isClientSide) {
+            // 客户端手势在事件层已处理；这里只兜住本地预测，不再发请求，避免双击。
+            return InteractionResult.SUCCESS;
+        }
+        return InteractionResult.CONSUME;
     }
 
     /**
