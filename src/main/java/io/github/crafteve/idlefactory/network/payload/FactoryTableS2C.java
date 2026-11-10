@@ -116,7 +116,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeUUID(machine.machineId());
         ResourceLocation.STREAM_CODEC.encode(buf, machine.primaryBlock().dimension().location());
         buf.writeLong(machine.primaryBlock().pos().asLong());
-        buf.writeVarInt(machine.blockCount());
         buf.writeByte(machine.health().ordinal());
         buf.writeBoolean(machine.probed());
         buf.writeBoolean(machine.stale());
@@ -149,7 +148,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
         BlockKey primaryBlock = BlockKey.of(
                 ResourceKey.create(Registries.DIMENSION, dimension), BlockPos.of(buf.readLong()));
-        int blockCount = buf.readVarInt();
         MachineHealth health = readEnum(buf, MachineHealth.values(), "machine health");
         boolean probed = buf.readBoolean();
         boolean stale = buf.readBoolean();
@@ -172,7 +170,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         IoResult.Reason inputReason = readEnum(buf, IoResult.Reason.values(), "input reason");
         IoResult.Reason outputReason = readEnum(buf, IoResult.Reason.values(), "output reason");
         return new FactorySnapshotBuilder.MachineView(nodeId, nodeName, nodeIconBlockId,
-                nodeMachineCount, machineId, primaryBlock, blockCount, health, probed, stale,
+                nodeMachineCount, machineId, primaryBlock, health, probed, stale,
                 blockId, groupBlockId, beTypeId, presence, ruleCount, inputs, outputs,
                 inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,
                 sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons);

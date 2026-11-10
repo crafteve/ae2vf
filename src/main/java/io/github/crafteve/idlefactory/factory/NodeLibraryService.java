@@ -96,20 +96,12 @@ final class NodeLibraryService {
         if (!replacing && nodes.size() + 1 > FactoryLimitsConfig.maxNodes()) {
             return NodeLibrary.Result.FULL;
         }
-        if (node.machineCount() > FactoryLimitsConfig.maxMachinesPerNode()
-                || node.blockCount() > FactoryLimitsConfig.maxBlocksPerNode()) {
+        if (node.machineCount() > FactoryLimitsConfig.maxMachinesPerNode()) {
             return NodeLibrary.Result.FULL;
-        }
-        for (Machine machine : node.machines()) {
-            if (machine.blocks().size() > FactoryLimitsConfig.maxBlocksPerMachine()) {
-                return NodeLibrary.Result.FULL;
-            }
         }
         Node old = nodes.byId(node.id()).orElse(null);
         int machineDelta = node.machineCount() - (old == null ? 0 : old.machineCount());
-        int blockDelta = node.blockCount() - (old == null ? 0 : old.blockCount());
-        if (nodes.totalMachineCount() + machineDelta > FactoryLimitsConfig.maxTotalMachines()
-                || nodes.totalBlockCount() + blockDelta > FactoryLimitsConfig.maxTotalBlocks()) {
+        if (nodes.totalMachineCount() + machineDelta > FactoryLimitsConfig.maxTotalMachines()) {
             return NodeLibrary.Result.FULL;
         }
         return null;

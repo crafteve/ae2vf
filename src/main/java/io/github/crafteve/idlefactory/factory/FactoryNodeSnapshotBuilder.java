@@ -73,15 +73,6 @@ public final class FactoryNodeSnapshotBuilder {
             return count;
         }
 
-        /** 节点占用的方块总数。 */
-        public int blockCount() {
-            int total = 0;
-            for (MemberView member : this.members) {
-                total += member.blocks().size();
-            }
-            return total;
-        }
-
         /** 是否已有 IO 规则或样板；删除确认弹窗用。 */
         public boolean configured() {
             return this.ruleCount > 0 || this.patternCount > 0;
@@ -104,38 +95,29 @@ public final class FactoryNodeSnapshotBuilder {
      * 节点下的一台机器。
      *
      * @param machineId 机器 id
-     * @param blocks    机器占用的方块，每块都带维度；{@code blocks.get(0)} 是类型方块
-     * @param blockId   观测到的类型方块 id
+     * @param block     机器占用的方块（一台机器只有一个方块）
+     * @param blockId   观测到的方块 id
      * @param health    机器健康
-     * @param probed    是否所有方块都探测过
-     * @param stale     是否有方块健康过期
+     * @param probed    是否探测过
+     * @param stale     健康是否过期
      */
-    public record MemberView(java.util.UUID machineId, List<BlockKey> blocks,
+    public record MemberView(java.util.UUID machineId, BlockKey block,
             @Nullable ResourceLocation blockId, MachineHealth health, boolean probed,
             boolean stale) {
 
-        public MemberView {
-            blocks = List.copyOf(blocks);
-        }
-
-        /** 类型 / 展示方块；没有方块时为 {@code null}。 */
-        @Nullable
+        /** 机器方块。 */
         public BlockKey primaryBlock() {
-            return this.blocks.isEmpty() ? null : this.blocks.get(0);
+            return this.block;
         }
 
-        /** 类型方块坐标；没有方块时为 {@code null}。 */
-        @Nullable
+        /** 方块坐标。 */
         public BlockPos primaryPos() {
-            BlockKey primary = primaryBlock();
-            return primary == null ? null : primary.pos();
+            return this.block.pos();
         }
 
-        /** 类型方块所在维度；没有方块时为 {@code null}。 */
-        @Nullable
+        /** 方块所在维度。 */
         public ResourceLocation dimensionId() {
-            BlockKey primary = primaryBlock();
-            return primary == null ? null : primary.dimension().location();
+            return this.block.dimension().location();
         }
     }
 
@@ -184,7 +166,7 @@ public final class FactoryNodeSnapshotBuilder {
                 if (health.isOnline()) {
                     anyOnline = true;
                 }
-                members.add(new MemberView(machine.id(), machine.blocks(), blockId, health, probed,
+                members.add(new MemberView(machine.id(), machine.block(), blockId, health, probed,
                         memberStale));
             }
             NodeHealth health = nodeHealth(members);

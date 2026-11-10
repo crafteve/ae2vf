@@ -166,8 +166,8 @@ final class FactoryNodeModel {
             tooltip.append('\n').append(first.dimensionId()).append(' ')
                     .append(first.primaryPos() == null ? "" : first.primaryPos().toShortString());
         }
-        tooltip.append("\n机器 ").append(view.machineCount()).append(" 台 · 方块 ")
-                .append(view.blockCount()).append(" 个 · 规则 ").append(view.ruleCount())
+        tooltip.append("\n机器 ").append(view.machineCount())
+                .append(" 台 · 规则 ").append(view.ruleCount())
                 .append(" 条 · 样板 ").append(view.patternCount());
         return new FactorySearchQuery.Fields(name, id, namespace,
                 FactoryUiText.modName(namespace), tooltip.toString(), List.of());

@@ -129,13 +129,11 @@ public final class NodeHealthResolver {
         boolean probed = true;
         boolean stale = false;
         boolean online = true;
-        for (BlockKey block : machine.blocks()) {
-            BlockObservation observation = observations.get(block);
-            if (observation == null || !observation.probed()) {
-                probed = false;
-                online = false;
-                continue;
-            }
+        BlockObservation observation = observations.get(machine.block());
+        if (observation == null || !observation.probed()) {
+            probed = false;
+            online = false;
+        } else {
             if (observation.isStale(now, staleHealthTicks)) {
                 stale = true;
                 online = false;
@@ -143,9 +141,8 @@ public final class NodeHealthResolver {
             if (!observation.present()) {
                 online = false;
             }
-            if (block.equals(machine.typeBlock())
-                    && !expectedTypeId.equals(observation.blockId())) {
-                // 类型方块还是「有东西」，但已经不是节点认的那种机器：不认。
+            if (!expectedTypeId.equals(observation.blockId())) {
+                // 方块还是「有东西」，但已经不是节点认的那种机器：不认。
                 online = false;
             }
         }

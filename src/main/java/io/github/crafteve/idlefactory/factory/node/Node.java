@@ -83,7 +83,7 @@ public final class Node {
      */
     public static Node of(@Nullable String name, ResourceLocation typeId, BlockKey block) {
         return new Node(UUID.randomUUID(), name, typeId, new NodeIoGroup(),
-                new NodeProvider(), List.of(new Machine(UUID.randomUUID(), List.of(block))), 0L);
+                new NodeProvider(), List.of(new Machine(UUID.randomUUID(), block)), 0L);
     }
 
     /** 节点 id。 */
@@ -127,15 +127,6 @@ public final class Node {
         return this.machines.size();
     }
 
-    /** 节点占用的方块总数。 */
-    public int blockCount() {
-        int total = 0;
-        for (Machine machine : this.machines) {
-            total += machine.blocks().size();
-        }
-        return total;
-    }
-
     /** 输入 + 输出规则总数。 */
     public int ruleCount() {
         return this.io.ruleCount();
@@ -169,7 +160,7 @@ public final class Node {
      */
     public Optional<Machine> machineAt(BlockKey key) {
         for (Machine machine : this.machines) {
-            if (machine.blocks().contains(key)) {
+            if (machine.block().equals(key)) {
                 return Optional.of(machine);
             }
         }

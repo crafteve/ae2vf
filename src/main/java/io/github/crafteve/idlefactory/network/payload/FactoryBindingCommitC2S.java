@@ -74,25 +74,25 @@ public record FactoryBindingCommitC2S(int containerId, BindingDraft draft)
             }
             FactoryRuntime runtime = FactoryRuntime.get();
             if (runtime == null) {
-                feedback(player, payload.containerId(), false, null, 0, 0, "Idle Factory 尚未启动");
+                feedback(player, payload.containerId(), false, null, 0, "Idle Factory 尚未启动");
                 return;
             }
             var factory = runtime.manager().byOwner(player.getUUID());
             if (factory.isEmpty()) {
-                feedback(player, payload.containerId(), false, null, 0, 0, "你还没有工厂");
+                feedback(player, payload.containerId(), false, null, 0, "你还没有工厂");
                 return;
             }
             FactoryService.BindingResult result = FactoryService.commitBinding(factory.get(),
                     payload.draft());
             feedback(player, payload.containerId(), result.ok(), result.nodeId(),
-                    result.machines(), result.blocks(), result.message());
+                    result.machines(), result.message());
         });
     }
 
     private static void feedback(ServerPlayer player, int containerId, boolean ok,
-            @Nullable UUID nodeId, int machines, int blocks, String message) {
+            @Nullable UUID nodeId, int machines, String message) {
         PacketDistributor.sendToPlayer(player, new FactoryBindingCommitS2C(containerId, ok,
-                nodeId, machines, blocks, message));
+                nodeId, machines, message));
     }
 
     private static void write(RegistryFriendlyByteBuf buf, FactoryBindingCommitC2S payload) {
@@ -105,11 +105,8 @@ public record FactoryBindingCommitC2S(int containerId, BindingDraft draft)
         }
         buf.writeVarInt(draft.machines().size());
         for (BindingDraft.MachineDraft machine : draft.machines()) {
-            buf.writeVarInt(machine.blocks().size());
-            for (BlockKey block : machine.blocks()) {
-                ResourceLocation.STREAM_CODEC.encode(buf, block.dimension().location());
-                buf.writeLong(block.pos().asLong());
-            }
+            ResourceLocation.STREAM_CODEC.encode(buf, machine.block().dimension().location());
+            buf.writeLong(machine.block().pos().asLong());
         }
     }
 
@@ -124,14 +121,10 @@ public record FactoryBindingCommitC2S(int containerId, BindingDraft draft)
         int machineCount = readCount(buf, ModNetwork.wireLimit(32768), "machines");
         List<BindingDraft.MachineDraft> machines = new ArrayList<>(machineCount);
         for (int i = 0; i < machineCount; i++) {
-            int blockCount = readCount(buf, ModNetwork.HARD_WIRE_ENTRIES, "blocks");
-            List<BlockKey> blocks = new ArrayList<>(blockCount);
-            for (int j = 0; j < blockCount; j++) {
-                ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
-                blocks.add(BlockKey.of(ResourceKey.create(Registries.DIMENSION, dimension),
-                        BlockPos.of(buf.readLong())));
-            }
-            machines.add(new BindingDraft.MachineDraft(blocks));
+            ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
+            machines.add(new BindingDraft.MachineDraft(BlockKey.of(
+                    ResourceKey.create(Registries.DIMENSION, dimension),
+                    BlockPos.of(buf.readLong()))));
         }
         return new FactoryBindingCommitC2S(containerId, new BindingDraft(mode, nodeId, machines));
     }

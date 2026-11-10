@@ -28,12 +28,8 @@ public final class NodeLibrary implements NodeLibraryView {
     public static final int HARD_MAX_NODES = 4096;
     /** 单节点机器数硬上限。 */
     public static final int HARD_MAX_MACHINES_PER_NODE = 256;
-    /** 单节点方块数硬上限。 */
-    public static final int HARD_MAX_BLOCKS_PER_NODE = 4096;
     /** 全工厂机器数硬上限。 */
     public static final int HARD_MAX_TOTAL_MACHINES = 8192;
-    /** 全工厂方块数硬上限。 */
-    public static final int HARD_MAX_TOTAL_BLOCKS = 32768;
 
     /**
      * 一次写操作的结果。
@@ -77,8 +73,7 @@ public final class NodeLibrary implements NodeLibraryView {
             return invalid;
         }
         if (this.byId.size() + 1 > HARD_MAX_NODES
-                || this.totalMachineCount() + node.machineCount() > HARD_MAX_TOTAL_MACHINES
-                || this.totalBlockCount() + node.blockCount() > HARD_MAX_TOTAL_BLOCKS) {
+                || this.totalMachineCount() + node.machineCount() > HARD_MAX_TOTAL_MACHINES) {
             return Result.FULL;
         }
         this.index(node);
@@ -103,9 +98,7 @@ public final class NodeLibrary implements NodeLibraryView {
             return invalid;
         }
         int machineDelta = node.machineCount() - old.machineCount();
-        int blockDelta = node.blockCount() - old.blockCount();
-        if (this.totalMachineCount() + machineDelta > HARD_MAX_TOTAL_MACHINES
-                || this.totalBlockCount() + blockDelta > HARD_MAX_TOTAL_BLOCKS) {
+        if (this.totalMachineCount() + machineDelta > HARD_MAX_TOTAL_MACHINES) {
             return Result.FULL;
         }
         this.unindex(old);
@@ -140,23 +133,17 @@ public final class NodeLibrary implements NodeLibraryView {
         if (node.machineCount() == 0) {
             return Result.CONFLICT;
         }
-        if (node.machineCount() > HARD_MAX_MACHINES_PER_NODE
-                || node.blockCount() > HARD_MAX_BLOCKS_PER_NODE) {
+        if (node.machineCount() > HARD_MAX_MACHINES_PER_NODE) {
             return Result.FULL;
         }
         for (Machine machine : node.machines()) {
-            if (machine.blocks().size() > Machine.HARD_MAX_BLOCKS) {
-                return Result.FULL;
-            }
             Node owner = this.machineToNode.get(machine.id());
             if (owner != null && owner != ignored) {
                 return Result.DUPLICATE;
             }
-            for (BlockKey block : machine.blocks()) {
-                Node blockOwner = this.blockToOwner.get(block);
-                if (blockOwner != null && blockOwner != ignored) {
-                    return Result.CONFLICT;
-                }
+            Node blockOwner = this.blockToOwner.get(machine.block());
+            if (blockOwner != null && blockOwner != ignored) {
+                return Result.CONFLICT;
             }
         }
         return null;
@@ -171,9 +158,7 @@ public final class NodeLibrary implements NodeLibraryView {
         this.byId.put(node.id(), node);
         for (Machine machine : node.machines()) {
             this.machineToNode.put(machine.id(), node);
-            for (BlockKey block : machine.blocks()) {
-                this.blockToOwner.put(block, node);
-            }
+            this.blockToOwner.put(machine.block(), node);
         }
     }
 
@@ -186,9 +171,7 @@ public final class NodeLibrary implements NodeLibraryView {
         this.byId.remove(node.id());
         for (Machine machine : node.machines()) {
             this.machineToNode.remove(machine.id());
-            for (BlockKey block : machine.blocks()) {
-                this.blockToOwner.remove(block);
-            }
+            this.blockToOwner.remove(machine.block());
         }
     }
 
@@ -263,15 +246,6 @@ public final class NodeLibrary implements NodeLibraryView {
         int total = 0;
         for (Node node : this.byId.values()) {
             total += node.machineCount();
-        }
-        return total;
-    }
-
-    @Override
-    public int totalBlockCount() {
-        int total = 0;
-        for (Node node : this.byId.values()) {
-            total += node.blockCount();
         }
         return total;
     }

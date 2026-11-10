@@ -78,6 +78,4 @@ public interface NodeLibraryView {
     /** @return 全工厂机器总数 */
     int totalMachineCount();
 
-    /** @return 全工厂方块总数 */
-    int totalBlockCount();
 }

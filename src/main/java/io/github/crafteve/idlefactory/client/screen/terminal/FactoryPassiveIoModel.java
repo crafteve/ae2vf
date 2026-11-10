@@ -82,25 +82,6 @@ final class FactoryPassiveIoModel {
             return this.members.size();
         }
 
-        /** 节点方块总数；多方块占位 tooltip 用它。 */
-        int blockCount() {
-            int total = 0;
-            for (FactorySnapshotBuilder.MachineView member : this.members) {
-                total += member.blockCount();
-            }
-            return total;
-        }
-
-        /** 是否多方块（任一成员方块数 > 1）。 */
-        boolean multiblock() {
-            for (FactorySnapshotBuilder.MachineView member : this.members) {
-                if (member.blockCount() > 1) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
         /** 节点显示名；优先节点名，否则方块名；失联时直接写「已失联」。 */
         String name() {
             if (this.machine.nodeName() != null && !this.machine.nodeName().isEmpty()) {

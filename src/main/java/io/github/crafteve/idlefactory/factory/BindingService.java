@@ -69,13 +69,11 @@ final class BindingService {
      * @param ok       是否成功
      * @param nodeId   落到哪个节点；失败时为 {@code null}
      * @param machines 本次新增机器数
-     * @param blocks   本次新增方块数
      * @param message  给玩家看的一句话
      */
-    public record BindingResult(boolean ok, @Nullable UUID nodeId, int machines, int blocks,
-            String message) {
+    public record BindingResult(boolean ok, @Nullable UUID nodeId, int machines, String message) {
         static BindingResult err(String message) {
-            return new BindingResult(false, null, 0, 0, message);
+            return new BindingResult(false, null, 0, message);
         }
     }
 
@@ -98,48 +96,33 @@ final class BindingService {
         Set<BlockKey> seen = new HashSet<>();
         List<Machine> machines = new ArrayList<>(draft.machines().size());
         ResourceLocation typeId = null;
-        int totalBlocks = 0;
         for (BindingDraft.MachineDraft machineDraft : draft.machines()) {
-            if (machineDraft.blocks().isEmpty()) {
-                return BindingResult.err("有机器没有方块");
+            BlockKey block = machineDraft.block();
+            if (!seen.add(block)) {
+                return BindingResult.err("草稿里有重复方块");
             }
-            if (machineDraft.blocks().size() > FactoryLimitsConfig.maxBlocksPerMachine()) {
-                return BindingResult.err("单台机器方块数超过上限");
+            if (factory.config().nodes().machineAt(block).isPresent()) {
+                return BindingResult.err("方块已属于节点：" + shortId(block));
             }
-            List<BlockKey> blocks = new ArrayList<>(machineDraft.blocks().size());
-            for (BlockKey block : machineDraft.blocks()) {
-                if (!seen.add(block)) {
-                    return BindingResult.err("草稿里有重复方块");
-                }
-                if (factory.config().nodes().machineAt(block).isPresent()) {
-                    return BindingResult.err("方块已属于节点：" + shortId(block));
-                }
-                LinkGate.ClaimCheck claim = gate.check(block, factory.id(), LinkRole.MACHINE);
-                if (claim.blocked()) {
-                    return BindingResult.err(LinkGateMessages.gateMessage(claim));
-                }
-                ServerLevel level = this.server.getLevel(block.dimension());
-                if (level == null || !level.isLoaded(block.pos())) {
-                    return BindingResult.err("方块所在区块未加载");
-                }
-                BlockEntity blockEntity = level.getBlockEntity(block.pos());
-                if (blockEntity == null) {
-                    return BindingResult.err("方块没有方块实体");
-                }
-                blocks.add(block);
+            LinkGate.ClaimCheck claim = gate.check(block, factory.id(), LinkRole.MACHINE);
+            if (claim.blocked()) {
+                return BindingResult.err(LinkGateMessages.gateMessage(claim));
             }
-            ServerLevel typeLevel = this.server.getLevel(blocks.get(0).dimension());
-            if (typeLevel == null) {
-                return BindingResult.err("类型方块所在维度不存在");
+            ServerLevel level = this.server.getLevel(block.dimension());
+            if (level == null || !level.isLoaded(block.pos())) {
+                return BindingResult.err("方块所在区块未加载");
             }
-            ResourceLocation machineType = blockId(typeLevel, blocks.get(0).pos());
+            BlockEntity blockEntity = level.getBlockEntity(block.pos());
+            if (blockEntity == null) {
+                return BindingResult.err("方块没有方块实体");
+            }
+            ResourceLocation machineType = blockId(level, block.pos());
             if (typeId == null) {
                 typeId = machineType;
             } else if (!typeId.equals(machineType)) {
                 return BindingResult.err("节点内机器类型不一致");
             }
-            machines.add(new Machine(UUID.randomUUID(), blocks));
-            totalBlocks += blocks.size();
+            machines.add(new Machine(UUID.randomUUID(), block));
         }
 
         Node candidate;
@@ -176,8 +159,8 @@ final class BindingService {
         for (BlockKey block : seen) {
             this.refreshObservation(block);
         }
-        return new BindingResult(true, candidate.id(), machines.size(), totalBlocks,
-                "已绑定 " + machines.size() + " 台机器 / " + totalBlocks + " 个方块");
+        return new BindingResult(true, candidate.id(), machines.size(),
+                "已绑定 " + machines.size() + " 台机器");
     }
 
     /**
@@ -250,7 +233,7 @@ final class BindingService {
             }
         }
         if (allConnected) {
-            // 普通左右键只对「未接入」或「1 机器节点」生效；堆叠 / 多方块节点的成员只提示编辑。
+            // 普通左右键只对「未接入」或「1 机器节点」生效；堆叠节点的成员只提示编辑。
             for (BlockPos targetPos : targets) {
                 Optional<Machine> machine = factory.config().nodes()
                         .machineAt(BlockKey.of(level.dimension(), targetPos));
@@ -260,7 +243,7 @@ final class BindingService {
                 Optional<Node> node = factory.config().nodes().nodeOfMachine(machine.get().id());
                 if (node.isPresent() && node.get().machineCount() > 1) {
                     FactoryMessages.barErr(player,
-                            "堆叠 / 多方块节点成员只支持蹲下右键编辑或终端删除");
+                            "堆叠节点成员只支持蹲下右键编辑或终端删除");
                     return 0;
                 }
             }

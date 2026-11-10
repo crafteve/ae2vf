@@ -48,10 +48,6 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         boolean storageOnline, List<FactoryNodeSnapshotBuilder.NodeView> nodes)
         implements CustomPacketPayload {
 
-    /** 单个成员最多几个方块；与机器方块硬上限一致。 */
-    public static final int MAX_BLOCKS_PER_MEMBER =
-            io.github.crafteve.idlefactory.factory.machine.Machine.HARD_MAX_BLOCKS;
-
     /** 包类型：{@code idlefactory:node_table}。 */
     public static final Type<FactoryNodeTableS2C> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "node_table"));
@@ -164,11 +160,8 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
     private static void writeMember(RegistryFriendlyByteBuf buf,
             FactoryNodeSnapshotBuilder.MemberView member) {
         buf.writeUUID(member.machineId());
-        buf.writeVarInt(member.blocks().size());
-        for (BlockKey block : member.blocks()) {
-            ResourceLocation.STREAM_CODEC.encode(buf, block.dimension().location());
-            buf.writeLong(block.pos().asLong());
-        }
+        ResourceLocation.STREAM_CODEC.encode(buf, member.block().dimension().location());
+        buf.writeLong(member.block().pos().asLong());
         writeNullableResourceLocation(buf, member.blockId());
         buf.writeByte(member.health().ordinal());
         buf.writeBoolean(member.probed());
@@ -177,19 +170,14 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
 
     private static FactoryNodeSnapshotBuilder.MemberView readMember(RegistryFriendlyByteBuf buf) {
         UUID machineId = buf.readUUID();
-        int blockCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxBlocksPerMachine()),
-                "blocks");
-        List<BlockKey> blocks = new ArrayList<>(blockCount);
-        for (int i = 0; i < blockCount; i++) {
-            ResourceLocation dimension = ResourceLocation.STREAM_CODEC.decode(buf);
-            blocks.add(BlockKey.of(ResourceKey.create(Registries.DIMENSION, dimension),
-                    net.minecraft.core.BlockPos.of(buf.readLong())));
-        }
+        BlockKey block = BlockKey.of(
+                ResourceKey.create(Registries.DIMENSION, ResourceLocation.STREAM_CODEC.decode(buf)),
+                net.minecraft.core.BlockPos.of(buf.readLong()));
         ResourceLocation blockId = readNullableResourceLocation(buf);
         MachineHealth health = readEnum(buf, MachineHealth.values(), "member health");
         boolean probed = buf.readBoolean();
         boolean stale = buf.readBoolean();
-        return new FactoryNodeSnapshotBuilder.MemberView(machineId, blocks, blockId, health, probed,
+        return new FactoryNodeSnapshotBuilder.MemberView(machineId, block, blockId, health, probed,
                 stale);
     }
 

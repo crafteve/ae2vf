@@ -47,7 +47,7 @@ public final class NodeTypeResolver {
         }
         ResourceLocation candidate = null;
         for (Machine machine : node.machines()) {
-            BlockObservation observation = observations.get(machine.typeBlock());
+            BlockObservation observation = observations.get(machine.block());
             if (observation == null || !observation.probed()
                     || observation.isStale(now, staleHealthTicks)
                     || !observation.present() || observation.blockId() == null) {

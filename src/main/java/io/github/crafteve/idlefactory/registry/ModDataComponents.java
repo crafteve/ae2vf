@@ -43,11 +43,11 @@ public final class ModDataComponents {
             ).apply(instance, (dimension, pos) -> BlockKey.of(
                     ResourceKey.create(Registries.DIMENSION, dimension), BlockPos.of(pos))));
 
-    /** 一台机器：方块列表。 */
+    /** 一台机器：一个方块。 */
     private static final Codec<BindingDraft.MachineDraft> MACHINE_CODEC =
             RecordCodecBuilder.create(instance -> instance.group(
-                    BLOCK_KEY_CODEC.listOf().fieldOf("blocks")
-                            .forGetter(BindingDraft.MachineDraft::blocks)
+                    BLOCK_KEY_CODEC.fieldOf("block")
+                            .forGetter(BindingDraft.MachineDraft::block)
             ).apply(instance, BindingDraft.MachineDraft::new));
 
     /** 草稿：模式 + 可选节点 id + 机器列表。 */

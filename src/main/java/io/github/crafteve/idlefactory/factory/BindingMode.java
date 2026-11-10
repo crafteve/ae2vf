@@ -3,19 +3,17 @@ package io.github.crafteve.idlefactory.factory;
 /**
  * 绑定杖的草稿模式。
  *
- * <p>SINGLE 是「一次接一个方块」的 1:1 语义；STACK 是「多台单方块机器」；MULTIBLOCK 是
- * 「一台多方块机器」；STACKED_MULTIBLOCK 是「多台多方块机器」。模式由客户端草稿持有，
- * 服务端只按提交包里的模式重新校验。</p>
+ * <p>SINGLE 是「一次接一个方块」的 1:1 语义；STACK 是「一次接多台单方块机器」。模式由客户端
+ * 草稿持有，服务端只按提交包里的模式重新校验。</p>
+ *
+ * <p>多方块删除后不再有 MULTIBLOCK / STACKED_MULTIBLOCK：机器与方块已经统一，多台机器由
+ * 节点承载，不需要「一台机器占多个方块」的模式。</p>
  */
 public enum BindingMode {
     /** 单方块单机器。 */
     SINGLE,
     /** 堆叠：多台单方块机器。 */
-    STACK,
-    /** 一台多方块机器。 */
-    MULTIBLOCK,
-    /** 多台多方块机器。 */
-    STACKED_MULTIBLOCK;
+    STACK;
 
     /**
      * 读存档 / 网络里的模式名。

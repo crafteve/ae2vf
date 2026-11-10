@@ -65,8 +65,7 @@ final class FactoryPassiveIoTooltip {
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
         lines.add(Component.literal(block.machine().dimension().location()
                 + " " + block.machine().pos().toShortString()).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.literal("机器 " + block.machineCount() + " 台 · 方块 "
-                + block.blockCount() + " 个" + (block.multiblock() ? "（多方块）" : ""))
+        lines.add(Component.literal("机器 " + block.machineCount() + " 台")
                 .withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal("规则 " + block.rules().size() + " 条")
                 .withStyle(ChatFormatting.GRAY));

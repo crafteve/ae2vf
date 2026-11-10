@@ -100,24 +100,17 @@ final class FactoryObservationRunner {
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 for (Machine machine : node.machines()) {
-                    boolean online = true;
-                    for (BlockKey block : machine.blocks()) {
-                        if (this.observations.observe(block).health() != Health.PRESENT) {
-                            online = false;
-                            break;
-                        }
+                    BlockKey block = machine.block();
+                    if (!this.seen.add(block)) {
+                        continue;
                     }
-                    for (BlockKey block : machine.blocks()) {
-                        if (!this.seen.add(block)) {
-                            continue;
-                        }
-                        if (this.observations.isDirty(block)) {
-                            this.dirtyKeys.add(block);
-                        } else if (online) {
-                            this.onlineKeys.add(block);
-                        } else {
-                            this.restKeys.add(block);
-                        }
+                    boolean online = this.observations.observe(block).health() == Health.PRESENT;
+                    if (this.observations.isDirty(block)) {
+                        this.dirtyKeys.add(block);
+                    } else if (online) {
+                        this.onlineKeys.add(block);
+                    } else {
+                        this.restKeys.add(block);
                     }
                 }
             }

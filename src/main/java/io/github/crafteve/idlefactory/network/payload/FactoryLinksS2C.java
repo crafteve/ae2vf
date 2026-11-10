@@ -82,7 +82,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<Link> m
         List<Link> machines = new ArrayList<>();
         for (Node node : factory.config().nodes().all()) {
             for (Machine machine : node.machines()) {
-                BlockKey typeBlock = machine.typeBlock();
+                BlockKey typeBlock = machine.block();
                 machines.add(new Link(typeBlock.dimension(), typeBlock.pos()));
             }
         }

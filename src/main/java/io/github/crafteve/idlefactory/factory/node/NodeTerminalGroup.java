@@ -129,7 +129,7 @@ final class NodeTerminalGroup {
      */
     @Nullable
     private AEItemKey resolveIcon() {
-        BlockKey typeBlock = this.node.machines().get(0).typeBlock();
+        BlockKey typeBlock = this.node.machines().get(0).block();
         ServerLevel level = this.server.getLevel(typeBlock.dimension());
         if (level == null || !level.isLoaded(typeBlock.pos())) {
             return null;
@@ -150,7 +150,7 @@ final class NodeTerminalGroup {
      */
     private static long sortOrder(Node node) {
         Machine machine = node.machines().get(0);
-        BlockKey typeBlock = machine.typeBlock();
+        BlockKey typeBlock = machine.block();
         return ((long) typeBlock.pos().getZ() << 24)
                 ^ ((long) typeBlock.pos().getX() << 8)
                 ^ typeBlock.pos().getY();

@@ -31,11 +31,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
- * 机器面的解析器：把「一台机器的全部方块」按六个面翻译成派单目标与可抽取存储。
+ * 机器面的解析器：把一台机器所在方块按六个面翻译成派单目标与可抽取存储。
  *
- * <p>虚拟供应器没有自己的方块，材料直接塞进机器本身。多方块机器要覆盖<b>所有方块</b>：
- * 先试类型方块（{@code blocks.get(0)}），再逐个部件；同一台机器可以跨维度，所以每个方块
- * 各自解析自己的世界。面选择顺序：机器输入规则里配过这个 key 的面优先，其次六面模拟。</p>
+ * <p>虚拟供应器没有自己的方块，材料直接塞进机器本身；机器已经统一为单个方块，所以这里只有
+ * 一个槽位。面选择顺序：机器输入规则里配过这个 key 的面优先，其次六面模拟。</p>
  *
  * <p>一次派单 / 一次回收共用一个 {@link Faces} 快照，快照里每个方块的面只解析一次。</p>
  */
@@ -63,16 +62,15 @@ final class ProviderFaceResolver {
      */
     @Nullable
     Faces snapshot(Machine machine) {
-        List<Faces.Slot> slots = new ArrayList<>(machine.blocks().size());
-        for (BlockKey block : machine.blocks()) {
-            ServerLevel level = this.node.levelOf(block);
-            if (level == null || !level.isLoaded(block.pos())) {
-                // 机器 ONLINE 要求所有方块可用；这里跳过未加载方块，交给健康门禁拦整台机器。
-                continue;
-            }
-            slots.add(new Faces.Slot(level, block.pos(), level.getBlockEntity(block.pos())));
+        BlockKey block = machine.block();
+        ServerLevel level = this.node.levelOf(block);
+        if (level == null || !level.isLoaded(block.pos())) {
+            // 机器 ONLINE 要求方块可用；未加载就交给健康门禁拦整台机器。
+            return null;
         }
-        return slots.isEmpty() ? null : new Faces(this, slots);
+        List<Faces.Slot> slots = List.of(
+                new Faces.Slot(level, block.pos(), level.getBlockEntity(block.pos())));
+        return new Faces(this, slots);
     }
 
     /**
@@ -140,7 +138,7 @@ final class ProviderFaceResolver {
     /**
      * 一次派单 / 一次回收里复用的面快照，覆盖整台机器的所有方块。
      *
-     * <p>方块顺序就是 {@code machine.blocks()}：类型方块在最前，部件依次在后。目标按需解析
+     * <p>机器只有一个方块，槽位列表因此恒为 1 项；保留列表是因为 {@code Faces} 按槽位索引。
      * 并记住「解析过没有」，某个面确实没有目标时不重复查能力。</p>
      */
     static final class Faces {

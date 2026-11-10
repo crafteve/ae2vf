@@ -68,8 +68,7 @@ final class FactoryNodeTooltip {
         String blocking = node.view().provider().blocking().isOn() ? "开" : "关";
         lines.add(line("provider", node.view().provider().available()
                 ? "可用 · 阻挡 " + blocking : "不可用（非 ME / 离线 / 失联）"));
-        lines.add(line("成员", node.view().machineCount() + " 台 · 方块 "
-                + node.view().blockCount() + " 个"));
+        lines.add(line("成员", node.view().machineCount() + " 台"));
         lines.add(line("规则 / 样板", node.view().ruleCount() + " 条 / "
                 + node.view().patternCount() + " 份"));
         if (!node.members().isEmpty()) {

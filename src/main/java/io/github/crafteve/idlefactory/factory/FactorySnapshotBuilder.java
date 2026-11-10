@@ -86,7 +86,6 @@ public final class FactorySnapshotBuilder {
      * @param nodeMachineCount 节点机器数
      * @param machineId      机器 id
      * @param primaryBlock   类型 / 展示方块（维度 + 坐标）
-     * @param blockCount     机器方块数
      * @param health         机器健康
      * @param probed         是否探测过
      * @param stale          健康是否过期
@@ -111,7 +110,7 @@ public final class FactorySnapshotBuilder {
      */
     public record MachineView(UUID nodeId, @Nullable String nodeName,
             @Nullable ResourceLocation nodeIconBlockId, int nodeMachineCount,
-            UUID machineId, BlockKey primaryBlock, int blockCount,
+            UUID machineId, BlockKey primaryBlock,
             MachineHealth health, boolean probed, boolean stale,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
             @Nullable ResourceLocation beTypeId, Set<CapabilityKind> presence, int ruleCount,
@@ -275,7 +274,7 @@ public final class FactorySnapshotBuilder {
             NodeHealthResolver.Snapshot nodeHealth = NodeHealthResolver.resolve(node,
                     blockObservations(node, observations), healthNow, staleTicks);
             for (Machine machine : node.machines()) {
-                BlockKey typeBlock = machine.typeBlock();
+                BlockKey typeBlock = machine.block();
                 Observation observation = observations == null
                         ? Observation.UNKNOWN : observations.observe(typeBlock);
                 NodeHealthResolver.MachineState state = nodeHealth.machine(machine.id());
@@ -323,7 +322,7 @@ public final class FactorySnapshotBuilder {
                 ResourceLocation groupBlockId = observation.blockId() != null
                         ? observation.blockId() : observation.lastBlockId();
                 views.add(new MachineView(node.id(), node.name(), node.typeBlockId(),
-                        node.machineCount(), machine.id(), typeBlock, machine.blocks().size(),
+                        node.machineCount(), machine.id(), typeBlock,
                         health, probed, stale,
                         observation.blockId(), groupBlockId, observation.beTypeId(),
                         observation.presence(), inputs.size() + outputs.size(),
@@ -350,12 +349,11 @@ public final class FactorySnapshotBuilder {
             @Nullable ObservationService observations) {
         Map<BlockKey, BlockObservation> map = new HashMap<>();
         for (Machine machine : node.machines()) {
-            for (BlockKey block : machine.blocks()) {
-                Observation observation = observations == null
-                        ? Observation.UNKNOWN : observations.observe(block);
-                map.put(block, new BlockObservation(observation.blockId(), observation.health(),
-                        observation.health() != Health.UNKNOWN, observation.observedAtTick()));
-            }
+            BlockKey block = machine.block();
+            Observation observation = observations == null
+                    ? Observation.UNKNOWN : observations.observe(block);
+            map.put(block, new BlockObservation(observation.blockId(), observation.health(),
+                    observation.health() != Health.UNKNOWN, observation.observedAtTick()));
         }
         return map;
     }

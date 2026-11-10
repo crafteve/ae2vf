@@ -35,13 +35,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 副本，同时镜像到绑定杖的非 persistent、非 network-synchronized 组件，供 tooltip 与重开
  * 界面恢复。客户端只做简单核验（主手、重复块、堆叠同 id），服务端仍会全量重验。</p>
  *
- * <p>手势：SINGLE 普通左右键仍走 1:1 toggle；STACK / MULTIBLOCK / STACKED_MULTIBLOCK 用
- * 蹲下右键开草稿，蹲下右键空气提交，蹲下左键空气取消。</p>
+ * <p>手势：SINGLE 普通左右键走 1:1 toggle；STACK 用蹲下右键开草稿并逐台加机器，
+ * 蹲下右键空气提交，蹲下左键空气取消。</p>
  */
 public final class BindingDraftController {
     private static BindingDraft draft = empty(BindingMode.SINGLE);
-    /** 当前是否有一台「还开着」的多方块机器；STACK 模式不用。 */
-    private static boolean machineOpen;
     /** 草稿所属玩家；换人就清空。 */
     @Nullable
     private static UUID owner;
@@ -91,7 +89,6 @@ public final class BindingDraftController {
      */
     public static void startEdit(UUID nodeId) {
         draft = new BindingDraft(BindingMode.STACK, nodeId, List.of());
-        machineOpen = false;
         syncComponent();
         actionBar("编辑节点：蹲下右键加机器，蹲下右键空气提交", ChatFormatting.AQUA);
     }
@@ -123,64 +120,32 @@ public final class BindingDraftController {
             }
             return addByNormalRightClick(block);
         }
-        // 蹲下右键：开草稿 / 开机器 / 加部件
+        // 蹲下右键：开草稿 / 加一台机器
         if (draft.isEmpty()) {
             UUID existing = blockToNode.get(block);
             draft = new BindingDraft(draft.mode(), existing, List.of());
-            machineOpen = false;
             syncComponent();
         }
         if (draft.mode() == BindingMode.SINGLE) {
-            actionBar("先蹲下滚轮切到堆叠 / 多方块模式", ChatFormatting.YELLOW);
+            actionBar("先蹲下滚轮切到堆叠模式", ChatFormatting.YELLOW);
             return InteractionResult.SUCCESS;
         }
-        if (draft.mode() == BindingMode.STACK) {
-            draft = draft.withMachine(List.of(block));
-            syncComponent();
-            actionBar("已加机器 #" + draft.machines().size() + "，蹲下右键空气提交", ChatFormatting.AQUA);
-            return InteractionResult.SUCCESS;
-        }
-        if (!machineOpen) {
-            draft = draft.withMachine(List.of(block));
-            machineOpen = true;
-            syncComponent();
-            actionBar("开始机器 #" + draft.machines().size() + "，右键加部件", ChatFormatting.AQUA);
-        } else {
-            addPart(block);
-        }
-        return InteractionResult.SUCCESS;
-    }
-
-    /** 普通右键：STACK 加一台单方块机器，多方块加部件。 */
-    private static InteractionResult addByNormalRightClick(BlockKey block) {
-        if (draft.mode() == BindingMode.STACK) {
-            draft = draft.withMachine(List.of(block));
-            syncComponent();
-            actionBar("已加机器 #" + draft.machines().size(), ChatFormatting.AQUA);
-            return InteractionResult.SUCCESS;
-        }
-        addPart(block);
-        return InteractionResult.SUCCESS;
-    }
-
-    /** 给当前开着的机器加一个部件；重复方块直接拒绝。 */
-    private static void addPart(BlockKey block) {
-        if (!machineOpen || draft.machines().isEmpty()) {
-            actionBar("先蹲下右键定第一块", ChatFormatting.YELLOW);
-            return;
-        }
-        int index = draft.machines().size() - 1;
-        List<BlockKey> blocks = new ArrayList<>(draft.machines().get(index).blocks());
-        if (blocks.contains(block)) {
-            actionBar("这个方块已经在草稿里", ChatFormatting.RED);
-            return;
-        }
-        blocks.add(block);
-        List<BindingDraft.MachineDraft> machines = new ArrayList<>(draft.machines());
-        machines.set(index, new BindingDraft.MachineDraft(blocks));
-        draft = new BindingDraft(draft.mode(), draft.nodeId(), machines);
+        draft = draft.withMachine(block);
         syncComponent();
-        actionBar("部件 +1（共 " + blocks.size() + " 块）", ChatFormatting.AQUA);
+        actionBar("已加机器 #" + draft.machines().size() + "，蹲下右键空气提交", ChatFormatting.AQUA);
+        return InteractionResult.SUCCESS;
+    }
+
+    /** 普通右键：STACK 加一台单方块机器。 */
+    private static InteractionResult addByNormalRightClick(BlockKey block) {
+        if (draft.mode() == BindingMode.SINGLE) {
+            actionBar("先蹲下滚轮切到堆叠模式", ChatFormatting.YELLOW);
+            return InteractionResult.SUCCESS;
+        }
+        draft = draft.withMachine(block);
+        syncComponent();
+        actionBar("已加机器 #" + draft.machines().size(), ChatFormatting.AQUA);
+        return InteractionResult.SUCCESS;
     }
 
     /**
@@ -199,25 +164,11 @@ public final class BindingDraftController {
             return;
         }
         BlockKey block = BlockKey.of(minecraft.player.level().dimension(), pos);
-        List<BindingDraft.MachineDraft> machines = new ArrayList<>(draft.machines().size());
-        boolean removed = false;
-        for (BindingDraft.MachineDraft machine : draft.machines()) {
-            if (machine.blocks().contains(block)) {
-                List<BlockKey> blocks = new ArrayList<>(machine.blocks());
-                blocks.remove(block);
-                if (!blocks.isEmpty()) {
-                    machines.add(new BindingDraft.MachineDraft(blocks));
-                }
-                removed = true;
-            } else {
-                machines.add(machine);
-            }
-        }
-        if (!removed) {
+        BindingDraft next = draft.withoutMachine(block);
+        if (next == draft) {
             return;
         }
-        draft = new BindingDraft(draft.mode(), draft.nodeId(), machines);
-        machineOpen = !machines.isEmpty() && draft.mode() != BindingMode.STACK;
+        draft = next;
         syncComponent();
         actionBar("已从草稿移除", ChatFormatting.GRAY);
     }
@@ -243,19 +194,6 @@ public final class BindingDraftController {
                 // SINGLE 不产生草稿
             }
             case STACK -> submit();
-            case MULTIBLOCK -> {
-                machineOpen = false;
-                submit();
-            }
-            case STACKED_MULTIBLOCK -> {
-                if (machineOpen) {
-                    machineOpen = false;
-                    actionBar("机器 #" + draft.machines().size()
-                            + " 已完成；蹲下右键空气提交整份草稿", ChatFormatting.AQUA);
-                } else {
-                    submit();
-                }
-            }
         }
     }
 
@@ -289,10 +227,8 @@ public final class BindingDraftController {
         }
         Map<BlockKey, Boolean> seen = new HashMap<>();
         for (BindingDraft.MachineDraft machine : draft.machines()) {
-            for (BlockKey block : machine.blocks()) {
-                if (seen.put(block, Boolean.TRUE) != null) {
-                    return "草稿里有重复方块";
-                }
+            if (seen.put(machine.block(), Boolean.TRUE) != null) {
+                return "草稿里有重复方块";
             }
         }
         return null;
@@ -375,7 +311,6 @@ public final class BindingDraftController {
             minecraft.player.getMainHandItem().remove(ModDataComponents.BINDING_DRAFT.get());
         }
         draft = empty(draft.mode());
-        machineOpen = false;
         handSlot = -1;
     }
 
@@ -408,8 +343,6 @@ public final class BindingDraftController {
         return switch (mode) {
             case SINGLE -> "单方块";
             case STACK -> "堆叠";
-            case MULTIBLOCK -> "多方块";
-            case STACKED_MULTIBLOCK -> "堆叠多方块";
         };
     }
 

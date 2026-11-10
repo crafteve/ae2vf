@@ -69,9 +69,8 @@ public final class LinkRegistry {
         for (Factory factory : manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 for (Machine machine : node.machines()) {
-                    for (BlockKey block : machine.blocks()) {
-                        put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos());
-                    }
+                    BlockKey block = machine.block();
+                    put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos());
                 }
             }
             StorageAnchor anchor = factory.config().storageAnchor();

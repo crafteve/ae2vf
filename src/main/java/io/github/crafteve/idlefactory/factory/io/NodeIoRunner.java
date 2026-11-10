@@ -112,35 +112,28 @@ public final class NodeIoRunner {
             machineState.sleepSince = -1L;
         }
 
-        // 门禁：机器所有方块都必须 PRESENT；任一方块不可用整台机器不跑。
-        if (observations != null) {
-            for (BlockKey block : machine.blocks()) {
-                if (!runnable(observations, block)) {
-                    sleepIfIdle(machineState, now);
-                    return 0L;
-                }
-            }
+        // 门禁：机器方块必须 PRESENT；不可用整台机器不跑。
+        if (observations != null && !runnable(observations, machine.block())) {
+            sleepIfIdle(machineState, now);
+            return 0L;
         }
 
-        BlockKey target = machine.typeBlock();
+        BlockKey target = machine.block();
         ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                 id -> new ItemVariantIndex());
-        // 变体预算按机器共享：一台机器的所有方块共用一个池，避免多方块把预算放大 N 倍。
         int[] sharedBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
-        List<MachineIoRunner.BlockRun> runs = new ArrayList<>(machine.blocks().size());
+        MachineIoRunner.BlockRun result;
         try {
-            for (BlockKey block : machine.blocks()) {
-                ServerLevel level = server.getLevel(block.dimension());
-                if (level == null || !level.isLoaded(block.pos())) {
-                    // 未加载不代表机器没了，保持醒着，下一轮再看
-                    return 0L;
-                }
-                LevelCapabilityCache caps = observations == null
-                        ? null : observations.capabilities(level);
-                long generation = observations == null ? 0L : observations.facesGeneration(block);
-                runs.add(MachineIoRunner.runBlock(storage, level, block.pos(), node.io(), caps,
-                        machineState.routes(block), generation, factoryVariants, now, sharedBudget));
+            ServerLevel level = server.getLevel(target.dimension());
+            if (level == null || !level.isLoaded(target.pos())) {
+                // 未加载不代表机器没了，保持醒着，下一轮再看
+                return 0L;
             }
+            LevelCapabilityCache caps = observations == null
+                    ? null : observations.capabilities(level);
+            long generation = observations == null ? 0L : observations.facesGeneration(target);
+            result = MachineIoRunner.runBlock(storage, level, target.pos(), node.io(), caps,
+                    machineState.routes(target), generation, factoryVariants, now, sharedBudget);
         } catch (RuntimeException e) {
             // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
             // MachineIoRunner 内部被调用，异常穿出去会带崩整个服务端 tick。更糟的是 IoTransfer
@@ -153,7 +146,6 @@ public final class NodeIoRunner {
             sleepIfIdle(machineState, now);
             return 0L;
         }
-        MachineIoRunner.MachineRun result = MachineIoRunner.MachineRun.combine(runs);
         // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
         // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
         // 都算“路没问题”，清掉连续计数。详见 noteRejected。

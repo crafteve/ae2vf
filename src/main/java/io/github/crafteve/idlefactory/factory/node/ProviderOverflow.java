@@ -201,7 +201,7 @@ final class ProviderOverflow {
      */
     static boolean dropAtMachine(NodeRuntime node, AEKey key, long amount) {
         ServerLevel level = node.machineLevel();
-        BlockPos pos = node.primaryMachine().typeBlock().pos();
+        BlockPos pos = node.primaryMachine().block().pos();
         if (level == null || amount <= 0L || !level.isLoaded(pos)) {
             return false;
         }

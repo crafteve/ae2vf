@@ -118,7 +118,7 @@ public final class NodeRuntime
      */
     boolean attach(IGridNode anchor) {
         try {
-            this.managed.create(this.anchorLevel, primaryMachine().typeBlock().pos());
+            this.managed.create(this.anchorLevel, primaryMachine().block().pos());
             IGridNode node = this.managed.getNode();
             if (node == null) {
                 // create 没抛异常却没给出节点：不回滚就会留下一个没人拆的半节点，
@@ -281,7 +281,7 @@ public final class NodeRuntime
     }
 
     /**
-     * 节点里的代表机器：1:1 阶段就是唯一那台，堆叠 / 多方块落地后仍需一个「类型方块宿主」。
+     * 节点里的代表机器：1:1 时是唯一那台，堆叠时取列表第一台；节点定位与图标都读它。
      *
      * @return 第一台机器
      */
@@ -396,7 +396,7 @@ public final class NodeRuntime
     /** 节点类型方块所在维度；派单与回收用。 */
     @Nullable
     ServerLevel machineLevel() {
-        return this.server.getLevel(primaryMachine().typeBlock().dimension());
+        return this.server.getLevel(primaryMachine().block().dimension());
     }
 
     /** 当前游戏时间，告警与回收节奏用。 */
@@ -414,7 +414,7 @@ public final class NodeRuntime
      */
     Level decodeLevel() {
         ServerLevel level = this.machineLevel();
-        if (level != null && level.isLoaded(primaryMachine().typeBlock().pos())) {
+        if (level != null && level.isLoaded(primaryMachine().block().pos())) {
             return level;
         }
         return this.anchorLevel;

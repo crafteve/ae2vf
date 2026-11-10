@@ -245,7 +245,7 @@ final class MachineLinkService {
      * @param target  在线玩家，可为 {@code null}
      */
     private void dropPattern(Machine machine, ItemStack stack, @Nullable ServerPlayer target) {
-        BlockKey typeBlock = machine.typeBlock();
+        BlockKey typeBlock = machine.block();
         ServerLevel level = this.server.getLevel(typeBlock.dimension());
         if (level != null && level.isLoaded(typeBlock.pos())) {
             Block.popResource(level, typeBlock.pos(), stack);

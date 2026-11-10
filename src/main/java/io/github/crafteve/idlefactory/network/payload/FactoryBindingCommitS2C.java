@@ -22,11 +22,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param ok          是否成功
  * @param nodeId      落到哪个节点；失败时为 {@code null}
  * @param machines    本次新增机器数
- * @param blocks      本次新增方块数
  * @param message     给玩家看的一句话
  */
 public record FactoryBindingCommitS2C(int containerId, boolean ok, @Nullable UUID nodeId,
-        int machines, int blocks, String message) implements CustomPacketPayload {
+        int machines, String message) implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:binding_commit_result}。 */
     public static final Type<FactoryBindingCommitS2C> TYPE =
@@ -60,7 +59,6 @@ public record FactoryBindingCommitS2C(int containerId, boolean ok, @Nullable UUI
             buf.writeUUID(payload.nodeId());
         }
         buf.writeVarInt(payload.machines());
-        buf.writeVarInt(payload.blocks());
         buf.writeUtf(payload.message());
     }
 
@@ -69,8 +67,7 @@ public record FactoryBindingCommitS2C(int containerId, boolean ok, @Nullable UUI
         boolean ok = buf.readBoolean();
         UUID nodeId = buf.readBoolean() ? buf.readUUID() : null;
         int machines = buf.readVarInt();
-        int blocks = buf.readVarInt();
         String message = buf.readUtf();
-        return new FactoryBindingCommitS2C(containerId, ok, nodeId, machines, blocks, message);
+        return new FactoryBindingCommitS2C(containerId, ok, nodeId, machines, message);
     }
 }

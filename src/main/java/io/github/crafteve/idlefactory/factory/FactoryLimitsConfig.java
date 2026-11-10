@@ -25,14 +25,8 @@ public final class FactoryLimitsConfig {
     public static final int HARD_MAX_NODES = NodeLibrary.HARD_MAX_NODES;
     /** 单节点机器数硬上限。 */
     public static final int HARD_MAX_MACHINES_PER_NODE = NodeLibrary.HARD_MAX_MACHINES_PER_NODE;
-    /** 单机器方块数硬上限。 */
-    public static final int HARD_MAX_BLOCKS_PER_MACHINE = Machine.HARD_MAX_BLOCKS;
-    /** 单节点方块数硬上限。 */
-    public static final int HARD_MAX_BLOCKS_PER_NODE = NodeLibrary.HARD_MAX_BLOCKS_PER_NODE;
     /** 全工厂机器数硬上限。 */
     public static final int HARD_MAX_TOTAL_MACHINES = NodeLibrary.HARD_MAX_TOTAL_MACHINES;
-    /** 全工厂方块数硬上限。 */
-    public static final int HARD_MAX_TOTAL_BLOCKS = NodeLibrary.HARD_MAX_TOTAL_BLOCKS;
     /** 每侧规则数硬上限。 */
     public static final int HARD_MAX_RULES_PER_SIDE = NodeIoGroup.MAX_RULES_PER_SIDE;
     /** 样板槽硬上限。 */
@@ -61,22 +55,10 @@ public final class FactoryLimitsConfig {
     public static final ModConfigSpec.IntValue MAX_MACHINES_PER_NODE = limited("maxMachinesPerNode",
             "单节点机器数上限；-1 表示无上限。 / Max machines per node; -1 = unlimited.",
             HARD_MAX_MACHINES_PER_NODE);
-    /** 单机器方块数上限；-1 表示无上限。 */
-    public static final ModConfigSpec.IntValue MAX_BLOCKS_PER_MACHINE = limited("maxBlocksPerMachine",
-            "单机器方块数上限；-1 表示无上限。 / Max blocks per machine; -1 = unlimited.",
-            HARD_MAX_BLOCKS_PER_MACHINE);
-    /** 单节点方块数上限；-1 表示无上限。 */
-    public static final ModConfigSpec.IntValue MAX_BLOCKS_PER_NODE = limited("maxBlocksPerNode",
-            "单节点方块数上限；-1 表示无上限。 / Max blocks per node; -1 = unlimited.",
-            HARD_MAX_BLOCKS_PER_NODE);
     /** 全工厂机器数上限；-1 表示无上限。 */
     public static final ModConfigSpec.IntValue MAX_TOTAL_MACHINES = limited("maxTotalMachines",
             "全工厂机器数上限；-1 表示无上限。 / Max machines per factory; -1 = unlimited.",
             HARD_MAX_TOTAL_MACHINES);
-    /** 全工厂方块数上限；-1 表示无上限。 */
-    public static final ModConfigSpec.IntValue MAX_TOTAL_BLOCKS = limited("maxTotalBlocks",
-            "全工厂方块数上限；-1 表示无上限。 / Max blocks per factory; -1 = unlimited.",
-            HARD_MAX_TOTAL_BLOCKS);
     /** 每侧规则数上限；-1 表示无上限。 */
     public static final ModConfigSpec.IntValue MAX_RULES_PER_SIDE = limited("maxRulesPerSide",
             "输入或输出每侧规则数上限；-1 表示无上限。 / Max rules per side; -1 = unlimited.",
@@ -151,24 +133,9 @@ public final class FactoryLimitsConfig {
         return effective(MAX_MACHINES_PER_NODE.get(), HARD_MAX_MACHINES_PER_NODE);
     }
 
-    /** @return 有效单机器方块数上限 */
-    public static int maxBlocksPerMachine() {
-        return effective(MAX_BLOCKS_PER_MACHINE.get(), HARD_MAX_BLOCKS_PER_MACHINE);
-    }
-
-    /** @return 有效单节点方块数上限 */
-    public static int maxBlocksPerNode() {
-        return effective(MAX_BLOCKS_PER_NODE.get(), HARD_MAX_BLOCKS_PER_NODE);
-    }
-
     /** @return 有效全工厂机器数上限 */
     public static int maxTotalMachines() {
         return effective(MAX_TOTAL_MACHINES.get(), HARD_MAX_TOTAL_MACHINES);
-    }
-
-    /** @return 有效全工厂方块数上限 */
-    public static int maxTotalBlocks() {
-        return effective(MAX_TOTAL_BLOCKS.get(), HARD_MAX_TOTAL_BLOCKS);
     }
 
     /** @return 有效每侧规则数上限 */

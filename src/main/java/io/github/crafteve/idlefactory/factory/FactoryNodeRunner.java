@@ -103,27 +103,15 @@ final class FactoryNodeRunner {
             for (Node node : factory.config().nodes().all()) {
                 boolean available = true;
                 for (Machine machine : node.machines()) {
-                    for (BlockKey block : machine.blocks()) {
-                        if (this.observations.observe(block).health() != Health.PRESENT) {
-                            available = false;
-                            break;
-                        }
-                    }
-                    if (!available) {
+                    if (this.observations.observe(machine.block()).health() != Health.PRESENT) {
+                        available = false;
                         break;
                     }
                 }
                 specs.add(new NodeManager.Spec(factory.id(), node, anchorNode, level, available));
                 Set<UUID> online = new HashSet<>();
                 for (Machine machine : node.machines()) {
-                    boolean machineOnline = true;
-                    for (BlockKey block : machine.blocks()) {
-                        if (this.observations.observe(block).health() != Health.PRESENT) {
-                            machineOnline = false;
-                            break;
-                        }
-                    }
-                    if (machineOnline) {
+                    if (this.observations.observe(machine.block()).health() == Health.PRESENT) {
                         online.add(machine.id());
                     }
                 }

@@ -92,10 +92,10 @@ public final class FactoryService {
     public static BindingResult commitBinding(Factory factory, BindingDraft draft) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
-            return new BindingResult(false, null, 0, 0, "Idle Factory 尚未启动（服务端未就绪）");
+            return new BindingResult(false, null, 0, "Idle Factory 尚未启动（服务端未就绪）");
         }
         BindingService.BindingResult result = machineToggle(runtime).commit(factory, draft);
-        return new BindingResult(result.ok(), result.nodeId(), result.machines(), result.blocks(),
+        return new BindingResult(result.ok(), result.nodeId(), result.machines(),
                 result.message());
     }
 
@@ -105,11 +105,9 @@ public final class FactoryService {
      * @param ok       是否成功
      * @param nodeId   落到哪个节点；失败时为 {@code null}
      * @param machines 本次新增机器数
-     * @param blocks   本次新增方块数
      * @param message  给玩家看的一句话
      */
-    public record BindingResult(boolean ok, java.util.UUID nodeId, int machines, int blocks,
-            String message) {
+    public record BindingResult(boolean ok, java.util.UUID nodeId, int machines, String message) {
     }
 
     /**
