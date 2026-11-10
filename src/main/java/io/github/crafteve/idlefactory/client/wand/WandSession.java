@@ -132,6 +132,9 @@ public final class WandSession {
             WandHud.failure(WandMessages.failure(WandFailure.NODE_NOT_FOUND));
             return;
         }
+        // 终端「+」进来时终端界面还开着；tick 的「打开别的界面就丢草稿」会在同一 tick
+        // 把刚建的草稿清掉，玩家关掉终端后已经是 IDLE，右键机器只能落成 1:1。先关界面再进编辑态。
+        closeOtherScreen(minecraft);
         draft = new WandDraft(nodeId, List.of(), Set.of(), WandCoordinator.nextSeq());
         state = State.EDITING;
         recheck(minecraft);
@@ -330,6 +333,21 @@ public final class WandSession {
             WandLinks.blockOfMachine(machineId).ifPresent(removed::add);
         }
         removedBlocks = Set.copyOf(removed);
+    }
+
+    /**
+     * 关掉当前界面：进入编辑态前必须没有别的界面，否则下一个 tick 会把草稿清掉。
+     *
+     * @param minecraft 客户端实例
+     */
+    private static void closeOtherScreen(Minecraft minecraft) {
+        if (minecraft.screen == null) {
+            return;
+        }
+        if (minecraft.player != null) {
+            minecraft.player.closeContainer();
+        }
+        minecraft.setScreen(null);
     }
 
     /**
