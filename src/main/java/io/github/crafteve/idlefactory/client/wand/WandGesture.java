@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.client.wand;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.FactoryLinkRenderer;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
@@ -188,6 +187,6 @@ public final class WandGesture {
     private static void clearLocalState() {
         WandSession.clearAll();
         WandLinks.clear();
-        FactoryLinkRenderer.clearCache();
+        WandLinkRenderer.clearCache();
     }
 }

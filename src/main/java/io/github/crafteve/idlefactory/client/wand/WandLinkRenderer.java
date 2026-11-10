@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client;
+package io.github.crafteve.idlefactory.client.wand;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -20,7 +20,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
@@ -46,23 +45,22 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
- * 已绑定机器/仓库的荧光块。
+ * 两把绑定杖的世界框：机器绿、草稿黄、冲突（含待删除）红、仓库蓝。
  *
  * <p>按 SFM 标签枪的做法：在 {@code AFTER_PARTICLES} 画填充方块面，先乘相机旋转的逆矩阵，
- * 再平移到相机相对坐标；使用缓存 VBO，只在坐标集合变化时重建。只画没有被同组方块挡住的
- * 面，整组一次 draw，CPU 每帧不逐方块提交。</p>
+ * 再平移到相机相对坐标；每种颜色一份缓存 VBO，只在坐标集合变化时重建。只画没有被同组方块
+ * 挡住的面，整组一次 draw，CPU 每帧不逐方块提交。</p>
  *
- * <p>颜色：机器绿、仓库蓝；深度永远通过，加法混合，所以穿墙可见。链接来自
- * {@link WandLinks}，只在主手拿对应绑定杖时画。</p>
+ * <p>数据只读：机器与仓库来自 {@link WandLinks}，草稿与冲突来自 {@link WandSession}。任意界面
+ * 打开时（含草稿面板）不画；不做曲线、悬停、世界内动画。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
-public final class FactoryLinkRenderer {
+public final class WandLinkRenderer {
+    /** 顶点缓冲初始大小。 */
     private static final int BUFFER_SIZE = 256;
-    /** 加法混合用的透明度；机器绿 / 仓库蓝共用。 */
+    /** 加法混合用的透明度；四种颜色共用。 */
     private static final int ALPHA = 100;
-    private static final int MACHINE_COLOR = 0xFF33FF73;
-    private static final int STORAGE_COLOR = 0xFF40A6FF;
 
     @SuppressWarnings("deprecation")
     private static final RenderType LINK_TYPE = RenderType.create(
@@ -89,14 +87,14 @@ public final class FactoryLinkRenderer {
                             }))
                     .createCompositeState(true));
 
-    private static final VBOCache CACHE = new VBOCache();
+    private static final Map<Kind, VBOEntry> CACHE = new EnumMap<>(Kind.class);
 
-    private FactoryLinkRenderer() {
+    private WandLinkRenderer() {
         // 纯静态渲染
     }
 
     /**
-     * 世界渲染：主手绑定杖、当前维度、已缓存链接。
+     * 世界渲染：按主手物品与草稿状态画对应颜色。
      *
      * @param event 世界渲染事件
      */
@@ -116,19 +114,50 @@ public final class FactoryLinkRenderer {
         if (!machineWand && !storageWand) {
             return;
         }
-        LongOpenHashSet positions = machineWand
-                ? collectBlocks(WandLinks.machineBlocks(), minecraft.level.dimension())
-                : collectLinks(WandLinks.storage(), minecraft.level.dimension());
-        if (positions.isEmpty()) {
+        ResourceKey<Level> dimension = minecraft.level.dimension();
+        if (storageWand) {
+            draw(Kind.STORAGE, collectLinks(WandLinks.storage(), dimension), event);
             return;
         }
-        Kind kind = machineWand ? Kind.MACHINE : Kind.STORAGE;
-        int color = machineWand ? MACHINE_COLOR : STORAGE_COLOR;
-        VBOEntry entry = CACHE.get(kind, positions, event, color);
-        if (entry == null) {
+        draw(Kind.MACHINE, collectBlocks(WandLinks.machineBlocks(), dimension), event);
+        if (!WandSession.isEditing()) {
             return;
         }
+        draw(Kind.DRAFT_ADDED, collectBlocks(WandSession.draft().added(), dimension), event);
+        LongOpenHashSet conflicts = new LongOpenHashSet();
+        addBlocks(conflicts, WandSession.conflictBlocks(), dimension);
+        addBlocks(conflicts, WandSession.removedBlocks(), dimension);
+        draw(Kind.DRAFT_CONFLICT, conflicts, event);
+    }
 
+    /** 释放全部 VBO；登录 / 登出 / 换维度时由客户端缓存调用。 */
+    public static void clearCache() {
+        for (VBOEntry entry : CACHE.values()) {
+            entry.vbo().close();
+        }
+        CACHE.clear();
+    }
+
+    /**
+     * 画一种颜色的坐标集合。
+     *
+     * @param kind      颜色种类
+     * @param positions 当前维度里的坐标
+     * @param event     渲染事件
+     */
+    private static void draw(Kind kind, LongOpenHashSet positions, RenderLevelStageEvent event) {
+        if (positions.isEmpty()) {
+            drop(kind);
+            return;
+        }
+        VBOEntry entry = CACHE.get(kind);
+        if (entry == null || !entry.positions().equals(positions)) {
+            if (entry != null) {
+                entry.vbo().close();
+            }
+            entry = createEntry(kind, positions);
+            CACHE.put(kind, entry);
+        }
         Camera camera = event.getCamera();
         Vec3 cameraPos = camera.getPosition();
         PoseStack pose = event.getPoseStack();
@@ -150,26 +179,59 @@ public final class FactoryLinkRenderer {
         pose.popPose();
     }
 
-    /** 释放 VBO；登录/登出时由客户端缓存调用。 */
-    public static void clearCache() {
-        CACHE.clear();
+    /**
+     * 丢掉一种颜色的缓存；坐标集合空了时调。
+     *
+     * @param kind 颜色种类
+     */
+    private static void drop(Kind kind) {
+        VBOEntry entry = CACHE.remove(kind);
+        if (entry != null) {
+            entry.vbo().close();
+        }
+    }
+
+    /**
+     * 新建一份 VBO。
+     *
+     * @param kind      颜色种类
+     * @param positions 坐标集合
+     * @return 缓存条目
+     */
+    private static VBOEntry createEntry(Kind kind, LongOpenHashSet positions) {
+        BlockPos origin = BlockPos.of(positions.longIterator().nextLong());
+        VertexBuffer vbo = createVbo(positions, origin, kind.color());
+        return new VBOEntry(new LongOpenHashSet(positions), origin, vbo);
     }
 
     /**
      * 收集当前维度里的机器方块坐标。
      *
-     * @param blocks    全部机器方块
+     * @param blocks    全部方块
      * @param dimension 当前维度
      * @return 坐标集合
      */
-    private static LongOpenHashSet collectBlocks(List<BlockKey> blocks, ResourceKey<Level> dimension) {
+    private static LongOpenHashSet collectBlocks(List<BlockKey> blocks,
+            ResourceKey<Level> dimension) {
         LongOpenHashSet positions = new LongOpenHashSet(Math.max(16, blocks.size()));
+        addBlocks(positions, blocks, dimension);
+        return positions;
+    }
+
+    /**
+     * 把指定维度的方块坐标加进集合。
+     *
+     * @param positions 目标集合
+     * @param blocks    方块
+     * @param dimension 当前维度
+     */
+    private static void addBlocks(LongOpenHashSet positions, Iterable<BlockKey> blocks,
+            ResourceKey<Level> dimension) {
         for (BlockKey block : blocks) {
             if (block.dimension().equals(dimension)) {
                 positions.add(block.pos().asLong());
             }
         }
-        return positions;
     }
 
     /**
@@ -190,60 +252,18 @@ public final class FactoryLinkRenderer {
         return positions;
     }
 
-    private enum Kind {
-        MACHINE,
-        STORAGE
-    }
-
     /**
-     * 缓存一组坐标的 VBO。坐标未变时每帧只做一次集合比较，不重建网格；变化或首次才重建。
+     * 把坐标集合编译成一个静态 VBO。
+     *
+     * @param positions 坐标集合
+     * @param origin    平移到原点的基准
+     * @param color     ARGB 颜色
+     * @return 顶点缓冲
      */
-    private static final class VBOCache {
-        private final Map<Kind, VBOEntry> cache = new EnumMap<>(Kind.class);
-        private int lastChangeCheck = -1;
-
-        @Nullable
-        private VBOEntry get(Kind kind, LongOpenHashSet positions, RenderLevelStageEvent event,
-                int color) {
-            if (positions.isEmpty()) {
-                return null;
-            }
-            VBOEntry entry = cache.get(kind);
-            boolean rebuild = entry == null;
-            int renderTick = event.getRenderTick();
-            // 集合比较比重建便宜，但也没必要每帧比；每 render tick 最多比一次。
-            if (!rebuild && renderTick != lastChangeCheck) {
-                lastChangeCheck = renderTick;
-                if (!entry.positions().equals(positions)) {
-                    rebuild = true;
-                }
-            }
-            if (rebuild) {
-                if (entry != null) {
-                    entry.vbo().close();
-                }
-                BlockPos origin = BlockPos.of(positions.longIterator().nextLong());
-                VertexBuffer vbo = createVbo(positions, origin, color);
-                entry = new VBOEntry(new LongOpenHashSet(positions), origin, vbo);
-                cache.put(kind, entry);
-            }
-            return entry;
-        }
-
-        private void clear() {
-            for (VBOEntry entry : cache.values()) {
-                entry.vbo().close();
-            }
-            cache.clear();
-            lastChangeCheck = -1;
-        }
-    }
-
     private static VertexBuffer createVbo(LongOpenHashSet positions, BlockPos origin, int color) {
         int red = color >> 16 & 0xFF;
         int green = color >> 8 & 0xFF;
         int blue = color & 0xFF;
-        int alpha = ALPHA;
 
         PoseStack pose = new PoseStack();
         BufferBuilder buffer = Tesselator.getInstance().begin(
@@ -259,7 +279,7 @@ public final class FactoryLinkRenderer {
             Matrix4f matrix = pose.last().pose();
             for (Direction face : Direction.values()) {
                 if (!positions.contains(pos.relative(face).asLong())) {
-                    writeFace(buffer, matrix, face, red, green, blue, alpha);
+                    writeFace(buffer, matrix, face, red, green, blue, ALPHA);
                 }
             }
             pose.popPose();
@@ -327,6 +347,29 @@ public final class FactoryLinkRenderer {
         }
     }
 
+    /** 一种颜色的缓存条目。 */
     private record VBOEntry(LongOpenHashSet positions, BlockPos origin, VertexBuffer vbo) {
+    }
+
+    /** 四种世界框颜色。 */
+    private enum Kind {
+        /** 已绑定机器。 */
+        MACHINE(0xFF33FF73),
+        /** 草稿待加入。 */
+        DRAFT_ADDED(0xFFFFCC33),
+        /** 校验冲突或待删除。 */
+        DRAFT_CONFLICT(0xFFFF4D4D),
+        /** 仓库地址。 */
+        STORAGE(0xFF40A6FF);
+
+        private final int color;
+
+        Kind(int color) {
+            this.color = color;
+        }
+
+        int color() {
+            return this.color;
+        }
     }
 }
