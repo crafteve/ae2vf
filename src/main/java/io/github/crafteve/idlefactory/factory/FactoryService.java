@@ -116,50 +116,6 @@ public final class FactoryService {
     }
 
     /**
-     * 旧绑定路径：提交一份旧草稿；随旧客户端一起删除。
-     *
-     * @param factory 工厂
-     * @param draft   旧草稿
-     * @return 旧回执
-     */
-    public static BindingResult commitBinding(Factory factory, BindingDraft draft) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return new BindingResult(false, null, 0, "Idle Factory 尚未启动（服务端未就绪）");
-        }
-        BindingService.BindingResult result = machineToggle(runtime).commit(factory, draft);
-        return new BindingResult(result.ok(), result.nodeId(), result.machines(),
-                result.message());
-    }
-
-    /**
-     * 旧绑定路径的草稿提交结果；随旧客户端一起删除。
-     *
-     * @param ok       是否成功
-     * @param nodeId   落到哪个节点；失败时为 {@code null}
-     * @param machines 本次新增机器数
-     * @param message  给玩家看的一句话
-     */
-    public record BindingResult(boolean ok, java.util.UUID nodeId, int machines, String message) {
-    }
-
-    /**
-     * 旧绑定路径：整组 toggle；随旧客户端一起删除。
-     *
-     * @param player 发起请求的玩家
-     * @param pos    目标机器
-     * @param chain  是否连锁
-     * @return 变更的台数
-     */
-    public static int toggleMachines(ServerPlayer player, BlockPos pos, boolean chain) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineToggle(runtime).toggleMachines(player, pos, chain);
-    }
-
-    /**
      * 空闲态右键方块：1:1 连接或断开。
      *
      * @param player 发起请求的玩家
@@ -286,17 +242,6 @@ public final class FactoryService {
     private static MachineLinkService machineLinks(FactoryRuntime runtime) {
         return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
                 runtime.nodeIoRunner(), machineLibrary(runtime), runtime.server());
-    }
-
-    /**
-     * 装配旧绑定路径的整组 toggle 服务；随旧客户端一起删除。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static BindingService machineToggle(FactoryRuntime runtime) {
-        return new BindingService(runtime.manager(), runtime.observations(),
-                machineLibrary(runtime), machineLinks(runtime), runtime.server());
     }
 
     /**

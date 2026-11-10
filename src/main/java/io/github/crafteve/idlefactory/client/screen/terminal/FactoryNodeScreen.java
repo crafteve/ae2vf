@@ -25,6 +25,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.H
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
@@ -143,6 +144,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.addRenderableWidget(this.searchBox);
         this.applyQuery(rememberedQuery);
         this.requestTable();
+        WandLinks.request();
     }
 
     @Override

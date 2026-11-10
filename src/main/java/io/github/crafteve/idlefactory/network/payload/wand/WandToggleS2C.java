@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -41,5 +42,6 @@ public record WandToggleS2C(WandCommitOutcome outcome) implements CustomPacketPa
      * @param context 上下文
      */
     public static void handle(WandToggleS2C payload, IPayloadContext context) {
+        context.enqueueWork(() -> WandCoordinator.handleToggle(payload));
     }
 }

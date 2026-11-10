@@ -28,6 +28,7 @@ public final class WandLinks {
     private static List<FactoryLinksS2C.Link> storage = List.of();
     private static List<BlockKey> machineBlocks = List.of();
     private static Map<BlockKey, Owner> owners = Map.of();
+    private static Map<UUID, BlockKey> machineBlocksById = Map.of();
     private static Map<UUID, FactoryLinksS2C.NodeLink> nodes = Map.of();
     private static boolean loaded;
 
@@ -51,6 +52,7 @@ public final class WandLinks {
      */
     public static void update(FactoryLinksS2C payload) {
         Map<BlockKey, Owner> nextOwners = new HashMap<>();
+        Map<UUID, BlockKey> nextMachineBlocks = new HashMap<>();
         Map<UUID, FactoryLinksS2C.NodeLink> nextNodes = new HashMap<>();
         List<BlockKey> nextBlocks = new ArrayList<>();
         for (FactoryLinksS2C.NodeLink node : payload.nodes()) {
@@ -58,12 +60,14 @@ public final class WandLinks {
             for (FactoryLinksS2C.MachineLink machine : node.machines()) {
                 nextOwners.put(machine.block(),
                         new Owner(node.nodeId(), machine.machineId()));
+                nextMachineBlocks.put(machine.machineId(), machine.block());
                 nextBlocks.add(machine.block());
             }
         }
         mode = payload.mode();
         storage = payload.storage();
         owners = Map.copyOf(nextOwners);
+        machineBlocksById = Map.copyOf(nextMachineBlocks);
         nodes = Map.copyOf(nextNodes);
         machineBlocks = List.copyOf(nextBlocks);
         loaded = true;
@@ -75,6 +79,7 @@ public final class WandLinks {
         storage = List.of();
         machineBlocks = List.of();
         owners = Map.of();
+        machineBlocksById = Map.of();
         nodes = Map.of();
         loaded = false;
     }
@@ -107,6 +112,16 @@ public final class WandLinks {
      */
     public static Optional<Owner> owner(BlockKey block) {
         return Optional.ofNullable(owners.get(block));
+    }
+
+    /**
+     * 按机器 id 取它所在的方块。
+     *
+     * @param machineId 机器 id
+     * @return 方块；机器不在快照里时为空
+     */
+    public static Optional<BlockKey> blockOfMachine(UUID machineId) {
+        return Optional.ofNullable(machineBlocksById.get(machineId));
     }
 
     /**

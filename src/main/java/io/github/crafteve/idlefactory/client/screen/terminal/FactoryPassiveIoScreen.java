@@ -17,6 +17,7 @@ import appeng.core.AEConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
@@ -158,6 +159,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.applyQuery(rememberedQuery);
         FactoryPassiveIoProbe.logScreen(this);
         requestTable();
+        WandLinks.request();
     }
 
     @Override

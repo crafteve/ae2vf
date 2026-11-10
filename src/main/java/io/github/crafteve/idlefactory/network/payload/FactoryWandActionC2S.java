@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 
 import net.minecraft.core.BlockPos;
@@ -19,10 +18,11 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 绑定杖的操作请求：机器/仓库 toggle、清空仓库请求、切换模式。
+ * 存储绑定杖的操作请求：仓库 toggle 与切换模式。
  *
- * <p>客户端只发“我点了什么”，服务端负责校验主手物品、工厂所有权、距离、目标类型和上限。
- * 处理完无论成功失败都回一份 {@link FactoryLinksS2C}，让客户端缓存和服务端一致。</p>
+ * <p>机器绑定杖的请求有独立包，见 {@code network.payload.wand}。客户端只发「我点了什么」，
+ * 服务端负责校验主手物品、工厂所有权与目标类型。处理完无论成功失败都回一份
+ * {@link FactoryLinksS2C}，让客户端缓存和服务端一致。</p>
  *
  * @param action 动作
  * @param pos    目标方块；清空请求/切换模式时为 {@code null}
@@ -74,12 +74,6 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
     private static void handleAction(ServerPlayer player, FactoryWandActionC2S payload) {
         BlockPos pos = payload.pos();
         switch (payload.action()) {
-            case MACHINE_TOGGLE -> {
-                if (pos != null && player.getMainHandItem().getItem()
-                        instanceof MachineBindingWandItem) {
-                    FactoryService.toggleMachines(player, pos, payload.chain());
-                }
-            }
             case STORAGE_TOGGLE -> {
                 if (pos != null && player.getMainHandItem().getItem()
                         instanceof StorageBindingWandItem) {
@@ -109,10 +103,8 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
         return runtime.manager().byOwner(player.getUUID()).orElse(null);
     }
 
-    /** 绑定杖动作。 */
+    /** 存储绑定杖动作。 */
     public enum Action {
-        /** 机器 toggle：已连接则断开，未连接则连接；连锁按整组 toggle。 */
-        MACHINE_TOGGLE,
         /** 仓库 toggle：已绑定则取消，未绑定则绑定；连锁按整组 toggle。 */
         STORAGE_TOGGLE,
         /** 切换 ME / 容器模式。 */

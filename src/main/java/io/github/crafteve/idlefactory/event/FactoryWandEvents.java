@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.event;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 
 import net.minecraft.world.InteractionHand;
@@ -10,10 +9,10 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 /**
- * 绑定杖的公共交互拦截。
+ * 存储绑定杖的公共交互拦截。
  *
- * <p>两根绑定杖左键都不能挖方块，只在主手时取消。右键由物品的 {@code onItemUseFirst}
- * 处理，在方块 GUI 之前就已经消费掉。</p>
+ * <p>存储杖左键不能挖方块，只在主手时取消。机器绑定杖左键完全不拦（B5）：它要靠正常挖掘
+ * 清理现场，左键手势也不存在。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME)
 public final class FactoryWandEvents {
@@ -22,7 +21,7 @@ public final class FactoryWandEvents {
     }
 
     /**
-     * 主手绑定杖左键方块：取消挖掘。
+     * 主手存储杖左键方块：取消挖掘。
      *
      * @param event 左键方块事件
      */
@@ -31,9 +30,7 @@ public final class FactoryWandEvents {
         if (event.getHand() != InteractionHand.MAIN_HAND) {
             return;
         }
-        if (event.getEntity().getMainHandItem().getItem() instanceof MachineBindingWandItem
-                || event.getEntity().getMainHandItem().getItem()
-                instanceof StorageBindingWandItem) {
+        if (event.getEntity().getMainHandItem().getItem() instanceof StorageBindingWandItem) {
             event.setCanceled(true);
         }
     }

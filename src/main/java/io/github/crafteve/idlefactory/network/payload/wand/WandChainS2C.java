@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.network.payload.wand;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
@@ -60,5 +61,6 @@ public record WandChainS2C(List<BlockKey> machines, WandFailure failure)
      * @param context 上下文
      */
     public static void handle(WandChainS2C payload, IPayloadContext context) {
+        context.enqueueWork(() -> WandCoordinator.handleChain(payload));
     }
 }

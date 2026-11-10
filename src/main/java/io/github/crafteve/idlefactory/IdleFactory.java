@@ -7,7 +7,6 @@ import com.mojang.logging.LogUtils;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.registry.ModCreativeTabs;
-import io.github.crafteve.idlefactory.registry.ModDataComponents;
 import io.github.crafteve.idlefactory.registry.ModItems;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
@@ -27,8 +26,6 @@ public class IdleFactory {
         ModMenus.MENUS.register(modEventBus);
         ModItems.ITEMS.register(modEventBus);
         ModCreativeTabs.TABS.register(modEventBus);
-        // 绑定杖草稿组件：随物品栈落盘，客户端负责在登录 / 换手时清空
-        ModDataComponents.COMPONENTS.register(modEventBus);
 
         // 网络包注册（P0 只有通道自检包）
         ModNetwork.register(modEventBus);

@@ -1,19 +1,13 @@
 package io.github.crafteve.idlefactory.item;
 
-import io.github.crafteve.idlefactory.client.BindingDraftController;
-
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.UseOnContext;
 
 /**
- * 机器绑定杖：左/右键机器 toggle，Ctrl 连锁 toggle。
+ * 机器绑定杖：1:1 toggle 与草稿编辑的入口物品。
  *
- * <p>不可堆叠、无耐久。右键在 {@link #onItemUseFirst} 里先于方块 GUI 执行：客户端发包，
- * 服务端返回 {@code CONSUME}，机器没有机会打开界面。实际的连接/断开在服务端
- * {@code FactoryService}。</p>
+ * <p>不可堆叠、无耐久。它自己不做任何交互判断：右键手势在客户端
+ * {@code client.wand.WandGesture}，服务端判定在 {@code factory.WandService}。这样物品类不再
+ * 引用 {@code client.*}，服务端加载时也不会碰到客户端类。</p>
  */
 public class MachineBindingWandItem extends Item {
     /**
@@ -21,23 +15,5 @@ public class MachineBindingWandItem extends Item {
      */
     public MachineBindingWandItem(Properties properties) {
         super(properties);
-    }
-
-    /**
-     * 右键机器：草稿手势或 1:1 toggle，先于方块交互，阻止机器 GUI。
-     *
-     * @param stack   物品
-     * @param context 使用上下文
-     * @return 客户端成功、服务端消费
-     */
-    @Override
-    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
-        if (context.getHand() != InteractionHand.MAIN_HAND) {
-            return InteractionResult.PASS;
-        }
-        if (context.getLevel().isClientSide) {
-            return BindingDraftController.onUseBlock(context);
-        }
-        return InteractionResult.CONSUME;
     }
 }

@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
+import io.github.crafteve.idlefactory.client.wand.WandSession;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
@@ -94,7 +94,7 @@ final class FactoryNodeActions {
             message("主手拿绑定杖才能编辑节点");
             return;
         }
-        BindingDraftController.startEdit(node.nodeId());
+        WandSession.startEdit(Minecraft.getInstance(), node.nodeId());
     }
 
     /**

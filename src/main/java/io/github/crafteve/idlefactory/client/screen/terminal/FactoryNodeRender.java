@@ -140,8 +140,8 @@ final class FactoryNodeRender {
                 roundRobin ? 0xFFFFFFFF : this.theme.textDim());
 
         int actionX = FactoryNodeLayout.actionX(viewport);
-        boolean editing = row.nodeId().equals(
-                io.github.crafteve.idlefactory.client.BindingDraftController.draft().nodeId());
+        boolean editing = io.github.crafteve.idlefactory.client.wand.WandSession
+                .isEditingNode(row.nodeId());
         FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.PLUS_Y,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),

@@ -1,0 +1,224 @@
+package io.github.crafteve.idlefactory.client.wand;
+
+import java.util.List;
+
+import org.jetbrains.annotations.Nullable;
+
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
+import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.factory.wand.WandFailure;
+import io.github.crafteve.idlefactory.factory.wand.WandIssue;
+import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
+import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
+import io.github.crafteve.idlefactory.network.payload.wand.WandCommitC2S;
+import io.github.crafteve.idlefactory.network.payload.wand.WandCommitS2C;
+import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
+import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
+import io.github.crafteve.idlefactory.network.payload.wand.WandToggleC2S;
+import io.github.crafteve.idlefactory.network.payload.wand.WandToggleS2C;
+
+import net.minecraft.client.Minecraft;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+/**
+ * 绑定杖的网络协调器：发请求、收执、超时与预校验缓存。
+ *
+ * <p>它是唯一直接发包的客户端类：草稿状态机与手势只描述意图，序列号、提交锁、回执匹配
+ * 都在这里。回执按「容器 id + 草稿版本号」匹配，迟到的包直接丢弃；提交 5 秒没有回执就回到
+ * 编辑态允许重试。</p>
+ */
+public final class WandCoordinator {
+    /** 单调递增的草稿版本号；登录归零。 */
+    private static long nextSeq;
+    /** 正在等待回执的提交序号。 */
+    private static long pendingSeq;
+    /** 正在等待回执的容器 id；{@code -1} 表示没有在等。 */
+    private static int pendingContainerId = -1;
+    /** 提交超时的绝对毫秒时刻。 */
+    private static long submitDeadlineMillis;
+    /** 最近一次预校验的问题；面板构造时读，关闭时清。 */
+    private static List<WandIssue> pendingIssues = List.of();
+    /** 最近一次提交结果；面板显示失败原因用。 */
+    @Nullable
+    private static WandCommitOutcome lastOutcome;
+
+    private WandCoordinator() {
+        // 纯静态协调器
+    }
+
+    /**
+     * 取下一个草稿版本号。
+     *
+     * @return 严格递增的版本号
+     */
+    public static long nextSeq() {
+        return ++nextSeq;
+    }
+
+    /** 登录 / 登出时清空序号、等待状态与缓存。 */
+    public static void reset() {
+        nextSeq = 0;
+        pendingSeq = 0;
+        pendingContainerId = -1;
+        submitDeadlineMillis = 0L;
+        pendingIssues = List.of();
+        lastOutcome = null;
+    }
+
+    /**
+     * 空闲态右键方块：发 1:1 toggle。
+     *
+     * @param block 目标方块
+     */
+    public static void toggle(BlockKey block) {
+        PacketDistributor.sendToServer(new WandToggleC2S(block.pos()));
+    }
+
+    /**
+     * 编辑态 Ctrl + 右键：请求连锁。
+     *
+     * @param block 连锁起点
+     */
+    public static void chain(BlockKey block) {
+        PacketDistributor.sendToServer(new WandChainC2S(block));
+    }
+
+    /** 编辑态蹲下右键：请求服务端预校验并打开面板。 */
+    public static void openDraft() {
+        if (WandSession.state() != WandSession.State.EDITING) {
+            return;
+        }
+        if (WandSession.draft().isEmpty()) {
+            WandHud.failure(WandMessages.failure(WandFailure.EMPTY_DRAFT));
+            return;
+        }
+        pendingIssues = List.of();
+        lastOutcome = null;
+        PacketDistributor.sendToServer(new WandOpenC2S(WandSession.draft()));
+    }
+
+    /**
+     * 面板点确定：进入提交态并上传草稿。
+     *
+     * @param containerId 面板菜单的容器 id
+     */
+    public static void submit(int containerId) {
+        if (WandSession.state() != WandSession.State.EDITING) {
+            WandHud.neutral(WandMessages.waiting());
+            return;
+        }
+        WandDraft draft = WandSession.draft();
+        if (draft.isEmpty()) {
+            WandHud.failure(WandMessages.failure(WandFailure.EMPTY_DRAFT));
+            return;
+        }
+        pendingSeq = draft.requestSeq();
+        pendingContainerId = containerId;
+        lastOutcome = null;
+        submitDeadlineMillis = System.currentTimeMillis() + WandLimits.SUBMIT_TIMEOUT_MILLIS;
+        WandSession.beginSubmit();
+        PacketDistributor.sendToServer(new WandCommitC2S(containerId, draft));
+    }
+
+    /**
+     * 1:1 回执：成功出绿字，失败出红字。
+     *
+     * @param payload 回执
+     */
+    public static void handleToggle(WandToggleS2C payload) {
+        WandCommitOutcome outcome = payload.outcome();
+        if (!outcome.ok()) {
+            WandHud.failure(WandMessages.failure(outcome.failure()));
+            return;
+        }
+        WandHud.success(outcome.addedMachines() > 0
+                ? WandMessages.toggleConnected() : WandMessages.toggleDisconnected());
+    }
+
+    /**
+     * 连锁回执：失败出红字，成功批量加进草稿。
+     *
+     * @param payload 回执
+     */
+    public static void handleChain(WandChainS2C payload) {
+        if (payload.failure() != WandFailure.NONE) {
+            WandHud.failure(WandMessages.failure(payload.failure()));
+            return;
+        }
+        WandSession.applyChain(payload.machines());
+    }
+
+    /**
+     * 预校验回执：失败只出 HUD，成功缓存问题等面板构造时读。
+     *
+     * @param payload 回执
+     */
+    public static void handleOpen(WandOpenS2C payload) {
+        if (payload.failure() != WandFailure.NONE) {
+            WandHud.failure(WandMessages.failure(payload.failure()));
+            return;
+        }
+        pendingIssues = payload.issues();
+    }
+
+    /**
+     * 提交回执：按容器 id 与版本号匹配，成功后清草稿并关面板。
+     *
+     * @param payload 回执
+     */
+    public static void handleCommit(WandCommitS2C payload) {
+        if (payload.containerId() != pendingContainerId || payload.requestSeq() != pendingSeq) {
+            return;
+        }
+        pendingContainerId = -1;
+        lastOutcome = payload.outcome();
+        if (!payload.outcome().ok()) {
+            WandSession.submitFailed();
+            WandHud.failure(WandMessages.failure(payload.outcome().failure()));
+            return;
+        }
+        WandHud.success(WandMessages.saved(payload.outcome().addedMachines(),
+                payload.outcome().removedMachines()));
+        WandSession.submitSucceeded();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null && minecraft.screen != null) {
+            minecraft.player.closeContainer();
+        }
+    }
+
+    /**
+     * 每 tick 检查提交超时。
+     *
+     * @param minecraft 客户端实例
+     */
+    public static void tick(Minecraft minecraft) {
+        if (WandSession.state() != WandSession.State.SUBMITTING) {
+            return;
+        }
+        if (System.currentTimeMillis() <= submitDeadlineMillis) {
+            return;
+        }
+        pendingContainerId = -1;
+        pendingSeq = 0;
+        WandSession.submitFailed();
+        WandHud.failure(WandMessages.timeout());
+    }
+
+    /** 面板构造时读的预校验问题。 */
+    public static List<WandIssue> pendingIssues() {
+        return pendingIssues;
+    }
+
+    /** 面板构造时读的最近一次提交结果；没有时为 {@code null}。 */
+    @Nullable
+    public static WandCommitOutcome lastOutcome() {
+        return lastOutcome;
+    }
+
+    /** 面板关闭时清掉预校验缓存，避免下一次打开读到旧问题。 */
+    public static void clearPendingIssues() {
+        pendingIssues = List.of();
+    }
+}

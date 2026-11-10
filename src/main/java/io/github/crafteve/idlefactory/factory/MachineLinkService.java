@@ -118,54 +118,6 @@ final class MachineLinkService {
         return new TopologyOutcome(true, 0, false, result);
     }
 
-    /**
-     * 一次旧绑定路径的删除结果。
-     *
-     * <p>只服务 {@link BindingService} 的整组 toggle；阶段 2 旧路径删除后本记录与
-     * {@link #removeMachine} 一起移除。</p>
-     *
-     * @param deleted     是否真的删掉了；{@code false} 只表示「因策略要求未删」
-     * @param rules       删除前的节点规则条数
-     * @param patterns    退回的样板数
-     * @param nodeDeleted 是否连节点一起删掉了
-     */
-    record DeleteOutcome(boolean deleted, int rules, int patterns, boolean nodeDeleted) {
-    }
-
-    /**
-     * 旧绑定路径的删除出口：有规则就跳过，删最后一台机器等于删节点。
-     *
-     * <p>阶段 2 会随 {@link BindingService} 一起删除；新代码一律走
-     * {@link #applyTopologyChange}。</p>
-     *
-     * @param factory  工厂
-     * @param node     机器所属节点
-     * @param machine  机器
-     * @param receiver 样板优先接收者
-     * @param batch    本次操作的节点库批量句柄
-     * @return 结果
-     */
-    DeleteOutcome removeMachine(Factory factory, Node node, Machine machine,
-            @Nullable ServerPlayer receiver, NodeLibraryService.Batch batch) {
-        int rules = node.ruleCount();
-        if (rules > 0) {
-            return new DeleteOutcome(false, rules, 0, false);
-        }
-        int returned = returnPatterns(factory, node, receiver);
-        boolean nodeDeleted = node.machineCount() <= 1;
-        if (nodeDeleted) {
-            batch.remove(node.id());
-        } else {
-            batch.replace(node.withRemovedMachine(machine.id()));
-        }
-        if (nodeDeleted) {
-            this.nodeManager.removeNode(node.id());
-        } else {
-            this.nodeManager.refreshPatterns(node.id());
-        }
-        this.nodeIoRunner.forget(machine.id());
-        return new DeleteOutcome(true, rules, returned, nodeDeleted);
-    }
 
     /**
      * 按节点 id 删除整个节点；界面节点卡片的删除入口。
