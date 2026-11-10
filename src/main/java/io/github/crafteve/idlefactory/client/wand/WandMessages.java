@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.client.wand;
 
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -46,6 +47,20 @@ public final class WandMessages {
             case LIMIT_MACHINES -> "wand.failure.limit_machines";
             case DELETE_BLOCKED -> "wand.failure.delete_blocked";
             case MEMBER_NOT_REMOVABLE -> "wand.failure.member_not_removable";
+        });
+    }
+
+    /**
+     * 删除被拒绝时节点上还留着的配置。
+     *
+     * @param reason 残留配置
+     * @return 可显示文案
+     */
+    public static Component deleteReason(WandDeleteReason reason) {
+        return Component.translatable(switch (reason) {
+            case NONE -> "wand.delete.none";
+            case HAS_RULES -> "wand.delete.has_rules";
+            case HAS_PATTERNS -> "wand.delete.has_patterns";
         });
     }
 
@@ -129,6 +144,63 @@ public final class WandMessages {
     /** 提交期间重复操作。 */
     public static Component waiting() {
         return Component.translatable("wand.hud.waiting");
+    }
+
+    /** 面板标题。 */
+    public static Component panelTitle() {
+        return Component.translatable("wand.panel.title");
+    }
+
+    /** 面板「取消」。 */
+    public static Component panelCancel() {
+        return Component.translatable("wand.panel.cancel");
+    }
+
+    /** 面板「确定」。 */
+    public static Component panelConfirm() {
+        return Component.translatable("wand.panel.confirm");
+    }
+
+    /**
+     * 面板摘要：新建。
+     *
+     * @param machines 台数
+     * @return 可显示文案
+     */
+    public static Component panelSummaryNew(int machines) {
+        return Component.translatable("wand.panel.summary.new", machines);
+    }
+
+    /**
+     * 面板摘要：编辑已有节点。
+     *
+     * @param nodeLabel 节点类型方块名
+     * @param added     待加入台数
+     * @param removed   待删除台数
+     * @return 可显示文案
+     */
+    public static Component panelSummaryEdit(String nodeLabel, int added, int removed) {
+        return Component.translatable("wand.panel.summary.edit", nodeLabel, added, removed);
+    }
+
+    /** 面板空态。 */
+    public static Component panelEmpty() {
+        return Component.translatable("wand.panel.empty");
+    }
+
+    /**
+     * 面板待修正提示。
+     *
+     * @param count 问题条数
+     * @return 可显示文案
+     */
+    public static Component panelIssues(int count) {
+        return Component.translatable("wand.panel.issues", count);
+    }
+
+    /** 面板内的删除标记。 */
+    public static Component panelRemoved() {
+        return Component.translatable("wand.panel.removed");
     }
 
     /**

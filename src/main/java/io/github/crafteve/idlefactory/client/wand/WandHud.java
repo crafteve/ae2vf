@@ -9,6 +9,9 @@ import io.github.crafteve.idlefactory.factory.wand.WandLimits;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -59,6 +62,7 @@ public final class WandHud {
      */
     public static void success(Component text) {
         flash(text, FactoryGuiTheme.current().statusRun());
+        play(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F);
     }
 
     /**
@@ -68,6 +72,7 @@ public final class WandHud {
      */
     public static void failure(Component text) {
         flash(text, FactoryGuiTheme.current().error());
+        play(SoundEvents.VILLAGER_NO, 1.0F);
     }
 
     /**
@@ -77,6 +82,25 @@ public final class WandHud {
      */
     public static void neutral(Component text) {
         flash(text, FactoryGuiTheme.current().statusWarn());
+        play(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F);
+    }
+
+    /** 草稿加 / 删 / 进入编辑的轻提示音。 */
+    public static void click() {
+        play(SoundEvents.UI_BUTTON_CLICK.value(), 1.4F);
+    }
+
+    /**
+     * 本地播放一个原版音效；只在客户端主线程调。
+     *
+     * @param event 音效
+     * @param pitch 音高
+     */
+    private static void play(SoundEvent event, float pitch) {
+        Player player = Minecraft.getInstance().player;
+        if (player != null) {
+            player.playSound(event, 0.35F, pitch);
+        }
     }
 
     /**

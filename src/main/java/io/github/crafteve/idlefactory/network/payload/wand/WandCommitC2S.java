@@ -1,12 +1,18 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.FactoryService;
+import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.factory.wand.WandFailure;
+import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -45,5 +51,19 @@ public record WandCommitC2S(int containerId, WandDraft draft) implements CustomP
      * @param context 上下文
      */
     public static void handle(WandCommitC2S payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            if (!FactoryGuiOpening.isWandMenu(player.containerMenu, payload.containerId())) {
+                PacketDistributor.sendToPlayer(player, new WandCommitS2C(payload.containerId(),
+                        payload.draft().requestSeq(),
+                        WandCommitOutcome.failure(WandFailure.INVALID_REQUEST)));
+                return;
+            }
+            WandCommitOutcome outcome = FactoryService.commitDraft(player, payload.draft());
+            PacketDistributor.sendToPlayer(player, new WandCommitS2C(payload.containerId(),
+                    payload.draft().requestSeq(), outcome));
+        });
     }
 }

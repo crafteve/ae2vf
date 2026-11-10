@@ -20,6 +20,7 @@ import io.github.crafteve.idlefactory.network.payload.wand.WandToggleC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandToggleS2C;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
@@ -43,6 +44,9 @@ public final class WandCoordinator {
     /** 最近一次提交结果；面板显示失败原因用。 */
     @Nullable
     private static WandCommitOutcome lastOutcome;
+    /** 面板内的一行提示（超时 / 提交失败）；没有时为 {@code null}。 */
+    @Nullable
+    private static Component panelStatus;
 
     private WandCoordinator() {
         // 纯静态协调器
@@ -65,6 +69,7 @@ public final class WandCoordinator {
         submitDeadlineMillis = 0L;
         pendingIssues = List.of();
         lastOutcome = null;
+        panelStatus = null;
     }
 
     /**
@@ -96,6 +101,7 @@ public final class WandCoordinator {
         }
         pendingIssues = List.of();
         lastOutcome = null;
+        panelStatus = null;
         PacketDistributor.sendToServer(new WandOpenC2S(WandSession.draft()));
     }
 
@@ -109,7 +115,7 @@ public final class WandCoordinator {
             WandHud.neutral(WandMessages.waiting());
             return;
         }
-        WandDraft draft = WandSession.draft();
+        WandDraft draft = WandSession.renewRequestSeq();
         if (draft.isEmpty()) {
             WandHud.failure(WandMessages.failure(WandFailure.EMPTY_DRAFT));
             return;
@@ -117,6 +123,7 @@ public final class WandCoordinator {
         pendingSeq = draft.requestSeq();
         pendingContainerId = containerId;
         lastOutcome = null;
+        panelStatus = null;
         submitDeadlineMillis = System.currentTimeMillis() + WandLimits.SUBMIT_TIMEOUT_MILLIS;
         WandSession.beginSubmit();
         PacketDistributor.sendToServer(new WandCommitC2S(containerId, draft));
@@ -176,6 +183,7 @@ public final class WandCoordinator {
         lastOutcome = payload.outcome();
         if (!payload.outcome().ok()) {
             WandSession.submitFailed();
+            panelStatus = WandMessages.failure(payload.outcome().failure());
             WandHud.failure(WandMessages.failure(payload.outcome().failure()));
             return;
         }
@@ -183,8 +191,9 @@ public final class WandCoordinator {
                 payload.outcome().removedMachines()));
         WandSession.submitSucceeded();
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.player != null && minecraft.screen != null) {
+        if (minecraft.player != null) {
             minecraft.player.closeContainer();
+            minecraft.setScreen(null);
         }
     }
 
@@ -203,6 +212,7 @@ public final class WandCoordinator {
         pendingContainerId = -1;
         pendingSeq = 0;
         WandSession.submitFailed();
+        panelStatus = WandMessages.timeout();
         WandHud.failure(WandMessages.timeout());
     }
 
@@ -220,5 +230,12 @@ public final class WandCoordinator {
     /** 面板关闭时清掉预校验缓存，避免下一次打开读到旧问题。 */
     public static void clearPendingIssues() {
         pendingIssues = List.of();
+        panelStatus = null;
+    }
+
+    /** 面板内的一行提示；没有时为 {@code null}。 */
+    @Nullable
+    public static Component panelStatus() {
+        return panelStatus;
     }
 }

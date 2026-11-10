@@ -1,12 +1,25 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
+import java.util.List;
+
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.factory.wand.WandFailure;
+import io.github.crafteve.idlefactory.factory.wand.WandIssue;
+import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+import io.github.crafteve.idlefactory.registry.ModMenus;
+
+import appeng.menu.MenuOpener;
+import appeng.menu.locator.MenuLocators;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -40,5 +53,25 @@ public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
      * @param context 上下文
      */
     public static void handle(WandOpenC2S payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            FactoryService.OpenResult result = FactoryService.openDraft(player, payload.draft());
+            int wireCount = Math.min(result.issues().size(), WandLimits.MAX_ISSUES_WIRE);
+            List<WandIssue> issues = result.issues().subList(0, wireCount);
+            PacketDistributor.sendToPlayer(player,
+                    new WandOpenS2C(issues, result.issueCount(), result.failure()));
+            if (result.failure() != WandFailure.NONE) {
+                return;
+            }
+            // 物品定位器走主手：面板与那把杖绑定，关掉再开仍是同一件物品
+            boolean opened = MenuOpener.open(ModMenus.WAND_DRAFT.get(), player,
+                    MenuLocators.forHand(player, InteractionHand.MAIN_HAND));
+            if (!opened) {
+                IdleFactory.LOGGER.warn("Idle Factory: 草稿面板打开失败：player={}",
+                        player.getUUID());
+            }
+        });
     }
 }

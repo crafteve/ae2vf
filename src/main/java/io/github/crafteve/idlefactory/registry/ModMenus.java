@@ -5,6 +5,8 @@ import io.github.crafteve.idlefactory.menu.FactoryNodeHost;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoHost;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandMenuHost;
 
 import appeng.menu.implementations.MenuTypeBuilder;
 
@@ -17,8 +19,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 /**
  * 菜单（容器）类型注册表。
  *
- * <p>只剩两个 AE2 终端菜单：被动 IO 配置与节点管理。它们复用 AE2 的边框与背包槽，
- * 不接 ME 库存菜单。</p>
+ * <p>两个 AE2 终端菜单（被动 IO 配置与节点管理）复用 AE2 的边框与背包槽，不接 ME 库存
+ * 菜单；草稿确认面板是不带槽位的对话框菜单，只负责打开与关闭。</p>
  */
 public final class ModMenus {
     /** 菜单注册表。 */
@@ -45,6 +47,16 @@ public final class ModMenus {
                                             new FactoryNodeMenu(type, containerId, inventory, host),
                                     FactoryNodeHost.class)
                             .buildUnregistered(id("node_terminal")));
+
+    /** 机器绑定杖的草稿确认面板：无槽位，只做登录壳。 */
+    public static final DeferredHolder<MenuType<?>, MenuType<WandMenu>> WAND_DRAFT =
+            MENUS.register("wand_draft",
+                    () -> MenuTypeBuilder
+                            .<WandMenu, WandMenuHost>create(
+                                    (type, containerId, inventory, host) ->
+                                            new WandMenu(type, containerId, inventory, host),
+                                    WandMenuHost.class)
+                            .buildUnregistered(id("wand_draft")));
 
     private static ResourceLocation id(String path) {
         return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, path);

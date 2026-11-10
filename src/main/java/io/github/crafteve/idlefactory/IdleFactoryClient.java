@@ -2,8 +2,11 @@ package io.github.crafteve.idlefactory;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.client.wand.WandMessages;
+import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import appeng.client.gui.style.StyleManager;
@@ -40,7 +43,7 @@ public class IdleFactoryClient {
     }
 
     /**
-     * 把两个终端菜单和界面绑起来。
+     * 把两个终端菜单、草稿面板和界面绑起来。
      *
      * @param event 菜单屏幕注册事件
      */
@@ -58,5 +61,10 @@ public class IdleFactoryClient {
                         new FactoryNodeScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/base_terminal.json")));
+        event.<WandMenu, WandDraftScreen>register(
+                ModMenus.WAND_DRAFT.get(),
+                (WandMenu menu, Inventory inventory, Component title) ->
+                        new WandDraftScreen(menu, inventory, WandMessages.panelTitle(),
+                                StyleManager.loadStyleDoc("/screens/craft_confirm.json")));
     }
 }

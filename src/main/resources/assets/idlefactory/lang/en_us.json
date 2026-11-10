@@ -35,5 +35,17 @@
   "wand.hud.deleted": "Node deleted",
   "wand.hud.cancelled": "Draft cancelled",
   "wand.hud.timeout": "The server did not respond, please retry",
-  "wand.hud.waiting": "Submitting, please wait"
+  "wand.hud.waiting": "Submitting, please wait",
+  "wand.panel.title": "Binding Wand - Draft",
+  "wand.panel.cancel": "Cancel",
+  "wand.panel.confirm": "Confirm",
+  "wand.panel.summary.new": "New node - %s machines",
+  "wand.panel.summary.edit": "Edit %s - +%s / -%s",
+  "wand.panel.empty": "The draft has no machines",
+  "wand.panel.issues": "Fix %s issue(s) first",
+  "wand.panel.removed": "Remove",
+  "wand.delete.none": "Deletion was not rejected",
+  "wand.delete.has_rules": "The node still has IO rules; clear them in a terminal first",
+  "wand.delete.has_patterns": "The node still has patterns; take them out in a terminal first"
 }
+

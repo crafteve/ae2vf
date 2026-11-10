@@ -1,11 +1,15 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+
+import io.netty.handler.codec.DecoderException;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -46,10 +50,9 @@ public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure fa
                     buf -> {
                         int count = buf.readVarInt();
                         if (count < 0 || count > WandLimits.MAX_ISSUES_WIRE) {
-                            throw new io.netty.handler.codec.DecoderException(
-                                    "预校验问题数量越界：" + count);
+                            throw new DecoderException("预校验问题数量越界：" + count);
                         }
-                        List<WandIssue> issues = new java.util.ArrayList<>(count);
+                        List<WandIssue> issues = new ArrayList<>(count);
                         for (int i = 0; i < count; i++) {
                             issues.add(WandDraftCodec.ISSUE.decode(buf));
                         }
@@ -61,9 +64,6 @@ public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure fa
         issues = List.copyOf(issues);
         if (issues.size() > WandLimits.MAX_ISSUES_WIRE || issueCount < issues.size()) {
             throw new IllegalArgumentException("预校验问题条数不合法");
-        }
-        if (failure == WandFailure.NONE && issues.isEmpty() && issueCount != 0) {
-            throw new IllegalArgumentException("问题总数与列表不一致");
         }
     }
 
@@ -79,5 +79,6 @@ public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure fa
      * @param context 上下文
      */
     public static void handle(WandOpenS2C payload, IPayloadContext context) {
+        context.enqueueWork(() -> WandCoordinator.handleOpen(payload));
     }
 }

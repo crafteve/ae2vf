@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
@@ -113,6 +114,7 @@ public final class WandSession {
         issues = List.of();
         conflictBlocks = Set.of();
         removedBlocks = Set.of();
+        WandHud.click();
     }
 
     /**
@@ -133,6 +135,7 @@ public final class WandSession {
         draft = new WandDraft(nodeId, List.of(), Set.of(), WandCoordinator.nextSeq());
         state = State.EDITING;
         recheck(minecraft);
+        WandHud.click();
     }
 
     /**
@@ -201,6 +204,18 @@ public final class WandSession {
         } else {
             WandHud.success(WandMessages.chain(added, skipped));
         }
+    }
+
+    /**
+     * 提交前换一个新版本号：超时重试也算一次新提交，不会被服务端当成重放。
+     *
+     * @return 带新版本号的草稿
+     */
+    public static WandDraft renewRequestSeq() {
+        if (state == State.EDITING && !draft.isEmpty()) {
+            draft = draft.withRequestSeq(WandCoordinator.nextSeq());
+        }
+        return draft;
     }
 
     /** 进入提交态；由协调器在发包前调。 */
@@ -277,7 +292,8 @@ public final class WandSession {
             clear();
         }
         handSlot = slot;
-        if (minecraft.screen != null) {
+        // 开别的界面就丢草稿；草稿面板本身是例外，关面板回编辑态还要接着用
+        if (minecraft.screen != null && !(minecraft.screen instanceof WandDraftScreen)) {
             clear();
         }
     }
@@ -291,6 +307,7 @@ public final class WandSession {
     private static void applyDraft(Minecraft minecraft, WandDraft next) {
         draft = next.withRequestSeq(WandCoordinator.nextSeq());
         recheck(minecraft);
+        WandHud.click();
     }
 
     /**

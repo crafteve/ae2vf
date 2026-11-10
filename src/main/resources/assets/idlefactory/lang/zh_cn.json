@@ -35,5 +35,17 @@
   "wand.hud.deleted": "已删除节点",
   "wand.hud.cancelled": "已取消草稿",
   "wand.hud.timeout": "服务端未响应，请重试",
-  "wand.hud.waiting": "正在提交，请稍候"
+  "wand.hud.waiting": "正在提交，请稍候",
+  "wand.panel.title": "绑定杖 · 草稿",
+  "wand.panel.cancel": "取消",
+  "wand.panel.confirm": "确定",
+  "wand.panel.summary.new": "新建 · %s 台",
+  "wand.panel.summary.edit": "编辑 %s · 加 %s / 删 %s",
+  "wand.panel.empty": "草稿里没有机器",
+  "wand.panel.issues": "先修正 %s 处",
+  "wand.panel.removed": "删除",
+  "wand.delete.none": "删除没有被拒绝",
+  "wand.delete.has_rules": "节点还有 IO 规则，先去终端清空",
+  "wand.delete.has_patterns": "节点还有样板，先去终端取走"
 }
+
