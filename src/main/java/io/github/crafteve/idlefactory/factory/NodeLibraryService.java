@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
@@ -13,18 +14,21 @@ import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
  * 批量操作用 {@link #begin} 开一个 {@link Batch}，整批改完调一次 {@code close()}，不会退化成
  * N 次存盘。读档走 {@code Factory#restoreNode}，不走这里（读档不该触发落盘）。</p>
  *
+ * <p>节点增删改会改变绑定杖快照，所以发布回调带上工厂：落盘、索引重建、节点对账之后由
+ * {@code FactoryRuntime.markDirtyLinks} 推一份新快照。</p>
+ *
  * <p>config 的软上限在这里判：节点数、单节点机器 / 方块数、全工厂机器 / 方块数、每侧规则数。
  * {@link NodeLibrary} 自己只守结构不变量与硬上限。</p>
  *
  * <p>本类不持有运行时单例：落盘回调从构造注入。</p>
  */
 final class NodeLibraryService {
-    private final Runnable publish;
+    private final Consumer<Factory> publish;
 
     /**
-     * @param publish 档案变更的唯一出口（落盘 + 索引重建 + 节点对账请求）
+     * @param publish 档案变更的唯一出口（落盘 + 索引重建 + 节点对账请求 + 链接快照推送）
      */
-    NodeLibraryService(Runnable publish) {
+    NodeLibraryService(Consumer<Factory> publish) {
         this.publish = publish;
     }
 
@@ -174,7 +178,7 @@ final class NodeLibraryService {
         /** 整批结束：改过才落盘一次。 */
         void close() {
             if (this.changed) {
-                publish.run();
+                publish.accept(this.factory);
             }
         }
     }

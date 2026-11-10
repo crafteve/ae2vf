@@ -1,12 +1,16 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.FactoryService;
+import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -40,5 +44,12 @@ public record WandToggleC2S(BlockPos pos) implements CustomPacketPayload {
      * @param context 上下文
      */
     public static void handle(WandToggleC2S payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            WandCommitOutcome outcome = FactoryService.toggleMachine(player, payload.pos());
+            PacketDistributor.sendToPlayer(player, new WandToggleS2C(outcome));
+        });
     }
 }

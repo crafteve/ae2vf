@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -29,16 +30,16 @@ import net.minecraft.server.level.ServerPlayer;
  */
 final class StorageLinkService {
     private final FactoryManager manager;
-    private final Runnable publish;
+    private final Consumer<Factory> publish;
     @Nullable
     private final StorageResolver storageResolver;
 
     /**
      * @param manager         工厂档案柜
-     * @param publish         档案变更的唯一出口
+     * @param publish         档案变更的唯一出口；仓库坐标写进快照，所以走推送版
      * @param storageResolver 仓库解析器；服务端未就绪时为 {@code null}
      */
-    StorageLinkService(FactoryManager manager, Runnable publish,
+    StorageLinkService(FactoryManager manager, Consumer<Factory> publish,
             @Nullable StorageResolver storageResolver) {
         this.manager = manager;
         this.publish = publish;
@@ -68,7 +69,7 @@ final class StorageLinkService {
         StorageMode next = factory.config().storageMode() == StorageMode.ME
                 ? StorageMode.CONTAINER : StorageMode.ME;
         factory.setStorageMode(next);
-        this.publish.run();
+        this.publish.accept(factory);
         FactoryMessages.barOk(player, "已切换为 " + FactoryMessages.modeLabel(next) + " 模式");
         return 1;
     }
@@ -114,7 +115,7 @@ final class StorageLinkService {
                 && me.dimension().equals(level.dimension()) && me.pos().equals(pos);
         if (same) {
             factory.bindStorage(null, this.storageResolver);
-            this.publish.run();
+            this.publish.accept(factory);
             FactoryMessages.barOk(player, "已取消 ME 仓库链接");
             return 1;
         }
@@ -131,7 +132,7 @@ final class StorageLinkService {
             return 0;
         }
         factory.bindStorage(new MeAnchor(level.dimension(), pos), this.storageResolver);
-        this.publish.run();
+        this.publish.accept(factory);
         FactoryMessages.barOk(player, "已绑定 ME 仓库 " + FactoryMessages.blockLabel(level, pos));
         return 1;
     }
@@ -226,7 +227,7 @@ final class StorageLinkService {
             return 0;
         }
         factory.bindStorage(next, this.storageResolver);
-        this.publish.run();
+        this.publish.accept(factory);
         if (!chain) {
             FactoryMessages.barOk(player, "已绑定容器 " + FactoryMessages.blockLabel(level, origin));
             return added;
@@ -262,7 +263,7 @@ final class StorageLinkService {
         }
         factory.bindStorage(next.isEmpty() ? null : next, this.storageResolver);
         factory.setStorageMode(StorageMode.CONTAINER);
-        this.publish.run();
+        this.publish.accept(factory);
         if (!chain) {
             String label = FactoryMessages.blockLabel(level, targets.getFirst());
             FactoryMessages.barOk(player, next.isEmpty()

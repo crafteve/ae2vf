@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
@@ -11,14 +15,18 @@ import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
+import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 工厂总调度室：绑定在服务器 tick 上的常驻服务。
@@ -61,6 +69,8 @@ public final class FactoryRuntime {
     /** 仓库解析器：启动时创建，供工厂定时刷新与指令即时刷新共用。 */
     @Nullable
     private StorageResolver storageResolver;
+    /** 每个玩家已经接受过的最大草稿提交序号；成功提交才推进，下线即清。 */
+    private final Map<UUID, Long> lastAcceptedSeq = new HashMap<>();
 
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
@@ -94,6 +104,7 @@ public final class FactoryRuntime {
         runtime.observations = null;
         runtime.tickRunner = null;
         runtime.notices.clear();
+        runtime.lastAcceptedSeq.clear();
         instance = null;
     }
 
@@ -155,12 +166,73 @@ public final class FactoryRuntime {
      * 走到这里，所以这里是唯一的同步点——以后新增修改路径，只要它调了 {@code markDirty}，
      * 索引就自动是新的，不存在“改了档案忘改索引”这种漏法。重建是 O(总数)，只发生在人手
      * 频率的配置变更时，tick 里不走这里。</p>
+     *
+     * <p><b>本方法不推链接快照</b>：规则、provider、名字、搬运余量这些写入不影响「节点 / 机器 /
+     * 方块」三层结构，推快照只会制造无意义流量。会改变结构（节点增删改、仓库锚点、类型迁移）
+     * 的入口改调 {@link #markDirtyLinks(Factory)}。</p>
      */
     public void markDirty() {
         save();
         this.links.rebuild(this.manager);
         // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
         this.nodeManager.requestReconcile();
+    }
+
+    /**
+     * 标记档案已变化，并把该工厂的链接快照推给在线拥有者。
+     *
+     * <p>只在会改变快照结构的写入后调用：节点增删改、仓库锚点变更、节点类型迁移、新建工厂。
+     * 先走一遍 {@link #markDirty()}，所以落盘、索引重建与节点对账的语义与原来完全一致。</p>
+     *
+     * @param factory 发生结构变化的工厂
+     */
+    public void markDirtyLinks(Factory factory) {
+        markDirty();
+        pushLinksTo(factory);
+    }
+
+    /**
+     * 把一个工厂的最新链接快照推给它的在线拥有者。
+     *
+     * <p>工厂只属于一个玩家，所以这里按拥有者找在线连接；不在线就只留服务端状态，下次登录
+     * 或开终端时会主动请求一次。</p>
+     *
+     * @param factory 工厂
+     */
+    private void pushLinksTo(Factory factory) {
+        ServerPlayer owner = this.server.getPlayerList().getPlayer(factory.config().owner());
+        if (owner != null) {
+            PacketDistributor.sendToPlayer(owner, FactoryLinksS2C.of(factory));
+        }
+    }
+
+    /**
+     * 玩家已经接受过的最大草稿提交序号。
+     *
+     * @param playerId 玩家 id
+     * @return 最大序号；从未成功提交过时为 {@code 0}
+     */
+    public long lastAcceptedSeq(UUID playerId) {
+        return this.lastAcceptedSeq.getOrDefault(playerId, 0L);
+    }
+
+    /**
+     * 记录一次成功提交；只前进、不后退。
+     *
+     * @param playerId 玩家 id
+     * @param seq      本次草稿的版本号
+     */
+    public void acceptCommitSeq(UUID playerId, long seq) {
+        this.lastAcceptedSeq.merge(playerId, seq, Math::max);
+    }
+
+    /**
+     * 清掉一个玩家的提交序号；下线时调，避免换号后旧序号挡住新提交。
+     *
+     * @param playerId 玩家 id
+     */
+    public void forgetCommitSeq(UUID playerId) {
+        this.lastAcceptedSeq.remove(playerId);
     }
 
     /**
@@ -197,7 +269,7 @@ public final class FactoryRuntime {
         }
         FactoryObservationRunner observationRunner = new FactoryObservationRunner(
                 this.server, this.manager, this.observations, this.nodeIoRunner,
-                this.nodeManager, this.notices, this::markDirty);
+                this.nodeManager, this.notices, this::markDirtyLinks);
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
                 this.server, this.manager, this.observations, this.nodeManager);
         this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
@@ -228,6 +300,14 @@ public final class FactoryRuntime {
             return;
         }
         IdleFactory.LOGGER.debug("Idle Factory: 节点 {} 告警：{}", notice.nodeId(), notice.message());
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        FactoryRuntime runtime = instance;
+        if (runtime != null) {
+            runtime.forgetCommitSeq(event.getEntity().getUUID());
+        }
     }
 
     @SubscribeEvent

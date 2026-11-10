@@ -1,12 +1,15 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -39,5 +42,13 @@ public record WandChainC2S(BlockKey origin) implements CustomPacketPayload {
      * @param context 上下文
      */
     public static void handle(WandChainC2S payload, IPayloadContext context) {
+        context.enqueueWork(() -> {
+            if (!(context.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            FactoryService.ChainResult result = FactoryService.chainMachines(player, payload.origin());
+            PacketDistributor.sendToPlayer(player,
+                    new WandChainS2C(result.machines(), result.failure()));
+        });
     }
 }

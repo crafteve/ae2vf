@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -35,7 +36,8 @@ import net.minecraft.server.MinecraftServer;
  *
  * <p>本类是 {@code withTypeBlockId} 的<b>唯一写入点</b>：只有
  * {@link NodeTypeResolver#migrationTarget} 成立时才替换节点，并通过 {@code publish} 落盘。
- * 健康不存副本，每次由 {@link NodeHealthResolver} 从观测快照现算。</p>
+ * 类型迁移会改变快照里的节点类型，所以发布回调带工厂，走推送版。健康不存副本，每次由
+ * {@link NodeHealthResolver} 从观测快照现算。</p>
  */
 final class FactoryObservationRunner {
     private final MinecraftServer server;
@@ -44,8 +46,8 @@ final class FactoryObservationRunner {
     private final NodeIoRunner nodeIoRunner;
     private final NodeManager nodeManager;
     private final FactoryNoticeHandler notices;
-    /** 档案变更出口：类型迁移时落盘并触发对账。 */
-    private final Runnable publish;
+    /** 档案变更出口：类型迁移时落盘、触发对账并推链接快照。 */
+    private final Consumer<Factory> publish;
 
     /** 每 tick 复用的三个优先级桶与合成序列。 */
     private final List<BlockKey> dirtyKeys = new ArrayList<>();
@@ -68,7 +70,7 @@ final class FactoryObservationRunner {
      */
     FactoryObservationRunner(MinecraftServer server, FactoryManager manager,
             ObservationService observations, NodeIoRunner nodeIoRunner,
-            NodeManager nodeManager, FactoryNoticeHandler notices, Runnable publish) {
+            NodeManager nodeManager, FactoryNoticeHandler notices, Consumer<Factory> publish) {
         this.server = server;
         this.manager = manager;
         this.observations = observations;
@@ -153,7 +155,7 @@ final class FactoryObservationRunner {
                     if (factory.config().library().replace(migrated)
                             == io.github.crafteve.idlefactory.factory.node.NodeLibrary.Result.REPLACED) {
                         current = migrated;
-                        this.publish.run();
+                        this.publish.accept(factory);
                     }
                 }
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,

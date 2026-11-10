@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -10,6 +11,7 @@ import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 
 import net.minecraft.server.MinecraftServer;
@@ -19,13 +21,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
 /**
- * 节点接线：准星接入、断开、删除，以及删除时的样板退回与执行器清理。
+ * 节点接线：节点增删改的唯一副作用出口，以及删除时的样板退回与执行器清理。
  *
- * <p>它是节点库写操作的唯一出口：三处删除调用点（命令确认、界面删除、连锁断开）只负责取参与
- * 出文案，真正的副作用在 {@link #removeMachine} 里一次做完——退样板、移出节点库、拆虚拟节点、
- * 清执行器瞬态。删掉节点最后一台机器等于删节点。</p>
+ * <p>真正写节点库的是 {@link #applyTopologyChange}：新建走 {@code add}、删除走 {@code remove}、
+ * 改成员走 {@code replace}，成功后统一拆 / 刷新虚拟节点并清执行器瞬态。绑定杖提交与终端删节点
+ * 都只走这一条路，删机器的副作用只有一套；规则与样板是否允许删由
+ * {@link WandValidator} 在写库前判，本类不重复判。</p>
  *
- * <p>本类不持有运行时单例：档案柜、发布回调、节点与执行器都从构造注入。</p>
+ * <p>样板只在<b>整个节点被删除</b>时退回；堆叠节点少一台机器保留样板（B1）。本类不落盘：
+ * 批量句柄由调用方传入，整批结束后由调用方 {@code close()} 一次。</p>
  */
 final class MachineLinkService {
     private final FactoryManager manager;
@@ -52,33 +56,98 @@ final class MachineLinkService {
     }
 
     /**
-     * 一次删除尝试的结果。
+     * 一次拓扑变更的结果。
+     *
+     * @param deleted     是否真的写成功；{@code false} 表示节点库拒绝了这次写入，副作用一点没做
+     * @param patterns    退回的样板数；只有整个节点被删除时才可能非零
+     * @param nodeDeleted 是否连节点一起删掉了
+     * @param result      节点库的原始结果，调用方据此映射文案与失败枚举
+     */
+    record TopologyOutcome(boolean deleted, int patterns, boolean nodeDeleted,
+            NodeLibrary.Result result) {
+    }
+
+    /**
+     * 应用一次节点拓扑变更，是节点增删改的唯一副作用出口。
+     *
+     * <p>三种形态：{@code base == null} 是新建（只用 {@code candidate}）；{@code candidate == null}
+     * 是删除整个节点；两者都非空是改成员。写入失败时不碰虚拟节点与执行器，返回
+     * {@code deleted=false}，调用方按 {@code result} 决定文案。</p>
+     *
+     * @param factory           工厂
+     * @param base              变更前的节点；新建时为 {@code null}
+     * @param candidate         变更后的节点；删除节点时为 {@code null}
+     * @param removedMachineIds 本次删掉的机器 id；删除节点时可为空，方法自己从 base 收集
+     * @param receiver          样板优先接收者；{@code null} 表示找工厂拥有者
+     * @param batch             本次操作的节点库批量句柄
+     * @return 结果
+     */
+    TopologyOutcome applyTopologyChange(Factory factory, @Nullable Node base, @Nullable Node candidate,
+            Collection<UUID> removedMachineIds, @Nullable ServerPlayer receiver,
+            NodeLibraryService.Batch batch) {
+        if (base == null) {
+            if (candidate == null) {
+                return new TopologyOutcome(false, 0, false, NodeLibrary.Result.NOT_FOUND);
+            }
+            NodeLibrary.Result result = batch.add(candidate);
+            return new TopologyOutcome(result == NodeLibrary.Result.ADDED, 0, false, result);
+        }
+        if (candidate == null) {
+            boolean removed = batch.remove(base.id());
+            if (!removed) {
+                return new TopologyOutcome(false, 0, false, NodeLibrary.Result.NOT_FOUND);
+            }
+            // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
+            this.nodeManager.removeNode(base.id());
+            // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
+            for (Machine machine : base.machines()) {
+                this.nodeIoRunner.forget(machine.id());
+            }
+            int returned = returnPatterns(factory, base, receiver);
+            return new TopologyOutcome(true, returned, true, NodeLibrary.Result.REMOVED);
+        }
+        NodeLibrary.Result result = batch.replace(candidate);
+        if (result != NodeLibrary.Result.REPLACED) {
+            return new TopologyOutcome(false, 0, false, result);
+        }
+        // 成员变了：样板广告要按新机器集合重算
+        this.nodeManager.refreshPatterns(base.id());
+        for (UUID machineId : removedMachineIds) {
+            this.nodeIoRunner.forget(machineId);
+        }
+        return new TopologyOutcome(true, 0, false, result);
+    }
+
+    /**
+     * 一次旧绑定路径的删除结果。
+     *
+     * <p>只服务 {@link BindingService} 的整组 toggle；阶段 2 旧路径删除后本记录与
+     * {@link #removeMachine} 一起移除。</p>
      *
      * @param deleted     是否真的删掉了；{@code false} 只表示「因策略要求未删」
      * @param rules       删除前的节点规则条数
      * @param patterns    退回的样板数
-     * @param nodeDeleted 是否连节点一起删掉了（删的是最后一台机器）
+     * @param nodeDeleted 是否连节点一起删掉了
      */
     record DeleteOutcome(boolean deleted, int rules, int patterns, boolean nodeDeleted) {
     }
 
     /**
-     * 删除一台机器的唯一出口。
+     * 旧绑定路径的删除出口：有规则就跳过，删最后一台机器等于删节点。
      *
-     * <p>删掉节点最后一台机器时整节点删除；否则只把该机器从节点里摘掉。本方法不落盘：
-     * 批量句柄由调用方传入，整批删除结束后由调用方 {@code close()} 一次。</p>
+     * <p>阶段 2 会随 {@link BindingService} 一起删除；新代码一律走
+     * {@link #applyTopologyChange}。</p>
      *
      * @param factory  工厂
      * @param node     机器所属节点
      * @param machine  机器
-     * @param receiver 样板优先接收者；{@code null} 表示找工厂拥有者
+     * @param receiver 样板优先接收者
      * @param batch    本次操作的节点库批量句柄
-     * @return 结果；{@code deleted=false} 表示机器还有规则、被跳过
+     * @return 结果
      */
     DeleteOutcome removeMachine(Factory factory, Node node, Machine machine,
             @Nullable ServerPlayer receiver, NodeLibraryService.Batch batch) {
         int rules = node.ruleCount();
-        // 规则不能批量丢：有规则的机器一律跳过，由玩家先清规则或直接删整个节点。
         if (rules > 0) {
             return new DeleteOutcome(false, rules, 0, false);
         }
@@ -89,13 +158,11 @@ final class MachineLinkService {
         } else {
             batch.replace(node.withRemovedMachine(machine.id()));
         }
-        // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
         if (nodeDeleted) {
             this.nodeManager.removeNode(node.id());
         } else {
             this.nodeManager.refreshPatterns(node.id());
         }
-        // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
         this.nodeIoRunner.forget(machine.id());
         return new DeleteOutcome(true, rules, returned, nodeDeleted);
     }
@@ -113,17 +180,14 @@ final class MachineLinkService {
             return NodeActions.Result.err("找不到节点");
         }
         Node node = found.get();
-        int returned = returnPatterns(factory, node, null);
         NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        if (!batch.remove(nodeId)) {
+        TopologyOutcome outcome = applyTopologyChange(factory, node, null, List.of(), null, batch);
+        if (!outcome.deleted()) {
             return NodeActions.Result.err("节点已不在节点库");
         }
         batch.close();
-        this.nodeManager.removeNode(nodeId);
-        for (Machine machine : node.machines()) {
-            this.nodeIoRunner.forget(machine.id());
-        }
-        String patternText = returned > 0 ? "（退回 " + returned + " 块样板）" : "";
+        String patternText = outcome.patterns() > 0
+                ? "（退回 " + outcome.patterns() + " 块样板）" : "";
         return NodeActions.Result.ok("已删除节点 [" + nodeId.toString().substring(0, 8) + "]"
                 + patternText);
     }
@@ -131,7 +195,7 @@ final class MachineLinkService {
     /**
      * 把一个节点的样板退回玩家。
      *
-     * <p>样板是玩家的东西，删机器不能吞掉：优先塞接收者（没有接收者就找工厂拥有者）的背包，
+     * <p>样板是玩家的东西，删节点不能吞掉：优先塞接收者（没有接收者就找工厂拥有者）的背包，
      * 塞不下或不在线就掉在机器坐标；机器所在区块没加载时退回接收者脚下，再不行落到主世界
      * 出生点，保证不丢。</p>
      *
@@ -140,7 +204,7 @@ final class MachineLinkService {
      * @param receiver 优先接收者；{@code null} 表示用工厂拥有者
      * @return 退回去的样板数
      */
-    int returnPatterns(Factory factory, Node node, @Nullable ServerPlayer receiver) {
+    private int returnPatterns(Factory factory, Node node, @Nullable ServerPlayer receiver) {
         List<ItemStack> patterns = node.provider().takePatterns();
         if (patterns.isEmpty()) {
             return 0;
