@@ -16,8 +16,8 @@ import net.minecraft.world.level.Level;
 /**
  * 一台机器：随机 id + 它所在的唯一方块。
  *
- * <p>多方块删除后「机器 = 一个方块」成为硬约束：节点仍可持有 1..N 台机器，但一台机器不再
- * 占多个方块，因此不再有主方块 / 类型方块的区分，也没有方块列表、方块数上限这些概念。</p>
+ * <p>「机器 = 一个方块」是硬约束：节点仍可持有 1..N 台机器，但一台机器只占一个方块，
+ * 因此没有主方块 / 类型方块的区分，也没有方块列表、方块数上限这些概念。</p>
  *
  * <p>机器不可变；规则与样板不在这里，它们归节点。</p>
  *
@@ -40,7 +40,7 @@ public record Machine(UUID id, BlockKey block) {
         return new Machine(UUID.randomUUID(), BlockKey.of(dimension, pos));
     }
 
-    /** 给界面和指令用的短 id（前 8 位）。 */
+    /** 给界面与日志用的短 id（前 8 位）。 */
     public String shortId() {
         return this.id.toString().substring(0, 8);
     }

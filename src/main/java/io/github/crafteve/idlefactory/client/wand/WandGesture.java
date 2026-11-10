@@ -158,6 +158,7 @@ public final class WandGesture {
     @SubscribeEvent
     static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         clearLocalState();
+        WandCoordinator.reset();
         WandLinks.request();
     }
 
@@ -188,5 +189,6 @@ public final class WandGesture {
         WandSession.clearAll();
         WandLinks.clear();
         WandLinkRenderer.clearCache();
+        WandHud.clear();
     }
 }

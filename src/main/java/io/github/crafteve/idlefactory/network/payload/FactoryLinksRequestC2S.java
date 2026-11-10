@@ -15,8 +15,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 客户端请求当前工厂的链接快照。
  *
- * <p>手持绑定杖、进服、换维度时发；服务端回 {@link FactoryLinksS2C}。没有工厂时回空快照，
- * 让客户端把旧缓存清掉。</p>
+ * <p>进服、换维度、打开终端时发一次；服务端回 {@link FactoryLinksS2C}。没有工厂时回空快照，
+ * 让客户端把旧缓存清掉。结构变更后的刷新靠服务端推送，不再轮询。</p>
  */
 public record FactoryLinksRequestC2S() implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:factory_links_request}。 */

@@ -53,11 +53,6 @@ public record WandDraft(@Nullable UUID nodeId, List<BlockKey> added, Set<UUID> r
         return this.added.isEmpty() && this.removed.isEmpty();
     }
 
-    /** 草稿条目总数（加与删合计），用于面板摘要与规模判断。 */
-    public int size() {
-        return this.added.size() + this.removed.size();
-    }
-
     /**
      * 方块是否已经在待加入列表里。
      *

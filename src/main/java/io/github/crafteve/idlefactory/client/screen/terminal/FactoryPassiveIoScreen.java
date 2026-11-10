@@ -46,7 +46,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>壳只做五件事：算内容视口、拉机器表、把快照交给模型、把鼠标命中交给动作层、按快照重画。
  * 内容区的模型、排版、绘制、滚动、JEI 目标与探针各自独立，屏幕类不内联任何卡片坐标。</p>
  *
- * <p>请求节拍与旧工作台一致：每 {@link #REQUEST_INTERVAL} tick 拉一份机器表；界面不靠服务端
+ * <p>每 {@link #REQUEST_INTERVAL} tick 拉一份机器表；界面不靠服务端
  * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈不在界面上展示，动作结果只由随后
  * 到达的机器快照体现。</p>
  */
@@ -282,7 +282,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      * 编辑反馈不再展示。
      *
      * <p>终端里没有提示条：动作是否生效由随后到达的机器快照体现，失败时规则会原样留在表里。
-     * 接口是两屏共用的，旧工作台仍需要这条反馈，所以这里保留空实现而不是删方法。</p>
+     * 接口是两屏共用的，节点终端仍需要这条反馈，所以这里保留空实现而不是删方法。</p>
      *
      * @param payload 反馈
      */

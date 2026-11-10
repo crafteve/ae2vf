@@ -97,7 +97,7 @@ public final class Node {
         return this.name;
     }
 
-    /** 类型方块 id：节点内所有机器 {@code blocks.get(0)} 的方块 id 必须等于它。 */
+    /** 类型方块 id：节点内所有机器的方块 id 必须等于它。 */
     public ResourceLocation typeBlockId() {
         return this.typeBlockId;
     }

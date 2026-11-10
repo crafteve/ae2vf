@@ -103,6 +103,11 @@ public final class WandHud {
         }
     }
 
+    /** 立即清掉闪条；登录 / 登出 / 换维度时调。 */
+    public static void clear() {
+        flashText = null;
+    }
+
     /**
      * 清到期闪条；客户端 tick 调。
      *

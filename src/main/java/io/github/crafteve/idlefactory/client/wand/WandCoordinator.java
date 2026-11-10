@@ -41,9 +41,6 @@ public final class WandCoordinator {
     private static long submitDeadlineMillis;
     /** 最近一次预校验的问题；面板构造时读，关闭时清。 */
     private static List<WandIssue> pendingIssues = List.of();
-    /** 最近一次提交结果；面板显示失败原因用。 */
-    @Nullable
-    private static WandCommitOutcome lastOutcome;
     /** 面板内的一行提示（超时 / 提交失败）；没有时为 {@code null}。 */
     @Nullable
     private static Component panelStatus;
@@ -68,7 +65,6 @@ public final class WandCoordinator {
         pendingContainerId = -1;
         submitDeadlineMillis = 0L;
         pendingIssues = List.of();
-        lastOutcome = null;
         panelStatus = null;
     }
 
@@ -100,7 +96,6 @@ public final class WandCoordinator {
             return;
         }
         pendingIssues = List.of();
-        lastOutcome = null;
         panelStatus = null;
         PacketDistributor.sendToServer(new WandOpenC2S(WandSession.draft()));
     }
@@ -122,7 +117,6 @@ public final class WandCoordinator {
         }
         pendingSeq = draft.requestSeq();
         pendingContainerId = containerId;
-        lastOutcome = null;
         panelStatus = null;
         submitDeadlineMillis = System.currentTimeMillis() + WandLimits.SUBMIT_TIMEOUT_MILLIS;
         WandSession.beginSubmit();
@@ -180,7 +174,6 @@ public final class WandCoordinator {
             return;
         }
         pendingContainerId = -1;
-        lastOutcome = payload.outcome();
         if (!payload.outcome().ok()) {
             WandSession.submitFailed();
             panelStatus = WandMessages.failure(payload.outcome().failure());
@@ -221,10 +214,15 @@ public final class WandCoordinator {
         return pendingIssues;
     }
 
-    /** 面板构造时读的最近一次提交结果；没有时为 {@code null}。 */
-    @Nullable
-    public static WandCommitOutcome lastOutcome() {
-        return lastOutcome;
+    /**
+     * 放弃正在等待的提交：草稿被清（换手 / 换维度 / 登出）后迟到回执必须丢弃。
+     *
+     * <p>服务端仍可能已经写库成功；那份回执到这里按过期丢弃，客户端下次请求快照就同步了。</p>
+     */
+    public static void abandonSubmission() {
+        pendingContainerId = -1;
+        pendingSeq = 0;
+        submitDeadlineMillis = 0L;
     }
 
     /** 面板关闭时清掉预校验缓存，避免下一次打开读到旧问题。 */

@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
  * <p>成立条件全部满足才迁移：</p>
  * <ol>
  *   <li>节点所有机器都离线（只要还有一台在线就不认原地换的新方块）；</li>
- *   <li>所有机器的 {@code blocks.get(0)} 都探测过且<b>不是</b>过期快照；</li>
+ *   <li>所有机器的方块都探测过且<b>不是</b>过期快照；</li>
  *   <li>这些类型方块都 PRESENT、blockId 非空；</li>
  *   <li>它们都是<b>同一个</b>新 id，且不等于当前 {@code typeBlockId}。</li>
  * </ol>

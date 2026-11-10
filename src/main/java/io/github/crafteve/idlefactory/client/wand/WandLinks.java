@@ -17,9 +17,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 客户端链接快照：服务端 {@link FactoryLinksS2C} 的唯一缓存。
  *
- * <p>服务端每次结构变更都会推送整份快照，客户端整体替换，不累积、不合并。缓存同时维护两张
- * 索引：{@code BlockKey → 归属} 供草稿三态与渲染用，{@code nodeId → 节点} 供终端编辑与类型
- * 基准用；另外把机器方块摊平成一份列表，渲染每帧只读它，不重新遍历节点。</p>
+ * <p>服务端每次结构变更都会推送整份快照，客户端整体替换，不累积、不合并。缓存同时维护三张
+ * 索引：{@code BlockKey → 归属} 与 {@code machineId → 方块} 供草稿三态、红框与面板用，
+ * {@code nodeId → 节点} 供终端编辑与类型基准用；另外把机器方块摊平成一份列表，渲染每帧只
+ * 读它，不重新遍历节点。</p>
  *
  * <p>只读缓存，不参与业务判断；登录 / 换维度 / 打开终端时主动请求一次，之后靠推送更新。</p>
  */
@@ -30,7 +31,6 @@ public final class WandLinks {
     private static Map<BlockKey, Owner> owners = Map.of();
     private static Map<UUID, BlockKey> machineBlocksById = Map.of();
     private static Map<UUID, FactoryLinksS2C.NodeLink> nodes = Map.of();
-    private static boolean loaded;
 
     private WandLinks() {
         // 纯静态缓存
@@ -70,7 +70,6 @@ public final class WandLinks {
         machineBlocksById = Map.copyOf(nextMachineBlocks);
         nodes = Map.copyOf(nextNodes);
         machineBlocks = List.copyOf(nextBlocks);
-        loaded = true;
     }
 
     /** 清空缓存；登录 / 登出 / 换维度时调。 */
@@ -81,12 +80,6 @@ public final class WandLinks {
         owners = Map.of();
         machineBlocksById = Map.of();
         nodes = Map.of();
-        loaded = false;
-    }
-
-    /** 是否已经收到过至少一份快照。 */
-    public static boolean loaded() {
-        return loaded;
     }
 
     /** 当前仓库模式。 */
@@ -100,7 +93,7 @@ public final class WandLinks {
     }
 
     /** 全部已绑定机器方块，按节点与成员顺序摊平。 */
-    public static List<BlockKey> machineBlocks() {
+    public static List<BlockKey> boundBlocks() {
         return machineBlocks;
     }
 

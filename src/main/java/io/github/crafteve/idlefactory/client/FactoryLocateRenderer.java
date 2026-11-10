@@ -26,7 +26,8 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
  * 节点终端的「定位」高亮：在目标方块周围画 3 秒线框。
  *
  * <p>纯客户端，不发包。与绑定杖的连接高亮不同，它在界面打开时也要画，所以不复用
- * {@link FactoryLinkRenderer} 的 {@code screen != null} 早退；只画一个方块，不需要 VBO 缓存。</p>
+ * {@link io.github.crafteve.idlefactory.client.wand.WandLinkRenderer} 的 {@code screen != null}
+ * 早退；只画一个方块，不需要 VBO 缓存。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)

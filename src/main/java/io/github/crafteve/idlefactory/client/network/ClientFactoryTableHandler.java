@@ -11,7 +11,7 @@ import net.minecraft.client.Minecraft;
  * 工厂只读数据的客户端入口：机器表与编辑反馈。
  *
  * <p>两者都按接口投递（{@link FactoryTableSink} / {@link FactoryFeedbackSink}），
- * 不列举具体屏幕；仓库摘要曾只服务旧工作台，随工作台一起删除。</p>
+ * 不列举具体屏幕。</p>
  */
 public final class ClientFactoryTableHandler {
     private ClientFactoryTableHandler() {
@@ -45,7 +45,7 @@ public final class ClientFactoryTableHandler {
     /**
      * 当前打开且容器 id 匹配的反馈接收口。
      *
-     * <p>被动 IO 终端、节点终端与旧工作台都实现 {@link FactoryFeedbackSink}；这里不列举具体屏幕。</p>
+     * <p>被动 IO 终端与节点终端都实现 {@link FactoryFeedbackSink}；这里不列举具体屏幕。</p>
      *
      * @param containerId 容器 id
      * @return 接收口；没有匹配的界面时为 {@code null}

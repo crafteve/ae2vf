@@ -239,6 +239,7 @@ public final class WandSession {
 
     /** 清空草稿并回 IDLE，保留所属玩家 / 维度。 */
     public static void clear() {
+        WandCoordinator.abandonSubmission();
         state = State.IDLE;
         draft = WandDraft.empty(0L);
         issues = List.of();

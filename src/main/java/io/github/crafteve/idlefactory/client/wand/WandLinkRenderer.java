@@ -119,7 +119,7 @@ public final class WandLinkRenderer {
             draw(Kind.STORAGE, collectLinks(WandLinks.storage(), dimension), event);
             return;
         }
-        draw(Kind.MACHINE, collectBlocks(WandLinks.machineBlocks(), dimension), event);
+        draw(Kind.MACHINE, collectBlocks(WandLinks.boundBlocks(), dimension), event);
         if (!WandSession.isEditing()) {
             return;
         }
