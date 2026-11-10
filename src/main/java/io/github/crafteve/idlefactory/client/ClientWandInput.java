@@ -2,6 +2,7 @@ package io.github.crafteve.idlefactory.client;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.BindingDraftController;
+import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
@@ -150,7 +151,7 @@ public final class ClientWandInput {
      */
     @SubscribeEvent
     static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
-        ClientFactoryLinks.clear();
+        WandLinks.clear();
         FactoryLinkRenderer.clearCache();
         BindingDraftController.clearAll();
         requestCooldown = 0;
@@ -163,7 +164,7 @@ public final class ClientWandInput {
      */
     @SubscribeEvent
     static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
-        ClientFactoryLinks.clear();
+        WandLinks.clear();
         FactoryLinkRenderer.clearCache();
         BindingDraftController.clearAll();
     }

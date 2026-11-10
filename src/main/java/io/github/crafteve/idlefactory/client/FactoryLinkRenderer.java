@@ -20,6 +20,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.client.wand.WandLinks;
+import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
@@ -35,6 +37,8 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -49,7 +53,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
  * 面，整组一次 draw，CPU 每帧不逐方块提交。</p>
  *
  * <p>颜色：机器绿、仓库蓝；深度永远通过，加法混合，所以穿墙可见。链接来自
- * {@link ClientFactoryLinks}，只在主手拿对应绑定杖时画。</p>
+ * {@link WandLinks}，只在主手拿对应绑定杖时画。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
@@ -112,9 +116,9 @@ public final class FactoryLinkRenderer {
         if (!machineWand && !storageWand) {
             return;
         }
-        List<FactoryLinksS2C.Link> links = machineWand
-                ? ClientFactoryLinks.machines() : ClientFactoryLinks.storage();
-        LongOpenHashSet positions = collect(links, minecraft.level.dimension());
+        LongOpenHashSet positions = machineWand
+                ? collectBlocks(WandLinks.machineBlocks(), minecraft.level.dimension())
+                : collectLinks(WandLinks.storage(), minecraft.level.dimension());
         if (positions.isEmpty()) {
             return;
         }
@@ -151,8 +155,32 @@ public final class FactoryLinkRenderer {
         CACHE.clear();
     }
 
-    private static LongOpenHashSet collect(List<FactoryLinksS2C.Link> links,
-            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension) {
+    /**
+     * 收集当前维度里的机器方块坐标。
+     *
+     * @param blocks    全部机器方块
+     * @param dimension 当前维度
+     * @return 坐标集合
+     */
+    private static LongOpenHashSet collectBlocks(List<BlockKey> blocks, ResourceKey<Level> dimension) {
+        LongOpenHashSet positions = new LongOpenHashSet(Math.max(16, blocks.size()));
+        for (BlockKey block : blocks) {
+            if (block.dimension().equals(dimension)) {
+                positions.add(block.pos().asLong());
+            }
+        }
+        return positions;
+    }
+
+    /**
+     * 收集当前维度里的仓库坐标。
+     *
+     * @param links     仓库坐标
+     * @param dimension 当前维度
+     * @return 坐标集合
+     */
+    private static LongOpenHashSet collectLinks(List<FactoryLinksS2C.Link> links,
+            ResourceKey<Level> dimension) {
         LongOpenHashSet positions = new LongOpenHashSet(Math.max(16, links.size()));
         for (FactoryLinksS2C.Link link : links) {
             if (link.dimension().equals(dimension)) {
