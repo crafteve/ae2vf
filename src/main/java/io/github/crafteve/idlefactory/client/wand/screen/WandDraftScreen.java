@@ -270,8 +270,10 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @return 问题列表
      */
     private List<WandIssue> issues() {
-        List<WandIssue> server = WandCoordinator.pendingIssues();
-        return server.isEmpty() ? WandSession.issues() : server;
+        if (WandCoordinator.openResultReceived()) {
+            return WandCoordinator.pendingIssues();
+        }
+        return WandSession.issues();
     }
 
     /**

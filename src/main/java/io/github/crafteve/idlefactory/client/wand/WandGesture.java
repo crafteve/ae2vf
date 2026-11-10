@@ -11,6 +11,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -66,7 +67,13 @@ public final class WandGesture {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (!holdingWand(minecraft) || minecraft.hitResult instanceof BlockHitResult) {
+        if (!holdingWand(minecraft)) {
+            return;
+        }
+        // 瞄着超距方块时 hitResult 仍是 BlockHitResult（Type.MISS），那也算空气，否则蹲下右键
+        // 在远处方块上会静默失效。
+        if (minecraft.hitResult instanceof BlockHitResult hit
+                && hit.getType() != HitResult.Type.MISS) {
             return;
         }
         if (handle(minecraft, null, minecraft.player.isShiftKeyDown(), Screen.hasControlDown())) {

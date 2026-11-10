@@ -41,6 +41,8 @@ public final class WandCoordinator {
     private static long submitDeadlineMillis;
     /** 最近一次预校验的问题；面板构造时读，关闭时清。 */
     private static List<WandIssue> pendingIssues = List.of();
+    /** 本次打开是否已经收到服务端预校验回执；收到后服务端结果就是唯一权威。 */
+    private static boolean openResultReceived;
     /** 面板内的一行提示（超时 / 提交失败）；没有时为 {@code null}。 */
     @Nullable
     private static Component panelStatus;
@@ -65,6 +67,7 @@ public final class WandCoordinator {
         pendingContainerId = -1;
         submitDeadlineMillis = 0L;
         pendingIssues = List.of();
+        openResultReceived = false;
         panelStatus = null;
     }
 
@@ -96,6 +99,7 @@ public final class WandCoordinator {
             return;
         }
         pendingIssues = List.of();
+        openResultReceived = false;
         panelStatus = null;
         PacketDistributor.sendToServer(new WandOpenC2S(WandSession.draft()));
     }
@@ -162,6 +166,7 @@ public final class WandCoordinator {
             return;
         }
         pendingIssues = payload.issues();
+        openResultReceived = true;
     }
 
     /**
@@ -214,6 +219,11 @@ public final class WandCoordinator {
         return pendingIssues;
     }
 
+    /** 本次打开是否已经收到服务端预校验回执；收到后不再退回客户端预检。 */
+    public static boolean openResultReceived() {
+        return openResultReceived;
+    }
+
     /**
      * 放弃正在等待的提交：草稿被清（换手 / 换维度 / 登出）后迟到回执必须丢弃。
      *
@@ -228,6 +238,7 @@ public final class WandCoordinator {
     /** 面板关闭时清掉预校验缓存，避免下一次打开读到旧问题。 */
     public static void clearPendingIssues() {
         pendingIssues = List.of();
+        openResultReceived = false;
         panelStatus = null;
     }
 
