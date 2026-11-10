@@ -66,7 +66,7 @@ public final class FactoryLinkFinder {
     /**
      * 目标方块是否是可接入的机器。
      *
-     * <p>判定与 {@code /idf factory connect} 一致：方块实体存在，且至少提供物品 / 流体 / 能量
+     * <p>判定与绑定杖接入一致：方块实体存在，且至少提供物品 / 流体 / 能量
      * 中的一种能力。</p>
      *
      * @param level 服务端世界

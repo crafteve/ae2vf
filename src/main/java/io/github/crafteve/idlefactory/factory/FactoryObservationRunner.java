@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
@@ -173,70 +172,31 @@ final class FactoryObservationRunner {
     }
 
     /**
-     * 消费一次状态迁移：记事件，恢复时唤醒机器。
+     * 消费一次状态迁移：失联通知与恢复唤醒。
      *
-     * <p>{@link Health#UNLOADED} 刻意不进事件流——玩家走两步就会触发一片，会把 {@code tail} 淹掉。
-     * 未加载只在 {@code diag observe} 里看得到。</p>
+     * <p>迁移事件原本还要写进诊断事件流，事件流随 /idf 指令一起删除；现在只保留有行为后果的
+     * 两条路径（聚合通知、唤醒 IO 睡眠），纯记录的部分不再存在。</p>
      *
      * @param transition 迁移
      */
     private void handleTransition(ObservationService.Transition transition) {
-        long now = this.server.overworld().getGameTime();
         for (Factory factory : this.manager.all()) {
-            Optional<Node> nodeFound = factory.config().nodes().nodeAt(transition.key());
             Optional<Machine> machineFound = factory.config().nodes().machineAt(transition.key());
-            if (nodeFound.isEmpty() || machineFound.isEmpty()) {
+            if (machineFound.isEmpty()) {
                 continue;
             }
             Machine machine = machineFound.get();
             switch (transition.to()) {
-                case MISSING, NO_DIMENSION -> {
-                    factory.live().stats().record(DiagEvent.of(now,
-                            DiagEvent.Level.ERROR, DiagEvent.Category.MACH, machine.id(),
-                            nodeFound.get().id(), null,
-                            transition.to().describe() + "，机器仍留在节点库"));
-                    this.notices.missing(factory.id());
-                }
+                case MISSING, NO_DIMENSION -> this.notices.missing(factory.id());
                 case PRESENT -> {
                     if (transition.from() != Health.UNKNOWN) {
-                        factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.OK,
-                                DiagEvent.Category.MACH, machine.id(), nodeFound.get().id(), null,
-                                "机器已恢复"));
                         this.nodeIoRunner.wake(machine.id());
                         this.notices.restored(factory.id());
                     }
                 }
                 default -> {
-                    // UNLOADED / UNKNOWN 不记
+                    // UNLOADED / UNKNOWN 不处理
                 }
-            }
-        }
-        this.handleContainerTransition(transition, now);
-    }
-
-    /**
-     * 容器迁移：记一条仓库事件。
-     *
-     * @param transition 迁移
-     * @param now        当前游戏时间
-     */
-    private void handleContainerTransition(ObservationService.Transition transition, long now) {
-        if (transition.to() == Health.UNLOADED || transition.to() == Health.UNKNOWN) {
-            return;
-        }
-        for (Factory factory : this.manager.all()) {
-            if (!(factory.config().storageAnchor() instanceof ContainerAnchor anchor)) {
-                continue;
-            }
-            for (ContainerRef ref : anchor.containers()) {
-                if (!ref.dimension().equals(transition.key().dimension())
-                        || !ref.pos().equals(transition.key().pos())) {
-                    continue;
-                }
-                factory.live().stats().record(DiagEvent.of(now,
-                        transition.to() == Health.PRESENT ? DiagEvent.Level.OK : DiagEvent.Level.ERROR,
-                        DiagEvent.Category.STOR, null, null,
-                        "容器 [" + ref.shortId() + "] " + transition.to().describe()));
             }
         }
     }

@@ -86,11 +86,6 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
                     FactoryService.toggleStorage(player, pos, payload.chain());
                 }
             }
-            case STORAGE_CLEAR_REQUEST -> {
-                if (player.getMainHandItem().getItem() instanceof StorageBindingWandItem) {
-                    FactoryService.requestClearStorage(player);
-                }
-            }
             case MODE_SWITCH -> {
                 if (player.getMainHandItem().getItem() instanceof StorageBindingWandItem) {
                     FactoryService.switchStorageMode(player);
@@ -120,8 +115,6 @@ public record FactoryWandActionC2S(Action action, @Nullable BlockPos pos, boolea
         MACHINE_TOGGLE,
         /** 仓库 toggle：已绑定则取消，未绑定则绑定；连锁按整组 toggle。 */
         STORAGE_TOGGLE,
-        /** 请求清空仓库：服务端发聊天确认，确认后才清。 */
-        STORAGE_CLEAR_REQUEST,
         /** 切换 ME / 容器模式。 */
         MODE_SWITCH
     }

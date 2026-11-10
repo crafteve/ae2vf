@@ -45,20 +45,7 @@ public final class LinkRegistry {
     public record Claim(UUID factoryId, LinkRole role) {
     }
 
-    /**
-     * 一条冲突：同一个 id 被两家占了（跨工厂，或同工厂里机器仓库重叠）。
-     *
-     * @param dimension 位置所在维度
-     * @param pos       位置坐标
-     * @param first     先登记的那家（保留生效）
-     * @param second    后登记的那家（被拒绝/仅报告）
-     */
-    public record Conflict(ResourceKey<Level> dimension, BlockPos pos,
-            Claim first, Claim second) {
-    }
-
     private final Map<UUID, Claim> byId = new HashMap<>();
-    private final Map<UUID, Set<UUID>> byFactory = new HashMap<>();
     /**
      * 区块 → 该区块内的占用键（带坐标）。
      *
@@ -71,35 +58,31 @@ public final class LinkRegistry {
      * 从档案重建整张表。启动、删档、对账时调；调一次就是一次全量自愈。
      *
      * <p>键一律按坐标现派生（{@link BlockKey#id()}），不信任记录里存的 id——存量漂移了也对得上。
-     * 冲突只报告不解决：先登记的保留生效，后到的进冲突列表。</p>
+     * 冲突按「先登记的保留生效、后到的忽略」处理：原本还会把冲突收集成列表返回给
+     * {@code /idf diag links}，指令删除后没有读者，冲突列表一并去掉。</p>
      *
      * @param manager 工厂档案柜
-     * @return 冲突列表；没有冲突时为空
      */
-    public List<Conflict> rebuild(FactoryManager manager) {
+    public void rebuild(FactoryManager manager) {
         this.byId.clear();
-        this.byFactory.clear();
         this.byChunk.clear();
-        List<Conflict> conflicts = new ArrayList<>();
         for (Factory factory : manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 for (Machine machine : node.machines()) {
                     for (BlockKey block : machine.blocks()) {
-                        put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos(),
-                                conflicts);
+                        put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos());
                     }
                 }
             }
             StorageAnchor anchor = factory.config().storageAnchor();
             if (anchor instanceof MeAnchor me) {
-                put(factory.id(), LinkRole.STORAGE, me.dimension(), me.pos(), conflicts);
+                put(factory.id(), LinkRole.STORAGE, me.dimension(), me.pos());
             } else if (anchor instanceof ContainerAnchor containers) {
                 for (ContainerRef ref : containers.containers()) {
-                    put(factory.id(), LinkRole.STORAGE, ref.dimension(), ref.pos(), conflicts);
+                    put(factory.id(), LinkRole.STORAGE, ref.dimension(), ref.pos());
                 }
             }
         }
-        return conflicts;
     }
 
     /**
@@ -124,17 +107,6 @@ public final class LinkRegistry {
     }
 
     /**
-     * 某工厂名下所有占用 id。
-     *
-     * @param factoryId 工厂 id
-     * @return 只读集合；没有时为空集
-     */
-    public Set<UUID> byFactory(UUID factoryId) {
-        Set<UUID> found = this.byFactory.get(factoryId);
-        return found == null ? Set.of() : Collections.unmodifiableSet(found);
-    }
-
-    /**
      * 某区块内所有占用键（带坐标，事件过滤、chunk 加载复探用）。
      *
      * @param chunk 区块坐标
@@ -145,29 +117,21 @@ public final class LinkRegistry {
         return found == null ? Set.of() : Collections.unmodifiableSet(found);
     }
 
-    /** 当前占用条数。 */
-    public int size() {
-        return this.byId.size();
-    }
-
     /** 是否为空。 */
     public boolean isEmpty() {
         return this.byId.isEmpty();
     }
 
-    private void put(UUID factoryId, LinkRole role, ResourceKey<Level> dimension, BlockPos pos,
-            List<Conflict> conflicts) {
+    private void put(UUID factoryId, LinkRole role, ResourceKey<Level> dimension, BlockPos pos) {
         UUID id = BlockKey.of(dimension, pos).id();
         Claim existing = this.byId.get(id);
         Claim claim = new Claim(factoryId, role);
         if (existing != null && (!existing.factoryId().equals(factoryId)
                 || existing.role() != role)) {
-            // 同工厂同角色重复出现只是去重问题，不算冲突；跨工厂或跨角色才报告
-            conflicts.add(new Conflict(dimension, pos, existing, claim));
+            // 同工厂同角色重复出现只是去重问题；跨工厂或跨角色保留先登记者，后到的忽略
             return;
         }
         this.byId.put(id, claim);
-        this.byFactory.computeIfAbsent(factoryId, ignored -> new HashSet<>()).add(id);
         this.byChunk.computeIfAbsent(new ChunkPos(pos), ignored -> new HashSet<>())
                 .add(new BlockKey(dimension, pos));
     }

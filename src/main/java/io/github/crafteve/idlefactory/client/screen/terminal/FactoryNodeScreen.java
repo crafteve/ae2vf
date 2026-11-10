@@ -537,12 +537,12 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private String emptyText() {
         if (!this.model.hasFactory()) {
-            return "先执行 /idf create";
+            return "工厂未就绪：重新打开一次终端";
         }
         if (this.model.filteredEmpty()) {
             return "没有匹配的节点";
         }
-        return "还没有机器 · 用 /idf factory connect 接入";
+        return "还没有机器 · 用机器绑定杖右键方块接入";
     }
 
     private int totalMembers() {

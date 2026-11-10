@@ -1,93 +1,24 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import appeng.api.stacks.AEKey;
 
 /**
- * 一个工厂的诊断数据：事件环形缓冲 + 每台机器的搬运统计 + 工厂级资源速率。
+ * 一个工厂的搬运统计：每台机器一份「最后搬运 tick、连续阻塞起点、逐规则原因与速率」。
  *
- * <p>纯运行时，<b>不写存档</b>。事件只记状态迁移和第一次出错，成功搬运只进计数器。</p>
- *
- * <p>P1 删除产线后统计只剩一层：按机器记「最后搬运 tick、连续阻塞起点、逐规则原因」。
- * 「在搬什么、多快」是工厂级的，直接挂在本类上，不再按线分组。</p>
+ * <p>纯运行时，<b>不写存档</b>。事件流与诊断文本出口在移除 /idf 指令时一并删除，
+ * 本类只保留界面快照读得动的机器级数据。</p>
  */
 public final class DiagStats {
-    /** 事件容量。 */
-    private static final int CAPACITY = 200;
-
-    private final DiagEvent[] events = new DiagEvent[CAPACITY];
-    /** 累计写入条数，用来算当前有效条数。 */
-    private int count;
-    /** 下一条写到哪。 */
-    private int next;
-
     /** 每台机器的统计。 */
     private final Map<UUID, MachineStats> machines = new HashMap<>();
-    /** 本秒窗口内的补料量，按资源。 */
-    private final Map<AEKey, Long> inWindow = new HashMap<>();
-    /** 本秒窗口内的抽取量，按资源。 */
-    private final Map<AEKey, Long> outWindow = new HashMap<>();
-    /** 上一秒的补料速率，按资源。 */
-    private final Map<AEKey, Long> rateIn = new HashMap<>();
-    /** 上一秒的抽取速率，按资源。 */
-    private final Map<AEKey, Long> rateOut = new HashMap<>();
-    /** 整个工厂最后一次成功搬运的时间。 */
-    private long lastMoveTick;
-
-    /**
-     * 记一条事件。
-     *
-     * @param event 事件
-     */
-    public void record(DiagEvent event) {
-        this.events[this.next] = event;
-        this.next = (this.next + 1) % CAPACITY;
-        this.count++;
-    }
-
-    /**
-     * 取最近的若干条，按时间从旧到新。
-     *
-     * @param max 最多几条
-     * @return 事件列表
-     */
-    public List<DiagEvent> recent(int max) {
-        int available = Math.min(this.count, CAPACITY);
-        int wanted = Math.min(Math.max(max, 0), available);
-        List<DiagEvent> result = new ArrayList<>(wanted);
-        for (int i = wanted - 1; i >= 0; i--) {
-            int index = Math.floorMod(this.next - 1 - i, CAPACITY);
-            DiagEvent event = this.events[index];
-            if (event != null) {
-                result.add(event);
-            }
-        }
-        return result;
-    }
-
-    /** 当前有效条数。 */
-    public int size() {
-        return Math.min(this.count, CAPACITY);
-    }
 
     /** 清空。 */
     public void clear() {
-        for (int i = 0; i < CAPACITY; i++) {
-            this.events[i] = null;
-        }
-        this.count = 0;
-        this.next = 0;
         this.machines.clear();
-        this.inWindow.clear();
-        this.outWindow.clear();
-        this.rateIn.clear();
-        this.rateOut.clear();
-        this.lastMoveTick = 0L;
     }
 
     /**
@@ -97,7 +28,7 @@ public final class DiagStats {
      * @return 统计
      */
     public MachineStats machine(UUID machineId) {
-        return this.machines.computeIfAbsent(machineId, id -> new MachineStats(this));
+        return this.machines.computeIfAbsent(machineId, id -> new MachineStats());
     }
 
     /**
@@ -110,89 +41,17 @@ public final class DiagStats {
         return this.machines.get(machineId);
     }
 
-    /** 所有机器的统计（只读）。 */
-    public Map<UUID, MachineStats> machines() {
-        return Map.copyOf(this.machines);
-    }
-
-    /** 整个工厂最后一次成功搬运的时间；从没搬过为 0。 */
-    public long lastMoveTick() {
-        return this.lastMoveTick;
-    }
-
-    /** 上一秒的补料速率，按资源。 */
-    public Map<AEKey, Long> rateIn() {
-        return Map.copyOf(this.rateIn);
-    }
-
-    /** 上一秒的抽取速率，按资源。 */
-    public Map<AEKey, Long> rateOut() {
-        return Map.copyOf(this.rateOut);
-    }
-
-    /** 上一秒的总搬运量（不同单位混在一起，只用于粗看）。 */
-    public long totalRate() {
-        long total = 0L;
-        for (long value : this.rateIn.values()) {
-            total += value;
-        }
-        for (long value : this.rateOut.values()) {
-            total += value;
-        }
-        return total;
-    }
-
     /**
-     * 当前处于阻塞状态的机器数。
-     *
-     * @return 机器数
-     */
-    public int blockedMachines() {
-        int blocked = 0;
-        for (MachineStats stats : this.machines.values()) {
-            if (stats.blockedSince() >= 0L) {
-                blocked++;
-            }
-        }
-        return blocked;
-    }
-
-    /**
-     * 采样一次速率。由 {@code FactoryRuntime} 每秒调一次。
+     * 采样一次速率。由 {@code FactoryTickRunner} 每秒调一次。
      */
     public void sample() {
-        this.rateIn.clear();
-        this.rateIn.putAll(this.inWindow);
-        this.inWindow.clear();
-        this.rateOut.clear();
-        this.rateOut.putAll(this.outWindow);
-        this.outWindow.clear();
         for (MachineStats stats : this.machines.values()) {
             stats.sample();
         }
     }
 
-    /**
-     * 记一次成功搬运到工厂级窗口。
-     *
-     * @param fed     按资源拆分的补料量
-     * @param pulled  按资源拆分的抽取量
-     * @param tick    时间
-     */
-    private void addFactoryMoved(Map<AEKey, Long> fed, Map<AEKey, Long> pulled, long tick) {
-        for (Map.Entry<AEKey, Long> entry : fed.entrySet()) {
-            this.inWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
-        }
-        for (Map.Entry<AEKey, Long> entry : pulled.entrySet()) {
-            this.outWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
-        }
-        this.lastMoveTick = tick;
-    }
-
     /** 一台机器的搬运统计。 */
     public static final class MachineStats {
-        /** 所属工厂统计；工厂级资源速率记在它身上。 */
-        private final DiagStats owner;
         private final Map<RuleKey, Long> inRuleWindow = new HashMap<>();
         private final Map<RuleKey, Long> outRuleWindow = new HashMap<>();
         private final Map<RuleKey, Long> inRuleRate = new HashMap<>();
@@ -207,10 +66,6 @@ public final class DiagStats {
         private IoResult.Reason inputReason = IoResult.Reason.OK;
         private IoResult.Reason outputReason = IoResult.Reason.OK;
 
-        private MachineStats(DiagStats owner) {
-            this.owner = owner;
-        }
-
         /**
          * 记一次成功搬运。
          *
@@ -222,7 +77,6 @@ public final class DiagStats {
          */
         public void addMoved(Map<AEKey, Long> fed, Map<AEKey, Long> pulled,
                 Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule, long tick) {
-            this.owner.addFactoryMoved(fed, pulled, tick);
             this.lastMoveTick = tick;
             this.blockedSince = -1L;
             this.inputReason = IoResult.Reason.OK;

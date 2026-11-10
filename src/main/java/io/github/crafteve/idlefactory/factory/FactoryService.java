@@ -1,160 +1,70 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+
+import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
 
 /**
- * 工厂行政窗口：创建 / 删除 / 绑定仓库 / 机器库 / 仓库调试的静态入口。
+ * 工厂行政窗口：保证工厂存在、按 id 删除节点/机器、机器与仓库的 toggle、绑定草稿提交。
  *
- * <p>终端、指令、以后的 WebUI 都走这里。它只做装配与转发，权限（第一版只看 owner）与
- * 档案写入在下面几个职责类里：{@link FactoryLifecycleService}（生命周期）、
- * {@link MachineLinkService} / {@link BindingService}（机器接线）、
- * {@link StorageLinkService} / {@link StorageMaintenanceService} /
- * {@link StorageConsoleService}（仓库）。</p>
+ * <p>指令删除后，这里只剩绑定杖、网络包与界面真正会走的入口；建厂不再是玩家动作，
+ * 打开终端时由 {@link #ensureFactory} 静默完成。</p>
  *
- * <p>保留静态签名是为了让指令、包处理器与物品入口零改动；新代码应直接用职责类，
- * 不要再通过本类定位运行时。</p>
+ * <p>它只做装配与转发，业务实现分别在 {@link BindingService}（草稿提交与整组 toggle）、
+ * {@link MachineLinkService}（按 id 删除）、{@link StorageLinkService}（仓库 toggle 与模式切换）。</p>
  */
 public final class FactoryService {
     private FactoryService() {
         // 纯静态工具类
     }
 
-
-    // ------------------------------------------------------------------
-    // ---- 静态门面：装配服务实例并转发 ----
-    // 保留原有静态签名，调用方零改动；业务实现见 FactoryLifecycleService / MachineLinkService / BindingService。
-    // ------------------------------------------------------------------
-
     /**
      * 保证玩家有工厂：没有就静默创建，已有就不动。
      *
-     * <p>终端菜单打开前调它；业务实现已下沉到 {@link FactoryLifecycleService}。</p>
+     * <p>终端菜单打开前调它。创建用的是与旧生命周期服务相同的确定性 id 规则
+     * （owner + 自增序号），只是不再有"创建成功"的聊天回执。</p>
      *
      * @param player 玩家
      */
     public static void ensureFactory(ServerPlayer player) {
         FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime != null) {
-            lifecycle(runtime).ensureFactory(player);
+        if (runtime == null) {
+            return;
         }
+        FactoryManager manager = runtime.manager();
+        if (manager.byOwner(player.getUUID()).isPresent()) {
+            return;
+        }
+        UUID id = nextFactoryId(manager, runtime, player.getUUID());
+        Factory factory = new Factory(id,
+                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
+        if (!manager.add(factory)) {
+            IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
+            return;
+        }
+        runtime.markDirty();
     }
 
     /**
-     * 给玩家创建一个工厂。一人一个，已有工厂时不动。
+     * 生成一个不与现有工厂冲突的确定性 id。
      *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 成功，{@code 0} 未创建）
+     * @param manager 工厂档案柜
+     * @param runtime 运行时（取自增序号）
+     * @param owner   拥有者
+     * @return 新 id
      */
-    public static int create(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return lifecycle(runtime).create(player);
-    }
-
-    /**
-     * 删除玩家自己的工厂。机器方块本身不动，只是不再属于任何工厂。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 成功，{@code 0} 未删除）
-     */
-    public static int delete(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return lifecycle(runtime).delete(player);
-    }
-
-    /**
-     * 打印工厂摘要和机器库。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int info(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return lifecycle(runtime).info(player);
-    }
-
-    /**
-     * 把准星选中的机器接入玩家自己的工厂。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
-     */
-    public static int connectMachine(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineLinks(runtime).connectMachine(player);
-    }
-
-    /**
-     * 删除准星选中的机器；有 IO 规则时先要求确认。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int disconnectMachine(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineLinks(runtime).disconnectMachine(player);
-    }
-
-    /**
-     * 确认删除准星选中的机器。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int confirmDisconnectMachine(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineLinks(runtime).confirmDisconnectMachine(player);
-    }
-
-    /**
-     * 按短 id 删除机器；有 IO 规则时先要求确认。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 短 id（前 8 位）
-     * @return 命令结果
-     */
-    public static int disconnectMachine(ServerPlayer player, String shortId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineLinks(runtime).disconnectMachine(player, shortId);
-    }
-
-    /**
-     * 按短 id 确认删除机器。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 短 id（前 8 位）
-     * @return 命令结果
-     */
-    public static int confirmDisconnectMachine(ServerPlayer player, String shortId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return machineLinks(runtime).confirmDisconnectMachine(player, shortId);
+    private static UUID nextFactoryId(FactoryManager manager, FactoryRuntime runtime, UUID owner) {
+        UUID id;
+        do {
+            long seq = runtime.takeNextSeq();
+            id = UUID.nameUUIDFromBytes((owner + ":" + seq).getBytes(StandardCharsets.UTF_8));
+        } while (manager.byId(id).isPresent());
+        return id;
     }
 
     /**
@@ -234,82 +144,6 @@ public final class FactoryService {
     }
 
     /**
-     * 服务端未就绪时的统一回执。
-     *
-     * @param player 玩家
-     * @return {@code 0}
-     */
-    private static int notStarted(ServerPlayer player) {
-        FactoryMessages.err(player, "Idle Factory 尚未启动（服务端未就绪）");
-        return 0;
-    }
-
-    /**
-     * 装配机器库写入口。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static NodeLibraryService machineLibrary(FactoryRuntime runtime) {
-        return new NodeLibraryService(runtime::markDirty);
-    }
-
-    /**
-     * 装配机器接线服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static MachineLinkService machineLinks(FactoryRuntime runtime) {
-        return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
-                runtime.nodeIoRunner(), machineLibrary(runtime), runtime.observations(),
-                runtime.server());
-    }
-
-    /**
-     * 装配机器整组 toggle 服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static BindingService machineToggle(FactoryRuntime runtime) {
-        return new BindingService(runtime.manager(), runtime.observations(),
-                machineLibrary(runtime), machineLinks(runtime), runtime.server());
-    }
-
-    /**
-     * 装配工厂生命周期服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static FactoryLifecycleService lifecycle(FactoryRuntime runtime) {
-        return new FactoryLifecycleService(runtime.manager(), runtime::markDirty,
-                runtime.nodeManager(), machineLinks(runtime), runtime.storageResolver(),
-                runtime.observations(), runtime::takeNextSeq);
-    }
-
-
-    // ------------------------------------------------------------------
-    // ---- 仓库相关入口：装配服务实例并转发 ----
-    // 业务实现见 StorageLinkService / StorageMaintenanceService / StorageConsoleService。
-    // ------------------------------------------------------------------
-
-    /**
-     * 清空当前仓库地址，保留模式。
-     *
-     * @param player 发起请求的玩家
-     * @return 清空为 {@code 1}
-     */
-    public static int clearStorage(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageLinks(runtime).clearStorage(player);
-    }
-
-    /**
      * 切换 ME / 容器模式；有链接时拒绝。
      *
      * @param player 发起请求的玩家
@@ -340,152 +174,46 @@ public final class FactoryService {
     }
 
     /**
-     * 请求清空仓库：先发聊天确认，点击确认后才真正清空。
+     * 服务端未就绪时的统一回执。
      *
-     * @param player 发起请求的玩家
-     * @return 发送确认消息为 {@code 1}
+     * @param player 玩家
+     * @return {@code 0}
      */
-    public static int requestClearStorage(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).requestClearStorage(player);
+    private static int notStarted(ServerPlayer player) {
+        FactoryMessages.err(player, "Idle Factory 尚未启动（服务端未就绪）");
+        return 0;
     }
 
     /**
-     * 聊天栏确认/取消清空仓库。
+     * 装配机器库写入口。
      *
-     * @param player  点击的玩家
-     * @param token   请求 token
-     * @param confirm {@code true} 清空，{@code false} 取消
-     * @return 成功为 {@code 1}
+     * @param runtime 运行时
+     * @return 服务实例
      */
-    public static int confirmClearStorage(ServerPlayer player, String token, boolean confirm) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).confirmClearStorage(player, token, confirm);
+    private static NodeLibraryService machineLibrary(FactoryRuntime runtime) {
+        return new NodeLibraryService(runtime::markDirty);
     }
 
     /**
-     * 把准星选中的方块容器加入工厂仓库。
+     * 装配机器接线服务。
      *
-     * @param player 发起请求的玩家
-     * @return 命令结果
+     * @param runtime 运行时
+     * @return 服务实例
      */
-    public static int bindContainer(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).bindContainer(player);
+    private static MachineLinkService machineLinks(FactoryRuntime runtime) {
+        return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
+                runtime.nodeIoRunner(), machineLibrary(runtime), runtime.server());
     }
 
     /**
-     * 解绑整个仓库。
+     * 装配机器整组 toggle 服务。
      *
-     * @param player 发起请求的玩家
-     * @return 命令结果
+     * @param runtime 运行时
+     * @return 服务实例
      */
-    public static int unbindStorage(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).unbindStorage(player);
-    }
-
-    /**
-     * 从容器仓库里移除一个容器。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 容器短 id
-     * @return 命令结果
-     */
-    public static int unbindContainer(ServerPlayer player, String shortId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).unbindContainer(player, shortId);
-    }
-
-    /**
-     * 设置容器优先级。高的先填、低的先抽。
-     *
-     * @param player   发起请求的玩家
-     * @param shortId  容器短 id
-     * @param priority 新优先级
-     * @return 命令结果
-     */
-    public static int setContainerPriority(ServerPlayer player, String shortId, int priority) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).setContainerPriority(player, shortId, priority);
-    }
-
-    /**
-     * 清理容器仓库里「已缺失」的容器（被拆、维度没了）。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int pruneStorage(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageMaintenance(runtime).pruneStorage(player);
-    }
-
-    /**
-     * 仓库摘要：类型、容器列表、物品。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public static int storageInfo(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageConsole(runtime).storageInfo(player);
-    }
-
-    /**
-     * 从工厂仓库取物品给玩家，类似 {@code /give}。
-     *
-     * @param player 目标玩家
-     * @param sample 物品样本（数量会被忽略）
-     * @param count  想取几个
-     * @return 命令结果（{@code 1} 取到，{@code 0} 没取到）
-     */
-    public static int storageGet(ServerPlayer player, ItemStack sample, int count) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageConsole(runtime).storageGet(player, sample, count);
-    }
-
-    /**
-     * 把玩家背包里的物品放进工厂仓库。
-     *
-     * @param player 目标玩家
-     * @param sample 物品样本（数量会被忽略）
-     * @param count  想放几个
-     * @return 命令结果（{@code 1} 存了，{@code 0} 没存）
-     */
-    public static int storagePut(ServerPlayer player, ItemStack sample, int count) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageConsole(runtime).storagePut(player, sample, count);
+    private static BindingService machineToggle(FactoryRuntime runtime) {
+        return new BindingService(runtime.manager(), runtime.observations(),
+                machineLibrary(runtime), machineLinks(runtime), runtime.server());
     }
 
     /**
@@ -497,27 +225,5 @@ public final class FactoryService {
     private static StorageLinkService storageLinks(FactoryRuntime runtime) {
         return new StorageLinkService(runtime.manager(), runtime::markDirty,
                 runtime.storageResolver());
-    }
-
-    /**
-     * 装配仓库维护服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static StorageMaintenanceService storageMaintenance(FactoryRuntime runtime) {
-        return new StorageMaintenanceService(runtime.manager(), runtime::markDirty,
-                runtime.storageResolver(), runtime.observations(), storageLinks(runtime));
-    }
-
-    /**
-     * 装配仓库摘要与存取服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static StorageConsoleService storageConsole(FactoryRuntime runtime) {
-        return new StorageConsoleService(runtime.manager(), runtime.storageResolver(),
-                runtime.observations());
     }
 }

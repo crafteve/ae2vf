@@ -4,7 +4,6 @@ import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
@@ -77,22 +76,6 @@ public final class FactoryMessages {
     }
 
     /**
-     * 可点击的链接文本。
-     *
-     * @param label   显示文字
-     * @param command 点击后执行的指令（带前导斜杠）
-     * @param hover   悬停说明
-     * @return 组件
-     */
-    public static MutableComponent link(String label, String command, String hover) {
-        return Component.literal(label).withStyle(style -> style
-                .withColor(TextColor.fromRgb(ID))
-                .withUnderlined(true)
-                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(hover))));
-    }
-
-    /**
      * 只有悬停、不点击的 id 文本。
      *
      * @param label 显示文字
@@ -103,16 +86,6 @@ public final class FactoryMessages {
         return Component.literal(label).withStyle(style -> style
                 .withColor(TextColor.fromRgb(ID))
                 .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(hover))));
-    }
-
-    /**
-     * 机器短 id，点击体检这台机器。
-     *
-     * @param shortId 机器短 id
-     * @return 组件
-     */
-    public static MutableComponent machineLink(String shortId) {
-        return link(shortId, "/idf diag why " + shortId, "体检机器 " + shortId);
     }
 
     /**

@@ -3,8 +3,6 @@ package io.github.crafteve.idlefactory.factory;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.diag.DiagService;
-import io.github.crafteve.idlefactory.factory.io.DiagEvent;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
@@ -37,11 +35,6 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryRuntime {
-    /** IO 执行间隔（tick）的下限。 */
-    public static final int MIN_IO_INTERVAL = FactoryTickRunner.MIN_IO_INTERVAL;
-    /** IO 执行间隔（tick）的上限。 */
-    public static final int MAX_IO_INTERVAL = FactoryTickRunner.MAX_IO_INTERVAL;
-
     private static FactoryRuntime instance;
 
     private final MinecraftServer server;
@@ -71,7 +64,7 @@ public final class FactoryRuntime {
 
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
-        this.nodeManager = new NodeManager(server, this::markDirty, this::recordNodeNotice);
+        this.nodeManager = new NodeManager(server, this::markDirty, this::logNodeNotice);
     }
 
     /**
@@ -97,7 +90,6 @@ public final class FactoryRuntime {
         runtime.save();
         runtime.nodeManager.destroyAll();
         runtime.nodeIoRunner.clear();
-        DiagService.clearWatches();
         runtime.storageResolver = null;
         runtime.observations = null;
         runtime.tickRunner = null;
@@ -151,22 +143,6 @@ public final class FactoryRuntime {
     /** 服务端实例。 */
     public MinecraftServer server() {
         return this.server;
-    }
-
-    /** 当前 IO 间隔（tick）。 */
-    public int ioInterval() {
-        return this.tickRunner == null ? 1 : this.tickRunner.ioInterval();
-    }
-
-    /**
-     * 设置 IO 间隔。
-     *
-     * @param ticks 间隔，会被夹到 {@link #MIN_IO_INTERVAL}..{@link #MAX_IO_INTERVAL}
-     */
-    public void setIoInterval(int ticks) {
-        if (this.tickRunner != null) {
-            this.tickRunner.setIoInterval(ticks);
-        }
     }
 
     /**
@@ -237,20 +213,21 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 把节点告警写进所属工厂的事件流；工厂已经没了就只记日志。
+     * 把节点告警写进日志。
+     *
+     * <p>事件流随 /idf 指令一起删除，节点告警不再有界面出口；这里保证它不会静默丢失。
+     * 工厂已经没了的告警仍然按 warn 记，因为它说明节点表和档案脱节了。</p>
      *
      * @param notice 节点告警
      */
-    private void recordNodeNotice(NodeManager.Notice notice) {
+    private void logNodeNotice(NodeManager.Notice notice) {
         Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
         if (factory == null) {
             IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",
                     notice.nodeId(), notice.message());
             return;
         }
-        long now = this.server.overworld().getGameTime();
-        factory.live().stats().record(DiagEvent.of(now, DiagEvent.Level.WARN,
-                DiagEvent.Category.MACH, null, notice.nodeId(), null, notice.message()));
+        IdleFactory.LOGGER.debug("Idle Factory: 节点 {} 告警：{}", notice.nodeId(), notice.message());
     }
 
     @SubscribeEvent

@@ -13,12 +13,10 @@ import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -41,181 +39,33 @@ final class MachineLinkService {
     private final NodeManager nodeManager;
     private final NodeIoRunner nodeIoRunner;
     private final NodeLibraryService nodeLibrary;
-    @Nullable
-    private final ObservationService observations;
     private final MinecraftServer server;
 
     /**
-     * @param manager       工厂档案柜
-     * @param nodeManager   虚拟节点管理器
+     * @param manager      工厂档案柜
+     * @param nodeManager  虚拟节点管理器
      * @param nodeIoRunner 执行器
-     * @param nodeLibrary   节点库写入口（落盘由它统一触发）
-     * @param observations  观测服务；服务端未就绪时为 {@code null}
-     * @param server        服务端
+     * @param nodeLibrary  节点库写入口（落盘由它统一触发）
+     * @param server       服务端
      */
     MachineLinkService(FactoryManager manager, NodeManager nodeManager,
             NodeIoRunner nodeIoRunner, NodeLibraryService nodeLibrary,
-            @Nullable ObservationService observations, MinecraftServer server) {
+            MinecraftServer server) {
         this.manager = manager;
         this.nodeManager = nodeManager;
         this.nodeIoRunner = nodeIoRunner;
         this.nodeLibrary = nodeLibrary;
-        this.observations = observations;
         this.server = server;
-    }
-
-    /**
-     * 把准星选中的机器接入玩家自己的工厂。
-     *
-     * <p>只接受「方块实体 + 至少提供 {@code IItemHandler} / {@code IFluidHandler}」的方块。
-     * 节点 id 与机器 id 都是随机 UUID，重复接入按方块占用去重。</p>
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果（{@code 1} 成功，{@code 0} 失败）
-     */
-    public int connectMachine(ServerPlayer player) {
-        Factory factory = owned(player);
-        if (factory == null) {
-            return 0;
-        }
-        BlockPos pos = LinkTargetResolver.pickedBlock(player);
-        if (pos == null) {
-            FactoryMessages.err(player, "没有对准方块（射线 " + (int) LinkTargetResolver.REACH + " 格）");
-            return 0;
-        }
-        ServerLevel level = player.serverLevel();
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity == null) {
-            FactoryMessages.err(player, "这个方块没有方块实体");
-            return 0;
-        }
-        MinecraftServer server = player.getServer();
-        if (server == null) {
-            FactoryMessages.err(player, "服务端未就绪");
-            return 0;
-        }
-        // 指令路径也是绑定入口，必须和绑定杖走同一套占用规则。
-        BlockKey block = BlockKey.of(level.dimension(), pos);
-        LinkGate gate = LinkGate.of(this.manager);
-        LinkGate.ClaimCheck claim = gate.check(block, factory.id(), LinkRole.MACHINE);
-        if (claim.blocked()) {
-            FactoryMessages.err(player, LinkGateMessages.gateMessage(claim));
-            return 0;
-        }
-        BlockProbe.Presence presence = BlockProbe.presence(server, block);
-        if (presence.health() != Health.PRESENT || presence.kinds().isEmpty()) {
-            FactoryMessages.err(player, "这个方块没有可搬运的存储（需要物品 / 流体 / 能量能力）");
-            return 0;
-        }
-        if (factory.config().nodes().machineAt(block).isPresent()) {
-            FactoryMessages.err(player, "这个方块已经接入过了");
-            return 0;
-        }
-        Node node = Node.of(null, BuiltInRegistries.BLOCK.getKey(level.getBlockState(pos).getBlock()),
-                block);
-        Machine machine = node.machines().get(0);
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        NodeLibrary.Result added = batch.add(node);
-        if (added != NodeLibrary.Result.ADDED) {
-            FactoryMessages.err(player, added == NodeLibrary.Result.FULL
-                    ? "节点库已满（上限 " + FactoryLimitsConfig.maxNodes() + " 个节点）"
-                    : "这个方块已经接入过了");
-            return 0;
-        }
-        refreshObservation(block);
-        batch.close();
-        FactoryMessages.ok(player, "已接入机器：" + machine.shortId() + " @ "
-                + level.dimension().location() + " " + pos.toShortString()
-                + " [" + presence.describe() + "]");
-        return 1;
-    }
-
-    /**
-     * 删除准星选中的机器；有 IO 规则时先要求确认。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public int disconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, DeletePolicy.PROMPT);
-    }
-
-    /**
-     * 确认删除准星选中的机器。
-     *
-     * @param player 发起请求的玩家
-     * @return 命令结果
-     */
-    public int confirmDisconnectMachine(ServerPlayer player) {
-        return deleteMachine(player, DeletePolicy.CONFIRMED);
-    }
-
-    /**
-     * 按短 id 删除机器；有 IO 规则时先要求确认。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 短 id（前 8 位）
-     * @return 命令结果
-     */
-    public int disconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, DeletePolicy.PROMPT);
-    }
-
-    /**
-     * 按短 id 确认删除机器。
-     *
-     * @param player  发起请求的玩家
-     * @param shortId 短 id（前 8 位）
-     * @return 命令结果
-     */
-    public int confirmDisconnectMachine(ServerPlayer player, String shortId) {
-        return deleteMachine(player, shortId, DeletePolicy.CONFIRMED);
-    }
-
-    private int deleteMachine(ServerPlayer player, DeletePolicy policy) {
-        Factory factory = owned(player);
-        if (factory == null) {
-            return 0;
-        }
-        BlockPos pos = LinkTargetResolver.pickedBlock(player);
-        if (pos == null) {
-            FactoryMessages.err(player, "没有对准方块（射线 " + (int) LinkTargetResolver.REACH + " 格）");
-            return 0;
-        }
-        ServerLevel level = player.serverLevel();
-        Optional<Machine> machine = factory.config().nodes()
-                .machineAt(BlockKey.of(level.dimension(), pos));
-        if (machine.isEmpty()) {
-            FactoryMessages.err(player, "这个位置没有接入的机器");
-            return 0;
-        }
-        return reportDelete(player, factory, machine.get(), policy,
-                "/idf factory disconnect confirm");
-    }
-
-    private int deleteMachine(ServerPlayer player, String shortId, DeletePolicy policy) {
-        Factory factory = owned(player);
-        if (factory == null) {
-            return 0;
-        }
-        Optional<Machine> target = factory.config().nodes().machineByShortId(shortId);
-        if (target.isEmpty()) {
-            FactoryMessages.err(player, "找不到目标 " + shortId + "（或前缀有歧义）");
-            return 0;
-        }
-        return reportDelete(player, factory, target.get(), policy,
-                "/idf factory disconnect " + shortId + " confirm");
     }
 
     /**
      * 删除策略：决定「有 IO 规则」的机器怎么处理。
      *
-     * <p>不用布尔参数：三处调用点需要三种语义，一个 {@code confirmed} 布尔只能表达两种。</p>
+     * <p>指令删除后只剩两种语义：按 id 删除（确认过了）与连锁断开（有规则就跳过）。
+     * 原本的「首次删除只提示确认」是命令行的两段式交互，随指令一起消失。</p>
      */
     enum DeletePolicy {
-        /** 命令首次删除：有规则只提示确认，不删。 */
-        PROMPT,
-        /** 已确认：有规则也删；命令 confirm 与界面删除都走这里。 */
+        /** 已确认：有规则也删。 */
         CONFIRMED,
         /** 连锁断开：有规则就跳过，规则不能批量丢。 */
         SKIP_WITH_RULES
@@ -250,7 +100,7 @@ final class MachineLinkService {
             DeletePolicy policy, @Nullable ServerPlayer receiver, NodeLibraryService.Batch batch) {
         int rules = node.ruleCount();
         boolean blocked = switch (policy) {
-            case PROMPT, SKIP_WITH_RULES -> rules > 0;
+            case SKIP_WITH_RULES -> rules > 0;
             case CONFIRMED -> false;
         };
         if (blocked) {
@@ -286,36 +136,6 @@ final class MachineLinkService {
         String patternText = outcome.patterns() > 0 ? "（退回 " + outcome.patterns() + " 块样板）" : "";
         String nodeText = outcome.nodeDeleted() ? "（节点已删除）" : "";
         return "已删除机器 [" + machine.shortId() + "]" + nodeText + rulesText + patternText;
-    }
-
-    /**
-     * 命令侧删除：取机器、按策略删、出文案。
-     *
-     * @param player         玩家
-     * @param factory        工厂
-     * @param target         机器
-     * @param policy         删除策略
-     * @param confirmCommand 给玩家的确认指令
-     * @return 命令结果
-     */
-    private int reportDelete(ServerPlayer player, Factory factory, Machine target,
-            DeletePolicy policy, String confirmCommand) {
-        Optional<Node> nodeFound = factory.config().nodes().nodeOfMachine(target.id());
-        if (nodeFound.isEmpty()) {
-            FactoryMessages.err(player, "机器不属于任何节点");
-            return 0;
-        }
-        Node node = nodeFound.get();
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        DeleteOutcome outcome = removeMachine(factory, node, target, policy, null, batch);
-        if (!outcome.deleted()) {
-            FactoryMessages.warn(player, "机器 [" + target.shortId() + "] 还有 " + outcome.rules()
-                    + " 条 IO 配置，确认删除请执行 " + confirmCommand + "，或在机器库界面删除");
-            return 0;
-        }
-        batch.close();
-        FactoryMessages.ok(player, deletedText(target, outcome));
-        return 1;
     }
 
     /**
@@ -385,32 +205,6 @@ final class MachineLinkService {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * 取玩家自己的工厂；没有就提示。
-     *
-     * @param player 玩家
-     * @return 工厂；玩家没有工厂时为 {@code null}
-     */
-    @Nullable
-    private Factory owned(ServerPlayer player) {
-        Factory factory = FactoryRefs.owned(this.manager, player);
-        if (factory == null) {
-            FactoryMessages.err(player, "你还没有工厂，先执行 /idlefactory create");
-        }
-        return factory;
-    }
-
-    /**
-     * 立刻刷新一个方块的观测。
-     *
-     * @param block 方块
-     * @return 刷新后的观测；观测服务未就绪时为 {@code null}
-     */
-    @Nullable
-    private Observation refreshObservation(BlockKey block) {
-        return this.observations == null ? null : this.observations.refresh(block);
     }
 
     /**

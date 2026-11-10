@@ -412,7 +412,7 @@ final class BindingService {
     private Factory owned(ServerPlayer player) {
         Factory factory = FactoryRefs.owned(this.manager, player);
         if (factory == null) {
-            FactoryMessages.err(player, "你还没有工厂，先执行 /idlefactory create");
+            FactoryMessages.err(player, "你还没有工厂：打开一次终端会自动创建");
         }
         return factory;
     }

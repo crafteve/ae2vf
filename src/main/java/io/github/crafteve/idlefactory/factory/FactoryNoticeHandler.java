@@ -84,7 +84,7 @@ final class FactoryNoticeHandler {
             int restored = this.restoredNotices.getOrDefault(factoryId, 0);
             if (missing > 0) {
                 player.displayClientMessage(FactoryMessages.warn(
-                        missing + " 台机器失联 · /idf factory info"), true);
+                        missing + " 台机器失联"), true);
             } else if (restored > 0) {
                 player.displayClientMessage(FactoryMessages.ok(
                         restored + " 台机器回来了 · 规则已恢复"), true);
