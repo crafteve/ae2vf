@@ -24,8 +24,8 @@ import appeng.api.stacks.AEItemKey;
 /**
  * 左表与 IO 详情共用的文案/图标解析。
  *
- * <p>资源名、单位、面名、数量缩写和诊断文案原来散在 {@link FactoryScreen} 里；展开详情
- * 也要用同一套说法，所以集中到这里，避免两处各写一份、翻译后对不上。</p>
+ * <p>资源名、单位、面名、数量缩写集中在这里；被动 IO 终端的列表与展开详情都用同一套说法，
+ * 避免两处各写一份、翻译后对不上。</p>
  */
 public final class FactoryLabels {
     private FactoryLabels() {

@@ -19,13 +19,12 @@ public final class ModCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, IdleFactory.MODID);
 
-    /** 放置工厂物品栏：图标用工厂终端。 */
+    /** 放置工厂物品栏：图标用被动 IO 终端。 */
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> IDLE_FACTORY =
             TABS.register("idlefactory", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.idlefactory"))
-                    .icon(() -> new ItemStack(ModItems.FACTORY_TERMINAL.get()))
+                    .icon(() -> new ItemStack(ModItems.PASSIVE_IO_TERMINAL.get()))
                     .displayItems((parameters, output) -> {
-                        output.accept(ModItems.FACTORY_TERMINAL.get());
                         output.accept(ModItems.PASSIVE_IO_TERMINAL.get());
                         output.accept(ModItems.NODE_TERMINAL.get());
                         output.accept(ModItems.MACHINE_BINDING_WAND.get());

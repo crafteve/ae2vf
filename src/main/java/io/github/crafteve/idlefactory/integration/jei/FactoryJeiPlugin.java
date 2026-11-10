@@ -11,7 +11,6 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
@@ -75,7 +74,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
 
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        registration.addGuiContainerHandler(FactoryScreen.class, new FactoryGuiHandler());
         registration.addGuiContainerHandler(FactoryPassiveIoScreen.class,
                 new PassiveIoGuiHandler());
         registration.addGhostIngredientHandler(FactoryPassiveIoScreen.class,
@@ -99,33 +97,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
     // ------------------------------------------------------------------
 
     private static Optional<IClickableIngredient<?>> clickableAt(
-            FactoryScreen screen, double mouseX, double mouseY) {
-        return clickableAt(screen.jeiTargetAt(mouseX, mouseY));
-    }
-
-    private static Optional<IClickableIngredient<?>> clickableAt(
-            @Nullable FactoryScreen.JeiTarget target) {
-        if (target == null || runtime == null) {
-            return Optional.empty();
-        }
-        if (target.kind() == CapabilityKind.ENERGY) {
-            // FE 没有物品形态；用独立配料，R/U 与收藏都落在 FE 上，而不是红石粉。
-            return runtime.getIngredientManager()
-                    .createClickableIngredient(FeIngredient.TYPE, FeIngredient.INSTANCE,
-                            target.area(), false)
-                    .map(ingredient -> (IClickableIngredient<?>) ingredient);
-        }
-        if (target.stack().isEmpty()) {
-            return Optional.empty();
-        }
-        // JEI 的 R/U 只关心物品身份；去掉数量，避免带数量的栈影响查找/匹配。
-        return runtime.getIngredientManager()
-                .createClickableIngredient(target.stack().copyWithCount(1),
-                        target.area(), false)
-                .map(ingredient -> (IClickableIngredient<?>) ingredient);
-    }
-
-    private static Optional<IClickableIngredient<?>> clickableAt(
             FactoryPassiveIoScreen screen, double mouseX, double mouseY) {
         FactoryPassiveIoJeiTargets.JeiTarget target = screen.jeiTargetAt(mouseX, mouseY);
         if (target == null || runtime == null) {
@@ -145,14 +116,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
                 .map(ingredient -> (IClickableIngredient<?>) ingredient);
     }
 
-    private static final class FactoryGuiHandler implements IGuiContainerHandler<FactoryScreen> {
-        @Override
-        public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
-                FactoryScreen screen, double mouseX, double mouseY) {
-            return clickableAt(screen, mouseX, mouseY);
-        }
-    }
-
     private static final class PassiveIoGuiHandler
             implements IGuiContainerHandler<FactoryPassiveIoScreen> {
         @Override
@@ -166,9 +129,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
         @Override
         public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
                 double mouseX, double mouseY) {
-            if (Minecraft.getInstance().screen instanceof FactoryScreen screen) {
-                return clickableAt(screen, mouseX, mouseY);
-            }
             if (Minecraft.getInstance().screen instanceof FactoryPassiveIoScreen screen) {
                 return clickableAt(screen, mouseX, mouseY);
             }

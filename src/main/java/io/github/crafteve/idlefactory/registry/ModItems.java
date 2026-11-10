@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.registry;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
 import io.github.crafteve.idlefactory.item.FactoryPassiveIoTerminalItem;
-import io.github.crafteve.idlefactory.item.FactoryTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 
@@ -21,11 +20,6 @@ public final class ModItems {
     /** 物品注册表。 */
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(Registries.ITEM, IdleFactory.MODID);
-
-    /** 工厂终端。 */
-    public static final DeferredHolder<Item, FactoryTerminalItem> FACTORY_TERMINAL =
-            ITEMS.register("factory_terminal",
-                    () -> new FactoryTerminalItem(unstackable()));
 
     /** 被动 IO 管理终端；右键打开第三版框架界面。 */
     public static final DeferredHolder<Item, FactoryPassiveIoTerminalItem> PASSIVE_IO_TERMINAL =

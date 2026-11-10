@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryBindingCommitS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryMachineActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
@@ -15,13 +14,9 @@ import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryStorageActionC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryStorageRequestC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
-import io.github.crafteve.idlefactory.network.payload.OpenFactoryGuiC2S;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -93,24 +88,12 @@ public final class ModNetwork {
                 FactoryTableRequestC2S::handle);
         registrar.playToClient(FactoryTableS2C.TYPE, FactoryTableS2C.STREAM_CODEC,
                 FactoryTableS2C::handle);
-        registrar.playToServer(FactoryStorageRequestC2S.TYPE,
-                FactoryStorageRequestC2S.STREAM_CODEC, FactoryStorageRequestC2S::handle);
-        registrar.playToClient(FactoryStorageS2C.TYPE, FactoryStorageS2C.STREAM_CODEC,
-                FactoryStorageS2C::handle);
-        registrar.playToServer(FactoryStorageActionC2S.TYPE,
-                FactoryStorageActionC2S.STREAM_CODEC, FactoryStorageActionC2S::handle);
 
-        // P1：机器 / IO 编辑
-        registrar.playToServer(FactoryMachineActionC2S.TYPE, FactoryMachineActionC2S.STREAM_CODEC,
-                FactoryMachineActionC2S::handle);
+        // P1：IO 编辑
         registrar.playToServer(FactoryRuleActionC2S.TYPE, FactoryRuleActionC2S.STREAM_CODEC,
                 FactoryRuleActionC2S::handle);
         registrar.playToClient(FactoryEditFeedbackS2C.TYPE, FactoryEditFeedbackS2C.STREAM_CODEC,
                 FactoryEditFeedbackS2C::handle);
-
-        // 物品入口：终端右键 / 快捷键请求打开界面
-        registrar.playToServer(OpenFactoryGuiC2S.TYPE, OpenFactoryGuiC2S.STREAM_CODEC,
-                OpenFactoryGuiC2S::handle);
 
         // 被动 IO：列表 / 卡片视图写物品组件，服务端确认后回同步
         registrar.playToServer(FactoryPassiveIoViewC2S.TYPE,

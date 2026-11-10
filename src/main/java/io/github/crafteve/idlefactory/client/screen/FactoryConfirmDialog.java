@@ -12,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * 浮层外点击一律吞掉，避免误触背后的列表。</p>
  *
  * <p>几何分两部分：{@link Bounds} 是浮层自身的位置，{@link #backdrop()} 是要压暗的父面板。
- * 旧工作台从 {@link FactoryLayout} 推导，节点终端直接给屏幕矩形。</p>
+ * 两者都由调用方（节点终端）直接给出屏幕矩形。</p>
  */
 public final class FactoryConfirmDialog {
     /** 浮层尺寸。 */
@@ -54,22 +54,6 @@ public final class FactoryConfirmDialog {
     }
 
     /**
-     * 打开确认浮层（旧工作台入口）。
-     *
-     * @param title        标题
-     * @param message      说明；可用 {@code \n} 分行
-     * @param confirmLabel 确认按钮文字
-     * @param onConfirm    确认回调
-     * @param layout       当前布局
-     */
-    public void open(String title, String message, String confirmLabel, Runnable onConfirm,
-            FactoryLayout layout) {
-        open(title, message, confirmLabel, onConfirm,
-                new Bounds(layout.confirmX(), layout.confirmY(), WIDTH, HEIGHT),
-                new Bounds(layout.panelX, layout.panelY, layout.panelW, layout.panelH));
-    }
-
-    /**
      * 打开确认浮层。
      *
      * @param title        标题
@@ -99,19 +83,6 @@ public final class FactoryConfirmDialog {
     /** 是否打开。 */
     public boolean isOpen() {
         return this.open;
-    }
-
-    /**
-     * 布局变化时更新引用（旧工作台入口）。
-     *
-     * @param layout 新布局
-     */
-    public void rebind(FactoryLayout layout) {
-        if (!this.open) {
-            return;
-        }
-        this.dialog = new Bounds(layout.confirmX(), layout.confirmY(), WIDTH, HEIGHT);
-        this.backdrop = new Bounds(layout.panelX, layout.panelY, layout.panelW, layout.panelH);
     }
 
     /**

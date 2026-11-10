@@ -2,19 +2,17 @@ package io.github.crafteve.idlefactory.client.network;
 
 import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
-import io.github.crafteve.idlefactory.client.screen.FactoryScreen;
 import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
-import io.github.crafteve.idlefactory.network.payload.FactoryStorageS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.client.Minecraft;
 
 /**
- * 工厂只读数据的客户端入口：机器表、仓库摘要与编辑反馈。
+ * 工厂只读数据的客户端入口：机器表与编辑反馈。
  *
- * <p>机器表与编辑反馈按 {@link FactoryTableSink} 投递，旧工作台与被动 IO 终端都能收到；
- * 仓库摘要只有旧工作台用，仍直接交给 {@link FactoryScreen}。</p>
+ * <p>两者都按接口投递（{@link FactoryTableSink} / {@link FactoryFeedbackSink}），
+ * 不列举具体屏幕；仓库摘要曾只服务旧工作台，随工作台一起删除。</p>
  */
 public final class ClientFactoryTableHandler {
     private ClientFactoryTableHandler() {
@@ -34,18 +32,6 @@ public final class ClientFactoryTableHandler {
         FactoryTableSink sink = currentSink(payload.containerId());
         if (sink != null) {
             sink.acceptTable(payload);
-        }
-    }
-
-    /**
-     * 处理仓库摘要。
-     *
-     * @param payload 负载
-     */
-    public static void handleStorage(FactoryStorageS2C payload) {
-        FactoryScreen screen = currentScreen(payload.containerId());
-        if (screen != null) {
-            screen.acceptStorage(payload);
         }
     }
 
@@ -90,20 +76,6 @@ public final class ClientFactoryTableHandler {
         if (Minecraft.getInstance().screen instanceof FactoryTableSink sink
                 && sink.containerId() == containerId) {
             return sink;
-        }
-        return null;
-    }
-
-    /**
-     * 当前打开且容器 id 匹配的旧工作台。
-     *
-     * @param containerId 容器 id
-     * @return 屏幕；不匹配时为 {@code null}
-     */
-    private static FactoryScreen currentScreen(int containerId) {
-        if (Minecraft.getInstance().screen instanceof FactoryScreen screen
-                && screen.getMenu().containerId == containerId) {
-            return screen;
         }
         return null;
     }

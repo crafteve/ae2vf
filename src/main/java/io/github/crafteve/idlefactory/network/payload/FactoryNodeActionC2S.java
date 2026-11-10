@@ -24,8 +24,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 客户端对一个节点做出的管理动作：删除整个节点。
  *
- * <p>删除成员的语义走 {@link FactoryMachineActionC2S}（移除成员，最后一台等价删节点）；
- * 这个包只表达「明确删节点」。服务端按玩家工厂与节点归属重新校验，不信任客户端。</p>
+ * <p>这个包只表达「明确删节点」；单台成员的删除入口随旧工作台一起删除，现在删机器只能删整个
+ * 节点。服务端按玩家工厂与节点归属重新校验，不信任客户端。</p>
  *
  * @param containerId 菜单容器 id
  * @param nodeId      目标节点 id

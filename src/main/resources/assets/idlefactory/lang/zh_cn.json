@@ -1,10 +1,5 @@
 {
-  "screen.idlefactory.title": "放置工厂",
-  "screen.idlefactory.search_hint": "搜索…",
-  "key.categories.idlefactory": "放置工厂",
-  "key.idlefactory.open_terminal": "打开工厂终端",
   "itemGroup.idlefactory": "放置工厂",
-  "item.idlefactory.factory_terminal": "工厂终端",
   "item.idlefactory.passive_io_terminal": "被动 IO 管理终端",
   "item.idlefactory.node_terminal": "节点管理终端",
   "item.idlefactory.machine_binding_wand": "机器绑定杖",
