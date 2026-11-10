@@ -5,7 +5,6 @@ import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.server.level.ServerLevel;
@@ -70,24 +69,6 @@ public final class FactoryMessages {
         return text(body, INFO);
     }
 
-    /** 正文，无前缀。 */
-    public static Component plain(String body) {
-        return text(body, PLAIN);
-    }
-
-    /**
-     * 只有悬停、不点击的 id 文本。
-     *
-     * @param label 显示文字
-     * @param hover 悬停说明
-     * @return 组件
-     */
-    public static MutableComponent hover(String label, String hover) {
-        return Component.literal(label).withStyle(style -> style
-                .withColor(TextColor.fromRgb(ID))
-                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Component.literal(hover))));
-    }
-
     /**
      * 发一条消息。
      *
@@ -96,16 +77,6 @@ public final class FactoryMessages {
      */
     public static void send(ServerPlayer player, Component message) {
         player.sendSystemMessage(message);
-    }
-
-    /**
-     * 给玩家发一条正文。
-     *
-     * @param player 接收者
-     * @param text   文本
-     */
-    public static void msg(ServerPlayer player, String text) {
-        send(player, plain(text));
     }
 
     /**

@@ -4,8 +4,6 @@ import net.minecraft.resources.ResourceLocation;
 
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 
 /**
  * 一台机器 / 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
@@ -197,16 +195,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      */
     public static FactoryStatus stale(FactoryGuiTheme theme) {
         return of(Kind.STALE, theme);
-    }
-
-    /**
-     * 节点未探测时的状态展示；给按节点聚合的卡片用。
-     *
-     * @param theme 当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus unprobed(FactoryGuiTheme theme) {
-        return of(Kind.UNPROBED, theme);
     }
 
     /**

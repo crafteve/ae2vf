@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.client;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,7 +7,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.network.ClientBindingCommitHandler;
 import io.github.crafteve.idlefactory.factory.BindingDraft;
 import io.github.crafteve.idlefactory.factory.BindingMode;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -58,11 +56,6 @@ public final class BindingDraftController {
     /** 当前草稿。 */
     public static BindingDraft draft() {
         return draft;
-    }
-
-    /** 草稿是否非空。 */
-    public static boolean hasDraft() {
-        return !draft.isEmpty();
     }
 
     /**

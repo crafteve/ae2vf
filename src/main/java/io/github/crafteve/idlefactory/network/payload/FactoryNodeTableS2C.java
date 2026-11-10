@@ -17,7 +17,6 @@ import io.github.crafteve.idlefactory.factory.node.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;

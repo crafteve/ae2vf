@@ -43,21 +43,6 @@ public record Multiplier(MultiplierMode mode, int factor) {
     }
 
     /**
-     * 固定倍率。
-     *
-     * @param factor 倍数；越界会被夹到 1..{@link #HARD_MAX_FACTOR}
-     * @return 倍率值对象
-     */
-    public static Multiplier fixed(int factor) {
-        return new Multiplier(MultiplierMode.FIXED, factor);
-    }
-
-    /** 智能倍率；实际倍数在派单时探测。 */
-    public static Multiplier smart() {
-        return new Multiplier(MultiplierMode.SMART, MIN_FACTOR);
-    }
-
-    /**
      * 这次派单实际使用的倍数。
      *
      * <p>关返回 1；固定返回配置倍数；智能使用调用方探测到的容量，探测失败（容量 &lt; 1）
@@ -72,26 +57,6 @@ public record Multiplier(MultiplierMode mode, int factor) {
             case FIXED -> this.factor;
             case SMART -> Math.clamp(smartCapacity, MIN_FACTOR, HARD_MAX_FACTOR);
         };
-    }
-
-    /**
-     * 换模式；固定倍数保留，切回固定时沿用旧值。
-     *
-     * @param next 新模式
-     * @return 新值对象
-     */
-    public Multiplier withMode(MultiplierMode next) {
-        return new Multiplier(next, this.factor);
-    }
-
-    /**
-     * 换固定倍数。
-     *
-     * @param next 新倍数
-     * @return 新值对象
-     */
-    public Multiplier withFactor(int next) {
-        return new Multiplier(this.mode, next);
     }
 
     /**

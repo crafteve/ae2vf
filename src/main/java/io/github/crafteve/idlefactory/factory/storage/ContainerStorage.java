@@ -8,7 +8,6 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
@@ -94,16 +93,6 @@ public final class ContainerStorage implements MEStorage {
         this.containers = List.copyOf(containers);
         this.totalContainers = totalContainers;
         this.observations = observations;
-    }
-
-    /** 声明的容器总数。 */
-    public int containerCount() {
-        return this.totalContainers;
-    }
-
-    /** 当前可用的容器数。 */
-    public int availableCount() {
-        return this.containers.size();
     }
 
     public long insert(AEKey key, long amount, boolean simulate) {

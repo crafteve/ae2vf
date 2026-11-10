@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -90,11 +89,6 @@ public final class RunnerState {
     /** 已登记状态的机器数（诊断用）。 */
     public int size() {
         return this.machines.size();
-    }
-
-    /** 已登记状态的机器 id（只读快照，遍历时用）。 */
-    public Set<UUID> ids() {
-        return Set.copyOf(this.machines.keySet());
     }
 
     /** 一台机器的睡眠状态。 */

@@ -16,7 +16,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.N
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
-import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;

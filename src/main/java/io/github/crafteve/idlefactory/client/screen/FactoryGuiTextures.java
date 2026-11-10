@@ -10,86 +10,21 @@ import io.github.crafteve.idlefactory.IdleFactory;
  * <p>全部由 {@code tools/gui/gen_textures.py} 离线生成，落在
  * {@code assets/idlefactory/textures/gui/}。Java 侧只引用，不拼路径字符串。</p>
  *
- * <p>新增贴图时三处一起改：生成脚本的 {@code SPECS}、这里的常量、以及 {@link FactoryNineSlice} 里
- * 对应的方法（因为边框宽度要跟着走）。</p>
+ * <p>第一版工作台删除后，只剩被动 IO 终端与共享渲染组件真正用到的贴图：面板、凹槽、按钮、
+ * 粗分隔线与四种状态灯 / 状态条。旧工作台的表格、IO 详情、搜索框、排序图标等贴图连同常量
+ * 一起删除，生成脚本里的对应条目也同步移除。</p>
  */
 public final class FactoryGuiTextures {
     /** 面板底：九宫格，边框 3。 */
     public static final ResourceLocation PANEL = id("panel");
     /** 凹槽格子：九宫格，边框 1。 */
     public static final ResourceLocation SLOT = id("slot");
-    /** 终端槽位：4×4 九宫格，浅底 + 四边深网格线，没有亮边。 */
-    public static final ResourceLocation TERMINAL_SLOT = id("terminal_slot");
-    /** 终端工作区底：1×1 深灰蓝，拉伸使用。 */
-    public static final ResourceLocation WORK_BG = id("work_bg");
-    /** 终端工作区内阴影：1×1，拉伸使用。 */
-    public static final ResourceLocation WORK_SHADOW = id("work_shadow");
-    /** 仓库悬停格：18×18 固定贴图。 */
-    public static final ResourceLocation SLOT_HOVER = id("slot_hover");
     /** 凸起按钮：九宫格，边框 1。 */
     public static final ResourceLocation BUTTON = id("button");
-    /** 黄色匹配按钮：九宫格，边框 1。 */
-    public static final ResourceLocation BUTTON_MATCH = id("button_match");
-    /** 输入框：九宫格，边框 1。 */
-    public static final ResourceLocation FIELD = id("field");
-    /** 搜索框纯色底：1×1，拉伸使用。 */
-    public static final ResourceLocation SEARCH_BG = id("search_bg");
-    /** 搜索框边框：1×1，拉伸使用。 */
-    public static final ResourceLocation SEARCH_BORDER = id("search_border");
-    /** 搜索框内阴影：1×1，拉伸使用。 */
-    public static final ResourceLocation SEARCH_SHADOW = id("search_shadow");
-    /** 搜索框内高光：1×1，拉伸使用。 */
-    public static final ResourceLocation SEARCH_HIGHLIGHT = id("search_highlight");
-    /** 搜索放大镜：固定 9×9。 */
-    public static final ResourceLocation SEARCH = id("search");
-    /** 搜索清空按钮：固定 7×7。 */
-    public static final ResourceLocation SEARCH_CLEAR = id("search_clear");
-    /** 排序按钮底：6×6 蓝灰九宫格。 */
-    public static final ResourceLocation SORT_BUTTON = id("sort_button");
-    /** 排序键图标：白色漏斗。 */
-    public static final ResourceLocation SORT_KEY = id("sort_key");
-    /** 排序方向：升序（白色上箭头）。 */
-    public static final ResourceLocation SORT_ASC = id("sort_asc");
-    /** 排序方向：降序（白色下箭头）。 */
-    public static final ResourceLocation SORT_DESC = id("sort_desc");
-    /** 范围：全部。 */
-    public static final ResourceLocation SCOPE_ALL = id("scope_all");
-    /** 范围：仅物品。 */
-    public static final ResourceLocation SCOPE_ITEMS = id("scope_items");
-    /** 范围：仅流体。 */
-    public static final ResourceLocation SCOPE_FLUIDS = id("scope_fluids");
-    /** 细分隔线：1×1，拉伸使用。 */
-    public static final ResourceLocation DIVIDER = id("divider");
-    /** 粗分隔线：1×1，拉伸使用。 */
-    public static final ResourceLocation DIVIDER_DARK = id("divider_dark");
-    /** 表头底色：1×1，拉伸使用。 */
-    public static final ResourceLocation HEADER_BG = id("header_bg");
-    /** 隔行底色：1×1，拉伸使用。 */
-    public static final ResourceLocation ROW_ALT = id("row_alt");
-
-    /** 凸起表头：九宫格，边框 1。 */
-    public static final ResourceLocation TABLE_HEADER = id("table_header");
-    /** 行卡片：九宫格，边框 1。 */
-    public static final ResourceLocation ROW_CARD = id("row_card");
-    /** 机器库卡片：九宫格，边框 1。 */
-    public static final ResourceLocation MACHINE_CARD = id("machine_card");
-    /** 表格内圈亮边：1×1。 */
-    public static final ResourceLocation TABLE_LIGHT = id("table_light");
-
-    /** IO 展开详情底板：九宫格，边框 3。 */
-    public static final ResourceLocation IO_PANEL = id("io_panel");
-    /** IO 规则单元格：九宫格，边框 1。 */
-    public static final ResourceLocation IO_CELL = id("io_cell");
-    /** IO 规则单元格悬停：九宫格，边框 1。 */
-    public static final ResourceLocation IO_CELL_HOVER = id("io_cell_hover");
-    /** IO 段头：九宫格，边框 2。 */
-    public static final ResourceLocation IO_HEADER = id("io_header");
     /** 按钮悬停：九宫格，边框 1。 */
     public static final ResourceLocation BUTTON_HOVER = id("button_hover");
-    /** 收起箭头：7×7。 */
-    public static final ResourceLocation CHEVRON_RIGHT = id("chevron_right");
-    /** 展开箭头：7×7。 */
-    public static final ResourceLocation CHEVRON_DOWN = id("chevron_down");
+    /** 粗分隔线：1×1，拉伸使用。 */
+    public static final ResourceLocation DIVIDER_DARK = id("divider_dark");
 
     /** 1px 状态条：运行。 */
     public static final ResourceLocation STATUS_STRIP_RUN = id("status_strip_run");
@@ -110,15 +45,6 @@ public final class FactoryGuiTextures {
     public static final ResourceLocation STATUS_LAMP_IDLE = id("status_lamp_idle");
 
     /**
-     * AE2 通用面板底：256×256，九宫格边框 4。
-     *
-     * <p>直接复用 AE2 的 {@code guis/background.png}，不再自己生成面板贴图：左面板要和右侧
-     * AE2 终端并排，只有用同一张底图才能保证上/左的深+白、下/右的白+阴影+深逐像素一致。</p>
-     */
-    public static final ResourceLocation AE2_BACKGROUND =
-            ResourceLocation.fromNamespaceAndPath("ae2", "textures/guis/background.png");
-
-    /**
      * AE2 搜索框：128×128，纵向三段各 12 高（普通 / 不可编辑 / 聚焦）。
      *
      * <p>直接复用 AE2 的 {@code guis/text_field.png}，切法与 AE2 的 {@code AETextField}
@@ -133,46 +59,10 @@ public final class FactoryGuiTextures {
     public static final int PANEL_BORDER = 3;
     /** 凹槽贴图的边长（4×4）。 */
     public static final int SLOT_SIZE = 4;
-    /** 终端槽位贴图的边长（4×4）。 */
-    public static final int TERMINAL_SLOT_SIZE = 4;
-    /** 仓库悬停格边长。 */
-    public static final int SLOT_HOVER_SIZE = 18;
     /** 按钮贴图的边长（6×6）。 */
     public static final int BUTTON_SIZE = 6;
-    /** 输入框贴图的边长（4×4）。 */
-    public static final int FIELD_SIZE = 4;
-    /** 设备列表外框/表头/行卡片的边长。 */
-    public static final int TABLE_FRAME_SIZE = 6;
-    /** 机器库卡片边长。 */
-    public static final int MACHINE_CARD_SIZE = 6;
-    /** IO 详情底板边长。 */
-    public static final int IO_PANEL_SIZE = 10;
-    /** IO 详情底板九宫格边框。 */
-    public static final int IO_PANEL_BORDER = 3;
-    /** IO 单元格/段头/悬停按钮的九宫格边长。 */
+    /** 悬停按钮 / 九宫格通用边长。 */
     public static final int IO_CELL_SIZE = 6;
-    /** IO 段头贴图边长；1px 边框用来画下/右阴影。 */
-    public static final int IO_HEADER_SIZE = 6;
-    /** IO 段头九宫格边框。 */
-    public static final int IO_HEADER_BORDER = 1;
-    /** 箭头贴图边长。 */
-    public static final int CHEVRON_SIZE = 7;
-    /** 行尾动作图标边长；展开箭头与移出 X 都是 7×7。 */
-    public static final int ROW_ACTION_ICON_SIZE = 7;
-    /** 状态灯边长。 */
-    public static final int STATUS_LAMP_SIZE = 4;
-    /** 搜索图标边长。 */
-    public static final int SEARCH_SIZE = 9;
-    /** 搜索清空图标边长。 */
-    public static final int SEARCH_CLEAR_SIZE = 7;
-    /** 排序按钮底贴图边长。 */
-    public static final int SORT_BUTTON_SIZE = 6;
-    /** 排序图标边长。 */
-    public static final int SORT_ICON_SIZE = 12;
-    /** AE2 通用面板底边长（正方形）。 */
-    public static final int AE2_BACKGROUND_SIZE = 256;
-    /** AE2 通用面板底九宫格边框；上/左 2px、下/右 4px，取大的 4 让底部阴影完整。 */
-    public static final int AE2_BACKGROUND_BORDER = 4;
     /** AE2 搜索框贴图边长（正方形）。 */
     public static final int AE2_TEXT_FIELD_SIZE = 128;
     /** AE2 搜索框纵向每段高度。 */

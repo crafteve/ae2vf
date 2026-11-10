@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.integration.jei;
 import java.util.List;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryResourceIconRender;
-import appeng.api.stacks.AEKey;
 
 import mezz.jei.api.ingredients.IIngredientRenderer;
 

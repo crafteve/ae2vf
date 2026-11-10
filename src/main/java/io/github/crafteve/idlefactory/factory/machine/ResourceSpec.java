@@ -88,11 +88,6 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
         return custom ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
     }
 
-    /** 是否「塞满」。 */
-    public boolean fillToCapacity() {
-        return this.amount <= 0L;
-    }
-
     /** 给界面用的面名。 */
     public String faceName() {
         return this.face == null ? ANY : this.face.getName();

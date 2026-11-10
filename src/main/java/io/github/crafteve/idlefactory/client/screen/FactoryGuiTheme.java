@@ -169,12 +169,4 @@ public record FactoryGuiTheme(
         return current;
     }
 
-    /**
-     * 切换当前主题（预留给后续设置项或命令）。
-     *
-     * @param theme 新主题；传 {@code null} 会恢复 {@link #AE2}
-     */
-    public static void setCurrent(FactoryGuiTheme theme) {
-        current = theme != null ? theme : AE2;
-    }
 }

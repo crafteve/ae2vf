@@ -1,15 +1,12 @@
 package io.github.crafteve.idlefactory.item;
 
 import io.github.crafteve.idlefactory.client.BindingDraftController;
-import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 
-import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 机器绑定杖：左/右键机器 toggle，Ctrl 连锁 toggle。

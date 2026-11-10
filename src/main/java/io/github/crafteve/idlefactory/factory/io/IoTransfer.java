@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory.io;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.storage.MEStorage;
-import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 /**

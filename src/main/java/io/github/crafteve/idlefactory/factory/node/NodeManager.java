@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -200,26 +199,6 @@ public final class NodeManager {
                 node.detachReturning();
             } catch (RuntimeException e) {
                 node.logThrottled(this.server.overworld().getGameTime(), "拆节点异常：" + e);
-            }
-        }
-    }
-
-    /**
-     * 拆掉一个工厂的全部节点，并把余量还回网络；只有工厂记录会被删除时才用。
-     *
-     * @param factoryId 工厂 id
-     */
-    public void removeFactory(UUID factoryId) {
-        Iterator<Map.Entry<UUID, NodeRuntime>> iterator = this.nodes.entrySet().iterator();
-        while (iterator.hasNext()) {
-            NodeRuntime node = iterator.next().getValue();
-            if (node.factoryId().equals(factoryId)) {
-                try {
-                    node.detachReturning();
-                } catch (RuntimeException e) {
-                    node.logThrottled(this.server.overworld().getGameTime(), "拆节点异常：" + e);
-                }
-                iterator.remove();
             }
         }
     }

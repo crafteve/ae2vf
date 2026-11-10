@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.factory.node;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -260,16 +259,4 @@ public final class NodeLibrary implements NodeLibraryView {
         return id.toString().substring(0, 8);
     }
 
-    /**
-     * 把所有节点按登记顺序摊平成机器列表；遍历节点→机器时用。
-     *
-     * @return 机器列表
-     */
-    public List<Machine> allMachines() {
-        List<Machine> machines = new ArrayList<>(this.totalMachineCount());
-        for (Node node : this.byId.values()) {
-            machines.addAll(node.machines());
-        }
-        return machines;
-    }
 }

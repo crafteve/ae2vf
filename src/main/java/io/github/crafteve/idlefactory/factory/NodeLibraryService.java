@@ -3,7 +3,6 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
 

@@ -11,7 +11,6 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import appeng.api.storage.MEStorage;
 

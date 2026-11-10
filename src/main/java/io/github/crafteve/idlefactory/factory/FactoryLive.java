@@ -46,10 +46,6 @@ public final class FactoryLive {
 
     /** 上一次解析的异常摘要；正常时为 {@code null}。 */
     @Nullable
-    public String storageError() {
-        return this.storageError;
-    }
-
     /** 诊断数据。 */
     public DiagStats stats() {
         return this.stats;

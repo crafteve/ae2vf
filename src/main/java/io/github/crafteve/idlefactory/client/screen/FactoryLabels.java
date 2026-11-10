@@ -122,85 +122,8 @@ public final class FactoryLabels {
         };
     }
 
-    /**
-     * 配置面的英文名，给 tooltip 和日志用。
-     *
-     * @param spec 规则
-     * @return 方向名；不限面时为 {@code any}
-     */
-    static String faceEn(ResourceSpec spec) {
-        return spec.face() == null ? ResourceSpec.ANY : spec.face().getName();
-    }
-
-    /**
-     * 资源数量在窄格子里的显示：物品/FE 压到最多 4 个字符，流体换算成 B。
-     *
-     * @param value 内部单位（物品个 / 流体 mB / FE）
-     * @param kind  资源类型
-     * @return 例如 {@code 12}、{@code 28M}、{@code 281T}、{@code 1.5B}、{@code 281kB}
-     */
-    public static String gridCount(long value, CapabilityKind kind) {
-        return kind == CapabilityKind.FLUID ? compactFluid(value) : compactCount(value);
-    }
-
     private static final String[] COMPACT_UNITS = {"E", "P", "T", "G", "M", "k"};
     private static final double[] COMPACT_DIVISORS = {1.0E18, 1.0E15, 1.0E12, 1.0E9, 1.0E6, 1.0E3};
-
-    /**
-     * 仓库格专用：最多 4 个字符。
-     *
-     * <p>先试带 1 位小数的写法，超长就丢掉小数；例如 {@code 281.5T → 281T}。
-     * 完整精度留给 tooltip 和速率。</p>
-     */
-    private static String compactCount(long value) {
-        if (value < 0L || value < 1000L) {
-            return Long.toString(value);
-        }
-        for (int i = 0; i < COMPACT_UNITS.length; i++) {
-            double divisor = COMPACT_DIVISORS[i];
-            if (value < divisor) {
-                continue;
-            }
-            double scaled = value / divisor;
-            String decimal = String.format(Locale.ROOT, "%.1f", scaled) + COMPACT_UNITS[i];
-            if (decimal.length() <= 4) {
-                return decimal;
-            }
-            String integer = Long.toString((long) scaled) + COMPACT_UNITS[i];
-            if (integer.length() <= 4) {
-                return integer;
-            }
-        }
-        return Long.toString(value);
-    }
-
-    /**
-     * 流体格专用：保留 B 和 0.001B 精度，最多 5 个字符；1B 以上才按 k/M/G… 缩写。
-     */
-    private static String compactFluid(long milliBuckets) {
-        if (milliBuckets < 1000L) {
-            return fluid(milliBuckets);
-        }
-        double buckets = milliBuckets / 1000.0D;
-        for (int i = 0; i < COMPACT_UNITS.length; i++) {
-            double divisor = COMPACT_DIVISORS[i];
-            if (buckets < divisor) {
-                continue;
-            }
-            double scaled = buckets / divisor;
-            String decimal = String.format(Locale.ROOT, "%.1f", scaled)
-                    + COMPACT_UNITS[i] + "B";
-            if (decimal.length() <= 5) {
-                return decimal;
-            }
-            String integer = Long.toString((long) scaled) + COMPACT_UNITS[i] + "B";
-            if (integer.length() <= 5) {
-                return integer;
-            }
-        }
-        String fallback = fluid(milliBuckets);
-        return fallback.length() <= 5 ? fallback : Long.toString((long) buckets) + "B";
-    }
 
     /**
      * 速率显示：物品 {@code 1.2k/s}、流体 {@code 1.5B/s}、FE {@code 28.1G FE/s}。
@@ -233,18 +156,6 @@ public final class FactoryLabels {
             return Long.toString(count);
         }
         return scaled(count, "");
-    }
-
-    /**
-     * tick 向上取整成秒，给睡眠提示用。
-     *
-     * <p>睡眠剩余按 tick 下发；显示时向上取整，避免剩余 1 tick 时出现「睡眠 0s」。</p>
-     *
-     * @param ticks tick 数
-     * @return 秒数；非正数时为 {@code 0}
-     */
-    static long seconds(long ticks) {
-        return ticks <= 0L ? 0L : (ticks + 19L) / 20L;
     }
 
     /**
@@ -311,37 +222,6 @@ public final class FactoryLabels {
             case NO_SPACE -> input ? "机器已满" : "仓库已满";
             case NO_HANDLER -> "无可用面";
             case REJECTED -> "该面拒收";
-        };
-    }
-
-    /**
-     * 诊断对应的 1px 状态条贴图。
-     *
-     * @param reason 原因
-     * @return 状态条贴图
-     */
-    static ResourceLocation reasonStrip(IoResult.Reason reason) {
-        return switch (reason) {
-            case OK -> FactoryGuiTextures.STATUS_STRIP_RUN;
-            case NO_ITEM -> FactoryGuiTextures.STATUS_STRIP_IDLE;
-            case NO_SPACE -> FactoryGuiTextures.STATUS_STRIP_WARN;
-            case NO_HANDLER, REJECTED -> FactoryGuiTextures.STATUS_STRIP_ERROR;
-        };
-    }
-
-    /**
-     * 诊断文字颜色。
-     *
-     * @param reason 原因
-     * @param theme  主题
-     * @return ARGB 颜色
-     */
-    public static int reasonColor(IoResult.Reason reason, FactoryGuiTheme theme) {
-        return switch (reason) {
-            case OK -> theme.statusRun();
-            case NO_ITEM -> theme.statusIdle();
-            case NO_SPACE -> theme.statusWarn();
-            case NO_HANDLER, REJECTED -> theme.error();
         };
     }
 
@@ -437,35 +317,6 @@ public final class FactoryLabels {
      */
     public static IoResult.Reason effectiveReason(long rate, IoResult.Reason reason) {
         return rate > 0L ? IoResult.Reason.OK : reason;
-    }
-
-    /**
-     * 「标签 + 值」的一行 tooltip：标签浅灰粗体、值亮色粗体。
-     *
-     * @param label 标签
-     * @param value 值
-     * @param theme 主题
-     * @return 文本组件
-     */
-    static Component labelValue(String label, String value, FactoryGuiTheme theme) {
-        return Component.empty()
-                .append(colored(label, theme.tooltip().label()))
-                .append(coloredBold(value, theme.tooltip().value()));
-    }
-
-    /**
-     * 「面：xxx」的 tooltip 片段，面用紫色区别于数值青。
-     *
-     * @param label 标签
-     * @param face  中文面名
-     * @param faceEn 英文面名
-     * @param theme 主题
-     * @return 文本组件
-     */
-    static Component faceLine(String label, String face, String faceEn, FactoryGuiTheme theme) {
-        return Component.empty()
-                .append(colored(label, theme.tooltip().label()))
-                .append(coloredBold(face + "（" + faceEn + "）", theme.tooltip().face()));
     }
 
     /**

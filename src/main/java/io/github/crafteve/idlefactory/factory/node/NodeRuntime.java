@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -255,11 +254,6 @@ public final class NodeRuntime
         }
     }
 
-    /** 节点是否已经建出来。 */
-    public boolean isAttached() {
-        return this.managed.getNode() != null;
-    }
-
     /** 节点是否在线（有电、已启动、频道要求满足）。 */
     public boolean isNodeOnline() {
         return this.managed.isOnline();
@@ -418,16 +412,6 @@ public final class NodeRuntime
             return level;
         }
         return this.anchorLevel;
-    }
-
-    /** 成功解码的样板数。 */
-    public int decodedPatternCount() {
-        return this.craft.decodedCount();
-    }
-
-    /** 产物白名单大小。 */
-    public int productCount() {
-        return this.craft.products().size();
     }
 
     /**

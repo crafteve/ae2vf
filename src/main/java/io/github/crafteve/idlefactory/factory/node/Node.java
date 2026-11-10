@@ -240,30 +240,6 @@ public final class Node {
     }
 
     /**
-     * 按 id 替换一台机器；属于结构变更，结构版本加一。
-     *
-     * @param machine 新机器；id 必须在节点里
-     * @return 新节点；id 不存在时返回自身
-     */
-    public Node withReplacedMachine(Machine machine) {
-        List<Machine> next = new ArrayList<>(this.machines.size());
-        boolean replaced = false;
-        for (Machine current : this.machines) {
-            if (current.id().equals(machine.id())) {
-                next.add(machine);
-                replaced = true;
-            } else {
-                next.add(current);
-            }
-        }
-        if (!replaced) {
-            return this;
-        }
-        return new Node(this.id, this.name, this.typeBlockId, this.io, this.provider, next,
-                this.topologyRevision + 1L);
-    }
-
-    /**
      * 序列化成 NBT：身份 + 类型 + IO + provider + 机器表。
      *
      * @param registries 注册表访问，物品组件编码需要

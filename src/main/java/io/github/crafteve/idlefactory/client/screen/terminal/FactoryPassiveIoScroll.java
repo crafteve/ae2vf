@@ -1,14 +1,10 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import java.util.ArrayList;
-import java.util.List;
 
-import org.jetbrains.annotations.Nullable;
 
 import appeng.client.gui.widgets.Scrollbar;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.util.Mth;
 

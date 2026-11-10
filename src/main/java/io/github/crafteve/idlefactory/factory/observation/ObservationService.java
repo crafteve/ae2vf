@@ -266,15 +266,6 @@ public final class ObservationService {
     }
 
     /**
-     * 面表被冻结的位置数（诊断用）。
-     *
-     * @return 冻结数
-     */
-    public int frozenFacesCount() {
-        return this.frozenFaces.size();
-    }
-
-    /**
      * 取某个维度的能力句柄缓存。
      *
      * @param level 维度

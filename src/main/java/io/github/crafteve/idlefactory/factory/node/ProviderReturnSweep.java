@@ -122,26 +122,6 @@ public final class ProviderReturnSweep {
         this.idle(now);
     }
 
-    /** 上一轮有存储能力的面数；0 表示六面都抽不到产物。 */
-    public int storageFaces() {
-        return this.storageFaces;
-    }
-
-    /** 上一次扫描的时间。 */
-    public long lastSweepTick() {
-        return this.lastSweepTick;
-    }
-
-    /** 上一次抽到东西的时间。 */
-    public long lastExtractTick() {
-        return this.lastExtractTick;
-    }
-
-    /** 当前空闲退避档位。 */
-    public int idleStep() {
-        return this.idleStep;
-    }
-
     /**
      * 扫一个面：白名单 key 逐条走「模拟进网络 → 从机器抽 → 插网络 → 剩下的塞回去」。
      *

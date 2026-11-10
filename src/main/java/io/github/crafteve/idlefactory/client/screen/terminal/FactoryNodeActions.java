@@ -4,7 +4,6 @@ import io.github.crafteve.idlefactory.client.BindingDraftController;
 import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
-import io.github.crafteve.idlefactory.factory.BindingMode;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;

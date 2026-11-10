@@ -32,32 +32,9 @@ public final class FactoryNineSlice {
                 x, y, width, height);
     }
 
-    /**
-     * 画终端左面板底：直接用 AE2 的通用背景。
-     *
-     * <p>左面板与右侧 AE2 终端并排，只有用同一张 {@code guis/background.png} 才能让底部
-     * 的「白 + 阴影 + 深」和右侧终端逐像素一致；自己生成的面板贴图立体方向相反，接缝处会露馅。</p>
-     */
-    public static void terminalPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.AE2_BACKGROUND,
-                FactoryGuiTextures.AE2_BACKGROUND_SIZE,
-                FactoryGuiTextures.AE2_BACKGROUND_BORDER, x, y, width, height);
-    }
-
     /** 画凹槽格子。 */
     public static void slot(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, FactoryGuiTextures.SLOT, FactoryGuiTextures.SLOT_SIZE, 1, x, y, width, height);
-    }
-
-    /**
-     * 画终端槽位：浅底 + 四边深网格线。
-     *
-     * <p>相邻槽位各带 1px 边，拼起来就是 2px 网格线；不要再用带亮边的 {@link #slot}，
-     * 那个是浅色面板上的内凹格，放到深色工作区里会亮得刺眼。</p>
-     */
-    public static void terminalSlot(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.TERMINAL_SLOT,
-                FactoryGuiTextures.TERMINAL_SLOT_SIZE, 1, x, y, width, height);
     }
 
     /** 画凸起按钮。 */
@@ -65,61 +42,9 @@ public final class FactoryNineSlice {
         slice(graphics, FactoryGuiTextures.BUTTON, FactoryGuiTextures.BUTTON_SIZE, 1, x, y, width, height);
     }
 
-    /** 画输入框。 */
-    public static void field(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.FIELD, FactoryGuiTextures.FIELD_SIZE, 1, x, y, width, height);
-    }
-
-    /** 画凸起表头。 */
-    public static void header(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.TABLE_HEADER, FactoryGuiTextures.TABLE_FRAME_SIZE, 1,
-                x, y, width, height);
-    }
-
-    /** 画行卡片。 */
-    public static void card(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.ROW_CARD, FactoryGuiTextures.TABLE_FRAME_SIZE, 1,
-                x, y, width, height);
-    }
-
-    /** 画机器库卡片。 */
-    public static void machineCard(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.MACHINE_CARD, FactoryGuiTextures.MACHINE_CARD_SIZE, 1,
-                x, y, width, height);
-    }
-
-    /** 画 IO 展开详情底板。 */
-    public static void ioPanel(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.IO_PANEL, FactoryGuiTextures.IO_PANEL_SIZE,
-                FactoryGuiTextures.IO_PANEL_BORDER, x, y, width, height);
-    }
-
-    /** 画 IO 规则单元格。 */
-    public static void ioCell(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.IO_CELL, FactoryGuiTextures.IO_CELL_SIZE, 1, x, y, width, height);
-    }
-
-    /** 画 IO 规则单元格悬停底。 */
-    public static void ioCellHover(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.IO_CELL_HOVER, FactoryGuiTextures.IO_CELL_SIZE, 1,
-                x, y, width, height);
-    }
-
-    /** 画 IO 段头：深色卡片，下/右 2px 深阴影。 */
-    public static void ioHeader(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.IO_HEADER, FactoryGuiTextures.IO_HEADER_SIZE,
-                FactoryGuiTextures.IO_HEADER_BORDER, x, y, width, height);
-    }
-
     /** 画按钮悬停底。 */
     public static void buttonHover(GuiGraphics graphics, int x, int y, int width, int height) {
         slice(graphics, FactoryGuiTextures.BUTTON_HOVER, FactoryGuiTextures.IO_CELL_SIZE, 1,
-                x, y, width, height);
-    }
-
-    /** 画蓝灰排序按钮底。 */
-    public static void sortButton(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.SORT_BUTTON, FactoryGuiTextures.SORT_BUTTON_SIZE, 1,
                 x, y, width, height);
     }
 

@@ -56,8 +56,4 @@ public final class ClientFactoryLinks {
         return machines;
     }
 
-    /** 是否已经收到过服务端快照。 */
-    public static boolean loaded() {
-        return loaded;
-    }
 }

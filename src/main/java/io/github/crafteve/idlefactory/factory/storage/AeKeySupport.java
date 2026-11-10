@@ -130,44 +130,6 @@ public final class AeKeySupport {
         return key instanceof AEItemKey item ? item.getReadOnlyStack() : ItemStack.EMPTY;
     }
 
-    /**
-     * 模糊匹配：只比类型与注册名，忽略数据组件。
-     *
-     * @param left  资源 key，可为 {@code null}
-     * @param right 资源 key，可为 {@code null}
-     * @return 类型与注册名都相同时为 {@code true}；任一为 {@code null} 时为 {@code false}
-     */
-    public static boolean fuzzyEquals(@Nullable AEKey left, @Nullable AEKey right) {
-        if (left == null || right == null) {
-            return false;
-        }
-        if (left == right) {
-            return true;
-        }
-        return left.getType().equals(right.getType()) && left.getId().equals(right.getId());
-    }
-
-    /**
-     * 精确匹配：直接用 AE2 的相等性，物品带数据组件。
-     *
-     * @param left  资源 key，可为 {@code null}
-     * @param right 资源 key，可为 {@code null}
-     * @return 相等时为 {@code true}；任一为 {@code null} 时为 {@code false}
-     */
-    public static boolean exactEquals(@Nullable AEKey left, @Nullable AEKey right) {
-        return left != null && left.equals(right);
-    }
-
-    /** 是否是物品 key。 */
-    public static boolean isItem(@Nullable AEKey key) {
-        return key instanceof AEItemKey;
-    }
-
-    /** 是否是流体 key。 */
-    public static boolean isFluid(@Nullable AEKey key) {
-        return key instanceof AEFluidKey;
-    }
-
     /** 是否是 Applied Flux 提供的 FE key（没装附属时恒为 {@code false}）。 */
     public static boolean isEnergy(@Nullable AEKey key) {
         return key != null && AppFluxKeys.isFe(key);
@@ -217,25 +179,6 @@ public final class AeKeySupport {
             out.put(key, counter.get(key));
         }
         return out;
-    }
-
-    /**
-     * 仓库里是否有一类资源。
-     *
-     * <p>用库存实况判断，而不是问后端「你支持不支持」：装了对应附属、且仓库里真有货，
-     * 才算这一类可用。没装 Applied Flux 时 FE 必然为空，自然返回 {@code false}。</p>
-     *
-     * @param storage 仓库
-     * @param kind    能力大类
-     * @return 有这类资源时为 {@code true}
-     */
-    public static boolean hasAny(MEStorage storage, CapabilityKind kind) {
-        for (AEKey key : snapshot(storage).keySet()) {
-            if (kind(key) == kind) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

@@ -22,7 +22,6 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Kind;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;

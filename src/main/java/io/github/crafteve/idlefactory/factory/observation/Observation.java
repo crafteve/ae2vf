@@ -95,21 +95,6 @@ public final class Observation {
         return this.workState;
     }
 
-    /** 最后一次工作状态探测的 tick；没探过为 {@code -1}。 */
-    public long workObservedAtTick() {
-        return this.workObservedAtTick;
-    }
-
-    /**
-     * 距离上次工作状态探测的 tick。
-     *
-     * @param now 当前 tick
-     * @return 没探过为 {@code -1}
-     */
-    public long workAgeTicks(long now) {
-        return this.workObservedAtTick < 0L ? -1L : Math.max(0L, now - this.workObservedAtTick);
-    }
-
     /** 下一次该探测工作状态的 tick。 */
     long nextWorkProbeTick() {
         return this.nextWorkProbeTick;
@@ -167,29 +152,9 @@ public final class Observation {
         return this.observedAtTick;
     }
 
-    /** 第一次观测到「不在了」的 tick；没失联为 {@code -1}。 */
-    public long missingSince() {
-        return this.missingSince;
-    }
-
     /** 下一次该探测的 tick。 */
     public long nextProbeTick() {
         return this.nextProbeTick;
-    }
-
-    /** 当前复探间隔（tick），诊断用。 */
-    public int probeInterval() {
-        return this.probeInterval;
-    }
-
-    /**
-     * 距离上次观测过去了多少 tick。
-     *
-     * @param now 当前 tick
-     * @return 未探测过时为 {@code -1}
-     */
-    public long ageTicks(long now) {
-        return this.observedAtTick < 0L ? -1L : Math.max(0L, now - this.observedAtTick);
     }
 
     /**

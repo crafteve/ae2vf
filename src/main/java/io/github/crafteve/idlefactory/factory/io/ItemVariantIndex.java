@@ -7,7 +7,6 @@ import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.resources.ResourceLocation;

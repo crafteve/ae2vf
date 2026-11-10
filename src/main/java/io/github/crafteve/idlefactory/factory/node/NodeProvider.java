@@ -82,26 +82,6 @@ public final class NodeProvider {
      * @param face      上次送进去的面；{@code null} 表示面未定
      */
     public record Pending(GenericStack stack, @Nullable UUID machineId, @Nullable Direction face) {
-        /**
-         * 换一个面，数量与机器不变。
-         *
-         * @param next 新面；{@code null} 表示面未定
-         * @return 新条目
-         */
-        public Pending withFace(@Nullable Direction next) {
-            return new Pending(this.stack, this.machineId, next);
-        }
-
-        /**
-         * 换数量，机器与面不变。
-         *
-         * @param amount 新数量
-         * @return 新条目
-         */
-        public Pending withAmount(long amount) {
-            return new Pending(new GenericStack(this.stack.what(), amount), this.machineId,
-                    this.face);
-        }
     }
 
     /** 阻挡开关。 */
@@ -121,24 +101,6 @@ public final class NodeProvider {
     /** 主动 / 被动模式。 */
     public ProviderMode mode() {
         return this.mode;
-    }
-
-    /** 玩家是否手动切过模式。 */
-    public boolean modePinned() {
-        return this.modePinned;
-    }
-
-    /**
-     * 手动切换模式；之后不再按「放入第一张样板」自动转主动。
-     *
-     * @param next 新模式
-     * @return 模式是否真的变了
-     */
-    public boolean selectMode(ProviderMode next) {
-        boolean changed = !this.modePinned || this.mode != next;
-        this.modePinned = true;
-        this.mode = next;
-        return changed;
     }
 
     /**
@@ -253,15 +215,6 @@ public final class NodeProvider {
     /** 余量总条数。 */
     public int pendingCount() {
         return this.pending.size();
-    }
-
-    /** 余量总数量。 */
-    public long pendingAmount() {
-        long total = 0L;
-        for (Pending entry : this.pending) {
-            total += entry.stack().amount();
-        }
-        return total;
     }
 
     /**

@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,31 +232,6 @@ public final class NodeIoRunner {
     }
 
     /**
-     * 这台机器睡到什么时候。
-     *
-     * @param machineId 机器 id
-     * @return 唤醒时间；没在睡时为 {@code 0}
-     */
-    public long sleepUntil(UUID machineId) {
-        RunnerState.MachineState state = this.state.peek(machineId);
-        if (state == null || !state.sleeping) {
-            return 0L;
-        }
-        return state.wakeAt;
-    }
-
-    /**
-     * 这台机器是什么时候开始睡的。
-     *
-     * @param machineId 机器 id
-     * @return 睡眠起点；没在睡时为 {@code -1}
-     */
-    public long sleepSince(UUID machineId) {
-        RunnerState.MachineState state = this.state.peek(machineId);
-        return state == null ? -1L : state.sleepSince;
-    }
-
-    /**
      * 丢掉一台机器的面路由。玩家改规则（加/删输入输出）时调——面可能跟着变了。
      *
      * @param machineId 机器 id
@@ -278,19 +252,6 @@ public final class NodeIoRunner {
     public int routeCount(UUID machineId) {
         RunnerState.MachineState state = this.state.peek(machineId);
         return state == null ? 0 : state.routeCount();
-    }
-
-    /**
-     * 全部机器记住的面路由总条数（诊断用）。
-     *
-     * @return 路由条数
-     */
-    public int totalRouteCount() {
-        int total = 0;
-        for (UUID machineId : this.state.ids()) {
-            total += routeCount(machineId);
-        }
-        return total;
     }
 
     /**

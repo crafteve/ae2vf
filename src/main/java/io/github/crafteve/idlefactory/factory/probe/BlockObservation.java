@@ -62,12 +62,4 @@ public record BlockObservation(@Nullable ResourceLocation blockId, Health health
         return this.health == Health.PRESENT;
     }
 
-    /**
-     * 未探测的占位。
-     *
-     * @return 未探测投影
-     */
-    public static BlockObservation unknown() {
-        return new BlockObservation(null, Health.UNKNOWN, false, -1L);
-    }
 }

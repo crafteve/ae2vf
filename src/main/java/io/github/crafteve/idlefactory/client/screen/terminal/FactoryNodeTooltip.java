@@ -6,7 +6,6 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Kind;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;

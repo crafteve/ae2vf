@@ -1,11 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -29,10 +26,6 @@ public final class FactoryLimitsConfig {
     public static final int HARD_MAX_TOTAL_MACHINES = NodeLibrary.HARD_MAX_TOTAL_MACHINES;
     /** 每侧规则数硬上限。 */
     public static final int HARD_MAX_RULES_PER_SIDE = NodeIoGroup.MAX_RULES_PER_SIDE;
-    /** 样板槽硬上限。 */
-    public static final int HARD_MAX_PATTERN_CAPACITY = NodeProvider.MAX_CAPACITY;
-    /** 倍率硬上限；与 {@code factory.node.Multiplier.HARD_MAX_FACTOR} 一致。 */
-    public static final int HARD_MAX_MULTIPLIER = Multiplier.HARD_MAX_FACTOR;
     /** 名字长度硬上限。 */
     public static final int HARD_MAX_NAME_LENGTH = Node.HARD_MAX_NAME_LENGTH;
     /** 观测预算硬上限（每 tick 探测多少次）。 */
@@ -63,14 +56,6 @@ public final class FactoryLimitsConfig {
     public static final ModConfigSpec.IntValue MAX_RULES_PER_SIDE = limited("maxRulesPerSide",
             "输入或输出每侧规则数上限；-1 表示无上限。 / Max rules per side; -1 = unlimited.",
             HARD_MAX_RULES_PER_SIDE);
-    /** 单节点样板槽上限；-1 表示无上限。 */
-    public static final ModConfigSpec.IntValue MAX_PATTERN_CAPACITY = limited("maxPatternCapacity",
-            "单节点样板槽上限；-1 表示无上限。 / Max pattern slots per node; -1 = unlimited.",
-            HARD_MAX_PATTERN_CAPACITY);
-    /** 固定/智能倍率上限；-1 表示用硬上限。 */
-    public static final ModConfigSpec.IntValue MAX_MULTIPLIER = limited("maxMultiplier",
-            "固定与智能倍率上限；-1 表示用硬上限。 / Max multiplier; -1 = hard cap.",
-            HARD_MAX_MULTIPLIER);
     /** 节点名字长度上限；-1 表示用硬上限。 */
     public static final ModConfigSpec.IntValue MAX_NAME_LENGTH = limited("maxNameLength",
             "节点名字长度上限；-1 表示用硬上限。 / Max node name length; -1 = hard cap.",
@@ -141,16 +126,6 @@ public final class FactoryLimitsConfig {
     /** @return 有效每侧规则数上限 */
     public static int maxRulesPerSide() {
         return effective(MAX_RULES_PER_SIDE.get(), HARD_MAX_RULES_PER_SIDE);
-    }
-
-    /** @return 有效单节点样板槽上限 */
-    public static int maxPatternCapacity() {
-        return effective(MAX_PATTERN_CAPACITY.get(), HARD_MAX_PATTERN_CAPACITY);
-    }
-
-    /** @return 有效倍率上限 */
-    public static int maxMultiplier() {
-        return effective(MAX_MULTIPLIER.get(), HARD_MAX_MULTIPLIER);
     }
 
     /** @return 有效名字长度上限 */

@@ -8,7 +8,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.Direction;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
@@ -48,19 +47,6 @@ public record FaceTable(Map<Direction, Set<CapabilityKind>> byFace,
     }
 
     /**
-     * 某个面提供的能力。
-     *
-     * @param face 面；{@code null} 表示无向
-     * @return 能力集合（只读，空集表示没有）
-     */
-    public Set<CapabilityKind> at(@Nullable Direction face) {
-        if (face == null) {
-            return this.unsided;
-        }
-        return this.byFace.getOrDefault(face, Set.of());
-    }
-
-    /**
      * 有某种能力的所有面（顺序 = {@link Direction} 枚举顺序，稳定）。
      *
      * @param kind 资源类型
@@ -74,16 +60,6 @@ public record FaceTable(Map<Direction, Set<CapabilityKind>> byFace,
             }
         }
         return result;
-    }
-
-    /**
-     * 无向查询是否报告了某种能力。
-     *
-     * @param kind 资源类型
-     * @return 有则为 {@code true}
-     */
-    public boolean hasUnsided(CapabilityKind kind) {
-        return this.unsided.contains(kind);
     }
 
     /**
