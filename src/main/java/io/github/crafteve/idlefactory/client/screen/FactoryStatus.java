@@ -2,8 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import net.minecraft.resources.ResourceLocation;
 
-import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.NodeStatus;
 
 /**
  * 一台机器 / 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
@@ -71,22 +71,23 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     /**
      * 取一个节点的状态种类。
      *
-     * <p>未探测 / 过期优先；节点健康只有在线、缺机、离线三档；在线时再看总状态。</p>
+     * <p>唯一一套节点判断顺序：未探测 / 过期优先，其次失联 / 缺机，最后才看"在干什么"。
+     * 两个终端都读服务端下发的 {@link NodeStatus}，这里只做展示映射，不再自己聚合。</p>
      *
-     * @param node 节点视图
+     * @param status 节点状态
      * @return 状态种类
      */
-    static Kind kindOf(FactoryNodeSnapshotBuilder.NodeView node) {
-        if (!node.probed()) {
+    static Kind kindOf(NodeStatus status) {
+        if (!status.probed()) {
             return Kind.UNPROBED;
         }
-        if (node.stale()) {
+        if (status.stale()) {
             return Kind.STALE;
         }
-        return switch (node.health()) {
+        return switch (status.health()) {
             case OFFLINE -> Kind.OFFLINE;
             case PARTIAL -> Kind.PARTIAL;
-            case ONLINE -> kindOf(node.totalState());
+            case ONLINE -> kindOf(status.totalState());
         };
     }
 
@@ -156,45 +157,14 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
-     * 把节点视图映射成文字、颜色和贴图。
+     * 把节点状态映射成文字、颜色和贴图。
      *
-     * @param node  节点视图
-     * @param theme 当前主题
+     * @param status 节点状态
+     * @param theme  当前主题
      * @return 状态展示
      */
-    public static FactoryStatus of(FactoryNodeSnapshotBuilder.NodeView node,
-            FactoryGuiTheme theme) {
-        return of(kindOf(node), theme);
-    }
-
-    /**
-     * 节点全部离线时的状态展示；给按节点聚合的卡片用。
-     *
-     * @param theme 当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus offline(FactoryGuiTheme theme) {
-        return of(Kind.OFFLINE, theme);
-    }
-
-    /**
-     * 节点部分在线时的状态展示；给按节点聚合的卡片用。
-     *
-     * @param theme 当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus partial(FactoryGuiTheme theme) {
-        return of(Kind.PARTIAL, theme);
-    }
-
-    /**
-     * 节点健康过期时的状态展示；给按节点聚合的卡片用。
-     *
-     * @param theme 当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus stale(FactoryGuiTheme theme) {
-        return of(Kind.STALE, theme);
+    public static FactoryStatus of(NodeStatus status, FactoryGuiTheme theme) {
+        return of(kindOf(status), theme);
     }
 
     /**
@@ -211,11 +181,11 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     /**
      * 节点状态文字；节点终端与被动 IO 终端共用。
      *
-     * @param node  节点视图
-     * @param theme 当前主题
+     * @param status 节点状态
+     * @param theme  当前主题
      * @return 状态文字
      */
-    public static String text(FactoryNodeSnapshotBuilder.NodeView node, FactoryGuiTheme theme) {
-        return of(node, theme).text();
+    public static String text(NodeStatus status, FactoryGuiTheme theme) {
+        return of(status, theme).text();
     }
 }

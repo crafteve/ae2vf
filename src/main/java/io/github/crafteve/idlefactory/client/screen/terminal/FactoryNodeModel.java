@@ -127,7 +127,7 @@ final class FactoryNodeModel {
         List<NodeRow> next = new ArrayList<>(this.nodes.size());
         for (FactoryNodeSnapshotBuilder.NodeView view : this.nodes) {
             String name = displayName(view);
-            FactoryStatus status = FactoryStatus.of(view, this.theme);
+            FactoryStatus status = FactoryStatus.of(view.status(), this.theme);
             if (!this.query.isEmpty() && !this.query.matches(fields(view, name, status))) {
                 continue;
             }
@@ -140,7 +140,7 @@ final class FactoryNodeModel {
         List<MemberRow> rows = new ArrayList<>(view.members().size());
         for (int i = 0; i < view.members().size(); i++) {
             FactoryNodeSnapshotBuilder.MemberView member = view.members().get(i);
-            rows.add(new MemberRow(member, FactoryStatus.of(view, this.theme), "#" + (i + 1)));
+            rows.add(new MemberRow(member, FactoryStatus.of(view.status(), this.theme), "#" + (i + 1)));
         }
         return rows;
     }

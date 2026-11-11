@@ -10,7 +10,6 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientNodeTableHandler;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
@@ -18,8 +17,8 @@ import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.network.ModNetwork;
+import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -111,10 +110,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
             buf.writeUtf(node.name(), Node.HARD_MAX_NAME_LENGTH);
         }
         ResourceLocation.STREAM_CODEC.encode(buf, node.typeBlockId());
-        buf.writeByte(node.health().ordinal());
-        buf.writeBoolean(node.probed());
-        buf.writeBoolean(node.stale());
-        buf.writeByte(node.totalState().ordinal());
+        NodeStatusCodec.write(buf, node.status());
         buf.writeVarInt(node.ruleCount());
         buf.writeVarInt(node.patternCount());
         buf.writeBoolean(node.provider().available());
@@ -132,11 +128,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         UUID nodeId = buf.readUUID();
         String name = buf.readBoolean() ? buf.readUtf(Node.HARD_MAX_NAME_LENGTH) : null;
         ResourceLocation typeBlockId = ResourceLocation.STREAM_CODEC.decode(buf);
-        NodeHealth health = readEnum(buf, NodeHealth.values(), "node health");
-        boolean probed = buf.readBoolean();
-        boolean stale = buf.readBoolean();
-        FactorySnapshotBuilder.TotalState totalState =
-                readEnum(buf, FactorySnapshotBuilder.TotalState.values(), "total state");
+        NodeStatus status = NodeStatusCodec.read(buf);
         int ruleCount = buf.readVarInt();
         int patternCount = buf.readVarInt();
         boolean available = buf.readBoolean();
@@ -150,8 +142,8 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         for (int i = 0; i < memberCount; i++) {
             members.add(readMember(buf));
         }
-        return new FactoryNodeSnapshotBuilder.NodeView(nodeId, name, typeBlockId, health, probed,
-                stale, totalState, ruleCount, patternCount,
+        return new FactoryNodeSnapshotBuilder.NodeView(nodeId, name, typeBlockId, status,
+                ruleCount, patternCount,
                 new FactoryNodeSnapshotBuilder.ProviderView(available, blocking, multiplier,
                         dispatch), members);
     }

@@ -13,6 +13,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
@@ -47,10 +48,21 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param hasFactory    玩家是否已有工厂
  * @param storageOnline 仓库是否在线
  * @param machines      机器视图
+ * @param nodeStatuses  节点状态：服务端唯一聚合结果，被动 IO 终端直接读，不再自己拼
  */
 public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline,
-        List<FactorySnapshotBuilder.MachineView> machines) implements CustomPacketPayload {
+        List<FactorySnapshotBuilder.MachineView> machines,
+        List<NodeStatusEntry> nodeStatuses) implements CustomPacketPayload {
+
+    /**
+     * 一个节点在机器表里的状态条目。
+     *
+     * @param nodeId 节点 id
+     * @param status 节点状态
+     */
+    public record NodeStatusEntry(UUID nodeId, NodeStatus status) {
+    }
 
     /** 包类型：{@code idlefactory:factory_table}。 */
     public static final Type<FactoryTableS2C> TYPE =
@@ -62,11 +74,12 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
 
     public FactoryTableS2C {
         machines = List.copyOf(machines);
+        nodeStatuses = List.copyOf(nodeStatuses);
     }
 
     /** 没有工厂时的空表。 */
     public static FactoryTableS2C empty(int containerId) {
-        return new FactoryTableS2C(containerId, false, false, List.of());
+        return new FactoryTableS2C(containerId, false, false, List.of(), List.of());
     }
 
     @Override
@@ -92,6 +105,11 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         for (FactorySnapshotBuilder.MachineView machine : payload.machines()) {
             writeMachine(buf, machine);
         }
+        buf.writeVarInt(payload.nodeStatuses().size());
+        for (NodeStatusEntry entry : payload.nodeStatuses()) {
+            buf.writeUUID(entry.nodeId());
+            NodeStatusCodec.write(buf, entry.status());
+        }
     }
 
     private static FactoryTableS2C read(RegistryFriendlyByteBuf buf) {
@@ -104,7 +122,13 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
-        return new FactoryTableS2C(containerId, hasFactory, storageOnline, machines);
+        int statusCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes()),
+                "node statuses");
+        List<NodeStatusEntry> nodeStatuses = new ArrayList<>(statusCount);
+        for (int i = 0; i < statusCount; i++) {
+            nodeStatuses.add(new NodeStatusEntry(buf.readUUID(), NodeStatusCodec.read(buf)));
+        }
+        return new FactoryTableS2C(containerId, hasFactory, storageOnline, machines, nodeStatuses);
     }
 
     private static void writeMachine(RegistryFriendlyByteBuf buf,

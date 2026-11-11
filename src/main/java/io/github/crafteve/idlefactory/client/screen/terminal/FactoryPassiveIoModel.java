@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryMachineSearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
+import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -34,6 +37,8 @@ final class FactoryPassiveIoModel {
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
     private List<BlockView> blocks = List.of();
+    /** 节点 id → 服务端算好的节点状态；本类只读，不再自己聚合。 */
+    private Map<UUID, NodeStatus> nodeStatuses = Map.of();
 
     /**
      * 一条 IO 规则在界面上的样子。
@@ -108,6 +113,11 @@ final class FactoryPassiveIoModel {
         this.hasFactory = payload.hasFactory();
         this.storageOnline = payload.storageOnline();
         this.machines = payload.machines();
+        Map<UUID, NodeStatus> nextStatuses = new HashMap<>(payload.nodeStatuses().size());
+        for (FactoryTableS2C.NodeStatusEntry entry : payload.nodeStatuses()) {
+            nextStatuses.put(entry.nodeId(), entry.status());
+        }
+        this.nodeStatuses = Map.copyOf(nextStatuses);
         rebuild();
     }
 
@@ -169,34 +179,15 @@ final class FactoryPassiveIoModel {
                 continue;
             }
             FactorySnapshotBuilder.MachineView anchor = members.get(0);
-            next.add(new BlockView(anchor, members, nodeStatus(members, anchor),
+            // 节点状态只读服务端下发的结论；缺失时用同一聚合函数兜底，绝不拿第一台自己拼。
+            NodeStatus status = this.nodeStatuses.get(anchor.nodeId());
+            if (status == null) {
+                status = NodeStatusResolver.resolve(members);
+            }
+            next.add(new BlockView(anchor, members, FactoryStatus.of(status, this.theme),
                     rules(members, anchor)));
         }
         this.blocks = List.copyOf(next);
-    }
-
-    /**
-     * 节点聚合状态：全部离线 = 失联，部分在线 = 缺机，其余沿用代表机器的状态。
-     *
-     * @param members 成员
-     * @param anchor  代表机器
-     * @return 状态展示
-     */
-    private FactoryStatus nodeStatus(List<FactorySnapshotBuilder.MachineView> members,
-            FactorySnapshotBuilder.MachineView anchor) {
-        int online = 0;
-        for (FactorySnapshotBuilder.MachineView member : members) {
-            if (member.health().isOnline()) {
-                online++;
-            }
-        }
-        if (online == 0) {
-            return FactoryStatus.offline(this.theme);
-        }
-        if (online < members.size()) {
-            return FactoryStatus.partial(this.theme);
-        }
-        return FactoryStatus.of(anchor, this.theme);
     }
 
     /**

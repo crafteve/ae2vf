@@ -38,21 +38,17 @@ public final class FactoryNodeSnapshotBuilder {
     /**
      * 一个节点在节点管理终端里的样子。
      *
-     * @param nodeId            节点 id
-     * @param name              玩家起的名字；{@code null} 表示用方块名
-     * @param typeBlockId       类型方块 id（节点图标 / 类型判定）
-     * @param health            节点健康
-     * @param probed            是否所有机器都探测过
-     * @param stale             是否有机器健康过期
-     * @param totalState        与被动 IO 终端一致的总状态
-     * @param ruleCount         节点 IO 规则总数
-     * @param patternCount      已放样板数
-     * @param provider          provider 组的状态
-     * @param members           节点下的机器
+     * @param nodeId       节点 id
+     * @param name         玩家起的名字；{@code null} 表示用方块名
+     * @param typeBlockId  类型方块 id（节点图标 / 类型判定）
+     * @param status       节点状态：服务端唯一聚合结果，客户端只读
+     * @param ruleCount    节点 IO 规则总数
+     * @param patternCount 已放样板数
+     * @param provider     provider 组的状态
+     * @param members      节点下的机器
      */
     public record NodeView(java.util.UUID nodeId, @Nullable String name,
-            ResourceLocation typeBlockId, NodeHealth health, boolean probed, boolean stale,
-            FactorySnapshotBuilder.TotalState totalState, int ruleCount, int patternCount,
+            ResourceLocation typeBlockId, NodeStatus status, int ruleCount, int patternCount,
             ProviderView provider, List<MemberView> members) {
 
         public NodeView {
@@ -164,9 +160,8 @@ public final class FactoryNodeSnapshotBuilder {
                                 view.health(), view.probed(), view.stale()));
             }
             boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
-            nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status.health(),
-                    status.probed(), status.stale(), status.totalState(), node.ruleCount(),
-                    node.patternCount(),
+            nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
+                    node.ruleCount(), node.patternCount(),
                     new ProviderView(available, node.provider().blocking(),
                             node.provider().multiplier(), node.provider().dispatch()),
                     members));

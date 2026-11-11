@@ -90,7 +90,7 @@ final class FactoryNodeRender {
         int slotX = FactoryNodeLayout.nameX(viewport) - FactoryNodeLayout.SLOT - 1;
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryNodeLayout.SLOT,
                 FactoryNodeLayout.SLOT);
-        boolean present = row.view().probed() && row.view().health().isOnline();
+        boolean present = row.view().status().probed() && row.view().status().health().isOnline();
         ItemStack icon = present
                 ? FactoryLabels.blockStack(row.view().typeBlockId()) : new ItemStack(Items.BARRIER);
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
@@ -187,13 +187,14 @@ final class FactoryNodeRender {
      * 状态小字：失联 / 未载 / 非 ME。只放得下时画，完整状态始终在 tooltip 里。
      */
     private String statusHint(NodeRow row) {
-        if (!row.view().probed()) {
+        io.github.crafteve.idlefactory.factory.NodeStatus status = row.view().status();
+        if (!status.probed()) {
             return "未探测";
         }
-        if (row.view().stale()) {
+        if (status.stale()) {
             return "健康过期";
         }
-        return switch (row.view().health()) {
+        return switch (status.health()) {
             case OFFLINE -> "失联";
             case PARTIAL -> "缺机";
             case ONLINE -> row.view().provider().available() ? "" : "非 ME";
