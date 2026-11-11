@@ -21,7 +21,7 @@ public record Multiplier(MultiplierMode mode, int factor) {
      * 倍率硬上限，不可由 config 关掉。
      *
      * <p>它同时是网络解码与存档解码的上限：再大的倍数会让样板数量乘法溢出，
-     * 也让一份货超出任何机器容量，只会把余量队列撑爆。</p>
+     * 也让一份货超出任何机器容量，只会把待写入队列撑爆。</p>
      */
     public static final int HARD_MAX_FACTOR = 64;
 

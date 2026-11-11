@@ -188,7 +188,7 @@ public final class NodeManager {
     }
 
     /**
-     * 拆掉一个节点的运行时，并把余量还回网络；节点删除走这里。
+     * 拆掉一个节点的运行时，并把待写入队列还回网络；节点删除走这里。
      *
      * @param nodeId 节点 id
      */

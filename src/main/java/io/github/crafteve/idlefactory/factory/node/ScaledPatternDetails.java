@@ -19,7 +19,7 @@ import net.minecraft.world.level.Level;
  * {@link Multiplier#HARD_MAX_FACTOR} 以内，这里只负责乘法与包装。</p>
  *
  * <p>派单时 CPU 会把放大后的输入交给 {@link #pushInputsToExternalInventory}，所以推进机器的
- * 数量就是 N 倍；收不下的零头由派单方记进余量。</p>
+ * 数量就是 N 倍；收不下的部分由投递按整数份处理。</p>
  */
 public final class ScaledPatternDetails implements IPatternDetails {
     private final IPatternDetails delegate;

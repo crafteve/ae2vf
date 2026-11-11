@@ -9,7 +9,7 @@ import java.util.Locale;
  * 不算阻挡物；粒度是整台机器，不是单个面。默认 {@link #OFF}。</p>
  */
 public enum BlockingMode {
-    /** 不阻挡：CPU 能推多少推多少，塞不下的零头进余量队列。 */
+    /** 不阻挡：CPU 能推多少推多少，塞不下的部分进待写入队列。 */
     OFF,
     /** 阻挡：机器里还有样板输入时，这份样板不推。 */
     ON;

@@ -72,6 +72,8 @@ public final class NodeRuntime
     private final Map<UUID, Boolean> machineOnline = new HashMap<>();
     /** 轮询派单游标；只存内存，不写档。 */
     private int dispatchCursor;
+    /** 主动侧可观测面：队列深度、卡了多久、最近一次失败原因。 */
+    private final NodeDigest digest = new NodeDigest();
     private long nextWarnTick;
 
     /**
@@ -151,50 +153,40 @@ public final class NodeRuntime
     }
 
     /**
-     * 拆节点，尽量把余量送进机器。
-     *
-     * <p>对账时锚点换了、机器还在：送不进去的余量留在机器记录里，下次建节点再冲刷。
-     * 机器真的被删时走 {@link #detachReturning()}。</p>
+     * 拆节点：队列随节点记录保留，下次建节点继续投递，不在这里动材料。
      */
     void detach() {
+        this.managed.destroy();
+    }
+
+    /**
+     * 拆节点且机器记录马上要删：先把队列尽力退回 ME 网络，退不回的丢弃并记日志。
+     */
+    void detachReturning() {
         try {
-            ProviderOverflow.flush(this);
+            this.craft.returnAllOrders(this.gameTime());
         } catch (RuntimeException e) {
-            this.logThrottled(this.server.overworld().getGameTime(), "拆节点前冲刷余量失败：" + e);
+            this.logThrottled(this.gameTime(), "拆节点时退回订单失败：" + e);
         }
         this.managed.destroy();
     }
 
     /**
-     * 拆节点并把余量还回去；机器记录马上要删时用。
-     *
-     * <p>先送回机器，送不进去的插 ME 网络，网络也收不下才掉在机器坐标——数据就要被删了，
-     * 不能留在队列里。</p>
+     * 停机拆节点：队列已经随存档保留，这里不碰材料。
      */
-    void detachReturning() {
-        try {
-            ProviderOverflow.drain(this);
-        } catch (RuntimeException e) {
-            this.logThrottled(this.server.overworld().getGameTime(), "拆节点时退回余量失败：" + e);
-        }
-        this.managed.destroy();
-    }
-
-    /** 停机拆节点：不碰存档数据。 */
     void shutdown() {
         this.managed.destroy();
     }
 
     /**
-     * 每 tick 一次：冲刷余量，再把攒下的样板变化与存档变化收口。
+     * 每 tick 一次：试投递队首，再把攒下的样板变化与存档变化收口。
      *
      * @return 是否改动了要落盘的数据
      */
     boolean tick() {
         boolean changed = false;
-        if (this.node.provider().pendingCount() > 0) {
-            changed |= ProviderOverflow.flush(this);
-        }
+        // 队列不退避，每 tick 都试；投递成功会激活产物回收。
+        this.craft.deliver(this.gameTime());
         if (this.patternsDirty) {
             this.craft.rebuild();
             // 先建后清：rebuild 抛异常时标记还留着，下一 tick 自然重试；
@@ -472,6 +464,12 @@ public final class NodeRuntime
     public ActivePlanner activePlanner() {
         return this.activePlanner;
     }
+
+    /** 主动侧可观测面（只读）。 */
+    public NodeDigest digest() {
+        return this.digest;
+    }
+
 
     /** 派单时用的动作源，标记成机器自己发起。 */
     IActionSource actionSource() {

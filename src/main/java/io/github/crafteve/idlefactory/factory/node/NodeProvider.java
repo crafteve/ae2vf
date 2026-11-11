@@ -16,9 +16,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 节点的样板供应器数据：阻挡、倍率、派单、样板槽与待发送余量。
+ * 节点的样板供应器数据：阻挡、倍率、派单、样板槽与待写入队列。
  *
- * <p>provider 归节点：一个节点一个样板容器，槽位与余量跟着节点记录走，堆叠机器共用。
+ * <p>provider 归节点：一个节点一个样板容器，槽位与待写入队列跟着节点记录走，堆叠机器共用。
  * 样板槽按容量存成定长列表，空槽用 {@link ItemStack#EMPTY} 占位，槽位下标就是样板访问终端
  * 看到的槽位。</p>
  *
@@ -32,22 +32,25 @@ public final class NodeProvider {
     public static final int CAPACITY_STEP = 9;
     /** 样板槽硬上限；config 只能调低。 */
     public static final int MAX_CAPACITY = 1024;
-    /** 余量队列硬顶，不可由 config 调整；满了退回 ME 网络。 */
+    /** 待写入队列的单数硬顶，不可由 config 调整；满了这单不收（CPU 另找别家）。 */
     public static final int MAX_PENDING = 64;
 
     private static final String TAG_BLOCKING = "Blocking";
     private static final String TAG_CAPACITY = "Capacity";
     private static final String TAG_PATTERNS = "Patterns";
     private static final String TAG_PENDING = "Pending";
+    private static final String TAG_LINES = "Lines";
     private static final String TAG_STACK = "Stack";
     private static final String TAG_FACE = "Face";
     private static final String TAG_MACHINE_ID = "MachineId";
+    private static final String TAG_ORPHANED_AT = "OrphanedAt";
+    private static final String TAG_ENQUEUED_AT = "EnqueuedAt";
     private static final String TAG_MODE = "Mode";
     private static final String TAG_MODE_PINNED = "ModePinned";
     private static final String TAG_MULTIPLIER_MODE = "MultiplierMode";
     private static final String TAG_MULTIPLIER_FACTOR = "MultiplierFactor";
     private static final String TAG_DISPATCH = "Dispatch";
-    /** 余量条目的面：-1 表示还没定面。 */
+    /** 订单行的面：-1 表示还没定面。 */
     private static final byte FACE_UNSET = -1;
 
     /** 阻挡开关。 */
@@ -64,24 +67,12 @@ public final class NodeProvider {
     private int capacity = DEFAULT_CAPACITY;
     /** 样板槽，定长、空槽为 {@link ItemStack#EMPTY}。 */
     private final List<ItemStack> patterns = new ArrayList<>();
-    /** 待发送余量：上一份已经接受、但机器一时收不下的零头。 */
-    private final List<Pending> pending = new ArrayList<>();
+    /** 待写入队列：一整单为一条，跨重启保留。 */
+    private final List<PendingOrder> pending = new ArrayList<>();
 
-    /** 新建空供应器：默认 9 槽、不阻挡、没有余量。 */
+    /** 新建空供应器：默认 9 槽、不阻挡、队列为空。 */
     public NodeProvider() {
         fill(this.patterns, DEFAULT_CAPACITY);
-    }
-
-    /**
-     * 一份还没送进机器的余量。
-     *
-     * <p>条目绑定原机器：只回填那一台，不拆分到别的机器；原机器被删了才退回 ME 网络。</p>
-     *
-     * @param stack     资源与数量；数量恒大于 0
-     * @param machineId 原机器 id；{@code null} 表示旧数据没记机器
-     * @param face      上次送进去的面；{@code null} 表示面未定
-     */
-    public record Pending(GenericStack stack, @Nullable UUID machineId, @Nullable Direction face) {
     }
 
     /** 阻挡开关。 */
@@ -207,51 +198,76 @@ public final class NodeProvider {
         return taken;
     }
 
-    /** 待发送余量（只读副本）。 */
-    public List<Pending> pending() {
+    /** 待写入队列（只读副本）。 */
+    public List<PendingOrder> pending() {
         return List.copyOf(this.pending);
     }
 
-    /** 余量总条数。 */
+    /** 队列里的单数。 */
     public int pendingCount() {
         return this.pending.size();
     }
 
     /**
-     * 追加一条余量。
+     * 追加一整单。
      *
-     * @param stack     资源与数量；数量不为正时忽略
-     * @param machineId 原机器 id；{@code null} 表示不绑定机器
-     * @param face      塞不进去的面；{@code null} 表示面未定
+     * @param order 订单
      * @return 是否入队；队列已满时返回 {@code false}
      */
-    public boolean addPending(GenericStack stack, @Nullable UUID machineId,
-            @Nullable Direction face) {
-        if (stack.amount() <= 0L || this.pending.size() >= MAX_PENDING) {
+    public boolean addOrder(PendingOrder order) {
+        if (order.lines().isEmpty() || this.pending.size() >= MAX_PENDING) {
             return false;
         }
-        this.pending.add(new Pending(stack, machineId, face));
+        this.pending.add(order);
         return true;
     }
 
     /**
-     * 整体替换余量队列；读档与冲刷后回写用。
+     * 取队首订单。
      *
-     * @param entries 新队列；超过 {@link #MAX_PENDING} 的部分丢弃
+     * @return 队首；队列空时为 {@code null}
      */
-    public void setPending(List<Pending> entries) {
+    @Nullable
+    public PendingOrder firstOrder() {
+        return this.pending.isEmpty() ? null : this.pending.get(0);
+    }
+
+    /** 移出队首（投递完成或已退回网络时）。 */
+    public void removeFirstOrder() {
+        if (!this.pending.isEmpty()) {
+            this.pending.remove(0);
+        }
+    }
+
+    /**
+     * 替换队首（改孤儿标记、剩余数量时用）。
+     *
+     * @param order 新队首
+     */
+    public void replaceFirstOrder(PendingOrder order) {
+        if (!this.pending.isEmpty()) {
+            this.pending.set(0, order);
+        }
+    }
+
+    /**
+     * 整体替换队列；读档与退回网络后回写用。
+     *
+     * @param orders 新队列；超过 {@link #MAX_PENDING} 的部分丢弃
+     */
+    public void setPending(List<PendingOrder> orders) {
         this.pending.clear();
-        for (Pending entry : entries) {
+        for (PendingOrder order : orders) {
             if (this.pending.size() >= MAX_PENDING) {
                 break;
             }
-            if (entry.stack().amount() > 0L) {
-                this.pending.add(entry);
+            if (!order.lines().isEmpty()) {
+                this.pending.add(order);
             }
         }
     }
 
-    /** 清空余量。 */
+    /** 清空队列。 */
     public void clearPending() {
         this.pending.clear();
     }
@@ -260,7 +276,7 @@ public final class NodeProvider {
      * 序列化成 NBT。
      *
      * <p>样板槽按定长列表整体落盘：槽位下标必须跨重启保持，所以空槽也写一个空复合标签。
-     * 余量条目带面，面缺失表示还没定面。</p>
+     * 订单行带面，面缺失表示投递时再选。</p>
      *
      * @param registries 注册表访问，样板的数据组件需要它
      * @return 新标签
@@ -283,15 +299,26 @@ public final class NodeProvider {
         tag.put(TAG_PATTERNS, patternList);
 
         ListTag pendingList = new ListTag();
-        for (Pending entry : this.pending) {
-            CompoundTag entryTag = new CompoundTag();
-            entryTag.put(TAG_STACK, GenericStack.writeTag(registries, entry.stack()));
-            entryTag.putByte(TAG_FACE, entry.face() == null
-                    ? FACE_UNSET : (byte) entry.face().get3DDataValue());
-            if (entry.machineId() != null) {
-                entryTag.putUUID(TAG_MACHINE_ID, entry.machineId());
+        for (PendingOrder order : this.pending) {
+            CompoundTag orderTag = new CompoundTag();
+            ListTag lineList = new ListTag();
+            for (PendingOrder.Line line : order.lines()) {
+                CompoundTag lineTag = new CompoundTag();
+                lineTag.put(TAG_STACK, GenericStack.writeTag(registries,
+                        new GenericStack(line.key(), line.amount())));
+                lineTag.putByte(TAG_FACE, line.face() == null
+                        ? FACE_UNSET : (byte) line.face().get3DDataValue());
+                lineList.add(lineTag);
             }
-            pendingList.add(entryTag);
+            orderTag.put(TAG_LINES, lineList);
+            if (order.machineId() != null) {
+                orderTag.putUUID(TAG_MACHINE_ID, order.machineId());
+            }
+            orderTag.putLong(TAG_ENQUEUED_AT, order.enqueuedAt());
+            if (order.orphanedAt() >= 0L) {
+                orderTag.putLong(TAG_ORPHANED_AT, order.orphanedAt());
+            }
+            pendingList.add(orderTag);
         }
         tag.put(TAG_PENDING, pendingList);
         return tag;
@@ -301,7 +328,7 @@ public final class NodeProvider {
      * 从 NBT 读回来。
      *
      * <p>旧档没有 {@code Provider} 复合标签时按默认值读：不阻挡、不倍率、轮询派单、9 槽、
-     * 空样板、空余量，不写迁移代码。</p>
+     * 空样板、空队列，不写迁移代码。</p>
      *
      * @param tag        存档标签；可以是空标签
      * @param registries 注册表访问
@@ -342,19 +369,38 @@ public final class NodeProvider {
         }
 
         ListTag pendingList = tag.getList(TAG_PENDING, Tag.TAG_COMPOUND);
-        for (int i = 0; i < pendingList.size() && provider.pending.size() < MAX_PENDING; i++) {
-            CompoundTag entryTag = pendingList.getCompound(i);
-            GenericStack stack = GenericStack.readTag(registries, entryTag.getCompound(TAG_STACK));
-            if (stack == null || stack.amount() <= 0L) {
+        List<PendingOrder> orders = new ArrayList<>();
+        for (int i = 0; i < pendingList.size() && orders.size() < MAX_PENDING; i++) {
+            CompoundTag orderTag = pendingList.getCompound(i);
+            // 旧档的「零头余量」只有 Stack 没有 Lines：认不出来就整条丢弃，绝不误读成整单。
+            if (!orderTag.contains(TAG_LINES)) {
                 continue;
             }
-            byte rawFace = entryTag.getByte(TAG_FACE);
-            Direction face = rawFace >= 0 && rawFace < 6
-                    ? Direction.from3DDataValue(rawFace) : null;
-            UUID machineId = entryTag.hasUUID(TAG_MACHINE_ID)
-                    ? entryTag.getUUID(TAG_MACHINE_ID) : null;
-            provider.pending.add(new Pending(stack, machineId, face));
+            ListTag lineList = orderTag.getList(TAG_LINES, Tag.TAG_COMPOUND);
+            List<PendingOrder.Line> lines = new ArrayList<>(lineList.size());
+            for (int lineIndex = 0; lineIndex < lineList.size(); lineIndex++) {
+                CompoundTag lineTag = lineList.getCompound(lineIndex);
+                GenericStack stack = GenericStack.readTag(registries, lineTag.getCompound(TAG_STACK));
+                if (stack == null || stack.amount() <= 0L) {
+                    continue;
+                }
+                byte rawFace = lineTag.getByte(TAG_FACE);
+                Direction face = rawFace >= 0 && rawFace < 6
+                        ? Direction.from3DDataValue(rawFace) : null;
+                lines.add(new PendingOrder.Line(stack.what(), stack.amount(), face));
+            }
+            if (lines.isEmpty()) {
+                continue;
+            }
+            UUID machineId = orderTag.hasUUID(TAG_MACHINE_ID)
+                    ? orderTag.getUUID(TAG_MACHINE_ID) : null;
+            long orphanedAt = orderTag.contains(TAG_ORPHANED_AT)
+                    ? orderTag.getLong(TAG_ORPHANED_AT) : -1L;
+            long enqueuedAt = orderTag.contains(TAG_ENQUEUED_AT)
+                    ? orderTag.getLong(TAG_ENQUEUED_AT) : -1L;
+            orders.add(new PendingOrder(lines, machineId, enqueuedAt, orphanedAt));
         }
+        provider.setPending(orders);
         return provider;
     }
 

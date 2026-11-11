@@ -192,7 +192,10 @@ public final class ProviderReturnSweep {
         if (left <= 0L) {
             return true;
         }
-        return ProviderOverflow.dropAtMachine(this.node, key, left);
+        // 塞不回机器也不生成掉落物实体（D21）：只记日志，材料按丢弃处理。
+        this.node.logThrottled(this.node.gameTime(),
+                "回收产物无处可放：" + left + " " + key.getDisplayName().getString());
+        return false;
     }
 
     /**

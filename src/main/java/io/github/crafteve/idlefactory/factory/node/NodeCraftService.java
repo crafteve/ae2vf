@@ -7,7 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.ProviderMode;
@@ -45,7 +48,7 @@ final class NodeCraftService implements ICraftingProvider {
      * 智能倍率的静态容量缓存：样板 → 探测当时的可装份数。
      *
      * <p>键是样板本身，值是「一台机器能装几份」的上限，不是实时空位；机器逐渐变满后这个值
-     * 可能偏大，收不下的部分走余量，不做每次 push 重探测。</p>
+     * 可能偏大，收不下的部分由投递按整数份处理，不做每次 push 重探测。</p>
      */
     private final java.util.Map<ItemStack, Integer> smartCache = new java.util.HashMap<>();
     /** 缓存对应的节点拓扑版本；结构变化后整体作废。 */
@@ -83,57 +86,198 @@ final class NodeCraftService implements ICraftingProvider {
         if (faces == null) {
             return false;
         }
-        // 已经往机器里塞过东西之后不能再报失败：CPU 会把同一份输入再推给下一家，造成复制。
-        boolean[] committed = {false};
+        if (provider.blocking().isOn() && faces.blockingHit(this.patternInputs)) {
+            return false;
+        }
         try {
-            if (provider.blocking().isOn() && faces.blockingHit(this.patternInputs)) {
-                return false;
-            }
+            // 收集这一单的全部资源与数量（数量比即样板比例）：只记录，不写机器。
             Map<AEKey, Long> needed = new LinkedHashMap<>();
-            for (KeyCounter counter : inputHolder) {
-                for (var entry : counter) {
-                    if (entry.getLongValue() > 0L) {
-                        needed.merge(entry.getKey(), entry.getLongValue(), Long::sum);
-                    }
+            details.pushInputsToExternalInventory(inputHolder, (key, amount) -> {
+                if (amount > 0L) {
+                    needed.merge(key, amount, Long::sum);
                 }
-            }
+            });
             if (needed.isEmpty()) {
                 return false;
             }
-            Map<AEKey, MachinePortResolver.Faces.Target> selections =
-                    new LinkedHashMap<>(needed.size());
+            List<PendingOrder.Line> lines = new ArrayList<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
-                // 只要能收 1 个就选它：固定倍率大于容量时，多出的部分进余量而不是整单失败。
-                MachinePortResolver.Faces.Target target =
-                        faces.select(entry.getKey(), 1L);
+                // 只要能收 1 个就选它并把面绑进订单：真塞不下由投递按整数份处理。
+                MachinePortResolver.Faces.Target target = faces.select(entry.getKey(), 1L);
                 if (target == null) {
                     return false;
                 }
-                selections.put(entry.getKey(), target);
+                lines.add(new PendingOrder.Line(entry.getKey(), entry.getValue(), target.face()));
             }
-            details.pushInputsToExternalInventory(inputHolder, (key, amount) -> {
-                if (amount <= 0L) {
-                    return;
-                }
-                MachinePortResolver.Faces.Target target = selections.get(key);
-                long inserted = target == null
-                        ? 0L : faces.insert(target, key, amount, Actionable.MODULATE);
-                if (inserted > 0L) {
-                    committed[0] = true;
-                }
-                if (inserted < amount) {
-                    // 收不下的进余量，绑定原机器；不回退成失败，避免 CPU 复制。
-                    ProviderOverflow.push(this.node, machine.id(), key, amount - inserted,
-                            target == null ? null : target.face());
-                }
-            });
-            committed[0] = true;
-            this.node.returnSweep().activate(this.node.gameTime());
-            return true;
+            long now = this.node.gameTime();
+            if (!provider.addOrder(new PendingOrder(lines, machine.id(), now, -1L))) {
+                return false;
+            }
         } catch (RuntimeException e) {
+            // 还没往机器里写任何东西，报失败是安全的。
             this.node.logThrottled(this.node.gameTime(), "派单异常：" + e);
-            return committed[0];
+            return false;
         }
+        this.node.digest().pending(provider.pendingCount(),
+                provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
+        this.node.returnSweep().activate(this.node.gameTime());
+        return true;
+    }
+
+    /**
+     * 每 tick 试投递队首：队列不退避，机器不在就等，机器被删就退回网络。
+     *
+     * <p>投递按「能完整做几份」算：所有行都能完整塞下的份数 n，n=0 一个都不写，
+     * 避免把机器塞成半份、把后续任务卡死。</p>
+     *
+     * @param now 当前游戏时间
+     */
+    void deliver(long now) {
+        NodeProvider provider = this.node.node().provider();
+        PendingOrder order = provider.firstOrder();
+        NodeDigest digest = this.node.digest();
+        if (order == null) {
+            digest.pending(0, -1L);
+            return;
+        }
+        digest.pending(provider.pendingCount(), order.enqueuedAt());
+        Machine machine = order.machineId() == null ? null : this.node.machine(order.machineId());
+        if (machine == null) {
+            this.returnOrDiscard(provider, order, now);
+            return;
+        }
+        if (!this.node.isAvailable()) {
+            // 机器没加载：等，订单不丢。
+            return;
+        }
+        MachinePortResolver.Faces faces = this.node.faces(machine);
+        if (faces == null) {
+            // 区块没加载：等。
+            return;
+        }
+        List<MachinePortResolver.Faces.Target> targets = new ArrayList<>(order.lines().size());
+        long maxSets = Long.MAX_VALUE;
+        for (PendingOrder.Line line : order.lines()) {
+            MachinePortResolver.Faces.Target target = this.target(faces, line);
+            if (target == null) {
+                digest.attempted(0L, Reason.NO_FACE);
+                return;
+            }
+            targets.add(target);
+            // 用大数量模拟一次，得到这个面能为该资源完整容纳几份。
+            long probe = target.target().insert(line.key(), Long.MAX_VALUE / 4L, Actionable.SIMULATE);
+            maxSets = Math.min(maxSets, probe / line.amount());
+        }
+        if (maxSets <= 0L) {
+            // 塞不下：整单留着，等机器腾出空间。一个都不写。
+            digest.attempted(0L, Reason.FULL);
+            return;
+        }
+        long delivered = 0L;
+        boolean shortfall = false;
+        for (int index = 0; index < order.lines().size(); index++) {
+            PendingOrder.Line line = order.lines().get(index);
+            long want = line.amount() * maxSets;
+            long inserted = targets.get(index).target().insert(line.key(), want, Actionable.MODULATE);
+            delivered += inserted;
+            if (inserted < want) {
+                shortfall = true;
+            }
+        }
+        provider.removeFirstOrder();
+        if (shortfall) {
+            // 主线程内模拟与提交之间没有其它写入；真出现缺口只能记录，绝不回退成「复制材料」。
+            this.node.logThrottled(now, "投递数量与模拟不一致，已按实际写入结算");
+        }
+        digest.attempted(delivered, shortfall ? Reason.ERROR : null);
+        this.node.returnSweep().activate(now);
+    }
+
+    /** 取一行在快照上的目标：先用绑定面，没有就重新选一次。 */
+    @Nullable
+    private MachinePortResolver.Faces.Target target(MachinePortResolver.Faces faces,
+            PendingOrder.Line line) {
+        if (line.face() != null) {
+            var raw = faces.target(0, line.face());
+            if (raw != null) {
+                return new MachinePortResolver.Faces.Target(faces.slots().get(0), line.face(), raw);
+            }
+        }
+        return faces.select(line.key(), line.amount());
+    }
+
+    /**
+     * 目标机器已被删：把订单退回 ME 网络；网络也不收就留成孤儿等重试，超时才丢弃。
+     *
+     * @param provider 供应器
+     * @param order    订单
+     * @param now      当前游戏时间
+     */
+    private void returnOrDiscard(NodeProvider provider, PendingOrder order, long now) {
+        if (order.orphan() && now - order.orphanedAt() > PendingOrder.ORPHAN_TIMEOUT_TICKS) {
+            // 网络长时间恢复不了：静默丢弃（只记日志，绝不生成掉落物实体）。
+            provider.removeFirstOrder();
+            this.node.logThrottled(now, "孤儿订单超时丢弃：" + order.lines().size() + " 行");
+            this.node.digest().pending(provider.pendingCount(),
+                    provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
+            return;
+        }
+        var network = this.node.networkStorage();
+        if (network == null) {
+            provider.replaceFirstOrder(order.asOrphan(now));
+            this.node.digest().attempted(0L, Reason.ERROR);
+            return;
+        }
+        List<PendingOrder.Line> remaining = new ArrayList<>(order.lines().size());
+        for (PendingOrder.Line line : order.lines()) {
+            long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
+                    this.node.actionSource());
+            if (accepted <= 0L) {
+                remaining.add(line);
+                continue;
+            }
+            long inserted = network.insert(line.key(), Math.min(accepted, line.amount()),
+                    Actionable.MODULATE, this.node.actionSource());
+            long left = line.amount() - inserted;
+            if (left > 0L) {
+                remaining.add(new PendingOrder.Line(line.key(), left, line.face()));
+            }
+        }
+        if (remaining.isEmpty()) {
+            provider.removeFirstOrder();
+        } else {
+            provider.replaceFirstOrder(order.withLines(remaining).asOrphan(now));
+        }
+        this.node.digest().pending(provider.pendingCount(),
+                provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
+    }
+
+    /**
+     * 节点销毁前把队列里的单全部退回网络；退不回的直接丢弃（只记日志，不生成掉落物）。
+     *
+     * @param now 当前游戏时间
+     */
+    void returnAllOrders(long now) {
+        NodeProvider provider = this.node.node().provider();
+        if (provider.pendingCount() == 0) {
+            return;
+        }
+        var network = this.node.networkStorage();
+        for (PendingOrder order : provider.pending()) {
+            if (network != null) {
+                for (PendingOrder.Line line : order.lines()) {
+                    long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
+                            this.node.actionSource());
+                    if (accepted > 0L) {
+                        network.insert(line.key(), Math.min(accepted, line.amount()),
+                                Actionable.MODULATE, this.node.actionSource());
+                    }
+                }
+            }
+        }
+        this.node.logThrottled(now, "节点销毁，队列 " + provider.pendingCount() + " 单已尽力退回网络");
+        provider.clearPending();
+        this.node.digest().pending(0, -1L);
     }
 
     @Override
