@@ -11,6 +11,7 @@ import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.IoUnit;
+import io.github.crafteve.idlefactory.factory.io.PassivePlanner;
 import io.github.crafteve.idlefactory.factory.io.TransferStats;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
@@ -305,12 +306,12 @@ public final class FactorySnapshotBuilder {
                 for (ResourceSpec spec : inputs) {
                     IoUnit unit = slot == null ? null
                             : slot.unit(true, new RuleKey(true, spec.key(), spec.face(), spec.mode()));
-                    Reason reason = unit == null || unit.ledger().current() == null
-                            ? Reason.NO_MATERIAL : unit.ledger().current().reason();
+                    Reason reason = unit == null
+                            ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     inputReasons.add(reason);
                     if (unit != null) {
                         inputSuccessAt = Math.max(inputSuccessAt, unit.digest().lastSuccessAt());
-                        if (reason != Reason.RUN) {
+                        if (reason != Reason.RUN && reason != Reason.SLEEPING) {
                             long since = unit.digest().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
@@ -324,15 +325,15 @@ public final class FactorySnapshotBuilder {
                 for (ResourceSpec spec : outputs) {
                     IoUnit unit = slot == null ? null
                             : slot.unit(false, new RuleKey(false, spec.key(), spec.face(), spec.mode()));
-                    Reason reason = unit == null || unit.ledger().current() == null
-                            ? Reason.NO_MATERIAL : unit.ledger().current().reason();
+                    Reason reason = unit == null
+                            ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     outputReasons.add(reason);
                     if (unit != null) {
                         lastSuccessAt = Math.max(lastSuccessAt, unit.digest().lastSuccessAt());
                         if (unit.digest().lastAttemptAt() >= 0L) {
                             minIdle = Math.min(minIdle, unit.digest().idleTicks(now));
                         }
-                        if (reason != Reason.RUN) {
+                        if (reason != Reason.RUN && reason != Reason.SLEEPING) {
                             long since = unit.digest().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);

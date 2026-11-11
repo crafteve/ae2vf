@@ -95,10 +95,28 @@ public final class PassivePlanner {
         int offset = Math.floorMod(start, size);
         for (int index = 0; index < size; index++) {
             IoUnit unit = units.get((offset + index) % size);
-            if (force || this.due(unit, now)) {
+            if (force || due(unit, now)) {
                 target.add(unit);
             }
         }
+    }
+
+    /**
+     * 界面显示用的原因：还在退避里就报「休息中」，否则报上一轮结果。
+     *
+     * <p>这条合成只服务视图：账本只记执行层真的跑过的那一轮，退避中的空白轮不写账。
+     * </p>
+     *
+     * @param unit 单元
+     * @param now  当前服务端 tick
+     * @return 原因
+     */
+    public static Reason displayReason(IoUnit unit, long now) {
+        IoLedger.Row row = unit.ledger().current();
+        if (row == null) {
+            return Reason.NO_MATERIAL;
+        }
+        return due(unit, now) ? row.reason() : Reason.SLEEPING;
     }
 
     /**
@@ -108,12 +126,12 @@ public final class PassivePlanner {
      * @param now  当前服务端 tick
      * @return 该跑为 {@code true}
      */
-    private boolean due(IoUnit unit, long now) {
+    public static boolean due(IoUnit unit, long now) {
         long last = unit.digest().lastAttemptAt();
         if (last < 0L || last > now) {
             return true;
         }
-        return now - last >= this.backoff(unit);
+        return now - last >= backoff(unit);
     }
 
     /**
@@ -122,7 +140,7 @@ public final class PassivePlanner {
      * @param unit 单元
      * @return 多少 tick 后允许再试
      */
-    private long backoff(IoUnit unit) {
+    private static long backoff(IoUnit unit) {
         IoLedger.Row row = unit.ledger().current();
         if (row == null) {
             return 0L;
