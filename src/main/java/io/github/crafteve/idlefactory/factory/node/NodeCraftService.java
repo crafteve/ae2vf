@@ -247,7 +247,9 @@ final class NodeCraftService implements ICraftingProvider {
         if (remaining.isEmpty()) {
             provider.removeFirstOrder();
         } else {
-            provider.replaceFirstOrder(order.withLines(remaining).asOrphan(now));
+            PendingOrder rest = order.withLines(remaining);
+            // 同一条款：孤儿时刻只在第一次失败时记，不能每 tick 刷新。
+            provider.replaceFirstOrder(order.orphan() ? rest : rest.asOrphan(now));
         }
         this.node.digest().pending(provider.pendingCount(),
                 provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());

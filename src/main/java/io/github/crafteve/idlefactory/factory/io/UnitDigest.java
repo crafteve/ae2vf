@@ -18,7 +18,6 @@ public final class UnitDigest {
     private long firstAttemptAt = -1L;
     private long lastAttemptAt = -1L;
     private long lastSuccessAt = -1L;
-    private long lastFailureAt = -1L;
     /** 最近一次搬动的时刻；{@code -1} 表示还没搬动过。 */
     private long idleSince = -1L;
     /** 连续被拒次数；不是拒收时清零。 */
@@ -51,7 +50,6 @@ public final class UnitDigest {
                 this.faceHint = face;
             }
         } else {
-            this.lastFailureAt = now;
             if (reason == Reason.REJECTED) {
                 this.rejectStreak++;
                 this.clearFaceHint();
@@ -74,11 +72,6 @@ public final class UnitDigest {
     /** 最近一次成功搬动的时刻；没成功过为 {@code -1}。 */
     public long lastSuccessAt() {
         return this.lastSuccessAt;
-    }
-
-    /** 最近一次失败的时刻；没失败过为 {@code -1}。 */
-    public long lastFailureAt() {
-        return this.lastFailureAt;
     }
 
     /**

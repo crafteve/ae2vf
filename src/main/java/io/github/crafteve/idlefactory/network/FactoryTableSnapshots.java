@@ -49,7 +49,7 @@ public final class FactoryTableSnapshots {
         Factory owner = factory.get();
         long now = player.serverLevel().getGameTime();
         List<FactorySnapshotBuilder.MachineView> machines = FactorySnapshotBuilder.machines(
-                owner, runtime.observations(), runtime.machineStates(), runtime.formFor(owner), now);
+                owner, runtime.observations(), runtime.formFor(owner), now);
         // 节点状态只在这里算一次：被动 IO 终端直接读，不再拿第一台机器自己拼。
         List<FactoryTableS2C.NodeStatusEntry> nodeStatuses = new ArrayList<>();
         for (Map.Entry<UUID, NodeStatus> entry : NodeStatusResolver.byNode(machines).entrySet()) {

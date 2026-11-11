@@ -15,7 +15,6 @@ import io.github.crafteve.idlefactory.factory.io.TransferStats;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
@@ -262,13 +261,12 @@ public final class FactorySnapshotBuilder {
      *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
-     * @param states       机器状态集合；{@code null} 时按未探测处理
      * @param form         本 tick 的表单；{@code null} 时没有执行数据
      * @param now          当前服务端 tick
      * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
-            @Nullable MachineStateLibrary states, @Nullable IoForm form, long now) {
+            @Nullable IoForm form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = FactoryLimitsConfig.staleHealthTicks();
@@ -410,7 +408,7 @@ public final class FactorySnapshotBuilder {
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
             long now) {
-        return machines(factory, observations, null, null, now);
+        return machines(factory, observations, null, now);
     }
 
 

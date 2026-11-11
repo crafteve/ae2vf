@@ -9,7 +9,6 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.BlockingMode;
@@ -121,10 +120,9 @@ public final class FactoryNodeSnapshotBuilder {
      * @return 节点视图
      */
     public static List<NodeView> nodes(Factory factory, @Nullable ObservationService observations,
-            @Nullable MachineStateLibrary states, @Nullable IoForm form,
-            @Nullable NodeManager nodeManager, long now) {
+            @Nullable IoForm form, @Nullable NodeManager nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
-                FactorySnapshotBuilder.machines(factory, observations, states, form, now);
+                FactorySnapshotBuilder.machines(factory, observations, form, now);
         // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
         Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
                 NodeStatusResolver.groupByNode(machineViews);

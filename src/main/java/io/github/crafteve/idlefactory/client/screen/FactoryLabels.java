@@ -5,7 +5,6 @@ import java.util.Locale;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.IoResult;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;

@@ -15,7 +15,6 @@ import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;

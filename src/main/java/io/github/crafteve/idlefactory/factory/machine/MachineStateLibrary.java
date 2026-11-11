@@ -31,17 +31,16 @@ public final class MachineStateLibrary {
      *
      * @param machine 机器
      * @param source  观测事实来源
-     * @param now     当前服务端 tick
      */
-    public void observed(Machine machine, BlockFacts.Source source, long now) {
+    public void observed(Machine machine, BlockFacts.Source source) {
         this.seen.add(machine.id());
         MachineState state = this.states.get(machine.id());
         MachineSignal signal = state == null ? MachineSignal.CONFIG_CHANGED : MachineSignal.OBSERVED;
         if (state == null) {
-            state = new MachineState(machine.id());
+            state = new MachineState();
             this.states.put(machine.id(), state);
         }
-        state.apply(signal, source.at(machine.block()), now);
+        state.apply(signal, source.at(machine.block()));
     }
 
     /** 结束一轮刷新：释放本轮没出现的机器状态。 */
@@ -58,16 +57,6 @@ public final class MachineStateLibrary {
     public MachineStatus status(UUID machineId) {
         MachineState state = this.states.get(machineId);
         return state == null ? MachineStatus.UNSEEN : state.status();
-    }
-
-    /**
-     * 取一台机器的完整状态。
-     *
-     * @param machineId 机器 id
-     * @return 状态；没有条目时为 {@code null}
-     */
-    public MachineState state(UUID machineId) {
-        return this.states.get(machineId);
     }
 
     /** 清空全部状态（服务器停止时）。 */

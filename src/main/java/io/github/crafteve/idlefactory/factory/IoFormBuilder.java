@@ -34,7 +34,7 @@ public final class IoFormBuilder {
      * @return 表单；调用方只读
      */
     public IoForm build(Factory factory, MachineStateLibrary states) {
-        IoForm form = this.forms.computeIfAbsent(factory.id(), IoForm::new);
+        IoForm form = this.forms.computeIfAbsent(factory.id(), id -> new IoForm());
         form.beginRebuild();
         for (Node node : factory.config().nodes().all()) {
             for (Machine machine : node.machines()) {

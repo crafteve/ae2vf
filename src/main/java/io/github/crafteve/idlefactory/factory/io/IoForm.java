@@ -24,25 +24,12 @@ import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
  * <p>槽位与单元都跨 tick 复用：每 tick 只做 mark-seen / add / drop，不新建集合。</p>
  */
 public final class IoForm {
-    private final UUID factoryId;
     /** 机器 id → 槽位；插入顺序即配置顺序，执行时按它轮转。 */
     private final Map<UUID, Slot> slots = new LinkedHashMap<>();
     /** 本轮出现过的机器 id。 */
     private final Set<UUID> seen = new HashSet<>();
     /** 本轮按配置顺序排好的槽位，执行层直接遍历。 */
     private final List<Slot> ordered = new ArrayList<>();
-
-    /**
-     * @param factoryId 所属工厂
-     */
-    public IoForm(UUID factoryId) {
-        this.factoryId = factoryId;
-    }
-
-    /** 所属工厂。 */
-    public UUID factoryId() {
-        return this.factoryId;
-    }
 
     /** 开始重建：清空上一轮的顺序，保留可复用对象。 */
     public void beginRebuild() {
@@ -86,11 +73,6 @@ public final class IoForm {
      */
     public @Nullable Slot slotOrNull(UUID machineId) {
         return this.slots.get(machineId);
-    }
-
-    /** 是否没有活干。 */
-    public boolean isEmpty() {
-        return this.ordered.isEmpty();
     }
 
     /**

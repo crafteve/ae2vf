@@ -20,7 +20,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoMod
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;

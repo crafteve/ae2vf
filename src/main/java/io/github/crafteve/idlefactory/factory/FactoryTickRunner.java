@@ -90,7 +90,7 @@ final class FactoryTickRunner {
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 for (Machine machine : node.machines()) {
-                    this.machineStates.observed(machine, this.observations, now);
+                    this.machineStates.observed(machine, this.observations);
                 }
             }
         }

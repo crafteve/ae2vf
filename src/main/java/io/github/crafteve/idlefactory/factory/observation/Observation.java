@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.factory.observation;
 
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.Objects;
 import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;

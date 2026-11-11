@@ -84,20 +84,6 @@ public final class IoLedger {
         return list;
     }
 
-    /** 是否一笔账都没有。 */
-    public boolean isEmpty() {
-        return this.size == 0;
-    }
-
-    /** 清空账本（单元被释放时由外部丢弃整个对象，这里只给复用场景用）。 */
-    public void clear() {
-        for (int index = 0; index < CAPACITY; index++) {
-            this.rows[index] = null;
-        }
-        this.head = 0;
-        this.size = 0;
-    }
-
     private int newestIndex() {
         return (this.head - 1 + CAPACITY) % CAPACITY;
     }
