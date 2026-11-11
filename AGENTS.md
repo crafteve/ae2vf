@@ -52,7 +52,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `menu` | 菜单与玩家槽位 | 工厂数据 |
 | `network` | 协议与负载 | 业务判断 |
 | `client` | 客户端入口、世界链接、绑定杖、按键 | 工厂界面细节 |
-| `client.screen` | 两个终端界面（`terminal` 子包）、共享渲染组件（主题 / 九宫格 / 文案 / 搜索 / 图标） | 服务端状态 |
+| `client.screen` | 两个终端界面（`terminal` 子包）、共享渲染组件（主题 / 九宫格 / 文案 / 搜索 / 图标 / 排序） | 服务端状态 |
 | `integration` | AE2 / Applied Flux / JEI / jecharacters 适配 | 核心逻辑 |
 
 命名后缀固定：
@@ -127,6 +127,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 嵌套立体：下拉框本身是立体框，选项各自也是小立体框。
 - 1px 像素精度：线条不糊、不对齐就重画；槽位保留格子感与悬停/选中动画。
 - 图标主导，少文字：物品、机器、状态优先用图标 + 颜色 + 动画表达。
+- 排序入口固定在两个终端的左侧工具栏：帮助 → 终端高度 → 档位 → 方向 →（被动 IO 再加视图切换）。档位 / 方向按钮沿用 AE2 工具栏按钮规格；自绘图标（状态 / IO 规则数 / 距离）由 `tools/gui/gen_textures.py` 生成，16×16、白 `#F2F2F2` + 右下 1px `#4D4D67` 阴影，Java 只 blit。
 - 状态表达：灯色 + 文字色 + 1px 状态条；列宽自适应，压缩机器名与状态，信息列优先。
 - 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步 `FactoryGuiTheme`。
 - 流体 / FE 图标按 AE2 风格：流体 still 贴图染色，FE 用 Applied Flux 图标（未装时绿色水贴图兜底）；物品用原版装饰层补耐久条。
@@ -140,6 +141,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - 没有指令入口：节点与规则全部在两个终端里操作，绑定杖负责世界里「点方块」这一半。
 - 表格可展开规则、可搜索；搜索沿用 AE2 语法并接 jecharacters 拼音兼容层。
+- 两个终端左侧工具栏提供六档排序（名称 / ID / 机器台数 / IO 规则数 / 状态 / 距离）与升降序切换；偏好写在终端物品的 `ae2:exported_settings` 组件上，两个终端各自记忆。
 - JEI R/U 必须覆盖机器列表、IO 列、仓库、背包；FE 使用独立配料（`idlefactory:fe`）与信息页，R/U / 收藏不得落到红石粉。
 
 ## 四、编码规范
@@ -247,7 +249,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoTransfer.java` · `NodeIoRunner.java` · `MachineIoRunner.java` · `RuleResolver.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoTransfer.java` · `NodeIoRunner.java` · `MachineIoRunner.java` · `RuleResolver.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -265,7 +267,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 12. 流体图标不透明：仓库格的悬停描边必须画在图标之后，否则只剩 1px 暗边。
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 浮层的绘制顺序写在终端屏幕的 `draw` 里，浮层必须排在物品与数量之后；被数量盖住基本都是顺序写错。
-15. 终端视图偏好（列表 / 卡片）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
+15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
 16. 机器失联只进 `FactoryLive.machineMissing`，不写档；只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
 18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `FactoryResourceIconRender`，R/U 走 `addIngredientInfo` 的 FE 信息页。
@@ -273,6 +275,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
     - **派活前把方向写死**：资源类型范围、可选附属的归属、存档兼容策略、包名与命名。方向没定死不要开工；确实要改，先停下来把已改的部分收口到可提交状态再改。
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
     - **机械的类型替换用 bash 批量替换 + 编译器收敛**，不要逐文件人工 read→edit（40 个文件约 80 次工具往返）。批量替换的安全做法见 4.3。
+20. `FactorySortMode` 的声明顺序同时是档位按钮的循环顺序、物品组件与线协议的 ordinal：只许末尾追加、不许重排，否则旧终端里的排序档位会错位。
 
 ### 6.3 文档偏差
 
