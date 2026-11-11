@@ -36,8 +36,8 @@ import net.minecraft.world.level.Level;
  * {@code FactoryRuntime} 每 tick 传进来。这样观测层可以保持零工厂依赖（见 {@link BlockKey}）。</p>
  *
  * <p>预算与退避是刻意的：平时排队的只有“有事的”（新的、刚脏过、失联、未加载），
- * 长期安静的 PRESENT 会一路退到 10 分钟一探——稳态下每 tick 的探测次数只和事件数
- * 相关，和对象总数解耦。</p>
+ * PRESENT 固定 100 tick 复探——不能更长，健康过期阈值（默认 1200 tick）比它短的话，
+ * 安静机器会把自己判成过期。稳态下每 tick 的探测次数与对象总数成正比但很小。</p>
  *
  * <p>预算由 {@code FactoryRuntime} 以 {@link IntSupplier} 注入，每次取预算都读当前 config，
  * 热改下一 tick 生效。探测顺序由调用方给的 {@code BlockKey} 序列决定（脏 > 在线机器 > 其余）。
