@@ -15,6 +15,7 @@ import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
+import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -59,14 +60,15 @@ final class FactoryPassiveIoModel {
     /**
      * 一个节点在内容区里的一块：机器行 + 规则行 + 虚线新增行。
      *
-     * @param machine 代表机器（节点第一台），图标 / 坐标 / 搜索字段用它
-     * @param members 节点下的全部机器；堆叠时长度 > 1
-     * @param status  节点聚合状态
-     * @param rules   输入在前、输出在后（节点规则）
+     * @param machine    代表机器（节点第一台），图标 / 坐标 / 搜索字段用它
+     * @param members    节点下的全部机器；堆叠时长度 > 1
+     * @param nodeStatus 服务端下发的节点状态；名字、灯、状态字都读它
+     * @param status     节点状态的展示映射
+     * @param rules      输入在前、输出在后（节点规则）
      */
     record BlockView(FactorySnapshotBuilder.MachineView machine,
-            List<FactorySnapshotBuilder.MachineView> members, FactoryStatus status,
-            List<RuleRow> rules) {
+            List<FactorySnapshotBuilder.MachineView> members, NodeStatus nodeStatus,
+            FactoryStatus status, List<RuleRow> rules) {
         BlockView {
             members = List.copyOf(members);
             rules = List.copyOf(rules);
@@ -92,7 +94,7 @@ final class FactoryPassiveIoModel {
             if (this.machine.nodeName() != null && !this.machine.nodeName().isEmpty()) {
                 return this.machine.nodeName();
             }
-            return !this.machine.health().isOnline()
+            return this.nodeStatus.health() == NodeHealth.OFFLINE
                     ? "已失联" : FactoryLabels.blockName(this.machine.blockId());
         }
     }
@@ -172,7 +174,7 @@ final class FactoryPassiveIoModel {
             // 节点状态只读服务端下发的结论；缺失时用同一聚合函数兜底，绝不拿第一台自己拼。
             NodeStatus status = this.nodeStatuses.get(anchor.nodeId());
             if (status == null) {
-                status = NodeStatusResolver.resolve(members);
+                status = NodeStatusResolver.resolve(anchor.ruleCount(), members);
             }
             if (!this.query.isEmpty()) {
                 String name = anchor.nodeName() != null && !anchor.nodeName().isEmpty()
@@ -185,8 +187,8 @@ final class FactoryPassiveIoModel {
                     continue;
                 }
             }
-            next.add(new BlockView(anchor, members, FactoryStatus.of(status, this.theme),
-                    rules(members, anchor)));
+            next.add(new BlockView(anchor, members, status,
+                    FactoryStatus.of(status, this.theme), rules(members, anchor)));
         }
         this.blocks = List.copyOf(next);
     }

@@ -6,11 +6,10 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 
 /**
- * 一台机器 / 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
+ * 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
  *
- * <p>把状态映射从界面壳里拆出来，绘制、搜索字段和 tooltip 用同一份结果，避免同一个对象
- * 在不同位置显示不同状态。健康只有在线 / 离线两个值；「未探测」与「健康过期」是独立的布尔，
- * 展示层把它们各归成一档，不塞进健康枚举。</p>
+ * <p>聚合已经在服务端 {@code NodeStatusResolver} 完成，这里只把服务端下发的 {@link NodeStatus}
+ * 映射成展示档位；绘制、搜索字段和 tooltip 用同一份结果，不在客户端再判断一次状态。</p>
  *
  * @param text  状态文字
  * @param color 状态文字颜色
@@ -22,7 +21,8 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     /**
      * 状态种类，和主题无关。
      *
-     * <p>顺序是有意的：组聚合平票时按枚举顺序取第一个，保证同一份快照每次算出同一个结果。</p>
+     * <p>枚举顺序不参与聚合：节点状态的取舍已在服务端完成，这里只按 {@code kindOf} 的
+     * 单一优先级映射到展示。</p>
      */
     enum Kind {
         /** 失联：方块没了、维度没了。 */

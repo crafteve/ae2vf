@@ -60,17 +60,6 @@ public final class FactoryNodeSnapshotBuilder {
             return this.members.size();
         }
 
-        /** 在线机器台数。 */
-        public int onlineMachineCount() {
-            int count = 0;
-            for (MemberView member : this.members) {
-                if (member.health().isOnline()) {
-                    count++;
-                }
-            }
-            return count;
-        }
-
         /** 是否已有 IO 规则或样板；删除确认弹窗用。 */
         public boolean configured() {
             return this.ruleCount > 0 || this.patternCount > 0;
@@ -143,7 +132,7 @@ public final class FactoryNodeSnapshotBuilder {
             List<FactorySnapshotBuilder.MachineView> views =
                     byNode.getOrDefault(node.id(), List.of());
             // 节点状态只由 NodeStatusResolver 一处聚合：探没过期看全体，在干什么按最需要管的那台。
-            NodeStatus status = NodeStatusResolver.resolve(views);
+            NodeStatus status = NodeStatusResolver.resolve(node.ruleCount(), views);
             List<MemberView> members = new ArrayList<>(node.machineCount());
             for (Machine machine : node.machines()) {
                 FactorySnapshotBuilder.MachineView view = null;
@@ -169,15 +158,4 @@ public final class FactoryNodeSnapshotBuilder {
         return nodes;
     }
 
-    /**
-     * 观测方块级健康是否「探测过」。
-     *
-     * <p>保留给 P2 的 resolver 使用；P1b 直接按成员健康聚合。</p>
-     *
-     * @param observation 观测
-     * @return 是否探测过
-     */
-    static boolean probed(Observation observation) {
-        return observation.health() != Health.UNKNOWN;
-    }
 }

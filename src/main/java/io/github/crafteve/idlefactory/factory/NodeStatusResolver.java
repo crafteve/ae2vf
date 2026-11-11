@@ -33,13 +33,17 @@ public final class NodeStatusResolver {
     /**
      * 聚合一个节点的状态。
      *
-     * @param members 该节点的全部成员机器视图；空列表按「无成员」处理
+     * <p>规则数是节点级事实，由调用方传入，resolver 不从成员里挑任何一个字段——否则又回到
+     * 「拿第一台拼」的老路。</p>
+     *
+     * @param ruleCount 节点 IO 规则总数（节点级，成员共用）
+     * @param members   该节点的全部成员机器视图；空列表按「没有成员」处理
      * @return 节点状态
      */
-    public static NodeStatus resolve(List<MachineView> members) {
+    public static NodeStatus resolve(int ruleCount, List<MachineView> members) {
         if (members.isEmpty()) {
-            // 正常流程里节点至少有一台机器；空列表按「离线且没配置」兜底，不参与成员顺序判断。
-            return new NodeStatus(true, false, NodeHealth.OFFLINE, TotalState.OFFLINE);
+            // 没有成员就没有任何可观测事实：probed 必须是 false，总状态按离线兜底。
+            return new NodeStatus(false, false, NodeHealth.OFFLINE, TotalState.OFFLINE);
         }
 
         boolean allProbed = true;
@@ -75,9 +79,11 @@ public final class NodeStatusResolver {
 
         NodeHealth health = online == 0 ? NodeHealth.OFFLINE
                 : online == members.size() ? NodeHealth.ONLINE : NodeHealth.PARTIAL;
-        int ruleCount = members.get(0).ruleCount();
         TotalState totalState;
-        if (ruleCount == 0) {
+        if (online == 0) {
+            // 全员离线时"在干什么"没有意义：直接给 OFFLINE，别把 OFFLINE + UNKNOWN 的组合丢给下游。
+            totalState = TotalState.OFFLINE;
+        } else if (ruleCount == 0) {
             totalState = TotalState.UNCONFIGURED;
         } else if (blocked) {
             totalState = TotalState.INPUT_BLOCKED;
@@ -108,7 +114,10 @@ public final class NodeStatusResolver {
         }
         Map<UUID, NodeStatus> statuses = new LinkedHashMap<>(grouped.size());
         for (Map.Entry<UUID, List<MachineView>> entry : grouped.entrySet()) {
-            statuses.put(entry.getKey(), resolve(entry.getValue()));
+            // 机器表把节点规则数冗余在每台机器上，组内取值相同；这里只读这个节点级字段，
+            // 不再让 resolver 去挑成员。
+            int ruleCount = entry.getValue().get(0).ruleCount();
+            statuses.put(entry.getKey(), resolve(ruleCount, entry.getValue()));
         }
         return statuses;
     }

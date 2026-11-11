@@ -16,6 +16,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.N
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+import io.github.crafteve.idlefactory.factory.NodeStatus;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -187,7 +188,7 @@ final class FactoryNodeRender {
      * 状态小字：失联 / 未载 / 非 ME。只放得下时画，完整状态始终在 tooltip 里。
      */
     private String statusHint(NodeRow row) {
-        io.github.crafteve.idlefactory.factory.NodeStatus status = row.view().status();
+        NodeStatus status = row.view().status();
         if (!status.probed()) {
             return "未探测";
         }
