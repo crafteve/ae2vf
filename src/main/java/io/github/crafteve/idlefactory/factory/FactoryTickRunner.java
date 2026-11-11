@@ -1,7 +1,11 @@
 package io.github.crafteve.idlefactory.factory;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
+import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
@@ -36,6 +40,8 @@ final class FactoryTickRunner {
     private final StorageResolver storageResolver;
     private final FactoryObservationRunner observationRunner;
     private final FactoryNodeRunner nodeRunner;
+    private final MachineStateLibrary machineStates;
+    private final IoFormBuilder formBuilder;
     private int tickCounter;
 
     /**
@@ -46,10 +52,13 @@ final class FactoryTickRunner {
      * @param storageResolver   仓库解析器
      * @param observationRunner 观测输入与迁移消费
      * @param nodeRunner        虚拟节点推进
+     * @param machineStates     机器状态集合
+     * @param formBuilder       表单生成器
      */
     FactoryTickRunner(MinecraftServer server, FactoryManager manager, NodeIoRunner nodeIoRunner,
             ObservationService observations, StorageResolver storageResolver,
-            FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner) {
+            FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner,
+            MachineStateLibrary machineStates, IoFormBuilder formBuilder) {
         this.server = server;
         this.manager = manager;
         this.nodeIoRunner = nodeIoRunner;
@@ -57,14 +66,16 @@ final class FactoryTickRunner {
         this.storageResolver = storageResolver;
         this.observationRunner = observationRunner;
         this.nodeRunner = nodeRunner;
+        this.machineStates = machineStates;
+        this.formBuilder = formBuilder;
     }
 
-    /** 每 tick 推进一次。 */
+    /** 每 tick 推进一次：先准备（观测 → 仓库 → 机器状态 → 表单），再执行。 */
     void tick() {
         this.tickCounter++;
+        long now = this.server.overworld().getGameTime();
 
         this.observationRunner.tick();
-
         this.nodeRunner.tick(this.tickCounter);
 
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
@@ -75,7 +86,21 @@ final class FactoryTickRunner {
             }
         }
 
-        this.nodeIoRunner.tick(this.server, this.manager, this.observations);
+        this.machineStates.beginRefresh();
+        for (Factory factory : this.manager.all()) {
+            for (Node node : factory.config().nodes().all()) {
+                for (Machine machine : node.machines()) {
+                    this.machineStates.observed(machine, this.observations, now);
+                }
+            }
+        }
+        this.machineStates.endRefresh();
+
+        // 执行段：回收 → 队列 → 被动（本次只有被动，回收与队列在后续阶段接进来）。
+        for (Factory factory : this.manager.all()) {
+            IoForm form = this.formBuilder.build(factory, this.machineStates);
+            this.nodeIoRunner.runFactory(this.server, factory, form, this.observations, now);
+        }
 
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",

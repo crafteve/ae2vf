@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
+import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
@@ -58,6 +59,10 @@ public final class FactoryRuntime {
     private final LinkRegistry links = new LinkRegistry();
     /** 失联/恢复通知的聚合与节流。 */
     private final FactoryNoticeHandler notices = new FactoryNoticeHandler();
+    /** 全服机器状态（世界的镜像，不写档）。 */
+    private final MachineStateLibrary machineStates = new MachineStateLibrary();
+    /** 每 tick 的 IO 表单生成器。 */
+    private final IoFormBuilder formBuilder = new IoFormBuilder();
     /** 虚拟机器节点：对账、分帧创建、每 tick 推进。 */
     private final NodeManager nodeManager;
     /** 每 tick 编排器；启动完成（load）后非 null。 */
@@ -100,6 +105,8 @@ public final class FactoryRuntime {
         runtime.save();
         runtime.nodeManager.destroyAll();
         runtime.nodeIoRunner.clear();
+        runtime.machineStates.clear();
+        runtime.formBuilder.clear();
         runtime.storageResolver = null;
         runtime.observations = null;
         runtime.tickRunner = null;
@@ -273,7 +280,8 @@ public final class FactoryRuntime {
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
                 this.server, this.manager, this.observations, this.nodeManager);
         this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
-                this.observations, this.storageResolver, observationRunner, nodeRunner);
+                this.observations, this.storageResolver, observationRunner, nodeRunner,
+                this.machineStates, this.formBuilder);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
 

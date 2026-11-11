@@ -9,29 +9,37 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 一个方块的只读观测事实。
  *
- * <p>这是观测层对外的唯一形状：健康解析器只依赖本接口，不再每 tick 把观测投影成第二份记录
- * 对象。{@code Observation} 直接实现它，「事实只存一份」由此成立。</p>
+ * <p>这是观测层对外的唯一形状：健康解析器、机器状态只依赖本接口，不再每 tick 把观测投影成
+ * 第二份记录对象。{@code Observation} 直接实现它，「事实只存一份」由此成立。</p>
  */
 public interface BlockFacts {
     /**
+     * 方块级健康。
+     *
+     * @return 当前结论；从没探过时为 {@link Health#UNKNOWN}
+     */
+    Health health();
+
+    /**
      * 是否探测过。
      *
-     * @return 探测过为 {@code true}；没探过时其余判断一律视为不成立
+     * @return 健康不是 UNKNOWN 时为 {@code true}
      */
-    boolean probed();
+    default boolean probed() {
+        return this.health() != Health.UNKNOWN;
+    }
 
     /**
      * 方块是否就绪。
      *
-     * @return 健康为 PRESENT 时为 {@code true}
+     * @return 健康为 {@link Health#PRESENT} 时为 {@code true}
      */
-    boolean present();
+    default boolean present() {
+        return this.health() == Health.PRESENT;
+    }
 
     /**
      * 健康是否已经过期。
-     *
-     * <p>公式：{@code probed && now - lastProbeTick > staleHealthTicks}。从未探测过时恒为
-     * {@code false}——「没探过」由 {@link #probed()} 表达，不能拿 -1 哨兵算成过期。</p>
      *
      * @param now              当前观测时钟
      * @param staleHealthTicks 过期阈值（tick）

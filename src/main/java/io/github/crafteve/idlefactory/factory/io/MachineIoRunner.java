@@ -8,15 +8,15 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
-import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+
+import appeng.api.stacks.AEKey;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import appeng.api.stacks.AEItemKey;
 
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
@@ -114,7 +114,7 @@ public final class MachineIoRunner {
      * @param storage    仓库
      * @param level      机器所在维度
      * @param pos        机器坐标
-     * @param group      IO 组
+     * @param slot       本台机器在本 tick 表单上的槽位
      * @param caps       能力句柄缓存；{@code null} 时直接查世界
      * @param routes     面路由表；{@code null} 时每次扫面
      * @param generation 观测层的面表代数
@@ -124,7 +124,7 @@ public final class MachineIoRunner {
      * @return 本方块结果
      */
     public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
-            NodeIoGroup group, @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes,
+            IoForm.Slot slot, @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes,
             long generation, @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
@@ -138,8 +138,8 @@ public final class MachineIoRunner {
         IoResult.Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
-        List<ResourceSpec> inputs = group.inputs();
-        List<ResourceSpec> outputs = group.outputs();
+        List<ResourceSpec> inputs = slot.inputSpecs();
+        List<ResourceSpec> outputs = slot.outputSpecs();
         // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
         // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
         // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。

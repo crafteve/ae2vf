@@ -141,26 +141,6 @@ public final class Observation implements BlockFacts {
     }
 
     /**
-     * 是否探测过。
-     *
-     * @return 健康不是 UNKNOWN 时为 {@code true}
-     */
-    @Override
-    public boolean probed() {
-        return this.health != Health.UNKNOWN;
-    }
-
-    /**
-     * 方块是否就绪。
-     *
-     * @return 健康为 PRESENT 时为 {@code true}
-     */
-    @Override
-    public boolean present() {
-        return this.health == Health.PRESENT;
-    }
-
-    /**
      * 健康是否已经过期。
      *
      * <p>从未探测过时恒为 {@code false}：过期与「没探过」是两件事，各由一个布尔表达。</p>

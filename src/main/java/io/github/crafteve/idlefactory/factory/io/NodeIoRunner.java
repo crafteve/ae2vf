@@ -9,11 +9,8 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
-import io.github.crafteve.idlefactory.factory.observation.Observation;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import appeng.api.storage.MEStorage;
@@ -22,16 +19,13 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * 被动执行器：遍历每个工厂机器库里的每一台机器，按机器自己的 IO 规则跑一轮搬运。
+ * 被动执行器：跑本 tick 的表单。
  *
- * <p>P1 删除产线后这里不再有「线 → 组 → 机器」的层级，只剩「工厂 → 机器库 → 机器」。
- * 睡眠也只有机器一级：连续 {@link RunnerState#SLEEP_AFTER_TICKS} tick 没搬动就睡，
- * 睡着的机器每 {@link RunnerState#WAKE_INTERVAL} tick 醒一次。{@code start} / 配置变更会手动唤醒。</p>
+ * <p>它只认识表单上的槽位（一台机器 + 它的规则），不再遍历节点，也不判断机器在不在——那是
+ * 表单的事。睡眠仍是机器一级：连续 {@link RunnerState#SLEEP_AFTER_TICKS} tick 没搬动就睡，
+ * 睡着的机器每 {@link RunnerState#WAKE_INTERVAL} tick 醒一次；配置变更会手动唤醒。</p>
  *
- * <p><b>门禁读观测，不读世界</b>：一台机器只有「没被观测标记失联」且「观测结论是 PRESENT」
- * 才会进 {@link MachineIoRunner}。失联的、未加载的一律直接睡，零世界查询。</p>
- *
- * <p>路由表按机器隔离：一台机器的面路由不会影响另一台。</p>
+ * <p>路由表按机器隔离：一台机器的面路由不会影响另一台。面表代数与能力缓存来自观测层。</p>
  */
 public final class NodeIoRunner {
     /** 探针打印间隔（tick）：首轮必打，之后每这么多轮打一次。 */
@@ -44,51 +38,33 @@ public final class NodeIoRunner {
     private long rounds;
 
     /**
-     * 跑一轮所有工厂的机器库。
+     * 跑一个工厂本 tick 的表单。
      *
      * @param server       服务端
-     * @param manager      工厂档案
-     * @param observations 观测服务；为 {@code null} 时退化成「不做健康门禁」
+     * @param factory      工厂
+     * @param form         本 tick 的表单
+     * @param observations 观测服务；为 {@code null} 时不给能力缓存与面表代数
+     * @param now          当前服务端 tick
      */
-    public void tick(MinecraftServer server, FactoryManager manager,
-            @Nullable ObservationService observations) {
-        long now = server.overworld().getGameTime();
-        int machines = 0;
-        int awake = 0;
-        long moved = 0L;
-        for (Factory factory : manager.all()) {
-            if (!factory.live().storageOnline()) {
-                continue;
-            }
-            MEStorage storage = factory.live().storage();
-            List<Node> nodes = factory.config().nodes().all();
-            // 节点 IO 轮转：每轮从不同的节点开始，避免固定顺序总是先喂第一个节点。
-            int start = nodes.isEmpty() ? 0 : (int) Math.floorMod(this.rounds, (long) nodes.size());
-            for (int nodeIndex = 0; nodeIndex < nodes.size(); nodeIndex++) {
-                Node node = nodes.get((start + nodeIndex) % nodes.size());
-                for (Machine machine : node.machines()) {
-                    machines++;
-                    if (this.state.peek(machine.id()) != null
-                            && isAwake(machine.id(), now)) {
-                        awake++;
-                    }
-                    moved += tickMachine(server, factory, storage, node, machine, now, observations);
-                }
-            }
+    public void runFactory(MinecraftServer server, Factory factory, IoForm form,
+            @Nullable ObservationService observations, long now) {
+        if (!factory.live().storageOnline()) {
+            this.rounds++;
+            return;
+        }
+        MEStorage storage = factory.live().storage();
+        List<IoForm.Slot> slots = form.slots();
+        if (slots.isEmpty()) {
+            this.rounds++;
+            return;
+        }
+        // 机器轮转：每轮从不同的槽位开始，避免固定顺序总是先喂第一台机器。
+        int start = (int) Math.floorMod(this.rounds, (long) slots.size());
+        for (int index = 0; index < slots.size(); index++) {
+            IoForm.Slot slot = slots.get((start + index) % slots.size());
+            tickMachine(server, factory, storage, slot, now, observations);
         }
         this.rounds++;
-    }
-
-    /**
-     * 这台机器这一轮是否会参与遍历（醒着、且不在睡眠期）。
-     *
-     * @param machineId 机器 id
-     * @param now       当前游戏时间
-     * @return 醒着时为 {@code true}
-     */
-    private boolean isAwake(UUID machineId, long now) {
-        RunnerState.MachineState machineState = this.state.peek(machineId);
-        return machineState == null || !machineState.sleeping || now >= machineState.wakeAt;
     }
 
     /**
@@ -97,7 +73,8 @@ public final class NodeIoRunner {
      * @return 本轮搬动的数量
      */
     private long tickMachine(MinecraftServer server, Factory factory, MEStorage storage,
-            Node node, Machine machine, long now, @Nullable ObservationService observations) {
+            IoForm.Slot slot, long now, @Nullable ObservationService observations) {
+        Machine machine = slot.machine();
         RunnerState.MachineState machineState = this.state.machine(machine.id());
         if (machineState.sleeping) {
             if (now < machineState.wakeAt) {
@@ -106,12 +83,6 @@ public final class NodeIoRunner {
             machineState.sleeping = false;
             machineState.idleSince = -1L;
             machineState.sleepSince = -1L;
-        }
-
-        // 门禁：机器方块必须 PRESENT；不可用整台机器不跑。
-        if (observations != null && !runnable(observations, machine.block())) {
-            sleepIfIdle(machineState, now);
-            return 0L;
         }
 
         BlockKey target = machine.block();
@@ -128,7 +99,7 @@ public final class NodeIoRunner {
             LevelCapabilityCache caps = observations == null
                     ? null : observations.capabilities(level);
             long generation = observations == null ? 0L : observations.facesGeneration(target);
-            result = MachineIoRunner.runBlock(storage, level, target.pos(), node.io(), caps,
+            result = MachineIoRunner.runBlock(storage, level, target.pos(), slot, caps,
                     machineState.routes(target), generation, factoryVariants, now, sharedBudget);
         } catch (RuntimeException e) {
             // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
@@ -168,17 +139,6 @@ public final class NodeIoRunner {
             sleepIfIdle(machineState, now);
         }
         return result.moved();
-    }
-
-    /**
-     * 观测结论是否允许搬。
-     *
-     * <p>只读缓存，<b>不探测</b>：UNKNOWN 说明观测服务还没轮到这台机器，先跳过（机器保持醒着，
-     * 几十 tick 内就会被探到）。这样 IO 永远不会绕过探测预算去打一个尖峰。</p>
-     */
-    private static boolean runnable(ObservationService observations, BlockKey target) {
-        Observation observation = observations.observe(target);
-        return observation.health().alive();
     }
 
     private static void sleepIfIdle(RunnerState.MachineState machineState, long now) {
