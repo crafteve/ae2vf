@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 
@@ -105,10 +106,10 @@ final class ProviderOverflow {
                     insertedAny = true;
                     continue;
                 }
-                ProviderFaceResolver.Faces faces = node.faces(machine);
+                MachinePortResolver.Faces faces = node.faces(machine);
                 if (faces != null) {
                     // 先按规则面 / 类型方块选一个目标；收不下再换下一个目标试一次。
-                    ProviderFaceResolver.Faces.Target target = faces.select(key, left);
+                    MachinePortResolver.Faces.Target target = faces.select(key, left);
                     long inserted = target == null
                             ? 0L : faces.insert(target, key, left, Actionable.MODULATE);
                     // 先扣量再走下一步：第二次 insert 抛异常时，这一笔不能留在 pending 里重送。
@@ -120,7 +121,7 @@ final class ProviderOverflow {
                     }
                     insertedAny |= inserted > 0L;
                     if (left > 0L) {
-                        ProviderFaceResolver.Faces.Target next = faces.select(key, left);
+                        MachinePortResolver.Faces.Target next = faces.select(key, left);
                         if (next != null) {
                             long more = faces.insert(next, key, left, Actionable.MODULATE);
                             face = next.face();

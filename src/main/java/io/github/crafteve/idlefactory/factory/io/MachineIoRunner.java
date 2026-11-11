@@ -12,16 +12,17 @@ import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import appeng.api.stacks.AEKey;
-import appeng.api.stacks.AEItemKey;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
  *
- * <p>面与 handler 的解析在 {@link RuleResolver}；物品变体的展开在 {@link ItemCandidates}。
+ * <p>面与 handler 的解析在 {@link MachinePortResolver}；物品变体的展开在 {@link ItemCandidates}。
  * 本类只负责按规则跑事务、汇总本轮结果与逐规则原因。</p>
  *
  * <p>搬成功就记住这个面；{@link Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
@@ -49,6 +50,7 @@ public final class MachineIoRunner {
      * @param outputReason 输出侧原因
      * @param inputReasons 逐输入规则的本轮原因，供界面显示每条规则的诊断
      * @param outputReasons 逐输出规则的本轮原因
+     * @param faces        逐规则本轮实际用的面，给单元的经验面与账本用
      */
     public record BlockRun(long fed, long pulled,
             Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
@@ -56,12 +58,14 @@ public final class MachineIoRunner {
             Reason lastReason, boolean inputFull,
             Reason inputReason, Reason outputReason,
             Map<RuleKey, Reason> inputReasons,
-            Map<RuleKey, Reason> outputReasons) {
+            Map<RuleKey, Reason> outputReasons,
+            Map<RuleKey, Direction> faces) {
 
         public BlockRun {
             // 逐规则原因会被快照读取，先冻结成只读，避免调用方后续改动影响已发出的视图。
             inputReasons = Map.copyOf(inputReasons);
             outputReasons = Map.copyOf(outputReasons);
+            faces = Map.copyOf(faces);
         }
 
         /** 一共搬了多少。 */
@@ -117,16 +121,14 @@ public final class MachineIoRunner {
      * @param pos        机器坐标
      * @param slot       本台机器在本 tick 表单上的槽位
      * @param caps       能力句柄缓存；{@code null} 时直接查世界
-     * @param routes     面路由表；{@code null} 时每次扫面
-     * @param generation 观测层的面表代数
      * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
      * @param now          当前服务端 tick，给变体索引算 TTL 与规则轮转
      * @param sharedBudget 本台机器本 tick 共享的变体预算；每个方块按序扣减
      * @return 本方块结果
      */
     public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
-            IoForm.Slot slot, @Nullable LevelCapabilityCache caps, @Nullable RouteTable routes,
-            long generation, @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
+            IoForm.Slot slot, @Nullable LevelCapabilityCache caps,
+            @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
         Map<AEKey, Long> fedByKey = new LinkedHashMap<>();
@@ -135,12 +137,13 @@ public final class MachineIoRunner {
         Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
         Map<RuleKey, Reason> inputReasons = new LinkedHashMap<>();
         Map<RuleKey, Reason> outputReasons = new LinkedHashMap<>();
+        Map<RuleKey, Direction> faces = new LinkedHashMap<>();
         Reason inputReason = null;
         Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
-        List<ResourceSpec> inputs = slot.inputSpecs();
-        List<ResourceSpec> outputs = slot.outputSpecs();
+        List<IoUnit> inputs = slot.inputs();
+        List<IoUnit> outputs = slot.outputs();
         // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
         // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
         // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
@@ -154,17 +157,21 @@ public final class MachineIoRunner {
         // 规则按 tick 轮转起点：同一侧的多条模糊规则共享本侧额度时，后面的规则不会被前面的永久挤掉。
         int inputStart = inputs.isEmpty() ? 0 : (int) Math.floorMod(now, (long) inputs.size());
         for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
-            ResourceSpec spec = inputs.get((inputStart + ruleIndex) % inputs.size());
+            IoUnit unit = inputs.get((inputStart + ruleIndex) % inputs.size());
+            ResourceSpec spec = unit.spec();
             anyInputRule = true;
-            RuleKey ruleKey = new RuleKey(true, spec.key(), spec.face(), spec.mode());
-            RuleResolver.Resolved resolved = RuleResolver.resolve(level, pos, spec, true, caps, routes,
-                    generation);
+            RuleKey ruleKey = unit.key().rule();
+            MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, true,
+                    caps, unit.digest().faceHint());
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 inputReason = worse(inputReason, Reason.NO_FACE);
                 inputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
+            }
+            if (resolved.face() != null) {
+                faces.put(ruleKey, resolved.face());
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
                     inputBudget);
@@ -192,12 +199,8 @@ public final class MachineIoRunner {
                     // NO_MATERIAL 只表示仓库没料，机器侧已经点头接收
                     accepted = true;
                 }
-                if (result.moved() > 0L) {
-                    remember(routes, spec, true, resolved, generation);
-                } else if (result.reason() == Reason.REJECTED) {
-                    // 有容量却不收：这个面不对，下次重扫
-                    clear(routes, spec, true);
-                } else {
+                // 搬通了什么都不用做；拒收由分析器清掉经验面；其余情况只留一条调试日志。
+                if (result.moved() <= 0L && result.reason() != Reason.REJECTED) {
                     IdleFactory.LOGGER.debug(
                             "IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
                             pos.toShortString(), spec.describe(), result.reason(),
@@ -226,16 +229,20 @@ public final class MachineIoRunner {
 
         int outputStart = outputs.isEmpty() ? 0 : (int) Math.floorMod(now + 1L, (long) outputs.size());
         for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
-            ResourceSpec spec = outputs.get((outputStart + ruleIndex) % outputs.size());
-            RuleKey ruleKey = new RuleKey(false, spec.key(), spec.face(), spec.mode());
-            RuleResolver.Resolved resolved = RuleResolver.resolve(level, pos, spec, false, caps, routes,
-                    generation);
+            IoUnit unit = outputs.get((outputStart + ruleIndex) % outputs.size());
+            ResourceSpec spec = unit.spec();
+            RuleKey ruleKey = unit.key().rule();
+            MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, false,
+                    caps, unit.digest().faceHint());
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
                 outputReason = worse(outputReason, Reason.NO_FACE);
                 outputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
+            }
+            if (resolved.face() != null) {
+                faces.put(ruleKey, resolved.face());
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
                     outputBudget);
@@ -255,11 +262,8 @@ public final class MachineIoRunner {
                 IoResult result = IoTransfer.pull(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
-                if (result.moved() > 0L) {
-                    remember(routes, spec, false, resolved, generation);
-                } else if (result.reason() == Reason.REJECTED) {
-                    clear(routes, spec, false);
-                } else {
+                // 搬通了什么都不用做；拒收由分析器清掉经验面；其余情况只留一条调试日志。
+                if (result.moved() <= 0L && result.reason() != Reason.REJECTED) {
                     IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
                             pos.toShortString(), spec.describe(), result.reason());
                 }
@@ -285,7 +289,7 @@ public final class MachineIoRunner {
                 fedByRule, pulledByRule, lastReason, inputFull,
                 inputReason == null ? Reason.RUN : inputReason,
                 outputReason == null ? Reason.RUN : outputReason,
-                inputReasons, outputReasons);
+                inputReasons, outputReasons, faces);
     }
 
     /**
@@ -300,7 +304,7 @@ public final class MachineIoRunner {
      * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
      * 取仓库变体索引、输出侧扫机器库存。</p>
      */
-    private static Adapters ruleAdapters(MEStorage storage, RuleResolver.Resolved resolved,
+    private static Adapters ruleAdapters(MEStorage storage, MachinePortResolver.Resolved resolved,
             ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
             int[] budget) {
         if (!(resolved.adapter() instanceof ItemAdapter base)) {
@@ -320,31 +324,15 @@ public final class MachineIoRunner {
      * 通道，流体 / 能量根本不进变体展开。用它决定另一侧要不要留额度，避免按「规则列表非空」
      * 判断时把只有流体或精确物品输出的机器也算进去，白白扣掉输入额度。</p>
      *
-     * @param specs 一侧的规则
+     * @param units 一侧的单元
      * @return 存在模糊物品规则时 {@code true}
      */
-    private static boolean usesVariants(List<ResourceSpec> specs) {
-        for (ResourceSpec spec : specs) {
-            if (spec.fuzzy()) {
+    private static boolean usesVariants(List<IoUnit> units) {
+        for (IoUnit unit : units) {
+            if (unit.spec().fuzzy()) {
                 return true;
             }
         }
         return false;
-    }
-
-    private static void remember(@Nullable RouteTable routes, ResourceSpec spec, boolean input,
-            RuleResolver.Resolved resolved, long generation) {
-        // 物品规则不记路由：无向句柄可能只读（Mekanism），模糊变体也可能落在不同面；
-        // 每次按当前物品重新探面，避免把某一条变体或某一侧钉死。
-        if (routes == null || spec.face() != null || (spec.key() instanceof AEItemKey)) {
-            return;
-        }
-        routes.remember(spec, input, new RouteTable.Route(resolved.face()), generation);
-    }
-
-    private static void clear(@Nullable RouteTable routes, ResourceSpec spec, boolean input) {
-        if (routes != null && spec.face() == null) {
-            routes.clear(spec, input);
-        }
     }
 }

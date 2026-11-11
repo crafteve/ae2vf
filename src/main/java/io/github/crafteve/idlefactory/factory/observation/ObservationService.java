@@ -55,15 +55,6 @@ public final class ObservationService implements BlockFacts.Source {
     private static final int DIRTY_BUDGET_PER_TICK = 64;
     /** 每 tick 最多探测几个工作状态。 */
     private static final int WORK_BUDGET_PER_TICK = 16;
-    /** 连续 REJECTED 几次才刷一次面表（单次拒收可能只是抖动）。 */
-    private static final int REJECT_STREAK_TO_REFRESH = 3;
-    /** 同一位置两次面表刷新至少间隔多少 tick。 */
-    private static final long FACE_REFRESH_COOLDOWN_TICKS = 100L;
-    /** 熔断窗口（tick）：10 分钟内刷新超过上限就冻结。 */
-    private static final long FACE_FREEZE_WINDOW_TICKS = 12000L;
-    /** 窗口内最多刷新几次，超过就冻结。 */
-    private static final int FACE_FREEZE_MAX_REFRESHES = 5;
-
     private final MinecraftServer server;
     /** 每 tick 探测预算；由运行时注入，读当前 config。 */
     private final IntSupplier probeBudget;
@@ -84,20 +75,6 @@ public final class ObservationService implements BlockFacts.Source {
     private final Set<BlockKey> dirty = new HashSet<>();
     /** 本 tick 产生的方块变化，取走即清空。 */
     private final List<BlockChange> changes = new ArrayList<>();
-    /** 位置 → 连续 REJECTED 次数（成功一次就清零）。 */
-    private final Map<BlockKey, Integer> rejectStreaks = new HashMap<>();
-    /** 位置 → 上次刷面表的 tick（冷却用）。 */
-    private final Map<BlockKey, Long> lastFaceRefresh = new HashMap<>();
-    /** 位置 → 熔断窗口（起点，窗口内刷新次数）。 */
-    private final Map<BlockKey, FaceWindow> faceWindows = new HashMap<>();
-    /**
-     * 面表被冻结的位置：只睡不刷，等成功一次再解冻。
-     *
-     * <p>冻结的意思是“这地方的面表一直在变，刷了也白刷，先别浪费探测”——注意冻的是
-     * 刷新动作，不是健康结论，更不是 IO 本身。</p>
-     */
-    private final Set<BlockKey> frozenFaces = new HashSet<>();
-
     private long tick;
     private int probesLastTick;
 
@@ -215,58 +192,6 @@ public final class ObservationService implements BlockFacts.Source {
     }
 
     /**
-     * IO 报告一次面级拒收（REJECTED）。
-     *
-     * <p>只刷面表，绝不动健康——面不对不等于机器没了。连续 {@value #REJECT_STREAK_TO_REFRESH}
-     * 次才刷一次，单次拒收可能只是抖动；两次刷新之间有冷却；窗口内刷太多次就冻结，
-     * 防止“报错→刷面表→还报错→再刷”的自激循环把 tick 点着。</p>
-     *
-     * <p>槽位级拒收（满了、机器内部不让放）一律按 FULL 睡，根本不许调这个方法——
-     * 进到这里的只能是“走这个面递不进去”。</p>
-     *
-     * @param key 位置
-     */
-    public void noteRejected(BlockKey key) {
-        if (this.frozenFaces.contains(key)) {
-            return;
-        }
-        int streak = this.rejectStreaks.getOrDefault(key, 0) + 1;
-        this.rejectStreaks.put(key, streak);
-        if (streak < REJECT_STREAK_TO_REFRESH) {
-            return;
-        }
-        this.rejectStreaks.put(key, 0);
-        Long lastRefresh = this.lastFaceRefresh.get(key);
-        if (lastRefresh != null && this.tick - lastRefresh < FACE_REFRESH_COOLDOWN_TICKS) {
-            return;
-        }
-        this.lastFaceRefresh.put(key, this.tick);
-        FaceWindow window = this.faceWindows.get(key);
-        if (window == null || this.tick - window.start() > FACE_FREEZE_WINDOW_TICKS) {
-            window = new FaceWindow(this.tick, 0);
-        }
-        window = new FaceWindow(window.start(), window.count() + 1);
-        this.faceWindows.put(key, window);
-        if (window.count() > FACE_FREEZE_MAX_REFRESHES) {
-            this.frozenFaces.add(key);
-            return;
-        }
-        this.faceCache.invalidate(key);
-    }
-
-    /**
-     * IO 成功一次：清连续计数，解冻。
-     *
-     * <p>路通了，说明之前全是误会——计数、冻结一起清，干干净净。</p>
-     *
-     * @param key 位置
-     */
-    public void noteSuccess(BlockKey key) {
-        this.rejectStreaks.remove(key);
-        this.frozenFaces.remove(key);
-    }
-
-    /**
      * 取某个维度的能力句柄缓存。
      *
      * @param level 维度
@@ -357,19 +282,6 @@ public final class ObservationService implements BlockFacts.Source {
     }
 
     /**
-     * 面表代数：每次面表被作废都会 +1，路由表拿它判断自己过没过期。
-     *
-     * <p>代数住在面表缓存里，这里只是转发——病历本（{@code Observation}）里已经没有
-     * 代数这个字段了，它只留健康和时钟。</p>
-     *
-     * @param key 位置键
-     * @return 代数；没登记过时为 {@code 0}
-     */
-    public long facesGeneration(BlockKey key) {
-        return this.faceCache.generation(key);
-    }
-
-    /**
      * 取走本 tick 的方块变化。
      *
      * <p>这是观测层对外的唯一通知出口：谁需要知道「本轮哪些方块变了」都从这里拿，
@@ -453,15 +365,6 @@ public final class ObservationService implements BlockFacts.Source {
      * @param tick 发生时刻（服务内部时钟）
      */
     public record BlockChange(BlockKey key, Health from, Health to, long tick) {
-    }
-
-    /**
-     * 熔断窗口：起点，以及窗口内已经刷了几次面表。
-     *
-     * @param start 窗口起点（服务内部时钟）
-     * @param count 窗口内刷新次数
-     */
-    private record FaceWindow(long start, int count) {
     }
 
     /**

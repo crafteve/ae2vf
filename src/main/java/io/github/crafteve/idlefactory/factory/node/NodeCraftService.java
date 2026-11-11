@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.ProviderMode;
@@ -78,7 +79,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (machine == null) {
             return false;
         }
-        ProviderFaceResolver.Faces faces = this.node.faces(machine);
+        MachinePortResolver.Faces faces = this.node.faces(machine);
         if (faces == null) {
             return false;
         }
@@ -99,11 +100,11 @@ final class NodeCraftService implements ICraftingProvider {
             if (needed.isEmpty()) {
                 return false;
             }
-            Map<AEKey, ProviderFaceResolver.Faces.Target> selections =
+            Map<AEKey, MachinePortResolver.Faces.Target> selections =
                     new LinkedHashMap<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
                 // 只要能收 1 个就选它：固定倍率大于容量时，多出的部分进余量而不是整单失败。
-                ProviderFaceResolver.Faces.Target target =
+                MachinePortResolver.Faces.Target target =
                         faces.select(entry.getKey(), 1L);
                 if (target == null) {
                     return false;
@@ -114,7 +115,7 @@ final class NodeCraftService implements ICraftingProvider {
                 if (amount <= 0L) {
                     return;
                 }
-                ProviderFaceResolver.Faces.Target target = selections.get(key);
+                MachinePortResolver.Faces.Target target = selections.get(key);
                 long inserted = target == null
                         ? 0L : faces.insert(target, key, amount, Actionable.MODULATE);
                 if (inserted > 0L) {
@@ -252,7 +253,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (online.isEmpty()) {
             return 1;
         }
-        ProviderFaceResolver.Faces faces = this.node.faces(online.get(0));
+        MachinePortResolver.Faces faces = this.node.faces(online.get(0));
         if (faces == null) {
             return 1;
         }
@@ -279,7 +280,7 @@ final class NodeCraftService implements ICraftingProvider {
      * @param factor  倍数
      * @return 所有输入都能收下时为 {@code true}
      */
-    private static boolean canFit(IPatternDetails details, ProviderFaceResolver.Faces faces,
+    private static boolean canFit(IPatternDetails details, MachinePortResolver.Faces faces,
             int factor) {
         for (IPatternDetails.IInput input : details.getInputs()) {
             GenericStack[] possible = input.getPossibleInputs();

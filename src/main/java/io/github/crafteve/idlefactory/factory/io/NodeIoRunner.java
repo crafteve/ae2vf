@@ -101,9 +101,8 @@ public final class NodeIoRunner {
             }
             LevelCapabilityCache caps = observations == null
                     ? null : observations.capabilities(level);
-            long generation = observations == null ? 0L : observations.facesGeneration(target);
             result = MachineIoRunner.runBlock(storage, level, target.pos(), slot, caps,
-                    machineState.routes(target), generation, factoryVariants, now, sharedBudget);
+                    factoryVariants, now, sharedBudget);
         } catch (RuntimeException e) {
             // 只在这里兜：第三方 handler（IItemHandler.insertItem / MEStorage.insert）都在
             // MachineIoRunner 内部被调用，异常穿出去会带崩整个服务端 tick。更糟的是 IoTransfer
@@ -116,18 +115,6 @@ public final class NodeIoRunner {
             this.recordReason(slot, Reason.ERROR, now);
             sleepIfIdle(machineState, now);
             return 0L;
-        }
-        // 熔断器喂食：只有面级拒收（REJECTED）才记——面不对和机器没了是两回事，
-        // 这里进去的只刷面表，绝不动健康；其他任何结果（搬通了、没料、满了）
-        // 都算“路没问题”，清掉连续计数。详见 noteRejected。
-        if (observations != null) {
-            BlockKey key = target;
-            if (result.inputReason() == Reason.REJECTED
-                    || result.outputReason() == Reason.REJECTED) {
-                observations.noteRejected(key);
-            } else {
-                observations.noteSuccess(key);
-            }
         }
         this.recordResult(slot, result, now);
         DiagStats.MachineStats stats = factory.live().stats().machine(machine.id());
@@ -159,7 +146,7 @@ public final class NodeIoRunner {
             Reason reason = result.inputReasons().get(rule);
             if (reason != null) {
                 this.analyzer.record(unit, reason, now,
-                        result.fedByRule().getOrDefault(rule, 0L), unit.spec().face());
+                        result.fedByRule().getOrDefault(rule, 0L), result.faces().get(rule));
             }
         }
         for (IoUnit unit : slot.outputs()) {
@@ -167,7 +154,7 @@ public final class NodeIoRunner {
             Reason reason = result.outputReasons().get(rule);
             if (reason != null) {
                 this.analyzer.record(unit, reason, now,
-                        result.pulledByRule().getOrDefault(rule, 0L), unit.spec().face());
+                        result.pulledByRule().getOrDefault(rule, 0L), result.faces().get(rule));
             }
         }
     }
@@ -235,29 +222,6 @@ public final class NodeIoRunner {
      */
     public void wake(UUID machineId) {
         this.state.wake(machineId);
-    }
-
-    /**
-     * 丢掉一台机器的面路由。玩家改规则（加/删输入输出）时调——面可能跟着变了。
-     *
-     * @param machineId 机器 id
-     */
-    public void forgetRoutes(UUID machineId) {
-        RunnerState.MachineState state = this.state.peek(machineId);
-        if (state != null) {
-            state.clearRoutes();
-        }
-    }
-
-    /**
-     * 一台机器记住的面路由条数（诊断用）。
-     *
-     * @param machineId 机器 id
-     * @return 路由条数
-     */
-    public int routeCount(UUID machineId) {
-        RunnerState.MachineState state = this.state.peek(machineId);
-        return state == null ? 0 : state.routeCount();
     }
 
     /**

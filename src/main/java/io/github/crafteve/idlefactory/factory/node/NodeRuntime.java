@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
@@ -53,7 +54,6 @@ public final class NodeRuntime
     private final Consumer<NodeManager.Notice> notice;
     private final NodeCraftService craft;
     private final NodePatternInventory patternInventory;
-    private final ProviderFaceResolver faceResolver;
     private final ProviderReturnSweep returnSweep;
     private final NodeTerminalGroup terminal;
     private final IManagedGridNode managed;
@@ -96,7 +96,6 @@ public final class NodeRuntime
 
         this.craft = new NodeCraftService(this);
         this.patternInventory = new NodePatternInventory(this);
-        this.faceResolver = new ProviderFaceResolver(this);
         this.returnSweep = new ProviderReturnSweep(this);
         this.terminal = new NodeTerminalGroup(server, node, available);
 
@@ -421,8 +420,15 @@ public final class NodeRuntime
      * @return 快照；没有任何方块加载时为 {@code null}
      */
     @Nullable
-    ProviderFaceResolver.Faces faces(Machine machine) {
-        return this.faceResolver.snapshot(machine);
+    MachinePortResolver.Faces faces(Machine machine) {
+        BlockKey block = machine.block();
+        ServerLevel level = this.levelOf(block);
+        if (level == null || !level.isLoaded(block.pos())) {
+            // 机器 ONLINE 要求方块可用；未加载就交给健康门禁拦整台机器。
+            return null;
+        }
+        return MachinePortResolver.faces(level, block.pos(), level.getBlockEntity(block.pos()),
+                this.node.io().inputs(), this.actionSource());
     }
 
     /**
