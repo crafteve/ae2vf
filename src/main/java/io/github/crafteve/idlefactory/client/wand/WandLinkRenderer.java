@@ -119,11 +119,35 @@ public final class WandLinkRenderer {
             draw(Kind.STORAGE, collectLinks(WandLinks.storage(), dimension), event);
             return;
         }
-        draw(Kind.MACHINE, collectBlocks(WandLinks.boundBlocks(), dimension), event);
-        if (!WandSession.isEditing()) {
+        boolean editing = WandSession.isEditing();
+        java.util.UUID editingNode = editing ? WandSession.draft().nodeId() : null;
+        LongOpenHashSet machineBlocks = new LongOpenHashSet();
+        LongOpenHashSet editableBlocks = new LongOpenHashSet();
+        for (BlockKey block : WandLinks.boundBlocks()) {
+            if (!block.dimension().equals(dimension)) {
+                continue;
+            }
+            boolean ownNode = editingNode != null
+                    && WandLinks.owner(block).map(owner -> owner.nodeId().equals(editingNode))
+                            .orElse(false);
+            if (ownNode) {
+                editableBlocks.add(block.pos().asLong());
+            } else {
+                machineBlocks.add(block.pos().asLong());
+            }
+        }
+        draw(Kind.MACHINE, machineBlocks, event);
+        if (!editing) {
             return;
         }
-        draw(Kind.DRAFT_ADDED, collectBlocks(WandSession.draft().added(), dimension), event);
+        // 编辑已有节点时，本节点的成员从绿框改成黄框：玩家要一眼看出这次能改哪些机器。
+        addBlocks(editableBlocks, WandSession.draft().added(), dimension);
+        for (BlockKey block : WandSession.removedBlocks()) {
+            if (block.dimension().equals(dimension)) {
+                editableBlocks.remove(block.pos().asLong());
+            }
+        }
+        draw(Kind.DRAFT_ADDED, editableBlocks, event);
         LongOpenHashSet conflicts = new LongOpenHashSet();
         addBlocks(conflicts, WandSession.conflictBlocks(), dimension);
         addBlocks(conflicts, WandSession.removedBlocks(), dimension);
