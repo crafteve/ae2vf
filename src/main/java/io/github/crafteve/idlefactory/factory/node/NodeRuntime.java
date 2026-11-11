@@ -54,6 +54,7 @@ public final class NodeRuntime
     private final Consumer<NodeManager.Notice> notice;
     private final NodeCraftService craft;
     private final NodePatternInventory patternInventory;
+    private final ActivePlanner activePlanner;
     private final ProviderReturnSweep returnSweep;
     private final NodeTerminalGroup terminal;
     private final IManagedGridNode managed;
@@ -96,7 +97,8 @@ public final class NodeRuntime
 
         this.craft = new NodeCraftService(this);
         this.patternInventory = new NodePatternInventory(this);
-        this.returnSweep = new ProviderReturnSweep(this);
+        this.activePlanner = new ActivePlanner();
+        this.returnSweep = new ProviderReturnSweep(this, this.activePlanner);
         this.terminal = new NodeTerminalGroup(server, node, available);
 
         this.managed = GridHelper.createManagedNode(this, this)
@@ -464,6 +466,11 @@ public final class NodeRuntime
     /** 产物回收：节奏与白名单调度都在它里面。 */
     public ProviderReturnSweep returnSweep() {
         return this.returnSweep;
+    }
+
+    /** 主动规划器：队列与回收的择时都归它。 */
+    public ActivePlanner activePlanner() {
+        return this.activePlanner;
     }
 
     /** 派单时用的动作源，标记成机器自己发起。 */

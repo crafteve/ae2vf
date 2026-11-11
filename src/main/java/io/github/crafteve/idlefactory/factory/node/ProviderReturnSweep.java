@@ -25,34 +25,26 @@ import net.minecraft.core.Direction;
  * 机器坐标。全程不丢东西。</p>
  */
 public final class ProviderReturnSweep {
-    /** 活跃期扫描间隔（tick）。 */
-    static final int ACTIVE_INTERVAL = 5;
-    /** 空闲退避阶梯（tick）。 */
-    static final int[] IDLE_DELAYS = {20, 40, 80, 128};
-    /** 一次派单 / 一次收获算活跃多久（tick）。 */
-    static final long ACTIVE_WINDOW = 200L;
     /** 固定顺序的六面。 */
     private static final Direction[] FACES = Direction.values();
 
     private final NodeRuntime node;
-    /** 下一次允许扫描的 tick。 */
-    private long nextSweepTick;
-    /** 活跃期截止 tick。 */
-    private long activeUntil;
+    /** 回收的择时住在这里，本类只负责扫。 */
+    private final ActivePlanner planner;
     /** 上一次真正扫过的时间。 */
     private long lastSweepTick;
     /** 上一次抽到东西的时间。 */
     private long lastExtractTick;
-    /** 空闲退避走到第几级。 */
-    private int idleStep;
     /** 上一轮有存储能力的面数。 */
     private int storageFaces;
 
     /**
-     * @param node 所属机器节点
+     * @param node    所属机器节点
+     * @param planner 主动规划器，决定什么时候扫
      */
-    ProviderReturnSweep(NodeRuntime node) {
+    ProviderReturnSweep(NodeRuntime node, ActivePlanner planner) {
         this.node = node;
+        this.planner = planner;
     }
 
     /**
@@ -61,9 +53,7 @@ public final class ProviderReturnSweep {
      * @param now 当前游戏时间
      */
     public void activate(long now) {
-        this.activeUntil = now + ACTIVE_WINDOW;
-        this.idleStep = 0;
-        this.nextSweepTick = now + ACTIVE_INTERVAL;
+        this.planner.activate(now);
     }
 
     /**
@@ -73,7 +63,7 @@ public final class ProviderReturnSweep {
      * @return 是否到期
      */
     public boolean isDue(long now) {
-        return now >= this.nextSweepTick;
+        return this.planner.sweepDue(now);
     }
 
     /**
@@ -211,12 +201,6 @@ public final class ProviderReturnSweep {
      * @param now 当前游戏时间
      */
     private void idle(long now) {
-        if (now < this.activeUntil) {
-            this.nextSweepTick = now + ACTIVE_INTERVAL;
-            return;
-        }
-        int step = Math.min(this.idleStep, IDLE_DELAYS.length - 1);
-        this.nextSweepTick = now + IDLE_DELAYS[step];
-        this.idleStep = Math.min(this.idleStep + 1, IDLE_DELAYS.length - 1);
+        this.planner.idle(now);
     }
 }

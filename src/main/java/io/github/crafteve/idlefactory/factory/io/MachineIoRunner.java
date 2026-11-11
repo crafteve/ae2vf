@@ -119,15 +119,16 @@ public final class MachineIoRunner {
      * @param storage    仓库
      * @param level      机器所在维度
      * @param pos        机器坐标
-     * @param slot       本台机器在本 tick 表单上的槽位
+     * @param inputs     本轮要跑的输入单元（规划器已排好顺序）
+     * @param outputs    本轮要跑的输出单元（规划器已排好顺序）
      * @param caps       能力句柄缓存；{@code null} 时直接查世界
      * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
-     * @param now          当前服务端 tick，给变体索引算 TTL 与规则轮转
+     * @param now          当前服务端 tick，给变体索引算 TTL
      * @param sharedBudget 本台机器本 tick 共享的变体预算；每个方块按序扣减
      * @return 本方块结果
      */
     public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
-            IoForm.Slot slot, @Nullable LevelCapabilityCache caps,
+            List<IoUnit> inputs, List<IoUnit> outputs, @Nullable LevelCapabilityCache caps,
             @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
@@ -142,8 +143,6 @@ public final class MachineIoRunner {
         Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
-        List<IoUnit> inputs = slot.inputs();
-        List<IoUnit> outputs = slot.outputs();
         // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
         // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
         // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
@@ -154,10 +153,9 @@ public final class MachineIoRunner {
         int[] inputBudget = {Math.min(sideAllowance, Math.max(0, sharedBudget[0]))};
         int inputQuota = inputBudget[0];
 
-        // 规则按 tick 轮转起点：同一侧的多条模糊规则共享本侧额度时，后面的规则不会被前面的永久挤掉。
-        int inputStart = inputs.isEmpty() ? 0 : (int) Math.floorMod(now, (long) inputs.size());
+        // 顺序由规划器给定（游标轮转在规划器里），执行器只按清单跑。
         for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
-            IoUnit unit = inputs.get((inputStart + ruleIndex) % inputs.size());
+            IoUnit unit = inputs.get(ruleIndex);
             ResourceSpec spec = unit.spec();
             anyInputRule = true;
             RuleKey ruleKey = unit.key().rule();
@@ -227,9 +225,8 @@ public final class MachineIoRunner {
                 Math.min(ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK - inputUsed, sharedBudget[0])};
         int outputQuota = outputBudget[0];
 
-        int outputStart = outputs.isEmpty() ? 0 : (int) Math.floorMod(now + 1L, (long) outputs.size());
         for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
-            IoUnit unit = outputs.get((outputStart + ruleIndex) % outputs.size());
+            IoUnit unit = outputs.get(ruleIndex);
             ResourceSpec spec = unit.spec();
             RuleKey ruleKey = unit.key().rule();
             MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, false,
