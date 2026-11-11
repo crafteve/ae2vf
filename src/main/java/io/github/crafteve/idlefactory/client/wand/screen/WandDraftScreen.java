@@ -13,6 +13,7 @@ import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.AE2Button;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.client.wand.WandMessages;
@@ -31,25 +32,38 @@ import net.minecraft.world.entity.player.Inventory;
 /**
  * 草稿确认面板：AE2 对话框样式，逐行列出草稿并提交。
  *
+ * <p>背景与两个按钮的几何来自 {@code assets/ae2/screens/idlefactory_wand_draft.json} 的
+ * {@code generatedBackground}：那是 AE2 自己按尺寸生成的浅色边框底，不带任何烤死的表格线。
+ * 面板内容（标题、摘要、草稿行、滚动条、状态行）全部自绘，用 {@code FactoryGuiTheme} 的
+ * 文字色与 {@code FactoryNineSlice} 的凹槽贴图，和节点终端保持同一套外观。</p>
+ *
  * <p>行来自客户端草稿，问题以服务端预校验为准（{@link WandCoordinator#pendingIssues()}），
  * 服务端还没回包时退回客户端预检结果。面板只是监视器：确定发提交意图，取消丢草稿，Esc /
  * 关闭保留草稿回到编辑态。</p>
  *
- * <p>不建任何槽位；标题与背包标签都按对话框惯例隐藏背包标签。</p>
+ * <p>不建任何槽位；背包标签按对话框惯例藏到屏幕外。</p>
  */
 public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
+    /** 标题行顶边。 */
+    private static final int TITLE_Y = 8;
+    /** 标题行左边距。 */
+    private static final int TITLE_X = 10;
     /** 摘要行顶边。 */
-    private static final int SUMMARY_Y = 19;
-    /** 行区顶边。 */
-    private static final int CONTENT_TOP = 32;
-    /** 行区底边。 */
-    private static final int CONTENT_BOTTOM = 150;
-    /** 行区左边界。 */
-    private static final int CONTENT_LEFT = 8;
-    /** 行区右边界。 */
-    private static final int CONTENT_RIGHT = 214;
+    private static final int SUMMARY_Y = 21;
+    /** 行区外框：左、上、宽、高；框内是凹槽底。 */
+    private static final int FRAME_X = 8;
+    private static final int FRAME_Y = 34;
+    private static final int FRAME_W = 224;
+    private static final int FRAME_H = 124;
+    /** 行区内边距。 */
+    private static final int INNER_PAD = 4;
+    /** 行区右边界（给滚动条留 3px 加 2px 间隙）。 */
+    private static final int INNER_RIGHT = FRAME_X + FRAME_W - 9;
+    /** 滚动条左边界与宽度。 */
+    private static final int SCROLL_X = FRAME_X + FRAME_W - 6;
+    private static final int SCROLL_W = 3;
     /** 状态行顶边。 */
-    private static final int STATUS_Y = 153;
+    private static final int STATUS_Y = 161;
 
     private final List<Row> rows = new ArrayList<>();
     private int scroll;
@@ -83,8 +97,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        int max = Math.max(0, this.rows.size() * WandRowRender.ROW_HEIGHT
-                - (CONTENT_BOTTOM - CONTENT_TOP));
+        int max = maxScroll();
         if (max > 0) {
             this.scroll = (int) Math.clamp(this.scroll - scrollY * WandRowRender.ROW_HEIGHT,
                     0, max);
@@ -152,9 +165,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             Optional<BlockKey> block = WandLinks.blockOfMachine(machineId);
             block.ifPresent(value -> this.rows.add(new Row(value, true)));
         }
-        int max = Math.max(0, this.rows.size() * WandRowRender.ROW_HEIGHT
-                - (CONTENT_BOTTOM - CONTENT_TOP));
-        this.scroll = Math.min(this.scroll, max);
+        this.scroll = Math.min(this.scroll, maxScroll());
     }
 
     /** 按提交态与校验结果更新两个按钮。 */
@@ -179,17 +190,37 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
                 && issues().isEmpty();
     }
 
+    /** 行区可显示高度。 */
+    private static int viewportHeight() {
+        return FRAME_H - INNER_PAD * 2;
+    }
+
+    /** 最大滚动量；行数不足一屏时为 0。 */
+    private int maxScroll() {
+        return Math.max(0, this.rows.size() * WandRowRender.ROW_HEIGHT - viewportHeight());
+    }
+
     /**
-     * 画摘要、行、滚动条与状态行。
+     * 画标题、摘要、行区外框、草稿行、滚动条与状态行。
      *
      * @param graphics 绘制上下文
      */
     private void drawPanel(GuiGraphics graphics) {
         FactoryGuiTheme theme = FactoryGuiTheme.current();
-        graphics.drawString(this.font, summary(), this.leftPos + CONTENT_LEFT,
-                this.topPos + SUMMARY_Y, theme.textPrimary(), false);
-        graphics.enableScissor(this.leftPos + CONTENT_LEFT, this.topPos + CONTENT_TOP,
-                this.leftPos + CONTENT_RIGHT, this.topPos + CONTENT_BOTTOM);
+        int left = this.leftPos;
+        int top = this.topPos;
+
+        graphics.drawString(this.font, WandMessages.panelTitle(), left + TITLE_X,
+                top + TITLE_Y, theme.textPrimary(), false);
+        graphics.drawString(this.font, summary(), left + TITLE_X, top + SUMMARY_Y,
+                theme.textDim(), false);
+
+        FactoryNineSlice.slot(graphics, left + FRAME_X, top + FRAME_Y, FRAME_W, FRAME_H);
+        int innerLeft = left + FRAME_X + INNER_PAD;
+        int innerTop = top + FRAME_Y + INNER_PAD;
+        int innerRight = left + INNER_RIGHT;
+        int innerBottom = top + FRAME_Y + FRAME_H - INNER_PAD;
+        graphics.enableScissor(innerLeft, innerTop, innerRight, innerBottom);
         try {
             drawRows(graphics, theme);
         } finally {
@@ -198,19 +229,22 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         if (this.rows.isEmpty()) {
             Component empty = WandMessages.panelEmpty();
             graphics.drawString(this.font, empty,
-                    this.leftPos + (this.imageWidth - this.font.width(empty)) / 2,
-                    this.topPos + (CONTENT_TOP + CONTENT_BOTTOM) / 2 - 4,
-                    theme.textDim(), false);
+                    left + FRAME_X + (FRAME_W - this.font.width(empty)) / 2,
+                    (innerTop + innerBottom) / 2 - 4, theme.textDim(), false);
         }
+        drawScrollbar(graphics, theme, innerTop, innerBottom);
         drawStatus(graphics, theme);
     }
 
     private void drawRows(GuiGraphics graphics, FactoryGuiTheme theme) {
         ResourceLocation fallback = WandPrecheck.baseType(this.minecraft, WandSession.draft());
+        int innerLeft = this.leftPos + FRAME_X + INNER_PAD;
+        int rowWidth = INNER_RIGHT - FRAME_X - INNER_PAD;
         for (int index = 0; index < this.rows.size(); index++) {
-            int y = this.topPos + CONTENT_TOP + index * WandRowRender.ROW_HEIGHT - this.scroll;
-            if (y + WandRowRender.ROW_HEIGHT < this.topPos + CONTENT_TOP
-                    || y > this.topPos + CONTENT_BOTTOM) {
+            int y = this.topPos + FRAME_Y + INNER_PAD + index * WandRowRender.ROW_HEIGHT
+                    - this.scroll;
+            if (y + WandRowRender.ROW_HEIGHT <= this.topPos + FRAME_Y + INNER_PAD
+                    || y >= this.topPos + FRAME_Y + FRAME_H - INNER_PAD) {
                 continue;
             }
             Row row = this.rows.get(index);
@@ -221,14 +255,36 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             if (blockId == null) {
                 continue;
             }
-            WandRowRender.draw(graphics, this.font, theme, this.leftPos + CONTENT_LEFT, y,
-                    CONTENT_RIGHT - CONTENT_LEFT, row.block(), blockId, row.removed(),
-                    isConflicted(row.block()));
+            WandRowRender.draw(graphics, this.font, theme, innerLeft, y, rowWidth,
+                    row.block(), blockId, row.removed(), isConflicted(row.block()));
         }
     }
 
     /**
-     * 状态行：有校验问题报条数，其次报提交超时 / 失败，最后报提交中。
+     * 滚动条：只在行数超出一屏时画，轨道与滑块都用主题色。
+     *
+     * @param graphics   绘制上下文
+     * @param theme      主题
+     * @param innerTop   轨道顶边（屏幕坐标）
+     * @param innerBottom 轨道底边（屏幕坐标）
+     */
+    private void drawScrollbar(GuiGraphics graphics, FactoryGuiTheme theme, int innerTop,
+            int innerBottom) {
+        int viewport = viewportHeight();
+        int total = this.rows.size() * WandRowRender.ROW_HEIGHT;
+        if (total <= viewport) {
+            return;
+        }
+        int x = this.leftPos + SCROLL_X;
+        graphics.fill(x, innerTop, x + SCROLL_W, innerBottom, theme.bevelDark());
+        int thumbHeight = Math.max(10, viewport * viewport / total);
+        int travel = viewport - thumbHeight;
+        int thumbY = innerTop + travel * this.scroll / Math.max(1, maxScroll());
+        graphics.fill(x, thumbY, x + SCROLL_W, thumbY + thumbHeight, theme.panelBorder());
+    }
+
+    /**
+     * 状态行：校验问题 &gt; 提交中 &gt; 提交失败 / 超时 &gt; 普通操作提示。
      *
      * @param graphics 绘制上下文
      * @param theme    主题
@@ -236,18 +292,22 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
     private void drawStatus(GuiGraphics graphics, FactoryGuiTheme theme) {
         List<WandIssue> issues = issues();
         Component status;
+        int color;
         if (!issues.isEmpty()) {
             status = WandMessages.panelIssues(issues.size());
+            color = theme.error();
         } else if (WandSession.state() == WandSession.State.SUBMITTING) {
             status = WandMessages.submitting();
-        } else {
+            color = theme.textDim();
+        } else if (WandCoordinator.panelStatus() != null) {
             status = WandCoordinator.panelStatus();
+            color = theme.error();
+        } else {
+            status = WandMessages.panelHint();
+            color = theme.textDim();
         }
-        if (status == null) {
-            return;
-        }
-        graphics.drawString(this.font, status, this.leftPos + CONTENT_LEFT,
-                this.topPos + STATUS_Y, theme.error(), false);
+        graphics.drawString(this.font, status, this.leftPos + FRAME_X + 2,
+                this.topPos + STATUS_Y, color, false);
     }
 
     /**

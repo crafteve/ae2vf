@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.wand.screen;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.wand.WandMessages;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 
@@ -11,16 +12,24 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 草稿面板的行渲染：图标 + 方块名 + 坐标，删除态红字并带删除标记。
+ * 草稿面板的行渲染：凹槽图标 + 方块名 + 坐标，删除态红字并带删除标记。
  *
  * <p>行是纯展示，不响应点击；撤销删除要回世界再右键一次。几何只在面板里算，本类只按给定
- * 矩形画一行。</p>
+ * 矩形画一行。图标底色用 {@link FactoryNineSlice#slot}，和节点终端的成员行同一种凹槽。</p>
  */
 public final class WandRowRender {
-    /** 行高；图标 12 + 上下 1px。 */
-    public static final int ROW_HEIGHT = 14;
-    /** 左侧内边距。 */
-    private static final int PADDING_X = 2;
+    /** 行高；18px 凹槽 + 0 间距，六行正好塞进行区。 */
+    public static final int ROW_HEIGHT = 18;
+    /** 图标凹槽边长。 */
+    private static final int SLOT = 18;
+    /** 名字左边界（槽 + 4px 间隙）。 */
+    private static final int TEXT_X = SLOT + 4;
+    /** 文字基线相对行顶的偏移。 */
+    private static final int TEXT_Y = 5;
+    /** 右侧至少有 2px 内边距。 */
+    private static final int RIGHT_PAD = 2;
+    /** 删除标记与坐标之间的间隙。 */
+    private static final int LABEL_GAP = 6;
 
     private WandRowRender() {
         // 纯静态渲染
@@ -46,19 +55,49 @@ public final class WandRowRender {
         boolean error = removed || conflicted;
         int color = error ? theme.error() : theme.textPrimary();
         if (removed) {
-            graphics.fill(x - PADDING_X, y, x + width, y + ROW_HEIGHT - 1, 0x22FF4D4D);
+            graphics.fill(x, y, x + width, y + ROW_HEIGHT - 1, 0x22FF4D4D);
         }
+        FactoryNineSlice.slot(graphics, x, y, SLOT, SLOT);
         graphics.renderItem(new ItemStack(BuiltInRegistries.BLOCK.get(blockId).asItem()),
-                x + PADDING_X, y + 1);
-        graphics.drawString(font, WandMessages.blockName(blockId), x + 18, y + 3, color, false);
+                x + 1, y + 1);
+
         String pos = block.pos().toShortString();
-        String removedLabel = WandMessages.panelRemoved().getString();
-        int rightReserve = removed ? font.width(removedLabel) + 6 : 2;
-        graphics.drawString(font, pos, x + width - rightReserve - font.width(pos), y + 3,
-                theme.textDim(), false);
+        String label = WandMessages.panelRemoved().getString();
+        int rightReserve = RIGHT_PAD;
         if (removed) {
-            graphics.drawString(font, removedLabel, x + width - font.width(removedLabel), y + 3,
+            graphics.drawString(font, label, x + width - RIGHT_PAD - font.width(label), y + TEXT_Y,
                     theme.error(), false);
+            rightReserve += font.width(label) + LABEL_GAP;
         }
+        rightReserve += font.width(pos);
+        graphics.drawString(font, pos, x + width - rightReserve, y + TEXT_Y,
+                theme.textDim(), false);
+
+        int nameWidth = width - TEXT_X - rightReserve - LABEL_GAP;
+        String name = ellipsize(font, WandMessages.blockName(blockId), nameWidth);
+        graphics.drawString(font, name, x + TEXT_X, y + TEXT_Y, color, false);
+    }
+
+    /**
+     * 按像素宽度截断字符串；超宽时用省略号收尾。
+     *
+     * @param font  字体
+     * @param text  原文
+     * @param width 可用宽度
+     * @return 适配宽度的文本
+     */
+    private static String ellipsize(Font font, String text, int width) {
+        if (width <= 0) {
+            return "";
+        }
+        if (font.width(text) <= width) {
+            return text;
+        }
+        String ellipsis = "…";
+        int budget = width - font.width(ellipsis);
+        if (budget <= 0) {
+            return ellipsis;
+        }
+        return font.plainSubstrByWidth(text, budget) + ellipsis;
     }
 }

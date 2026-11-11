@@ -203,6 +203,11 @@ public final class WandMessages {
         return Component.translatable("wand.panel.removed");
     }
 
+    /** 面板没有问题时底部的操作提示。 */
+    public static Component panelHint() {
+        return Component.translatable("wand.panel.hint");
+    }
+
     /**
      * 节点类型方块名；读不到时退回类型 id。
      *

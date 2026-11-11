@@ -43,6 +43,14 @@ public class IdleFactoryClient {
     }
 
     /**
+     * 草稿面板样式路径。
+     *
+     * <p>{@code StyleManager.loadStyleDoc} 固定按 {@code ae2} 命名空间解析，所以样式文件放在
+     * {@code assets/ae2/screens/} 下；面板尺寸与两个按钮的位置都写在那份 json 里，Java 只读。</p>
+     */
+    private static final String WAND_DRAFT_STYLE = "/screens/idlefactory_wand_draft.json";
+
+    /**
      * 把两个终端菜单、草稿面板和界面绑起来。
      *
      * @param event 菜单屏幕注册事件
@@ -65,6 +73,6 @@ public class IdleFactoryClient {
                 ModMenus.WAND_DRAFT.get(),
                 (WandMenu menu, Inventory inventory, Component title) ->
                         new WandDraftScreen(menu, inventory, WandMessages.panelTitle(),
-                                StyleManager.loadStyleDoc("/screens/craft_confirm.json")));
+                                StyleManager.loadStyleDoc(WAND_DRAFT_STYLE)));
     }
 }

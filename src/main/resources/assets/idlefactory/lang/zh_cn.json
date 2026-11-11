@@ -44,8 +44,8 @@
   "wand.panel.empty": "草稿里没有机器",
   "wand.panel.issues": "先修正 %s 处",
   "wand.panel.removed": "删除",
+  "wand.panel.hint": "Esc 返回 · 滚轮翻页 · 右键继续加机器",
   "wand.delete.none": "删除没有被拒绝",
   "wand.delete.has_rules": "节点还有 IO 规则，先去终端清空",
   "wand.delete.has_patterns": "节点还有样板，先去终端取走"
 }
-
