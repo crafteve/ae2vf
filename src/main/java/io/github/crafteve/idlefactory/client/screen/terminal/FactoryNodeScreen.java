@@ -205,6 +205,10 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         if (box == null) {
             return;
         }
+        syncRenameBox();
+        if (this.renameBox == null) {
+            return;
+        }
         FactoryGuiTheme theme = FactoryGuiTheme.current();
         graphics.fill(box.getX() - 1, box.getY() - 1, box.getX() + box.getWidth() + 1,
                 box.getY() + box.getHeight() + 1, theme.bevelLight());
@@ -335,9 +339,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         Viewport viewport = contentViewport();
         this.layout = FactoryNodeLayout.of(this.model.rows(), viewport, this.expanded,
                 this.expandedAll);
-        if (this.renameBox != null) {
-            cancelRename();
-        }
+        // 改名框不在这里取消：每秒一次的快照刷新也会走 rebuildLayout，取消会让改名框活不过一秒。
+        // 位置在每帧 drawRenameBox 里按最新排版重贴；节点真的消失时才由 syncRenameBox 取消。
         clampScroll();
         int signature = this.model.rows().size() * 31 + totalMembers();
         if (signature != this.lastLogSignature) {
@@ -430,7 +433,51 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.renameBox.setValue(node.view().name() == null ? "" : node.view().name());
         this.renameBox.setMaxLength(io.github.crafteve.idlefactory.factory.FactoryLimitsConfig.maxNameLength());
         this.renameBox.setFocused(true);
+        // 搜索框让出焦点，避免两个输入框的焦点框同时亮着。
+        if (this.searchBox != null) {
+            this.searchBox.setFocused(false);
+        }
         this.renamingNode = node.nodeId();
+    }
+
+    /**
+     * 把改名框贴回正在改名的节点：布局 / 滚动 / 快照变化后都按当前几何重新定位。
+     *
+     * <p>节点被删除或被搜索过滤掉时取消改名，避免输入框留在空处。</p>
+     */
+    private void syncRenameBox() {
+        FactorySearchEditBox box = this.renameBox;
+        UUID nodeId = this.renamingNode;
+        FactoryNodeLayout current = this.layout;
+        if (box == null || nodeId == null) {
+            return;
+        }
+        int index = findNodeIndex(nodeId);
+        if (current == null || index < 0 || index >= current.boxes().size()) {
+            cancelRename();
+            return;
+        }
+        int top = FactoryNodeLayout.screenY(current.viewport(),
+                current.boxes().get(index).top(), this.scroll);
+        box.setX(FactoryNodeLayout.nameX(current.viewport()));
+        box.setY(top + 5);
+        box.setWidth(Math.max(40, FactoryNodeLayout.nameWidth(current.viewport())));
+    }
+
+    /**
+     * 节点在当前过滤结果里的下标。
+     *
+     * @param nodeId 节点 id
+     * @return 下标；不在可见行里为 -1
+     */
+    private int findNodeIndex(UUID nodeId) {
+        List<NodeRow> rows = this.model.rows();
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i).nodeId().equals(nodeId)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private void commitRename() {
