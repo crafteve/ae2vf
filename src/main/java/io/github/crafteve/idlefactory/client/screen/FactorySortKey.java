@@ -2,7 +2,9 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -65,6 +67,40 @@ public record FactorySortKey(String name, String id, int machineCount, int ruleC
             sorted.add(entry.item());
         }
         return List.copyOf(sorted);
+    }
+
+    /**
+     * 保持既有顺序重排：先按上一次的顺序摆放仍在的项，新出现的项按当前排序追加在末尾。
+     *
+     * <p>给改名框 / 删除确认框打开时用：快照照常更新数据，但列表不许在用户操作期间跳动。</p>
+     *
+     * @param items    本次快照过滤后的项
+     * @param previous 上一次已排好序的项
+     * @param idOf     从项取节点 id
+     * @param keyOf    从项取排序键；新出现的项用它排序
+     * @param context  档位、方向与玩家位置
+     * @param <T>      行 / 块类型
+     * @return 保持既有顺序的不可变列表
+     */
+    public static <T> List<T> preserveOrder(List<T> items, List<T> previous,
+            Function<T, UUID> idOf, Function<T, FactorySortKey> keyOf,
+            FactorySortContext context) {
+        if (previous.isEmpty()) {
+            return sorted(items, keyOf, context);
+        }
+        Map<UUID, T> remaining = new LinkedHashMap<>();
+        for (T item : items) {
+            remaining.put(idOf.apply(item), item);
+        }
+        List<T> ordered = new ArrayList<>(items.size());
+        for (T old : previous) {
+            T current = remaining.remove(idOf.apply(old));
+            if (current != null) {
+                ordered.add(current);
+            }
+        }
+        ordered.addAll(sorted(new ArrayList<>(remaining.values()), keyOf, context));
+        return List.copyOf(ordered);
     }
 
     /**

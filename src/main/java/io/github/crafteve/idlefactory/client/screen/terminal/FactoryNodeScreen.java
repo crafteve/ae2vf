@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import appeng.api.config.Settings;
+import appeng.api.config.SortDir;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.style.TerminalStyle;
@@ -21,6 +22,9 @@ import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
@@ -28,9 +32,11 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.No
 import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
+import io.github.crafteve.idlefactory.menu.FactorySortMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -77,6 +83,10 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private int rows = MIN_ROWS;
     private final FactoryNodeModel model;
+    /** 当前排序档位；初值来自物品组件，切换后回写。 */
+    private FactorySortMode sortMode;
+    /** 当前排序方向；初值来自物品组件，切换后回写。 */
+    private SortDir sortDirection;
     @Nullable
     private FactoryNodeLayout layout;
     @Nullable
@@ -110,12 +120,19 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             ScreenStyle style) {
         super(menu, inventory, title, style);
         this.model = new FactoryNodeModel(FactoryGuiTheme.current());
+        this.sortMode = menu.host().sortMode();
+        this.sortDirection = menu.host().sortDirection();
+        this.model.setSortContext(this.sortContext());
         this.bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
             // 指南页待接入。
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
+        this.addToLeftToolbar(new FactorySortModeButton(() -> this.sortMode,
+                button -> this.cycleSortMode()));
+        this.addToLeftToolbar(new FactorySortDirectionButton(() -> this.sortDirection,
+                button -> this.toggleSortDirection()));
     }
 
     @Override
@@ -309,6 +326,10 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param payload 节点表
      */
     public void acceptNodeTable(FactoryNodeTableS2C payload) {
+        // 改名框 / 删除确认框打开时冻结行序：快照照常更新数据，但列表不在用户操作期间跳动。
+        this.model.setSortFrozen(this.renameBox != null
+                || (this.confirmDialog != null && this.confirmDialog.isOpen()));
+        this.model.setSortContext(this.sortContext());
         this.model.accept(payload);
         // 快照里已经消失的节点不再占用展开状态；搜索过滤不会误删展开状态。
         Set<UUID> alive = new HashSet<>();
@@ -330,6 +351,72 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         if (!payload.ok() && this.minecraft != null && this.minecraft.player != null) {
             this.minecraft.player.displayClientMessage(Component.literal(payload.message()), true);
         }
+    }
+
+    /**
+     * 接收服务端确认的排序偏好。
+     *
+     * <p>本地已经先改过；这里只处理两端不一致的情况（比如旧回执），一致时不做任何重排。</p>
+     *
+     * @param mode      档位
+     * @param direction 方向
+     */
+    public void acceptSort(FactorySortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSortContext(this.sortContext());
+        this.model.resort();
+        rebuildLayout();
+    }
+
+    /** 档位按钮：循环到下一个档位。 */
+    private void cycleSortMode() {
+        applySort(this.sortMode.next(), this.sortDirection);
+    }
+
+    /** 方向按钮：升序 / 降序互换。 */
+    private void toggleSortDirection() {
+        SortDir next = this.sortDirection == SortDir.ASCENDING
+                ? SortDir.DESCENDING : SortDir.ASCENDING;
+        applySort(this.sortMode, next);
+    }
+
+    /**
+     * 应用一次排序变化：本地先改并重排，再发请求让服务端写物品组件。
+     *
+     * @param mode      新档位
+     * @param direction 新方向
+     */
+    private void applySort(FactorySortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSortContext(this.sortContext());
+        this.model.resort();
+        rebuildLayout();
+        PacketDistributor.sendToServer(
+                new FactoryTerminalSortC2S(this.menu.containerId, mode, direction));
+    }
+
+    /**
+     * 当前排序上下文：档位、方向与玩家位置。
+     *
+     * <p>玩家位置只在快照到达时取一次，距离档因此按快照节拍重排，不做每帧重排。</p>
+     *
+     * @return 排序上下文
+     */
+    private FactorySortContext sortContext() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return new FactorySortContext(this.sortMode, this.sortDirection, null, null);
+        }
+        return new FactorySortContext(this.sortMode, this.sortDirection,
+                this.minecraft.player.level().dimension(),
+                this.minecraft.player.blockPosition());
     }
 
     void rebuildLayout() {

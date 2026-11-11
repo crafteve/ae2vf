@@ -14,6 +14,8 @@ import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
@@ -32,12 +34,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * 网络通道。
  *
  * <p>当前包含机器表、仓库快照、IO 规则动作、编辑反馈、界面打开请求、被动 IO 视图同步、
- * 绑定杖操作与三层链接快照。绑定杖的 1:1 toggle、连锁、草稿预校验与提交各有独立的请求 /
- * 回执包，不再复用仓库动作包。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
+ * 两个终端共用的排序偏好同步、绑定杖操作与三层链接快照。绑定杖的 1:1 toggle、连锁、草稿预校验
+ * 与提交各有独立的请求 / 回执包，不再复用仓库动作包。改包结构时记得递增
+ * {@link #PROTOCOL_VERSION}。</p>
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "32";
+    public static final String PROTOCOL_VERSION = "33";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -98,6 +101,12 @@ public final class ModNetwork {
                 FactoryPassiveIoViewC2S.STREAM_CODEC, FactoryPassiveIoViewC2S::handle);
         registrar.playToClient(FactoryPassiveIoViewS2C.TYPE,
                 FactoryPassiveIoViewS2C.STREAM_CODEC, FactoryPassiveIoViewS2C::handle);
+
+        // 两个终端共用的排序偏好：档位 + 方向，服务端写物品组件后回同步
+        registrar.playToServer(FactoryTerminalSortC2S.TYPE,
+                FactoryTerminalSortC2S.STREAM_CODEC, FactoryTerminalSortC2S::handle);
+        registrar.playToClient(FactoryTerminalSortS2C.TYPE,
+                FactoryTerminalSortS2C.STREAM_CODEC, FactoryTerminalSortS2C::handle);
 
         // 绑定杖：仓库动作 + 三层链接快照
         registrar.playToServer(FactoryWandActionC2S.TYPE, FactoryWandActionC2S.STREAM_CODEC,

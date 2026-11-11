@@ -5,6 +5,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.config.Settings;
+import appeng.api.config.SortDir;
 import appeng.api.stacks.AEKey;
 import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
@@ -16,6 +17,9 @@ import appeng.core.AEConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
@@ -27,10 +31,12 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoMod
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.FactorySortMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -77,6 +83,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private int rows = MIN_ROWS;
     /** 当前列表 / 磁贴视图；初值来自物品组件。 */
     private FactoryPassiveIoView view;
+    /** 当前排序档位；初值来自物品组件，切换后回写。 */
+    private FactorySortMode sortMode;
+    /** 当前排序方向；初值来自物品组件，切换后回写。 */
+    private SortDir sortDirection;
     /** 内容模型：快照 + 搜索词 → 机器块。 */
     private final FactoryPassiveIoModel model;
     /** 本帧排版；由模型、视图与视口重建。 */
@@ -108,6 +118,9 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super(menu, inventory, title, style);
         this.view = menu.host().view();
         this.model = new FactoryPassiveIoModel(FactoryGuiTheme.current());
+        this.sortMode = menu.host().sortMode();
+        this.sortDirection = menu.host().sortDirection();
+        this.model.setSortContext(this.sortContext());
         Scrollbar bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.scroll = new FactoryPassiveIoScroll(bar);
         // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
@@ -117,6 +130,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
+        this.addToLeftToolbar(new FactorySortModeButton(() -> this.sortMode,
+                button -> this.cycleSortMode()));
+        this.addToLeftToolbar(new FactorySortDirectionButton(() -> this.sortDirection,
+                button -> this.toggleSortDirection()));
         this.addToLeftToolbar(new FactoryPassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
     }
@@ -260,6 +277,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     @Override
     public void acceptTable(FactoryTableS2C payload) {
+        this.model.setSortContext(this.sortContext());
         this.model.accept(payload);
         rebuildLayout();
         int signature = payload.machines().size() * 37 + totalRules();
@@ -294,6 +312,72 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.view = next;
         rebuildLayout();
         FactoryPassiveIoProbe.logScreen(this);
+    }
+
+    /**
+     * 接收服务端确认的排序偏好。
+     *
+     * <p>本地已经先改过；这里只处理两端不一致的情况（比如旧回执），一致时不做任何重排。</p>
+     *
+     * @param mode      档位
+     * @param direction 方向
+     */
+    public void acceptSort(FactorySortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSortContext(this.sortContext());
+        this.model.resort();
+        rebuildLayout();
+    }
+
+    /** 档位按钮：循环到下一个档位。 */
+    private void cycleSortMode() {
+        applySort(this.sortMode.next(), this.sortDirection);
+    }
+
+    /** 方向按钮：升序 / 降序互换。 */
+    private void toggleSortDirection() {
+        SortDir next = this.sortDirection == SortDir.ASCENDING
+                ? SortDir.DESCENDING : SortDir.ASCENDING;
+        applySort(this.sortMode, next);
+    }
+
+    /**
+     * 应用一次排序变化：本地先改并重排，再发请求让服务端写物品组件。
+     *
+     * @param mode      新档位
+     * @param direction 新方向
+     */
+    private void applySort(FactorySortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSortContext(this.sortContext());
+        this.model.resort();
+        rebuildLayout();
+        PacketDistributor.sendToServer(
+                new FactoryTerminalSortC2S(this.menu.containerId, mode, direction));
+    }
+
+    /**
+     * 当前排序上下文：档位、方向与玩家位置。
+     *
+     * <p>玩家位置只在快照到达时取一次，距离档因此按快照节拍重排，不做每帧重排。</p>
+     *
+     * @return 排序上下文
+     */
+    private FactorySortContext sortContext() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return new FactorySortContext(this.sortMode, this.sortDirection, null, null);
+        }
+        return new FactorySortContext(this.sortMode, this.sortDirection,
+                this.minecraft.player.level().dimension(),
+                this.minecraft.player.blockPosition());
     }
 
     /**

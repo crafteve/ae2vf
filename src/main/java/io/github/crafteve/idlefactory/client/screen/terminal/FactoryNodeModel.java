@@ -31,6 +31,8 @@ final class FactoryNodeModel {
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
     /** 当前排序上下文：档位、方向与玩家位置。 */
     private FactorySortContext sortContext = FactorySortContext.defaults();
+    /** 是否冻结顺序：改名框 / 删除确认框打开时不让列表在用户操作期间跳动。 */
+    private boolean sortFrozen;
     private List<NodeRow> rows = List.of();
 
     /**
@@ -104,6 +106,15 @@ final class FactoryNodeModel {
     }
 
     /**
+     * 冻结或解冻顺序；冻结时快照照常更新，但行序保持不变。
+     *
+     * @param frozen 是否冻结
+     */
+    void setSortFrozen(boolean frozen) {
+        this.sortFrozen = frozen;
+    }
+
+    /**
      * 按当前快照与排序上下文重新排序。
      *
      * <p>由排序按钮与快照接收方调用；滚动与排版由屏幕在之后重建。</p>
@@ -157,7 +168,12 @@ final class FactoryNodeModel {
             }
             next.add(new NodeRow(view, status, name, members(view)));
         }
-        this.rows = FactorySortKey.sorted(next, this::sortKey, this.sortContext);
+        if (this.sortFrozen) {
+            this.rows = FactorySortKey.preserveOrder(next, this.rows, NodeRow::nodeId,
+                    this::sortKey, this.sortContext);
+        } else {
+            this.rows = FactorySortKey.sorted(next, this::sortKey, this.sortContext);
+        }
     }
 
     /**
