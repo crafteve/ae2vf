@@ -16,8 +16,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
  * 机器行用 {@code Level.IO}。坐标相对内容区，绘制、命中、tooltip 都从这里取同一份结果；滚动只在
  * 取值时加 {@code scroll}，不重建排版。</p>
  *
- * <p>节点行结构：左边图标 + 名字 + 状态点，中间 provider 三格凹底，右边编辑 / 删除成对。
- * 展开后机器行只在行尾放定位；节点行按钮不随展开消失。</p>
+ * <p>节点行结构：左边图标 + 名字，右侧 provider 三枚方形键帽，再右侧编辑 / 删除两枚 9×9
+ * 小键上下叠放。展开后机器行只在行尾放定位；节点行按钮不随展开消失。</p>
  */
 final class FactoryNodeLayout {
     /** 节点行高。 */
@@ -34,18 +34,12 @@ final class FactoryNodeLayout {
     static final int STATUS_W = FactoryLamp.WIDTH;
     /** 图标凹槽。 */
     static final int SLOT = 18;
-    /** 堆叠徽标尺寸。 */
-    static final int BADGE_W = 11;
-    static final int BADGE_H = 9;
-    /** provider 键帽尺寸与间隔；高度撑满节点行。 */
-    static final int KEY_W = 14;
-    static final int KEY_H = 18;
+    /** provider 键帽尺寸与间隔：与被动 IO 的 chip 同规格，方形、直接坐在状态带上。 */
+    static final int KEY_W = 13;
+    static final int KEY_H = 13;
     static final int KEY_GAP = 1;
-    /** provider 凹底内边距。 */
-    static final int TROUGH_PAD = 1;
-    /** provider 凹底宽高。 */
-    static final int TROUGH_W = TROUGH_PAD * 2 + KEY_W * 3 + KEY_GAP * 2;
-    static final int TROUGH_H = 18;
+    /** provider 键帽在节点行内的垂直偏移（上下留白相等）。 */
+    static final int KEY_INSET_Y = (NODE_ROW_H - KEY_H) / 2;
     /** 编辑 / 删除键帽：上下叠放的两枚小正方形。 */
     static final int ACTION_W = 9;
     static final int ACTION_H = 9;
@@ -250,8 +244,8 @@ final class FactoryNodeLayout {
     }
 
     private static Hit hitNodeRow(Viewport viewport, NodeBox box, int localX, int localY) {
-        int keyY = box.top() + 1;
-        if (localY >= keyY - 1 && localY < keyY + KEY_H + 1) {
+        int keyY = box.top() + KEY_INSET_Y;
+        if (localY >= keyY && localY < keyY + KEY_H) {
             if (inside(localX, keyX(viewport, 0), KEY_W)) {
                 return new Hit(Kind.BLOCKING, box.index(), -1);
             }
@@ -300,19 +294,14 @@ final class FactoryNodeLayout {
         return cardX(viewport) + 1 + STATUS_W + 1 + SLOT + 1;
     }
 
-    /** provider 凹底左边缘（屏幕坐标）。 */
-    static int troughX(Viewport viewport) {
-        return actionX(viewport) - 2 - TROUGH_W;
-    }
-
-    /** provider 凹底右边缘。 */
-    static int troughRight(Viewport viewport) {
-        return actionX(viewport) - 2;
+    /** provider 键帽组左边缘（屏幕坐标）：与编辑 / 删除键列留 2px 间隙。 */
+    static int keyGroupX(Viewport viewport) {
+        return actionX(viewport) - 2 - (KEY_W * 3 + KEY_GAP * 2);
     }
 
     /** 第 index 枚 provider 键帽左边缘。 */
     static int keyX(Viewport viewport, int index) {
-        return troughX(viewport) + TROUGH_PAD + index * (KEY_W + KEY_GAP);
+        return keyGroupX(viewport) + index * (KEY_W + KEY_GAP);
     }
 
     /** 编辑 / 删除键列左边缘；两键上下叠放。 */
@@ -322,7 +311,7 @@ final class FactoryNodeLayout {
 
     /** 名字可用宽度。 */
     static int nameWidth(Viewport viewport) {
-        return troughX(viewport) - 2 - nameX(viewport);
+        return keyGroupX(viewport) - 2 - nameX(viewport);
     }
 
     /** 机器行卡片左边缘。 */

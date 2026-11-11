@@ -88,13 +88,37 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void edit(int containerId, NodeRow node) {
-        if (!(Minecraft.getInstance().player != null
-                && Minecraft.getInstance().player.getMainHandItem().getItem()
-                instanceof io.github.crafteve.idlefactory.item.MachineBindingWandItem)) {
-            message("主手拿绑定杖才能编辑节点");
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
             return;
         }
-        WandSession.startEdit(Minecraft.getInstance(), node.nodeId());
+        // 打开终端时主手是终端物品，绑定杖通常在快捷栏：先把选中槽切到它，编辑态的手势才可用。
+        if (!(minecraft.player.getMainHandItem().getItem()
+                instanceof io.github.crafteve.idlefactory.item.MachineBindingWandItem)) {
+            int slot = wandHotbarSlot(minecraft.player);
+            if (slot < 0) {
+                message("把绑定杖放到快捷栏才能编辑节点");
+                return;
+            }
+            minecraft.player.getInventory().selected = slot;
+        }
+        WandSession.startEdit(minecraft, node.nodeId());
+    }
+
+    /**
+     * 在快捷栏里找绑定杖。
+     *
+     * @param player 玩家
+     * @return 选中槽下标；找不到为 -1
+     */
+    private static int wandHotbarSlot(net.minecraft.world.entity.player.Player player) {
+        for (int slot = 0; slot < 9; slot++) {
+            if (player.getInventory().items.get(slot).getItem()
+                    instanceof io.github.crafteve.idlefactory.item.MachineBindingWandItem) {
+                return slot;
+            }
+        }
+        return -1;
     }
 
     /**

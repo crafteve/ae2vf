@@ -96,9 +96,9 @@ final class FactoryNodeRender {
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
         if (row.view().machineCount() > 1) {
-            drawBadge(graphics, slotX + FactoryNodeLayout.SLOT - FactoryNodeLayout.BADGE_W + 1,
-                    top + FactoryNodeLayout.NODE_ROW_H - FactoryNodeLayout.BADGE_H,
-                    row.view().machineCount());
+            // 用原版物品数量修饰器：右下角白字黑描边，和物品同一渲染批次，不会被图标盖住。
+            graphics.renderItemDecorations(this.font,
+                    icon.copyWithCount(row.view().machineCount()), slotX + 1, top + 2);
         }
 
         String name = ellipsize(row.name(), FactoryNodeLayout.nameWidth(viewport));
@@ -106,10 +106,10 @@ final class FactoryNodeRender {
                 this.theme.textPrimary(), false);
         drawStatusHints(graphics, viewport, row, top);
 
-        drawProvider(graphics, viewport, top);
-        int keyY = top + 1;
-        int keyTextY = keyY + (FactoryNodeLayout.KEY_H - 8) / 2;
         boolean provider = row.view().provider().available();
+        int keyY = top + FactoryNodeLayout.KEY_INSET_Y;
+        int keyTextY = keyY + 2;
+
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 provider && row.view().provider().blocking().isOn()
@@ -139,24 +139,26 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.KEY_W, keyTextY,
                 roundRobin ? 0xFFFFFFFF : this.theme.textDim());
 
+        // 编辑 / 删除是 9×9 的叠放小键：保持小巧，内区只画符号本身，不另画图形。
         int actionX = FactoryNodeLayout.actionX(viewport);
         boolean editing = io.github.crafteve.idlefactory.client.wand.WandSession
                 .isEditingNode(row.nodeId());
-        FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.PLUS_Y,
+        int plusY = top + FactoryNodeLayout.PLUS_Y;
+        FactoryKeycap.draw(graphics, this.theme, actionX, plusY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
-        drawLabel(graphics, "+", actionX, FactoryNodeLayout.ACTION_W,
-                top + FactoryNodeLayout.PLUS_Y + 1, this.theme.statusWarn());
+        drawSymbol(graphics, "+", actionX, plusY, FactoryNodeLayout.ACTION_W,
+                FactoryNodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
-        FactoryKeycap.draw(graphics, this.theme, actionX, top + FactoryNodeLayout.CROSS_Y,
+        int crossY = top + FactoryNodeLayout.CROSS_Y;
+        FactoryKeycap.draw(graphics, this.theme, actionX, crossY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, box.index(), Kind.DELETE));
-        drawLabel(graphics, "×", actionX, FactoryNodeLayout.ACTION_W,
-                top + FactoryNodeLayout.CROSS_Y + 1,
-                armed ? 0xFFFFFFFF : this.theme.error());
+        drawSymbol(graphics, "×", actionX, crossY, FactoryNodeLayout.ACTION_W,
+                FactoryNodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
     }
 
     /** 倍率键帽文字：关 / ×N / 智。 */
@@ -167,13 +169,6 @@ final class FactoryNodeRender {
             case FIXED -> multiplier.factor() >= 8 ? "8" : Integer.toString(multiplier.factor());
             case SMART -> "智";
         };
-    }
-
-    private void drawBadge(GuiGraphics graphics, int x, int y, int count) {
-        graphics.fill(x, y, x + FactoryNodeLayout.BADGE_W, y + FactoryNodeLayout.BADGE_H,
-                0xB4000000);
-        String text = Integer.toString(count);
-        graphics.drawString(this.font, text, x + 1, y + 1, 0xFFFFFFFF, false);
     }
 
     private void drawStatusHints(GuiGraphics graphics, Viewport viewport, NodeRow row, int top) {
@@ -203,18 +198,6 @@ final class FactoryNodeRender {
             case PARTIAL -> "缺机";
             case ONLINE -> row.view().provider().available() ? "" : "非 ME";
         };
-    }
-
-    private void drawProvider(GuiGraphics graphics, Viewport viewport, int top) {
-        int x = FactoryNodeLayout.troughX(viewport);
-        int y = top + 1;
-        int right = FactoryNodeLayout.troughRight(viewport);
-        int bottom = y + FactoryNodeLayout.TROUGH_H;
-        graphics.fill(x, y, right, bottom, this.theme.slotBg());
-        graphics.fill(x, y, right, y + 1, this.theme.bevelDark());
-        graphics.fill(x, y, x + 1, bottom, this.theme.bevelDark());
-        graphics.fill(x, bottom - 1, right, bottom, this.theme.panelBorderLight());
-        graphics.fill(right - 1, y, right, bottom, this.theme.panelBorderLight());
     }
 
     private void drawMembers(GuiGraphics graphics, Viewport viewport, NodeBox box, NodeRow row,
@@ -279,6 +262,24 @@ final class FactoryNodeRender {
             int color) {
         graphics.drawString(this.font, text, x + (width - this.font.width(text)) / 2, y, color,
                 false);
+    }
+
+    /**
+     * 在 9×9 小键里画符号：水平与垂直都居中，只画字形。
+     *
+     * @param graphics 画布
+     * @param symbol   符号（+ / ×）
+     * @param x        键帽左边缘
+     * @param y        键帽上边缘
+     * @param width    键帽宽
+     * @param height   键帽高
+     * @param color    字色
+     */
+    private void drawSymbol(GuiGraphics graphics, String symbol, int x, int y, int width,
+            int height, int color) {
+        int textX = x + (width - this.font.width(symbol)) / 2;
+        int textY = y + (height - this.font.lineHeight) / 2;
+        graphics.drawString(this.font, symbol, textX, textY, color, false);
     }
 
     private String ellipsize(String text, int width) {
