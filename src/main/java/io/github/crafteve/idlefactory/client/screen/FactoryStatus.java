@@ -50,25 +50,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
-     * 取一台机器的状态种类。
-     *
-     * @param machine 机器视图
-     * @return 状态种类
-     */
-    static Kind kindOf(FactorySnapshotBuilder.MachineView machine) {
-        if (!machine.probed()) {
-            return Kind.UNPROBED;
-        }
-        if (machine.stale()) {
-            return Kind.STALE;
-        }
-        if (!machine.health().isOnline()) {
-            return Kind.OFFLINE;
-        }
-        return kindOf(machine.totalState());
-    }
-
-    /**
      * 取一个节点的状态种类。
      *
      * <p>唯一一套节点判断顺序：未探测 / 过期优先，其次失联 / 缺机，最后才看"在干什么"。
@@ -146,17 +127,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
-     * 把机器视图映射成文字、颜色和贴图。
-     *
-     * @param machine 机器视图
-     * @param theme   当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus of(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
-        return of(kindOf(machine), theme);
-    }
-
-    /**
      * 把节点状态映射成文字、颜色和贴图。
      *
      * @param status 节点状态
@@ -167,25 +137,4 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
         return of(kindOf(status), theme);
     }
 
-    /**
-     * 机器状态文字；搜索字段与 tooltip 共用。
-     *
-     * @param machine 机器视图
-     * @param theme   当前主题
-     * @return 状态文字
-     */
-    public static String text(FactorySnapshotBuilder.MachineView machine, FactoryGuiTheme theme) {
-        return of(machine, theme).text();
-    }
-
-    /**
-     * 节点状态文字；节点终端与被动 IO 终端共用。
-     *
-     * @param status 节点状态
-     * @param theme  当前主题
-     * @return 状态文字
-     */
-    public static String text(NodeStatus status, FactoryGuiTheme theme) {
-        return of(status, theme).text();
-    }
 }

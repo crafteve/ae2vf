@@ -8,9 +8,9 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
-import io.github.crafteve.idlefactory.client.screen.FactoryUiText;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
@@ -155,21 +155,13 @@ final class FactoryNodeModel {
         return view.name() != null ? view.name() : FactoryLabels.blockName(view.typeBlockId());
     }
 
-    private static FactorySearchQuery.Fields fields(FactoryNodeSnapshotBuilder.NodeView view,
+    private FactorySearchQuery.Fields fields(FactoryNodeSnapshotBuilder.NodeView view,
             String name, FactoryStatus status) {
-        String id = view.typeBlockId().toString();
-        String namespace = view.typeBlockId().getNamespace();
-        StringBuilder tooltip = new StringBuilder(status.text());
         FactoryNodeSnapshotBuilder.MemberView first =
                 view.members().isEmpty() ? null : view.members().get(0);
-        if (first != null) {
-            tooltip.append('\n').append(first.dimensionId()).append(' ')
-                    .append(first.primaryPos().toShortString());
-        }
-        tooltip.append("\n机器 ").append(view.machineCount())
-                .append(" 台 · 规则 ").append(view.ruleCount())
-                .append(" 条 · 样板 ").append(view.patternCount());
-        return new FactorySearchQuery.Fields(name, id, namespace,
-                FactoryUiText.modName(namespace), tooltip.toString(), List.of());
+        return FactoryNodeSearchFields.of(name, view.typeBlockId(), view.status(),
+                first == null ? null : first.dimensionId().toString(),
+                first == null ? null : first.primaryPos(),
+                view.machineCount(), view.ruleCount(), view.patternCount(), this.theme);
     }
 }

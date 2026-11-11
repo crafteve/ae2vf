@@ -9,7 +9,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.FactoryMachineSearchFields;
+import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
@@ -168,21 +168,22 @@ final class FactoryPassiveIoModel {
         }
         List<BlockView> next = new ArrayList<>(byNode.size());
         for (List<FactorySnapshotBuilder.MachineView> members : byNode.values()) {
-            boolean matched = this.query.isEmpty();
-            for (FactorySnapshotBuilder.MachineView member : members) {
-                if (!matched && this.query.matches(
-                        FactoryMachineSearchFields.of(member, this.theme))) {
-                    matched = true;
-                }
-            }
-            if (!matched) {
-                continue;
-            }
             FactorySnapshotBuilder.MachineView anchor = members.get(0);
             // 节点状态只读服务端下发的结论；缺失时用同一聚合函数兜底，绝不拿第一台自己拼。
             NodeStatus status = this.nodeStatuses.get(anchor.nodeId());
             if (status == null) {
                 status = NodeStatusResolver.resolve(members);
+            }
+            if (!this.query.isEmpty()) {
+                String name = anchor.nodeName() != null && !anchor.nodeName().isEmpty()
+                        ? anchor.nodeName() : FactoryLabels.blockName(anchor.nodeIconBlockId());
+                FactorySearchQuery.Fields fields = FactoryNodeSearchFields.of(name,
+                        anchor.nodeIconBlockId(), status,
+                        anchor.dimension().location().toString(), anchor.pos(),
+                        members.size(), anchor.ruleCount(), -1, this.theme);
+                if (!this.query.matches(fields)) {
+                    continue;
+                }
             }
             next.add(new BlockView(anchor, members, FactoryStatus.of(status, this.theme),
                     rules(members, anchor)));
