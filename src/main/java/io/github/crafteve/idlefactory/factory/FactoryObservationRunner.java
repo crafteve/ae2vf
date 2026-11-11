@@ -1,10 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -16,9 +14,7 @@ import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.node.NodeTypeResolver;
-import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
@@ -56,8 +52,6 @@ final class FactoryObservationRunner {
     private final List<BlockKey> orderedKeys = new ArrayList<>();
     /** 去重集合：同一方块可能被多台机器 / 多个工厂引用。 */
     private final Set<BlockKey> seen = new HashSet<>();
-    /** 每 tick 复用的方块观测投影。 */
-    private final Map<BlockKey, BlockObservation> blockObservations = new HashMap<>();
 
     /**
      * @param server        服务端
@@ -80,14 +74,13 @@ final class FactoryObservationRunner {
         this.publish = publish;
     }
 
-    /** 观测一轮：排好序列 → 观测 → 解析健康与类型迁移 → 消费状态迁移。 */
+    /** 观测一轮：排好序列 → 观测 → 解析健康与类型迁移 → 消费方块变化。 */
     void tick() {
         this.collectKeys();
         this.observations.tick(this.orderedKeys);
-        this.snapshotBlocks();
         this.resolveNodes();
-        for (ObservationService.Transition transition : this.observations.drainTransitions()) {
-            this.handleTransition(transition);
+        for (ObservationService.BlockChange change : this.observations.drainChanges()) {
+            this.handleChange(change);
         }
         this.notices.flush(this.server, this.manager);
     }
@@ -130,17 +123,6 @@ final class FactoryObservationRunner {
         this.orderedKeys.addAll(this.restKeys);
     }
 
-    /** 把观测服务的结果投影成 {@link BlockObservation}，复用同一张 map。 */
-    private void snapshotBlocks() {
-        this.blockObservations.clear();
-        for (BlockKey key : this.orderedKeys) {
-            Observation observation = this.observations.observe(key);
-            this.blockObservations.put(key, new BlockObservation(observation.blockId(),
-                    observation.health(), observation.health() != Health.UNKNOWN,
-                    observation.observedAtTick()));
-        }
-    }
-
     /** 解析每个节点的健康与类型迁移。 */
     private void resolveNodes() {
         long now = this.observations.currentTick();
@@ -149,7 +131,7 @@ final class FactoryObservationRunner {
             for (Node node : factory.config().nodes().all()) {
                 Node current = node;
                 Optional<ResourceLocation> migration = NodeTypeResolver.migrationTarget(current,
-                        this.blockObservations, now, staleTicks);
+                        this.observations, now, staleTicks);
                 if (migration.isPresent()) {
                     Node migrated = current.withTypeBlockId(migration.get());
                     if (factory.config().library().replace(migrated)
@@ -159,7 +141,7 @@ final class FactoryObservationRunner {
                     }
                 }
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,
-                        this.blockObservations, now, staleTicks);
+                        this.observations, now, staleTicks);
                 this.nodeManager.setAvailable(current.id(),
                         snapshot.health() != NodeHealth.OFFLINE);
             }
@@ -167,24 +149,24 @@ final class FactoryObservationRunner {
     }
 
     /**
-     * 消费一次状态迁移：失联通知与恢复唤醒。
+     * 消费一次方块变化：失联通知与恢复唤醒。
      *
      * <p>这里只保留有行为后果的两条路径（聚合通知、唤醒 IO 睡眠）；纯记录的诊断事件流已经
      * 随指令入口一起删除。</p>
      *
-     * @param transition 迁移
+     * @param change 变化
      */
-    private void handleTransition(ObservationService.Transition transition) {
+    private void handleChange(ObservationService.BlockChange change) {
         for (Factory factory : this.manager.all()) {
-            Optional<Machine> machineFound = factory.config().nodes().machineAt(transition.key());
+            Optional<Machine> machineFound = factory.config().nodes().machineAt(change.key());
             if (machineFound.isEmpty()) {
                 continue;
             }
             Machine machine = machineFound.get();
-            switch (transition.to()) {
+            switch (change.to()) {
                 case MISSING, NO_DIMENSION -> this.notices.missing(factory.id());
                 case PRESENT -> {
-                    if (transition.from() != Health.UNKNOWN) {
+                    if (change.from() != Health.UNKNOWN) {
                         this.nodeIoRunner.wake(machine.id());
                         this.notices.restored(factory.id());
                     }

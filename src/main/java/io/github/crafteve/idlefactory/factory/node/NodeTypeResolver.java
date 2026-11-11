@@ -1,11 +1,9 @@
 package io.github.crafteve.idlefactory.factory.node;
 
-import java.util.Map;
 import java.util.Optional;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
+import io.github.crafteve.idlefactory.factory.probe.BlockFacts;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 
 import net.minecraft.resources.ResourceLocation;
@@ -33,22 +31,22 @@ public final class NodeTypeResolver {
      * 判断是否需要迁移类型。
      *
      * @param node             节点
-     * @param observations     方块观测快照
+     * @param facts            方块观测事实来源
      * @param now              当前游戏时间
      * @param staleHealthTicks 过期阈值（tick）
      * @return 新类型方块 id；不满足迁移条件时为空
      */
     public static Optional<ResourceLocation> migrationTarget(Node node,
-            Map<BlockKey, BlockObservation> observations, long now, long staleHealthTicks) {
+            BlockFacts.Source facts, long now, long staleHealthTicks) {
         NodeHealthResolver.Snapshot snapshot =
-                NodeHealthResolver.resolve(node, observations, now, staleHealthTicks);
+                NodeHealthResolver.resolve(node, facts, now, staleHealthTicks);
         if (snapshot.health() != NodeHealth.OFFLINE) {
             return Optional.empty();
         }
         ResourceLocation candidate = null;
         for (Machine machine : node.machines()) {
-            BlockObservation observation = observations.get(machine.block());
-            if (observation == null || !observation.probed()
+            BlockFacts observation = facts.at(machine.block());
+            if (!observation.probed()
                     || observation.isStale(now, staleHealthTicks)
                     || !observation.present() || observation.blockId() == null) {
                 return Optional.empty();

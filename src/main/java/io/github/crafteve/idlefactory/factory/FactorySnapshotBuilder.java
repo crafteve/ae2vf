@@ -2,8 +2,6 @@ package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,8 +19,7 @@ import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
-import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.probe.BlockFacts;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
@@ -271,8 +268,10 @@ public final class FactorySnapshotBuilder {
             NodeIoGroup io = node.io();
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
+            BlockFacts.Source facts = observations == null
+                    ? key -> Observation.UNKNOWN : observations;
             NodeHealthResolver.Snapshot nodeHealth = NodeHealthResolver.resolve(node,
-                    blockObservations(node, observations), healthNow, staleTicks);
+                    facts, healthNow, staleTicks);
             for (Machine machine : node.machines()) {
                 BlockKey typeBlock = machine.block();
                 Observation observation = observations == null
@@ -333,29 +332,6 @@ public final class FactorySnapshotBuilder {
             }
         }
         return views;
-    }
-
-    /**
-     * 把一个节点的方块观测投影成 {@link BlockObservation} 表，交给健康解析器。
-     *
-     * <p>快照是请求驱动的，不在 tick 热路径上，这里按节点现建一张小表；tick 热路径的复用表
-     * 在 {@code FactoryObservationRunner}。</p>
-     *
-     * @param node         节点
-     * @param observations 观测服务；{@code null} 时全部按未探测
-     * @return 方块观测表
-     */
-    private static Map<BlockKey, BlockObservation> blockObservations(Node node,
-            @Nullable ObservationService observations) {
-        Map<BlockKey, BlockObservation> map = new HashMap<>();
-        for (Machine machine : node.machines()) {
-            BlockKey block = machine.block();
-            Observation observation = observations == null
-                    ? Observation.UNKNOWN : observations.observe(block);
-            map.put(block, new BlockObservation(observation.blockId(), observation.health(),
-                    observation.health() != Health.UNKNOWN, observation.observedAtTick()));
-        }
-        return map;
     }
 
     /**

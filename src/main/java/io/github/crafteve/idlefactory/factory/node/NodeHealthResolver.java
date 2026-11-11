@@ -2,12 +2,10 @@ package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.probe.BlockObservation;
+import io.github.crafteve.idlefactory.factory.probe.BlockFacts;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 
@@ -17,7 +15,7 @@ import net.minecraft.resources.ResourceLocation;
  * 健康解析器：节点 + 方块观测快照 + 时间 → 机器 / 节点健康、{@code probed}、{@code stale}。
  *
  * <p>纯函数，不依赖运行时、不读配置、不探世界。过期判定只调用
- * {@link BlockObservation#isStale(long, long)}，本类不重复实现公式。</p>
+ * {@link BlockFacts#isStale(long, long)}，本类不重复实现公式。</p>
  *
  * <p>语义：机器所有方块 PRESENT 且都探测过才算在线；任一方块不可用即离线。节点按机器聚合：
  * 全部在线 = 在线，部分在线 = 缺机，没有一台在线 = 离线。「没探过」与「探过但过期」是独立
@@ -74,20 +72,19 @@ public final class NodeHealthResolver {
     /**
      * 解析一个节点。
      *
-     * @param node             节点
-     * @param observations     方块观测快照
+     * @param facts            方块观测事实来源
      * @param now              当前游戏时间
      * @param staleHealthTicks 过期阈值（tick）
      * @return 节点与成员的结论
      */
-    public static Snapshot resolve(Node node, Map<BlockKey, BlockObservation> observations,
+    public static Snapshot resolve(Node node, BlockFacts.Source facts,
             long now, long staleHealthTicks) {
         List<MachineState> machines = new ArrayList<>(node.machineCount());
         int online = 0;
         boolean allProbed = true;
         boolean anyStale = false;
         for (Machine machine : node.machines()) {
-            MachineState state = resolveMachine(machine, node.typeBlockId(), observations, now,
+            MachineState state = resolveMachine(machine, node.typeBlockId(), facts, now,
                     staleHealthTicks);
             machines.add(state);
             if (state.health().isOnline()) {
@@ -119,18 +116,18 @@ public final class NodeHealthResolver {
      *
      * @param machine          机器
      * @param expectedTypeId   节点类型方块 id
-     * @param observations     方块观测快照
+     * @param facts            方块观测事实来源
      * @param now              当前观测时钟
      * @param staleHealthTicks 过期阈值
      * @return 机器结论
      */
     public static MachineState resolveMachine(Machine machine, ResourceLocation expectedTypeId,
-            Map<BlockKey, BlockObservation> observations, long now, long staleHealthTicks) {
+            BlockFacts.Source facts, long now, long staleHealthTicks) {
         boolean probed = true;
         boolean stale = false;
         boolean online = true;
-        BlockObservation observation = observations.get(machine.block());
-        if (observation == null || !observation.probed()) {
+        BlockFacts observation = facts.at(machine.block());
+        if (!observation.probed()) {
             probed = false;
             online = false;
         } else {

@@ -8,6 +8,7 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.probe.BlockFacts;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
@@ -27,7 +28,7 @@ import net.minecraft.resources.ResourceLocation;
  * 「有没有升级」：任一个变了，说明这个位置换过方块——{@code ObservationService} 凭它们
  * 判断面表过期（面表本身住在 capability 包，这里的字段只负责举证）。</p>
  */
-public final class Observation {
+public final class Observation implements BlockFacts {
     /** 还没探测过的占位。只读共享，永远不要对它调用包内写方法。 */
     public static final Observation UNKNOWN = new Observation();
 
@@ -137,6 +138,43 @@ public final class Observation {
     /** 是不是原版 {@code Container}（给没有注册能力的模组方块兜底）。 */
     public boolean legacyContainer() {
         return this.legacyContainer;
+    }
+
+    /**
+     * 是否探测过。
+     *
+     * @return 健康不是 UNKNOWN 时为 {@code true}
+     */
+    @Override
+    public boolean probed() {
+        return this.health != Health.UNKNOWN;
+    }
+
+    /**
+     * 方块是否就绪。
+     *
+     * @return 健康为 PRESENT 时为 {@code true}
+     */
+    @Override
+    public boolean present() {
+        return this.health == Health.PRESENT;
+    }
+
+    /**
+     * 健康是否已经过期。
+     *
+     * <p>从未探测过时恒为 {@code false}：过期与「没探过」是两件事，各由一个布尔表达。</p>
+     *
+     * @param now              当前观测时钟
+     * @param staleHealthTicks 过期阈值（tick）
+     * @return 探过且超过阈值时为 {@code true}
+     */
+    @Override
+    public boolean isStale(long now, long staleHealthTicks) {
+        if (!this.probed() || this.observedAtTick < 0L) {
+            return false;
+        }
+        return now - this.observedAtTick > staleHealthTicks;
     }
 
     /** 最后一次探测的 tick；从没探过为 {@code -1}。 */

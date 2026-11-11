@@ -16,6 +16,7 @@ import io.github.crafteve.idlefactory.factory.capability.FaceCache;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
+import io.github.crafteve.idlefactory.factory.probe.BlockFacts;
 import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
 import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.WorkState;
@@ -43,7 +44,7 @@ import net.minecraft.world.level.Level;
  * 热改下一 tick 生效。探测顺序由调用方给的 {@code BlockKey} 序列决定（脏 > 在线机器 > 其余）。
  * 本类只探测、记 {@code observedAtTick}、吐 {@link Health}，<b>不判断 stale</b>。</p>
  */
-public final class ObservationService {
+public final class ObservationService implements BlockFacts.Source {
     /**
      * 每 tick 最多处理几个「被失效事件标脏」的条目。
      *
@@ -81,8 +82,8 @@ public final class ObservationService {
     private final Map<ResourceKey<Level>, LevelCapabilityCache> capabilityCaches = new HashMap<>();
     /** 能力失效事件标脏的位置，下一 tick 优先重探。 */
     private final Set<BlockKey> dirty = new HashSet<>();
-    /** 本 tick 产生的迁移，取走即清空。 */
-    private final List<Transition> transitions = new ArrayList<>();
+    /** 本 tick 产生的方块变化，取走即清空。 */
+    private final List<BlockChange> changes = new ArrayList<>();
     /** 位置 → 连续 REJECTED 次数（成功一次就清零）。 */
     private final Map<BlockKey, Integer> rejectStreaks = new HashMap<>();
     /** 位置 → 上次刷面表的 tick（冷却用）。 */
@@ -288,6 +289,19 @@ public final class ObservationService {
     }
 
     /**
+     * 按位置取观测事实（{@link BlockFacts.Source} 的实现）。
+     *
+     * <p>健康解析器只依赖这个接口，不再每 tick 拿观测投影出一张第二份表。</p>
+     *
+     * @param key 位置键
+     * @return 观测事实；没登记过时返回未探测的空事实
+     */
+    @Override
+    public BlockFacts at(BlockKey key) {
+        return this.observe(key);
+    }
+
+    /**
      * 立即探测一次并返回结果（命令、接入、诊断用）。
      *
      * @param key 位置键
@@ -356,16 +370,19 @@ public final class ObservationService {
     }
 
     /**
-     * 取走本 tick 的状态迁移。
+     * 取走本 tick 的方块变化。
      *
-     * @return 迁移列表；没有时为空列表
+     * <p>这是观测层对外的唯一通知出口：谁需要知道「本轮哪些方块变了」都从这里拿，
+     * 不再有第二、第三条通道。</p>
+     *
+     * @return 变化列表；没有时为空列表
      */
-    public List<Transition> drainTransitions() {
-        if (this.transitions.isEmpty()) {
+    public List<BlockChange> drainChanges() {
+        if (this.changes.isEmpty()) {
             return List.of();
         }
-        List<Transition> drained = List.copyOf(this.transitions);
-        this.transitions.clear();
+        List<BlockChange> drained = List.copyOf(this.changes);
+        this.changes.clear();
         return drained;
     }
 
@@ -408,7 +425,7 @@ public final class ObservationService {
         BlockProbe.Presence presence = BlockProbe.presence(this.server, key);
         observation.applyProbe(presence, this.tick);
         if (before != observation.health()) {
-            this.transitions.add(new Transition(key, before, observation.health(), this.tick));
+            this.changes.add(new BlockChange(key, before, observation.health(), this.tick));
         }
         if (before != observation.health()
                 || !Objects.equals(oldBlock, observation.blockId())
@@ -428,14 +445,14 @@ public final class ObservationService {
     }
 
     /**
-     * 一次状态迁移。
+     * 一次方块健康变化。
      *
      * @param key  位置
      * @param from 旧结论
      * @param to   新结论
      * @param tick 发生时刻（服务内部时钟）
      */
-    public record Transition(BlockKey key, Health from, Health to, long tick) {
+    public record BlockChange(BlockKey key, Health from, Health to, long tick) {
     }
 
     /**
