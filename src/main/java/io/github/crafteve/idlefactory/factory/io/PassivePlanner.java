@@ -133,7 +133,8 @@ public final class PassivePlanner {
             case BUDGET_OUT -> 1L;
             case NO_MATERIAL -> NO_MATERIAL_TICKS;
             case FULL -> FULL_TICKS;
-            case NO_FACE, REJECTED -> FACE_TICKS;
+            case NO_FACE -> FACE_TICKS;
+            case REJECTED -> Math.min(FACE_TICKS * Math.max(1, unit.digest().rejectStreak()), 100L);
             case ERROR -> Math.min(
                     ERROR_BASE_TICKS << Math.min(Math.max(unit.digest().countOf(Reason.ERROR) - 1, 0), 3),
                     ERROR_CAP_TICKS);

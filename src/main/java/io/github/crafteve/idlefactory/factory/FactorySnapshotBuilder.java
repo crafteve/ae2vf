@@ -322,6 +322,7 @@ public final class FactorySnapshotBuilder {
                 }
                 List<Reason> outputReasons = new ArrayList<>(outputs.size());
                 long lastSuccessAt = inputSuccessAt;
+                long minIdle = Long.MAX_VALUE;
                 for (ResourceSpec spec : outputs) {
                     IoUnit unit = slot == null ? null
                             : slot.unit(false, new RuleKey(false, spec.key(), spec.face(), spec.mode()));
@@ -330,6 +331,9 @@ public final class FactorySnapshotBuilder {
                     outputReasons.add(reason);
                     if (unit != null) {
                         lastSuccessAt = Math.max(lastSuccessAt, unit.digest().lastSuccessAt());
+                        if (unit.digest().lastAttemptAt() >= 0L) {
+                            minIdle = Math.min(minIdle, unit.digest().idleTicks(now));
+                        }
                         if (reason != Reason.RUN) {
                             long since = unit.digest().lastAttemptAt();
                             if (since >= 0L) {
@@ -339,7 +343,12 @@ public final class FactorySnapshotBuilder {
                     }
                 }
 
-                long sinceMove = lastSuccessAt < 0L ? -1L : Math.max(0L, now - lastSuccessAt);
+                long sinceMove;
+                if (!outputs.isEmpty() && minIdle != Long.MAX_VALUE) {
+                    sinceMove = minIdle;
+                } else {
+                    sinceMove = lastSuccessAt < 0L ? -1L : Math.max(0L, now - lastSuccessAt);
+                }
                 long blocked = blockedSince < 0L ? -1L : Math.max(0L, now - blockedSince);
                 long sinceInput = inputSuccessAt < 0L ? -1L : Math.max(0L, now - inputSuccessAt);
                 boolean inputFull = !inputReasons.isEmpty() && inputReasons.stream()

@@ -54,7 +54,7 @@ public final class UnitDigest {
             this.lastFailureAt = now;
             if (reason == Reason.REJECTED) {
                 this.rejectStreak++;
-                this.faceHint = null;
+                this.clearFaceHint();
             } else {
                 this.rejectStreak = 0;
             }

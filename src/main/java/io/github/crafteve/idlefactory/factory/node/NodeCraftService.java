@@ -224,7 +224,8 @@ final class NodeCraftService implements ICraftingProvider {
         }
         var network = this.node.networkStorage();
         if (network == null) {
-            provider.replaceFirstOrder(order.asOrphan(now));
+            // 只在第一次失败时记孤儿时刻，否则每 tick 刷新会让超时永远不触发。
+            provider.replaceFirstOrder(order.orphan() ? order : order.asOrphan(now));
             this.node.digest().attempted(0L, Reason.ERROR);
             return;
         }
