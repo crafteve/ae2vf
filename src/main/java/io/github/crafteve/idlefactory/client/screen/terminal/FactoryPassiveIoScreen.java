@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
 import java.util.List;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -31,7 +30,6 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -98,13 +96,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private boolean jeiDragging;
     /** 上一次日志签名，避免每秒刷一行表快照。 */
     private int lastLogSignature = -1;
-    /** 删除确认窗口（毫秒）。 */
-    private static final long DELETE_CONFIRM_MS = 3000L;
-    /** 待确认删除的节点 id；空表示没有。 */
-    @Nullable
-    private UUID pendingDeleteNode;
-    /** 待确认删除的截止时间（毫秒）。 */
-    private long pendingDeleteUntil;
 
     /**
      * @param menu      菜单
@@ -449,27 +440,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             return;
         }
         BlockView block = this.model.blocks().get(hit.block());
-        if (hit.kind() == FactoryPassiveIoLayout.Kind.DELETE) {
-            // 两次点击确认：第一次进入待确认，3 秒内再点同一个节点才真正删除。
-            long now = System.currentTimeMillis();
-            if (this.pendingDeleteNode != null
-                    && this.pendingDeleteNode.equals(block.nodeId())
-                    && now < this.pendingDeleteUntil) {
-                this.pendingDeleteNode = null;
-                PacketDistributor.sendToServer(new FactoryNodeActionC2S(this.menu.containerId,
-                        block.nodeId()));
-            } else {
-                this.pendingDeleteNode = block.nodeId();
-                this.pendingDeleteUntil = now + DELETE_CONFIRM_MS;
-                if (this.minecraft != null && this.minecraft.player != null) {
-                    this.minecraft.player.displayClientMessage(
-                            Component.literal("再点一次删除节点「" + block.name() + "」"
-                                    + (block.rules().isEmpty() ? "" : "（含节点规则）")),
-                            true);
-                }
-            }
-            return;
-        }
         if (hit.rule() < 0 || hit.rule() >= block.rules().size()) {
             return;
         }

@@ -208,14 +208,6 @@ final class FactoryPassiveIoRender {
      * @param top         机器行上边缘（屏幕坐标）
      * @param blockBottom 机器大卡片下边缘（屏幕坐标）
      */
-    /** 在给定矩形里居中画一段单行文字。 */
-    private void drawCentered(GuiGraphics graphics, String text, int x, int width, int y,
-            int height, int color) {
-        int textX = x + (width - this.font.width(text)) / 2;
-        int textY = y + (height - this.font.lineHeight) / 2 + 1;
-        graphics.drawString(this.font, text, textX, textY, color, false);
-    }
-
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
             int top, int blockBottom) {
         int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
@@ -236,25 +228,18 @@ final class FactoryPassiveIoRender {
                 slotX + 1, top + 2);
         int nameX = slotX + FactoryPassiveIoLayout.SLOT + FactoryPassiveIoLayout.GAP;
         int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
-        int badge2X = contentRight - 4 - 2 - FactoryPassiveIoLayout.BADGE_W;
-        int badge1X = badge2X - 2 - FactoryPassiveIoLayout.BADGE_W;
+        // 状态灯占最右 3px，数量文字排在它左边；删节点只留在节点管理终端，这里没有 × 按钮。
+        int lampX = contentRight - 5;
         String count = block.machineCount() > 1 ? "×" + block.machineCount() : "";
-        int countW = count.isEmpty() ? 0 : this.font.width(count) + 2;
+        int countW = count.isEmpty() ? 0 : this.font.width(count) + 3;
         graphics.drawString(this.font,
-                ellipsize(block.name(), badge1X - 2 - nameX - countW), nameX, top + 6,
+                ellipsize(block.name(), lampX - 4 - nameX - countW), nameX, top + 6,
                 this.theme.textPrimary(), false);
         if (!count.isEmpty()) {
-            graphics.drawString(this.font, count, badge1X - 2 - this.font.width(count),
+            graphics.drawString(this.font, count, lampX - 4 - this.font.width(count),
                     top + 6, this.theme.statusRun(), false);
         }
-        dashedRect(graphics, badge1X, top + 4, FactoryPassiveIoLayout.BADGE_W,
-                FactoryPassiveIoLayout.BADGE_H, this.theme.textDim());
-        // 第二枚徽章改成节点删除按钮：第一次点击进入待确认，再点一次才发删节点。
-        graphics.fill(badge2X, top + 4, badge2X + FactoryPassiveIoLayout.BADGE_W,
-                top + 4 + FactoryPassiveIoLayout.BADGE_H, this.theme.slotBg());
-        this.drawCentered(graphics, "×", badge2X, FactoryPassiveIoLayout.BADGE_W, top + 4,
-                FactoryPassiveIoLayout.BADGE_H, this.theme.error());
-        FactoryNineSlice.icon(graphics, block.status().lamp(), contentRight - 5, top + 8, 3);
+        FactoryNineSlice.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -470,29 +455,6 @@ final class FactoryPassiveIoRender {
         String ellipsis = "…";
         int body = width - this.font.width(ellipsis);
         return body <= 0 ? "" : this.font.plainSubstrByWidth(text, body) + ellipsis;
-    }
-
-    /**
-     * 画 1px 虚线框（2 实 2 空）。
-     *
-     * <p>虚线是放置目标的语义，不是立体边框；不生成贴图，按像素循环画，任意宽度都不会被拉伸糊掉。</p>
-     */
-    private static void dashedRect(GuiGraphics graphics, int x, int y, int width, int height,
-            int color) {
-        for (int i = 0; i < width; i++) {
-            if ((i / 2) % 2 != 0) {
-                continue;
-            }
-            graphics.fill(x + i, y, x + i + 1, y + 1, color);
-            graphics.fill(x + i, y + height - 1, x + i + 1, y + height, color);
-        }
-        for (int j = 0; j < height; j++) {
-            if ((j / 2) % 2 != 0) {
-                continue;
-            }
-            graphics.fill(x, y + j, x + 1, y + j + 1, color);
-            graphics.fill(x + width - 1, y + j, x + width, y + j + 1, color);
-        }
     }
 
     private int directionColor(RuleRow rule) {

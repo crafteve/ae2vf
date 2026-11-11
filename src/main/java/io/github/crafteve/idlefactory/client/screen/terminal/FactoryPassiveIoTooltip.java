@@ -50,10 +50,6 @@ final class FactoryPassiveIoTooltip {
             case ADD -> List.of(
                     Component.literal("从 JEI 拖到这里新建行"),
                     Component.literal("新规则默认作为输入").withStyle(ChatFormatting.GRAY));
-            case DELETE -> List.of(
-                    Component.literal("删除节点").withStyle(ChatFormatting.RED),
-                    Component.literal("再点一次确认；含规则 / 样板会一起删除")
-                            .withStyle(ChatFormatting.GRAY));
             default -> rule(block, block.rules().get(hit.rule()));
         };
     }
