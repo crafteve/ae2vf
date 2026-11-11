@@ -73,6 +73,31 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
+     * 状态档的排序等级：0 最好、越大越差。
+     *
+     * <p>和展示用同一套 {@link Kind}，所以排序位置与灯色永远一致：升序（从好到坏）时运行在
+     * 最前、失联在最后；方向按钮切降序就整体反过来。</p>
+     *
+     * @param status 节点状态
+     * @return 等级，0..10
+     */
+    public static int sortRank(NodeStatus status) {
+        return switch (kindOf(status)) {
+            case RUNNING -> 0;
+            case INPUT_OK -> 1;
+            case IDLE -> 2;
+            case UNCONFIGURED -> 3;
+            case UNKNOWN -> 4;
+            case WAITING_MATERIAL -> 5;
+            case INPUT_BLOCKED -> 6;
+            case UNPROBED -> 7;
+            case PARTIAL -> 8;
+            case STALE -> 9;
+            case OFFLINE -> 10;
+        };
+    }
+
+    /**
      * 健康已确定时，把总状态映射成种类。
      *
      * @param state 服务端总状态

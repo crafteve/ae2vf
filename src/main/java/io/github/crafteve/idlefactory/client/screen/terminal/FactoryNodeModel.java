@@ -10,6 +10,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.FactorySortKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
@@ -27,6 +29,8 @@ final class FactoryNodeModel {
     private boolean meStorage;
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
+    /** 当前排序上下文：档位、方向与玩家位置。 */
+    private FactorySortContext sortContext = FactorySortContext.defaults();
     private List<NodeRow> rows = List.of();
 
     /**
@@ -90,6 +94,24 @@ final class FactoryNodeModel {
         rebuild();
     }
 
+    /**
+     * 更新排序上下文；只记录，不重建。调用方随后自己触发一次 {@link #resort()}。
+     *
+     * @param next 新上下文
+     */
+    void setSortContext(FactorySortContext next) {
+        this.sortContext = next;
+    }
+
+    /**
+     * 按当前快照与排序上下文重新排序。
+     *
+     * <p>由排序按钮与快照接收方调用；滚动与排版由屏幕在之后重建。</p>
+     */
+    void resort() {
+        rebuild();
+    }
+
     /** 当前可见节点。 */
     List<NodeRow> rows() {
         return this.rows;
@@ -122,6 +144,8 @@ final class FactoryNodeModel {
 
     /**
      * 按当前搜索词与快照重建节点行。
+     *
+     * <p>顺序：先过滤、再排序；规则行与成员行不参与排序。</p>
      */
     private void rebuild() {
         List<NodeRow> next = new ArrayList<>(this.nodes.size());
@@ -133,7 +157,27 @@ final class FactoryNodeModel {
             }
             next.add(new NodeRow(view, status, name, members(view)));
         }
-        this.rows = List.copyOf(next);
+        this.rows = FactorySortKey.sorted(next, this::sortKey, this.sortContext);
+    }
+
+    /**
+     * 取一行的排序键。
+     *
+     * @param row 节点行
+     * @return 排序键
+     */
+    private FactorySortKey sortKey(NodeRow row) {
+        FactoryNodeSnapshotBuilder.NodeView view = row.view();
+        long nearest = FactorySortKey.UNREACHABLE_DISTANCE;
+        for (FactoryNodeSnapshotBuilder.MemberView member : view.members()) {
+            long distance = FactorySortKey.distance(this.sortContext.playerDimension(),
+                    this.sortContext.playerPos(), member.block().dimension(),
+                    member.block().pos());
+            nearest = Math.min(nearest, distance);
+        }
+        return new FactorySortKey(row.name(), view.typeBlockId().toString(),
+                view.machineCount(), view.ruleCount(), FactoryStatus.sortRank(view.status()),
+                nearest, row.nodeId());
     }
 
     private List<MemberRow> members(FactoryNodeSnapshotBuilder.NodeView view) {

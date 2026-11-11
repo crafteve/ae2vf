@@ -11,6 +11,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.FactorySortKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
@@ -20,6 +22,8 @@ import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+
+import net.minecraft.resources.ResourceLocation;
 
 /**
  * 被动 IO 终端的只读内容模型：一份机器表 + 搜索词 → 按节点分组的卡片。
@@ -37,6 +41,8 @@ final class FactoryPassiveIoModel {
     private boolean hasFactory;
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
+    /** 当前排序上下文：档位、方向与玩家位置。 */
+    private FactorySortContext sortContext = FactorySortContext.defaults();
     private List<BlockView> blocks = List.of();
     /** 节点 id → 服务端算好的节点状态；本类只读，不再自己聚合。 */
     private Map<UUID, NodeStatus> nodeStatuses = Map.of();
@@ -133,6 +139,24 @@ final class FactoryPassiveIoModel {
         rebuild();
     }
 
+    /**
+     * 更新排序上下文；只记录，不重建。调用方随后自己触发一次 {@link #resort()}。
+     *
+     * @param next 新上下文
+     */
+    void setSortContext(FactorySortContext next) {
+        this.sortContext = next;
+    }
+
+    /**
+     * 按当前快照与排序上下文重新排序。
+     *
+     * <p>由排序按钮与快照接收方调用；滚动与排版由屏幕在之后重建。</p>
+     */
+    void resort() {
+        rebuild();
+    }
+
     /** 当前可见块。 */
     List<BlockView> blocks() {
         return this.blocks;
@@ -160,6 +184,8 @@ final class FactoryPassiveIoModel {
 
     /**
      * 按当前搜索词与快照重建块列表。
+     *
+     * <p>顺序：先过滤、再排序；规则行与成员行不参与排序。</p>
      *
      * <p>过滤只作用于成员机器层：命中一台机器就把整个节点铺开，不做规则级过滤。</p>
      */
@@ -190,7 +216,31 @@ final class FactoryPassiveIoModel {
             next.add(new BlockView(anchor, members, status,
                     FactoryStatus.of(status, this.theme), rules(members, anchor)));
         }
-        this.blocks = List.copyOf(next);
+        this.blocks = FactorySortKey.sorted(next, this::sortKey, this.sortContext);
+    }
+
+    /**
+     * 取一块的排序键。
+     *
+     * <p>显示名用「自定义名 → 类型方块名」，不用卡片上的「已失联」占位文本，保证和节点管理
+     * 终端对同一个节点排出来一致。</p>
+     *
+     * @param block 节点块
+     * @return 排序键
+     */
+    private FactorySortKey sortKey(BlockView block) {
+        FactorySnapshotBuilder.MachineView anchor = block.machine();
+        long nearest = FactorySortKey.UNREACHABLE_DISTANCE;
+        for (FactorySnapshotBuilder.MachineView member : block.members()) {
+            long distance = FactorySortKey.distance(this.sortContext.playerDimension(),
+                    this.sortContext.playerPos(), member.primaryBlock().dimension(),
+                    member.pos());
+            nearest = Math.min(nearest, distance);
+        }
+        ResourceLocation icon = anchor.nodeIconBlockId();
+        return new FactorySortKey(FactorySortKey.displayName(anchor.nodeName(), icon),
+                icon == null ? "" : icon.toString(), block.machineCount(), anchor.ruleCount(),
+                FactoryStatus.sortRank(block.nodeStatus()), nearest, block.nodeId());
     }
 
     /**
