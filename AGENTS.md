@@ -279,6 +279,6 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
-- 无已知偏差；发现时顺手修，不单独开重构。
+- 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
 - 2026-11-11 修正 §1.2：原文写「主动合成未实现」，与代码不符（`NodeCraftService`、
   `ProviderMode.ACTIVE`、`ProviderReturnSweep` 等早已实现）。
