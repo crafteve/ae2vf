@@ -44,13 +44,16 @@ final class FactoryNodeTooltip {
                     ? "开" : "关", "左键切换");
             case MULTIPLIER -> List.of(
                     Component.literal("倍增").withStyle(ChatFormatting.BOLD),
-                    Component.literal("待接入：样板倍率").withStyle(ChatFormatting.GRAY));
+                    Component.literal("左键循环：关 → ×2 → ×4 → ×8 → 智能")
+                            .withStyle(ChatFormatting.GRAY));
             case DISPATCH -> List.of(
                     Component.literal("逐台 / 轮询").withStyle(ChatFormatting.BOLD),
-                    Component.literal("待接入：多机派单策略").withStyle(ChatFormatting.GRAY));
+                    Component.literal("左键切换顺序 / 轮询").withStyle(ChatFormatting.GRAY));
             case EDIT -> List.of(
                     Component.literal("编辑节点").withStyle(ChatFormatting.BOLD),
-                    Component.literal("待接入：绑定杖编辑会话").withStyle(ChatFormatting.GRAY));
+                    Component.literal("进入绑定杖编辑态，右键加 / 删机器，蹲下右键提交")
+                            .withStyle(ChatFormatting.GRAY),
+                    Component.literal("主手或快捷栏里要有绑定杖").withStyle(ChatFormatting.DARK_GRAY));
             case DELETE -> delete(node);
             case MEMBER -> member(node, hit.member());
             case LOCATE -> locate(node, hit.member());

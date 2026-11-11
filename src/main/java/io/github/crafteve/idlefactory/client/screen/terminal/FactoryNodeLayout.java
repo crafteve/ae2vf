@@ -16,8 +16,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
  * 机器行用 {@code Level.IO}。坐标相对内容区，绘制、命中、tooltip 都从这里取同一份结果；滚动只在
  * 取值时加 {@code scroll}，不重建排版。</p>
  *
- * <p>节点行结构：左边图标 + 名字，右侧 provider 三枚方形键帽，再右侧编辑 / 删除两枚 9×9
- * 小键上下叠放。展开后机器行只在行尾放定位；节点行按钮不随展开消失。</p>
+ * <p>节点行结构：左边图标 + 名字，右侧 provider 三枚方形键帽，再右侧编辑 / 删除两枚同规格
+ * 键帽横向并排。展开后机器行只在行尾放定位；节点行按钮不随展开消失。</p>
  */
 final class FactoryNodeLayout {
     /** 节点行高。 */
@@ -40,12 +40,11 @@ final class FactoryNodeLayout {
     static final int KEY_GAP = 1;
     /** provider 键帽在节点行内的垂直偏移（上下留白相等）。 */
     static final int KEY_INSET_Y = (NODE_ROW_H - KEY_H) / 2;
-    /** 编辑 / 删除键帽：上下叠放的两枚小正方形。 */
-    static final int ACTION_W = 9;
-    static final int ACTION_H = 9;
-    /** 编辑键相对节点行的上偏移；删除键接在它下面。 */
-    static final int PLUS_Y = 1;
-    static final int CROSS_Y = 10;
+    /** 编辑 / 删除键帽：与 provider 键同规格，横向并排。 */
+    static final int ACTION_W = KEY_W;
+    static final int ACTION_H = KEY_H;
+    /** 两枚动作键之间的间隔。 */
+    static final int ACTION_GAP = 1;
     /** 机器行定位键边长。 */
     static final int LOCATE = 16;
     /** 展开后的“还有 N 台”汇总行高。 */
@@ -255,12 +254,10 @@ final class FactoryNodeLayout {
             if (inside(localX, keyX(viewport, 2), KEY_W)) {
                 return new Hit(Kind.DISPATCH, box.index(), -1);
             }
-        }
-        if (inside(localX, actionX(viewport), ACTION_W)) {
-            if (inside(localY, box.top() + PLUS_Y, ACTION_H)) {
+            if (inside(localX, actionX(viewport), ACTION_W)) {
                 return new Hit(Kind.EDIT, box.index(), -1);
             }
-            if (inside(localY, box.top() + CROSS_Y, ACTION_H)) {
+            if (inside(localX, deleteX(viewport), ACTION_W)) {
                 return new Hit(Kind.DELETE, box.index(), -1);
             }
         }
@@ -304,9 +301,14 @@ final class FactoryNodeLayout {
         return keyGroupX(viewport) + index * (KEY_W + KEY_GAP);
     }
 
-    /** 编辑 / 删除键列左边缘；两键上下叠放。 */
+    /** 编辑 / 删除键组左边缘；两键横向并排。 */
     static int actionX(Viewport viewport) {
-        return cardRight(viewport) - 2 - ACTION_W;
+        return cardRight(viewport) - 2 - (ACTION_W * 2 + ACTION_GAP);
+    }
+
+    /** 删除键左边缘。 */
+    static int deleteX(Viewport viewport) {
+        return actionX(viewport) + ACTION_W + ACTION_GAP;
     }
 
     /** 名字可用宽度。 */

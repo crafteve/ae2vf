@@ -139,25 +139,25 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.KEY_W, keyTextY,
                 roundRobin ? 0xFFFFFFFF : this.theme.textDim());
 
-        // 编辑 / 删除是 9×9 的叠放小键：保持小巧，内区只画符号本身，不另画图形。
-        int actionX = FactoryNodeLayout.actionX(viewport);
+        // 编辑 / 删除与 provider 键同规格、横向并排；内区只画 + / × 字形。
+        int actionY = top + FactoryNodeLayout.KEY_INSET_Y;
+        int editX = FactoryNodeLayout.actionX(viewport);
+        int deleteX = FactoryNodeLayout.deleteX(viewport);
         boolean editing = io.github.crafteve.idlefactory.client.wand.WandSession
                 .isEditingNode(row.nodeId());
-        int plusY = top + FactoryNodeLayout.PLUS_Y;
-        FactoryKeycap.draw(graphics, this.theme, actionX, plusY,
+        FactoryKeycap.draw(graphics, this.theme, editX, actionY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
-        drawSymbol(graphics, "+", actionX, plusY, FactoryNodeLayout.ACTION_W,
+        drawSymbol(graphics, "+", editX, actionY, FactoryNodeLayout.ACTION_W,
                 FactoryNodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
-        int crossY = top + FactoryNodeLayout.CROSS_Y;
-        FactoryKeycap.draw(graphics, this.theme, actionX, crossY,
+        FactoryKeycap.draw(graphics, this.theme, deleteX, actionY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, box.index(), Kind.DELETE));
-        drawSymbol(graphics, "×", actionX, crossY, FactoryNodeLayout.ACTION_W,
+        drawSymbol(graphics, "×", deleteX, actionY, FactoryNodeLayout.ACTION_W,
                 FactoryNodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
     }
 
