@@ -149,7 +149,7 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
-        drawSymbol(graphics, "+", editX, actionY, FactoryNodeLayout.ACTION_W,
+        drawPlus(graphics, editX, actionY, FactoryNodeLayout.ACTION_W,
                 FactoryNodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
@@ -157,7 +157,7 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, box.index(), Kind.DELETE));
-        drawSymbol(graphics, "×", deleteX, actionY, FactoryNodeLayout.ACTION_W,
+        drawCross(graphics, deleteX, actionY, FactoryNodeLayout.ACTION_W,
                 FactoryNodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
     }
 
@@ -264,22 +264,52 @@ final class FactoryNodeRender {
                 false);
     }
 
+    /** 动作键符号的像素图案边长；1px 笔画保证任意缩放下都均匀。 */
+    private static final int SYMBOL_SIZE = 5;
+
     /**
-     * 在 9×9 小键里画符号：水平与垂直都居中，只画字形。
+     * 在键帽里画 "+"：5×5 像素图案，横竖各 1px、四臂等长。
+     *
+     * <p>不用字体字形：字体的 advance 宽与行高和实际笔画对不上，塞进带边框的小键帽会偏、
+     * 会显得粗细不匀。这里按整数像素居中，位置与笔画都是确定的。</p>
      *
      * @param graphics 画布
-     * @param symbol   符号（+ / ×）
      * @param x        键帽左边缘
      * @param y        键帽上边缘
      * @param width    键帽宽
      * @param height   键帽高
-     * @param color    字色
+     * @param color    笔画颜色
      */
-    private void drawSymbol(GuiGraphics graphics, String symbol, int x, int y, int width,
-            int height, int color) {
-        int textX = x + (width - this.font.width(symbol)) / 2;
-        int textY = y + (height - this.font.lineHeight) / 2;
-        graphics.drawString(this.font, symbol, textX, textY, color, false);
+    private void drawPlus(GuiGraphics graphics, int x, int y, int width, int height,
+            int color) {
+        int originX = x + (width - SYMBOL_SIZE) / 2;
+        int originY = y + (height - SYMBOL_SIZE) / 2;
+        int middle = SYMBOL_SIZE / 2;
+        graphics.fill(originX, originY + middle, originX + SYMBOL_SIZE, originY + middle + 1,
+                color);
+        graphics.fill(originX + middle, originY, originX + middle + 1, originY + SYMBOL_SIZE,
+                color);
+    }
+
+    /**
+     * 在键帽里画 "×"：5×5 像素图案，两条 1px 对角线。
+     *
+     * @param graphics 画布
+     * @param x        键帽左边缘
+     * @param y        键帽上边缘
+     * @param width    键帽宽
+     * @param height   键帽高
+     * @param color    笔画颜色
+     */
+    private void drawCross(GuiGraphics graphics, int x, int y, int width, int height,
+            int color) {
+        int originX = x + (width - SYMBOL_SIZE) / 2;
+        int originY = y + (height - SYMBOL_SIZE) / 2;
+        for (int i = 0; i < SYMBOL_SIZE; i++) {
+            graphics.fill(originX + i, originY + i, originX + i + 1, originY + i + 1, color);
+            graphics.fill(originX + SYMBOL_SIZE - 1 - i, originY + i,
+                    originX + SYMBOL_SIZE - i, originY + i + 1, color);
+        }
     }
 
     private String ellipsize(String text, int width) {
