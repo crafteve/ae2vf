@@ -44,6 +44,15 @@ public final class FactoryGuiTextures {
     /** 4×4 状态灯：空闲。 */
     public static final ResourceLocation STATUS_LAMP_IDLE = id("status_lamp_idle");
 
+    /** 排序图标：状态（三根阶梯条）。 */
+    public static final ResourceLocation SORT_STATUS = id("sort_status");
+    /** 排序图标：IO 规则数（三条规则行）。 */
+    public static final ResourceLocation SORT_RULE_COUNT = id("sort_rule_count");
+    /** 排序图标：距离（立柱 + 双向箭头）。 */
+    public static final ResourceLocation SORT_DISTANCE = id("sort_distance");
+    /** 排序图标边长（16×16，与 AE2 工具栏图标同规格）。 */
+    public static final int SORT_ICON_SIZE = 16;
+
     /**
      * AE2 搜索框：128×128，纵向三段各 12 高（普通 / 不可编辑 / 聚焦）。
      *

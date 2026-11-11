@@ -92,6 +92,8 @@ SORT_BUTTON_BG = (0x87, 0x8F, 0xA5)
 SORT_BUTTON_LIGHT = (0xA6, 0xAE, 0xC2)
 SORT_BUTTON_DARK = (0x5F, 0x68, 0x7D)
 SORT_ICON = (0xF2, 0xF2, 0xF2)
+# 排序图标阴影：与 AE2 states.png 的图标阴影同色，保证和 AE2 原生按钮图标一致
+SORT_ICON_SHADOW = (0x4D, 0x4D, 0x67)
 
 OUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
@@ -198,6 +200,62 @@ def _vline(img: Image.Image, x: int, y1: int, y2: int, color) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 排序图标（16×16，与 AE2 states.png 的工具栏图标同规格）
+# ---------------------------------------------------------------------------
+
+def _icon_canvas() -> Image.Image:
+    """16×16 透明底的排序图标画布。"""
+    return Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+
+
+def _icon_shadow(img: Image.Image) -> Image.Image:
+    """把白色像素整体复制一层到右下 1px 当阴影，被白色压住的位置不画阴影。
+
+    与 AE2 原生图标同款：主色白、右下 1px 深色阴影，因此放进左侧工具栏不会跳。
+    """
+    out = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    src = img.load()
+    dst = out.load()
+    for y in range(img.height):
+        for x in range(img.width):
+            if src[x, y][3] > 0:
+                dst[x, y] = SORT_ICON
+                if x + 1 < img.width and y + 1 < img.height and src[x + 1, y + 1][3] == 0:
+                    dst[x + 1, y + 1] = SORT_ICON_SHADOW
+    return out
+
+
+def sort_status() -> Image.Image:
+    """状态档图标：三根阶梯条，表示状态等级（好 → 坏）。"""
+    img = _icon_canvas()
+    rect(img, 1, 9, 3, 6, SORT_ICON)
+    rect(img, 6, 6, 3, 9, SORT_ICON)
+    rect(img, 11, 3, 3, 12, SORT_ICON)
+    return _icon_shadow(img)
+
+
+def sort_rule_count() -> Image.Image:
+    """IO 规则数档图标：三条规则行（行首小方块 + 长条）。"""
+    img = _icon_canvas()
+    for y in (2, 7, 12):
+        rect(img, 2, y, 2, 2, SORT_ICON)
+        rect(img, 5, y, 8, 2, SORT_ICON)
+    return _icon_shadow(img)
+
+
+def sort_distance() -> Image.Image:
+    """距离档图标：两侧立柱 + 中间双向箭头，读作「间距」。"""
+    img = _icon_canvas()
+    rect(img, 2, 3, 2, 10, SORT_ICON)
+    rect(img, 13, 3, 2, 10, SORT_ICON)
+    rect(img, 7, 7, 3, 2, SORT_ICON)
+    for x, y in ((5, 7), (5, 8), (6, 6), (6, 7), (6, 8), (6, 9),
+                 (10, 6), (10, 7), (10, 8), (10, 9), (11, 7), (11, 8)):
+        rect(img, x, y, 1, 1, SORT_ICON)
+    return _icon_shadow(img)
+
+
+# ---------------------------------------------------------------------------
 # 入口
 # ---------------------------------------------------------------------------
 
@@ -216,6 +274,9 @@ SPECS = {
     "status_lamp_warn": (lambda: status_lamp(STATUS_WARN), "状态灯：警告"),
     "status_lamp_error": (lambda: status_lamp(STATUS_ERROR), "状态灯：错误"),
     "status_lamp_idle": (lambda: status_lamp(STATUS_IDLE), "状态灯：空闲"),
+    "sort_status": (sort_status, "排序图标：状态（三根阶梯条）"),
+    "sort_rule_count": (sort_rule_count, "排序图标：IO 规则数（三条规则行）"),
+    "sort_distance": (sort_distance, "排序图标：距离（立柱 + 双向箭头）"),
 }
 
 
