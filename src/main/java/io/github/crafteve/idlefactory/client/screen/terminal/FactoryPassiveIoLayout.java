@@ -342,7 +342,8 @@ final class FactoryPassiveIoLayout {
 
     /** 速率列 x。 */
     static int rateX(Viewport viewport) {
-        return contentRight(viewport) - RATE_W;
+        // 速率列右侧再留 3px，别贴着卡片右边缘。
+        return contentRight(viewport) - RATE_W - 3;
     }
 
     /**

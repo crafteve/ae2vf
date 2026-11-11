@@ -228,17 +228,15 @@ final class FactoryPassiveIoRender {
                 slotX + 1, top + 2);
         int nameX = slotX + FactoryPassiveIoLayout.SLOT + FactoryPassiveIoLayout.GAP;
         int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
-        // 状态灯占最右 3px，数量文字排在它左边；删节点只留在节点管理终端，这里没有 × 按钮。
+        // 状态灯占最右 3px；数量用原版物品数量修饰器，叠在图标右下角，和背包一致。
         int lampX = contentRight - 5;
-        String count = block.machineCount() > 1 ? "×" + block.machineCount() : "";
-        int countW = count.isEmpty() ? 0 : this.font.width(count) + 3;
-        graphics.drawString(this.font,
-                ellipsize(block.name(), lampX - 4 - nameX - countW), nameX, top + 6,
-                this.theme.textPrimary(), false);
-        if (!count.isEmpty()) {
-            graphics.drawString(this.font, count, lampX - 4 - this.font.width(count),
-                    top + 6, this.theme.statusRun(), false);
+        if (block.machineCount() > 1) {
+            graphics.renderItemDecorations(this.font,
+                    icon.copyWithCount(block.machineCount()), slotX + 1, top + 2);
         }
+        graphics.drawString(this.font,
+                ellipsize(block.name(), lampX - 4 - nameX), nameX, top + 6,
+                this.theme.textPrimary(), false);
         FactoryNineSlice.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
     }
 
