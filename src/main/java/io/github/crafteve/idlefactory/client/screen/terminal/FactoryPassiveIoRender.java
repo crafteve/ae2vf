@@ -21,6 +21,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoMod
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
@@ -222,7 +223,7 @@ final class FactoryPassiveIoRender {
         int slotX = FactoryPassiveIoLayout.headerX(viewport);
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        ItemStack icon = !block.machine().health().isOnline()
+        ItemStack icon = block.nodeStatus().health() == NodeHealth.OFFLINE
                 ? new ItemStack(Items.BARRIER) : FactoryLabels.blockStack(block.machine().blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);

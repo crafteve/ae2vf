@@ -102,16 +102,29 @@ public final class NodeStatusResolver {
     }
 
     /**
+     * 按节点把机器视图分组；机器表节点状态与节点表成员查找共用这一份分组。
+     *
+     * <p>包内可见：只给同包的快照构建器用，不对外暴露可变的中间表。</p>
+     *
+     * @param machines 整厂机器视图
+     * @return 节点 id → 该节点的成员视图；顺序按机器表首次出现
+     */
+    static Map<UUID, List<MachineView>> groupByNode(List<MachineView> machines) {
+        Map<UUID, List<MachineView>> grouped = new LinkedHashMap<>();
+        for (MachineView machine : machines) {
+            grouped.computeIfAbsent(machine.nodeId(), ignored -> new ArrayList<>()).add(machine);
+        }
+        return grouped;
+    }
+
+    /**
      * 按节点分组聚合，给机器表快照附带节点状态用。
      *
      * @param machines 整厂机器视图
      * @return 节点 id → 节点状态；顺序按机器表首次出现
      */
     public static Map<UUID, NodeStatus> byNode(List<MachineView> machines) {
-        Map<UUID, List<MachineView>> grouped = new LinkedHashMap<>();
-        for (MachineView machine : machines) {
-            grouped.computeIfAbsent(machine.nodeId(), ignored -> new ArrayList<>()).add(machine);
-        }
+        Map<UUID, List<MachineView>> grouped = groupByNode(machines);
         Map<UUID, NodeStatus> statuses = new LinkedHashMap<>(grouped.size());
         for (Map.Entry<UUID, List<MachineView>> entry : grouped.entrySet()) {
             // 机器表把节点规则数冗余在每台机器上，组内取值相同；这里只读这个节点级字段，

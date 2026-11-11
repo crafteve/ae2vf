@@ -12,6 +12,10 @@ import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
  * {@code stale} 要求任一成员过期，{@code health} 按在线台数分档，{@code totalState} 按
  * "最需要管的那台"聚合。</p>
  *
+ * <p>两个边界值也是契约的一部分：没有成员时 {@code probed = false}、{@code health = OFFLINE}、
+ * {@code totalState = OFFLINE}，因为没有任何可观测事实；全员离线时 {@code totalState} 直接给
+ * {@code OFFLINE}，不会出现"离线 + 未知"的组合交给下游。</p>
+ *
  * @param probed     是否全部成员都探测过
  * @param stale      是否有成员健康过期
  * @param health     节点健康

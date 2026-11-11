@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,9 +12,7 @@ import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.observation.Observation;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.Health;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
@@ -120,11 +117,9 @@ public final class FactoryNodeSnapshotBuilder {
             long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, now);
+        // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
         Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
-                new LinkedHashMap<>();
-        for (FactorySnapshotBuilder.MachineView view : machineViews) {
-            byNode.computeIfAbsent(view.nodeId(), ignored -> new ArrayList<>()).add(view);
-        }
+                NodeStatusResolver.groupByNode(machineViews);
         List<NodeView> nodes = new ArrayList<>(factory.config().nodes().size());
         boolean meStorage = factory.config().storageMode() == StorageMode.ME;
         boolean storageOnline = factory.live().storageOnline();
