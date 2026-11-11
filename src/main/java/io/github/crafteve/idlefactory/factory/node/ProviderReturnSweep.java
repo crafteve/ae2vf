@@ -8,7 +8,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 
-import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
+import io.github.crafteve.idlefactory.factory.io.IoPortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 
 import net.minecraft.core.Direction;
@@ -89,7 +89,7 @@ public final class ProviderReturnSweep {
         boolean harvested = false;
         // 回收扫整台机器的所有方块；一台派单机器可能只是节点里的一个成员。
         for (Machine machine : this.node.onlineMachines()) {
-            MachinePortResolver.Faces faces = this.node.faces(machine);
+            IoPortResolver.Faces faces = this.node.faces(machine);
             if (faces == null) {
                 continue;
             }

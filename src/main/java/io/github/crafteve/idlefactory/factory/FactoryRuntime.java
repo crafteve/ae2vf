@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
+import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
@@ -49,7 +49,7 @@ public final class FactoryRuntime {
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
-    private final NodeIoRunner nodeIoRunner = new NodeIoRunner();
+    private final PassiveIoRunner nodeIoRunner = new PassiveIoRunner();
     /**
      * 全服占用索引：统一 id → 认领。
      *
@@ -160,7 +160,7 @@ public final class FactoryRuntime {
     }
 
     /** IO 执行器。 */
-    public NodeIoRunner nodeIoRunner() {
+    public PassiveIoRunner nodeIoRunner() {
         return this.nodeIoRunner;
     }
 

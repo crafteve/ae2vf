@@ -20,7 +20,7 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
  *
- * <p>面与 handler 的解析在 {@link MachinePortResolver}；物品变体的展开在 {@link ItemCandidates}。
+ * <p>面与 handler 的解析在 {@link IoPortResolver}；物品变体的展开在 {@link ItemCandidates}。
  * 本类只负责按规则跑事务、汇总本轮结果与逐规则原因。</p>
  *
  * <p>搬成功就记住这个面；{@link Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
@@ -32,7 +32,7 @@ import net.minecraft.server.level.ServerLevel;
  * 单规则 8、单机器 16，输入/输出按侧分配，防止变体爆炸时一次打满；规则处理顺序按 tick
  * 轮转，避免后面的规则被饿死。</p>
  */
-public final class MachineIoRunner {
+public final class IoExecutor {
     /**
      * 一次机器搬运的结果：只保留调用方真的会读的分量。
      *
@@ -79,7 +79,7 @@ public final class MachineIoRunner {
         return next.severity() > current.severity() ? next : current;
     }
 
-    private MachineIoRunner() {
+    private IoExecutor() {
         // 纯静态工具类
     }
 
@@ -122,7 +122,7 @@ public final class MachineIoRunner {
             IoUnit unit = inputs.get(ruleIndex);
             ResourceSpec spec = unit.spec();
             RuleKey ruleKey = unit.key().rule();
-            MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, true,
+            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, true,
                     caps, unit.digest().faceHint());
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
@@ -184,7 +184,7 @@ public final class MachineIoRunner {
             IoUnit unit = outputs.get(ruleIndex);
             ResourceSpec spec = unit.spec();
             RuleKey ruleKey = unit.key().rule();
-            MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, false,
+            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, false,
                     caps, unit.digest().faceHint());
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
@@ -246,7 +246,7 @@ public final class MachineIoRunner {
      * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
      * 取仓库变体索引、输出侧扫机器库存。</p>
      */
-    private static Adapters ruleAdapters(MEStorage storage, MachinePortResolver.Resolved resolved,
+    private static Adapters ruleAdapters(MEStorage storage, IoPortResolver.Resolved resolved,
             ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
             int[] budget) {
         if (!(resolved.adapter() instanceof ItemAdapter base)) {

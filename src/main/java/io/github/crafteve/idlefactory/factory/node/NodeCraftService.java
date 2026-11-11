@@ -9,7 +9,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
+import io.github.crafteve.idlefactory.factory.io.IoPortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.ProviderMode;
@@ -81,7 +81,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (machine == null) {
             return false;
         }
-        MachinePortResolver.Faces faces = this.node.faces(machine);
+        IoPortResolver.Faces faces = this.node.faces(machine);
         if (faces == null) {
             return false;
         }
@@ -102,7 +102,7 @@ final class NodeCraftService implements ICraftingProvider {
             List<PendingOrder.Line> lines = new ArrayList<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
                 // 只要能收 1 个就选它并把面绑进订单：真塞不下由投递按整数份处理。
-                MachinePortResolver.Faces.Target target = faces.select(entry.getKey(), 1L);
+                IoPortResolver.Faces.Target target = faces.select(entry.getKey(), 1L);
                 if (target == null) {
                     return false;
                 }
@@ -150,15 +150,15 @@ final class NodeCraftService implements ICraftingProvider {
             // 机器没加载：等，订单不丢。
             return;
         }
-        MachinePortResolver.Faces faces = this.node.faces(machine);
+        IoPortResolver.Faces faces = this.node.faces(machine);
         if (faces == null) {
             // 区块没加载：等。
             return;
         }
-        List<MachinePortResolver.Faces.Target> targets = new ArrayList<>(order.lines().size());
+        List<IoPortResolver.Faces.Target> targets = new ArrayList<>(order.lines().size());
         long maxSets = Long.MAX_VALUE;
         for (PendingOrder.Line line : order.lines()) {
-            MachinePortResolver.Faces.Target target = this.target(faces, line);
+            IoPortResolver.Faces.Target target = this.target(faces, line);
             if (target == null) {
                 return;
             }
@@ -208,12 +208,12 @@ final class NodeCraftService implements ICraftingProvider {
     }
     /** 取一行在快照上的目标：先用绑定面，没有就重新选一次。 */
     @Nullable
-    private MachinePortResolver.Faces.Target target(MachinePortResolver.Faces faces,
+    private IoPortResolver.Faces.Target target(IoPortResolver.Faces faces,
             PendingOrder.Line line) {
         if (line.face() != null) {
             var raw = faces.target(line.face());
             if (raw != null) {
-                return new MachinePortResolver.Faces.Target(faces.slots().get(0), line.face(), raw);
+                return new IoPortResolver.Faces.Target(faces.slots().get(0), line.face(), raw);
             }
         }
         return faces.select(line.key(), line.amount());
@@ -416,7 +416,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (online.isEmpty()) {
             return 1;
         }
-        MachinePortResolver.Faces faces = this.node.faces(online.get(0));
+        IoPortResolver.Faces faces = this.node.faces(online.get(0));
         if (faces == null) {
             return 1;
         }
@@ -443,7 +443,7 @@ final class NodeCraftService implements ICraftingProvider {
      * @param factor  倍数
      * @return 所有输入都能收下时为 {@code true}
      */
-    private static boolean canFit(IPatternDetails details, MachinePortResolver.Faces faces,
+    private static boolean canFit(IPatternDetails details, IoPortResolver.Faces faces,
             int factor) {
         for (IPatternDetails.IInput input : details.getInputs()) {
             GenericStack[] possible = input.getPossibleInputs();

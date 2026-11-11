@@ -46,7 +46,7 @@ import net.neoforged.neoforge.items.IItemHandler;
  * <p>面记忆只有两份来源：规则里配置的面（最高优先）与经验面（单元的结论里记住上次搬通的面，
  * 仅在没配面时兜底）。写入被拒（REJECTED）就由分析器就地清掉经验面，下一轮重新探。</p>
  */
-public final class MachinePortResolver {
+public final class IoPortResolver {
     /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
     private static final int ENERGY_PROBE = 1000;
     /** 物品面探测的模拟量：1 个就足以判断这个面收不收 / 抽不抽得出来。 */
@@ -66,7 +66,7 @@ public final class MachinePortResolver {
     public record Resolved(ResourceAdapter adapter, @Nullable Direction face) {
     }
 
-    private MachinePortResolver() {
+    private IoPortResolver() {
         // 纯静态工具类
     }
 

@@ -2,8 +2,8 @@
  * 工厂的 IO 执行层：表单、排期、搬运事务、账本与历史结论。
  *
  * <p>工作清单是 {@code IoForm}，一行是 {@code IoUnit}（机器 + 规则 + 方向）。{@code PassivePlanner}
- * 按规则择时并排好这一轮的清单，{@code NodeIoRunner} 是薄驱动，{@code MachineIoRunner} 按清单跑，
- * {@code MachinePortResolver} 是机器侧唯一的选面 / 模拟 / 写入入口，{@code IoTransfer} 是唯一写路径。</p>
+ * 按规则择时并排好这一轮的清单，{@code PassiveIoRunner} 是薄驱动，{@code IoExecutor} 按清单跑，
+ * {@code IoPortResolver} 是机器侧唯一的选面 / 模拟 / 写入入口，{@code IoTransfer} 是唯一写路径。</p>
  *
  * <p>{@code Reason} 是执行结果原因，{@code IoLedger} 记明细（会滚），{@code UnitDigest} 记摘要
  * （不滚），{@code LedgerAnalyzer} 是两者唯一的更新者。{@code TransferStats} 只回答每秒搬了多少。</p>

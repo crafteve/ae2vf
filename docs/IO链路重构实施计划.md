@@ -552,3 +552,11 @@ ERROR        异常；退款失败也归这里
 **最终数字**：核心六包 64 文件 / 8211 行（基线 74 文件 / 10695 行）；`io+node` 的 `return 0L/continue/return false` 共 70 处，但语义已从「静默跳过」改为「每处都落账本原因或只是扫面循环内的`continue`」；协议版本 34。
 
 **仍未做**：单元账本明细展开（`IoLedger.rows()`）未接界面；节点「投递尝试次数 / 最近错误 / 累计投递量」未上界面；`IoExecutor` 未单独成类（执行器仍是收窄后的 `MachineIoRunner`）。
+
+**命名统一（2026-11-11 追加）**：按「数据结构带 Io 前缀、角色用语义前缀+角色后缀、执行入口用 Io+角色」的分族规则，改名三处（纯机械改名，不动行为与协议）：
+
+- `MachineIoRunner` → `IoExecutor`（执行器，无跨轮记忆）
+- `NodeIoRunner` → `PassiveIoRunner`（被动腿的驱动，与 `PassivePlanner` 配对）
+- `MachinePortResolver` → `IoPortResolver`（机器侧唯一写入口，被动与主动共用）
+
+`AGENTS.md` §6.1 的关键文件表仍列着旧类名（以及已删除的 `RuleResolver` / `RunnerState` / `RouteTable`），按 §5.6 需要单独批准后才能改。

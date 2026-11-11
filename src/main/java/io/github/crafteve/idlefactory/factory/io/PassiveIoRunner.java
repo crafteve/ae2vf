@@ -28,7 +28,7 @@ import net.minecraft.server.level.ServerLevel;
  * <p>异常按机器兜住：第三方 handler 抛异常不能带崩服务端 tick，记一条节流 warn 并按本轮
  * 失败落账，下一轮照常重试。</p>
  */
-public final class NodeIoRunner {
+public final class PassiveIoRunner {
     /** 坏机器日志节流间隔（tick）。 */
     private static final long FAILURE_LOG_INTERVAL = 1200L;
 
@@ -89,7 +89,7 @@ public final class NodeIoRunner {
         ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
                 id -> new ItemVariantIndex());
         int[] sharedBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
-        MachineIoRunner.BlockRun result;
+        IoExecutor.BlockRun result;
         try {
             ServerLevel level = server.getLevel(target.dimension());
             if (level == null || !level.isLoaded(target.pos())) {
@@ -98,10 +98,10 @@ public final class NodeIoRunner {
             }
             LevelCapabilityCache caps = observations == null
                     ? null : observations.capabilities(level);
-            result = MachineIoRunner.runBlock(storage, level, target.pos(), plan.inputs(),
+            result = IoExecutor.runBlock(storage, level, target.pos(), plan.inputs(),
                     plan.outputs(), caps, factoryVariants, now, sharedBudget);
         } catch (RuntimeException e) {
-            // 只在这里兜：第三方 handler 在 MachineIoRunner 内部被调用，异常穿出去会带崩
+            // 只在这里兜：第三方 handler 在 IoExecutor 内部被调用，异常穿出去会带崩
             // 整个服务端 tick。更糟的是 IoTransfer 已经先从仓库扣了料才交给机器，异常意味着
             // 「已扣未给」，这台机器本轮只能按未搬动处理：记节流 warn、落一条 ERROR 账，
             // 下一轮照常重试，其余机器不受影响。只捕 RuntimeException，不捕 Error。
@@ -124,7 +124,7 @@ public final class NodeIoRunner {
      * @param result 本轮结果
      * @param now    当前服务端 tick
      */
-    private void recordResult(PassivePlanner.Plan plan, MachineIoRunner.BlockRun result, long now) {
+    private void recordResult(PassivePlanner.Plan plan, IoExecutor.BlockRun result, long now) {
         for (IoUnit unit : plan.inputs()) {
             RuleKey rule = unit.key().rule();
             Reason reason = result.inputReasons().get(rule);

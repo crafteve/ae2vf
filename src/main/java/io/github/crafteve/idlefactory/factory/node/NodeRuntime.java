@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
+import io.github.crafteve.idlefactory.factory.io.IoPortResolver;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
@@ -414,14 +414,14 @@ public final class NodeRuntime
      * @return 快照；没有任何方块加载时为 {@code null}
      */
     @Nullable
-    MachinePortResolver.Faces faces(Machine machine) {
+    IoPortResolver.Faces faces(Machine machine) {
         BlockKey block = machine.block();
         ServerLevel level = this.levelOf(block);
         if (level == null || !level.isLoaded(block.pos())) {
             // 机器 ONLINE 要求方块可用；未加载就交给健康门禁拦整台机器。
             return null;
         }
-        return MachinePortResolver.faces(level, block.pos(), level.getBlockEntity(block.pos()),
+        return IoPortResolver.faces(level, block.pos(), level.getBlockEntity(block.pos()),
                 this.node.io().inputs(), this.actionSource());
     }
 

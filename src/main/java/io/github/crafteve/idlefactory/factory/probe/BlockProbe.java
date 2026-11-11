@@ -41,7 +41,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
  * <p><b>区块未加载时不许当作「不存在」</b>：{@link #presence} 会先查 {@code isLoaded}，未加载直接
  * 返回 {@link Health#UNLOADED}，不会去读方块。这是整套观测最容易被破坏的一条纪律。</p>
  *
- * <p>执行层（{@code MachineIoRunner} / {@code ContainerStorage}）为了搬运仍可直接取 handler，
+ * <p>执行层（{@code IoExecutor} / {@code ContainerStorage}）为了搬运仍可直接取 handler，
  * 但不得据此改写观测——观测只由这里的结果驱动。</p>
  */
 public final class BlockProbe {

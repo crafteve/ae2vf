@@ -5,7 +5,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
+import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -38,7 +38,7 @@ final class FactoryTickRunner {
 
     private final MinecraftServer server;
     private final FactoryManager manager;
-    private final NodeIoRunner nodeIoRunner;
+    private final PassiveIoRunner nodeIoRunner;
     private final ObservationService observations;
     private final StorageResolver storageResolver;
     private final FactoryObservationRunner observationRunner;
@@ -58,7 +58,7 @@ final class FactoryTickRunner {
      * @param machineStates     机器状态集合
      * @param formBuilder       表单生成器
      */
-    FactoryTickRunner(MinecraftServer server, FactoryManager manager, NodeIoRunner nodeIoRunner,
+    FactoryTickRunner(MinecraftServer server, FactoryManager manager, PassiveIoRunner nodeIoRunner,
             ObservationService observations, StorageResolver storageResolver,
             FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner,
             MachineStateLibrary machineStates, IoFormBuilder formBuilder) {
