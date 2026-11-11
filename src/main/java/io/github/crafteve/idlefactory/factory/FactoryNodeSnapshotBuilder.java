@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -24,9 +26,9 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 把工厂的节点库整理成节点管理终端直接可用的视图。
  *
- * <p>视图按节点 → 成员 → 方块三层建模：{@code NodeView} 带节点健康、类型方块、{@code probed}
- * 与 {@code stale}；{@code MemberView} 带机器健康与唯一的方块位置。
- * 健康由观测快照机械聚合：P1b 只区分在线 / 离线，P2 换成 {@code NodeHealthResolver}。</p>
+ * <p>视图按节点 → 成员 → 方块三层建模：{@code NodeView} 带节点状态、类型方块、provider 与成员；
+ * {@code MemberView} 带机器健康与唯一的方块位置。节点状态由 {@link NodeStatusResolver}
+ * 一处聚合：探没过期看全体成员，在干什么按最需要管的那台，结果与成员登记顺序无关。</p>
  */
 public final class FactoryNodeSnapshotBuilder {
     private FactoryNodeSnapshotBuilder() {
@@ -133,73 +135,43 @@ public final class FactoryNodeSnapshotBuilder {
             long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, now);
+        Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
+                new LinkedHashMap<>();
+        for (FactorySnapshotBuilder.MachineView view : machineViews) {
+            byNode.computeIfAbsent(view.nodeId(), ignored -> new ArrayList<>()).add(view);
+        }
         List<NodeView> nodes = new ArrayList<>(factory.config().nodes().size());
         boolean meStorage = factory.config().storageMode() == StorageMode.ME;
         boolean storageOnline = factory.live().storageOnline();
         for (Node node : factory.config().nodes().all()) {
+            List<FactorySnapshotBuilder.MachineView> views =
+                    byNode.getOrDefault(node.id(), List.of());
+            // 节点状态只由 NodeStatusResolver 一处聚合：探没过期看全体，在干什么按最需要管的那台。
+            NodeStatus status = NodeStatusResolver.resolve(views);
             List<MemberView> members = new ArrayList<>(node.machineCount());
-            boolean allProbed = true;
-            boolean anyStale = false;
-            boolean anyOnline = false;
-            FactorySnapshotBuilder.TotalState state = FactorySnapshotBuilder.TotalState.OFFLINE;
             for (Machine machine : node.machines()) {
-                MachineHealth health = MachineHealth.OFFLINE;
-                boolean probed = false;
-                boolean memberStale = false;
-                ResourceLocation blockId = null;
-                for (FactorySnapshotBuilder.MachineView view : machineViews) {
-                    if (view.machineId().equals(machine.id())) {
-                        health = view.health();
-                        probed = view.probed();
-                        memberStale = view.stale();
-                        blockId = view.blockId();
-                        state = view.totalState();
+                FactorySnapshotBuilder.MachineView view = null;
+                for (FactorySnapshotBuilder.MachineView candidate : views) {
+                    if (candidate.machineId().equals(machine.id())) {
+                        view = candidate;
                         break;
                     }
                 }
-                if (!probed) {
-                    allProbed = false;
-                }
-                if (memberStale) {
-                    anyStale = true;
-                }
-                if (health.isOnline()) {
-                    anyOnline = true;
-                }
-                members.add(new MemberView(machine.id(), machine.block(), blockId, health, probed,
-                        memberStale));
+                members.add(view == null
+                        ? new MemberView(machine.id(), machine.block(), null, MachineHealth.OFFLINE,
+                                false, false)
+                        : new MemberView(machine.id(), machine.block(), view.blockId(),
+                                view.health(), view.probed(), view.stale()));
             }
-            NodeHealth health = nodeHealth(members);
-            if (!anyOnline) {
-                state = FactorySnapshotBuilder.TotalState.OFFLINE;
-            }
-            boolean available = meStorage && storageOnline && anyOnline;
-            nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), health, allProbed,
-                    anyStale, state, node.ruleCount(), node.patternCount(),
+            boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
+            nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status.health(),
+                    status.probed(), status.stale(), status.totalState(), node.ruleCount(),
+                    node.patternCount(),
                     new ProviderView(available, node.provider().blocking(),
                             node.provider().multiplier(), node.provider().dispatch()),
                     members));
         }
         return nodes;
-    }
-
-    /**
-     * 按成员机器聚合节点健康：全部在线 = 在线，部分在线 = 缺机，没有一台在线 = 离线。
-     *
-     * @param members 成员视图
-     * @return 节点健康
-     */
-    private static NodeHealth nodeHealth(List<MemberView> members) {
-        int online = 0;
-        for (MemberView member : members) {
-            if (member.health().isOnline()) {
-                online++;
-            }
-        }
-        if (online == 0) {
-            return NodeHealth.OFFLINE;
-        }
-        return online == members.size() ? NodeHealth.ONLINE : NodeHealth.PARTIAL;
     }
 
     /**
