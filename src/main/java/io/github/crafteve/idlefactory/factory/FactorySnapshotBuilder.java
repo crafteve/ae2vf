@@ -9,11 +9,13 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.DiagStats;
-import io.github.crafteve.idlefactory.factory.io.IoResult;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
+import io.github.crafteve.idlefactory.factory.io.IoUnit;
+import io.github.crafteve.idlefactory.factory.io.TransferStats;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
@@ -255,13 +257,18 @@ public final class FactorySnapshotBuilder {
     /**
      * 机器视图列表：节点 → 机器摊平，顺序沿用节点库与机器加入顺序。
      *
+     * <p>「为什么不动」不再问统计对象：原因与时刻来自表单单元的账本与历史结论，机器在不在
+     * 来自观测事实，速率来自每秒采样的 {@link TransferStats}。三份真相各读各的，不在视图里拼。</p>
+     *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
+     * @param states       机器状态集合；{@code null} 时按未探测处理
+     * @param form         本 tick 的表单；{@code null} 时没有执行数据
      * @param now          当前服务端 tick
      * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
-            long now) {
+            @Nullable MachineStateLibrary states, @Nullable IoForm form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = FactoryLimitsConfig.staleHealthTicks();
@@ -282,7 +289,8 @@ public final class FactorySnapshotBuilder {
                 boolean probed = state != null && state.probed();
                 boolean stale = state != null && state.stale();
 
-                DiagStats.MachineStats stats = factory.live().stats().machineOrNull(machine.id());
+                TransferStats.MachineStats stats = factory.live().stats().machineOrNull(machine.id());
+                IoForm.Slot slot = form == null ? null : form.slotOrNull(machine.id());
                 List<Long> inputRates = new ArrayList<>(inputs.size());
                 for (ResourceSpec spec : inputs) {
                     inputRates.add(stats == null ? 0L
@@ -294,29 +302,51 @@ public final class FactorySnapshotBuilder {
                             : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
                 }
                 List<Reason> inputReasons = new ArrayList<>(inputs.size());
+                long inputSuccessAt = -1L;
+                long blockedSince = -1L;
                 for (ResourceSpec spec : inputs) {
-                    inputReasons.add(stats == null ? Reason.NO_MATERIAL
-                            : stats.ruleReason(true,
-                                    new RuleKey(true, spec.key(), spec.face(), spec.mode())));
+                    IoUnit unit = slot == null ? null
+                            : slot.unit(true, new RuleKey(true, spec.key(), spec.face(), spec.mode()));
+                    Reason reason = unit == null || unit.ledger().current() == null
+                            ? Reason.NO_MATERIAL : unit.ledger().current().reason();
+                    inputReasons.add(reason);
+                    if (unit != null) {
+                        inputSuccessAt = Math.max(inputSuccessAt, unit.digest().lastSuccessAt());
+                        if (reason != Reason.RUN) {
+                            long since = unit.digest().lastAttemptAt();
+                            if (since >= 0L) {
+                                blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
+                            }
+                        }
+                    }
                 }
                 List<Reason> outputReasons = new ArrayList<>(outputs.size());
+                long lastSuccessAt = inputSuccessAt;
                 for (ResourceSpec spec : outputs) {
-                    outputReasons.add(stats == null ? Reason.NO_MATERIAL
-                            : stats.ruleReason(false,
-                                    new RuleKey(false, spec.key(), spec.face(), spec.mode())));
+                    IoUnit unit = slot == null ? null
+                            : slot.unit(false, new RuleKey(false, spec.key(), spec.face(), spec.mode()));
+                    Reason reason = unit == null || unit.ledger().current() == null
+                            ? Reason.NO_MATERIAL : unit.ledger().current().reason();
+                    outputReasons.add(reason);
+                    if (unit != null) {
+                        lastSuccessAt = Math.max(lastSuccessAt, unit.digest().lastSuccessAt());
+                        if (reason != Reason.RUN) {
+                            long since = unit.digest().lastAttemptAt();
+                            if (since >= 0L) {
+                                blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
+                            }
+                        }
+                    }
                 }
 
-                long sinceMove = stats != null && stats.lastMoveTick() > 0L
-                        ? Math.max(0L, now - stats.lastMoveTick()) : -1L;
-                long blocked = stats != null && stats.blockedSince() >= 0L
-                        ? Math.max(0L, now - stats.blockedSince()) : -1L;
-                long sinceInput = stats != null && stats.lastInputMoveTick() > 0L
-                        ? Math.max(0L, now - stats.lastInputMoveTick()) : -1L;
-                boolean inputFull = stats != null && stats.inputFull();
-                Reason inputReason = stats == null
-                        ? Reason.RUN : stats.inputReason();
-                Reason outputReason = stats == null
-                        ? Reason.RUN : stats.outputReason();
+                long sinceMove = lastSuccessAt < 0L ? -1L : Math.max(0L, now - lastSuccessAt);
+                long blocked = blockedSince < 0L ? -1L : Math.max(0L, now - blockedSince);
+                long sinceInput = inputSuccessAt < 0L ? -1L : Math.max(0L, now - inputSuccessAt);
+                boolean inputFull = !inputReasons.isEmpty() && inputReasons.stream()
+                        .allMatch(reason -> reason == Reason.FULL || reason == Reason.REJECTED
+                                || reason == Reason.NO_FACE);
+                Reason inputReason = worst(inputReasons);
+                Reason outputReason = worst(outputReasons);
 
                 // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」。
                 ResourceLocation groupBlockId = observation.blockId() != null
@@ -334,6 +364,46 @@ public final class FactorySnapshotBuilder {
         }
         return views;
     }
+
+    /**
+     * 一列原因里最需要注意的那个（按拒绝 &gt; 无面 &gt; 满 &gt; 缺料 &gt; 其它）。
+     *
+     * @param reasons 原因列表
+     * @return 最坏原因；空列表按正常
+     */
+    private static Reason worst(List<Reason> reasons) {
+        Reason worst = Reason.RUN;
+        int severity = -1;
+        for (Reason reason : reasons) {
+            int rank = switch (reason) {
+                case ERROR -> 5;
+                case REJECTED -> 4;
+                case NO_FACE -> 3;
+                case FULL -> 2;
+                case NO_MATERIAL -> 1;
+                case RUN, SLEEPING, BUDGET_OUT -> 0;
+            };
+            if (rank > severity) {
+                severity = rank;
+                worst = reason;
+            }
+        }
+        return worst;
+    }
+
+    /**
+     * 兼容旧调用：没有状态集合与表单时，执行数据按空处理。
+     *
+     * @param factory      工厂
+     * @param observations 观测服务
+     * @param now          当前服务端 tick
+     * @return 视图列表
+     */
+    public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
+            long now) {
+        return machines(factory, observations, null, null, now);
+    }
+
 
     /**
      * 兼容旧调用：不提供当前 tick，速率/时间字段为空。

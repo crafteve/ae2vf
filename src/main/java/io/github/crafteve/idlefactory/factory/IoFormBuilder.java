@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.HashMap;
+
+import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.UUID;
 
@@ -50,6 +52,16 @@ public final class IoFormBuilder {
         }
         form.endRebuild();
         return form;
+    }
+
+    /**
+     * 取一个工厂最近一次生成的表单。
+     *
+     * @param factoryId 工厂 id
+     * @return 表单；还没生成过时为 {@code null}
+     */
+    public @Nullable IoForm form(UUID factoryId) {
+        return this.forms.get(factoryId);
     }
 
     /**

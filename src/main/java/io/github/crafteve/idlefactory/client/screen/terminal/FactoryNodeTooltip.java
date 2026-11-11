@@ -73,6 +73,10 @@ final class FactoryNodeTooltip {
         lines.add(line("成员", node.view().machineCount() + " 台"));
         lines.add(line("规则 / 样板", node.view().ruleCount() + " 条 / "
                 + node.view().patternCount() + " 份"));
+        if (node.view().pendingCount() > 0) {
+            lines.add(line("待投递", node.view().pendingCount() + " 单"
+                    + waitedText(node.view().pendingOldestAt())));
+        }
         if (!node.members().isEmpty()) {
             FactoryNodeSnapshotBuilder.MemberView first = node.members().get(0).member();
             lines.add(line("位置", first.dimensionId() + " "
@@ -81,6 +85,21 @@ final class FactoryNodeTooltip {
         lines.add(Component.literal("点名字改名 · 点卡片展开 / 收起")
                 .withStyle(ChatFormatting.DARK_GRAY));
         return lines;
+    }
+
+    /**
+     * 队首等了多久，客户端用本地游戏时间与队首入队时刻比。
+     *
+     * @param pendingOldestAt 队首入队时刻；没有为 -1
+     * @return 形如「 · 最久等 3 秒」；算不出来时为空串
+     */
+    private static String waitedText(long pendingOldestAt) {
+        var level = net.minecraft.client.Minecraft.getInstance().level;
+        if (level == null || pendingOldestAt < 0L) {
+            return "";
+        }
+        long ticks = Math.max(0L, level.getGameTime() - pendingOldestAt);
+        return " · 最久等 " + (ticks / 20L) + " 秒";
     }
 
     private static List<Component> provider(NodeRow node, String label, String value, String hint) {

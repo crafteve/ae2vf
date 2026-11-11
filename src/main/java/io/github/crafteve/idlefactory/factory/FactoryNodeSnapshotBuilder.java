@@ -7,11 +7,15 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeManager;
+import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
@@ -39,14 +43,17 @@ public final class FactoryNodeSnapshotBuilder {
      * @param name         玩家起的名字；{@code null} 表示用方块名
      * @param typeBlockId  类型方块 id（节点图标 / 类型判定）
      * @param status       节点状态：服务端唯一聚合结果，客户端只读
-     * @param ruleCount    节点 IO 规则总数
-     * @param patternCount 已放样板数
-     * @param provider     provider 组的状态
-     * @param members      节点下的机器
+     * @param ruleCount        节点 IO 规则总数
+     * @param patternCount     已放样板数
+     * @param pendingCount     待写入队列的单数
+     * @param pendingOldestAt  队首入队时刻；队列空时为 -1
+     * @param provider         provider 组的状态
+     * @param members          节点下的机器
      */
     public record NodeView(java.util.UUID nodeId, @Nullable String name,
             ResourceLocation typeBlockId, NodeStatus status, int ruleCount, int patternCount,
-            ProviderView provider, List<MemberView> members) {
+            int pendingCount, long pendingOldestAt, ProviderView provider,
+            List<MemberView> members) {
 
         public NodeView {
             members = List.copyOf(members);
@@ -114,9 +121,10 @@ public final class FactoryNodeSnapshotBuilder {
      * @return 节点视图
      */
     public static List<NodeView> nodes(Factory factory, @Nullable ObservationService observations,
-            long now) {
+            @Nullable MachineStateLibrary states, @Nullable IoForm form,
+            @Nullable NodeManager nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
-                FactorySnapshotBuilder.machines(factory, observations, now);
+                FactorySnapshotBuilder.machines(factory, observations, states, form, now);
         // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
         Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
                 NodeStatusResolver.groupByNode(machineViews);
@@ -144,8 +152,11 @@ public final class FactoryNodeSnapshotBuilder {
                                 view.health(), view.probed(), view.stale()));
             }
             boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
+            NodeRuntime runtime = nodeManager == null ? null : nodeManager.node(node.id());
+            int pendingCount = runtime == null ? 0 : runtime.digest().pendingCount();
+            long pendingOldestAt = runtime == null ? -1L : runtime.digest().pendingOldestAt();
             nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
-                    node.ruleCount(), node.patternCount(),
+                    node.ruleCount(), node.patternCount(), pendingCount, pendingOldestAt,
                     new ProviderView(available, node.provider().blocking(),
                             node.provider().multiplier(), node.provider().dispatch()),
                     members));

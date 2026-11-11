@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
@@ -124,6 +125,22 @@ public final class FactoryRuntime {
     /** 档案柜。 */
     public FactoryManager manager() {
         return this.manager;
+    }
+
+    /** 全服机器状态（世界的镜像，只读）。 */
+    public MachineStateLibrary machineStates() {
+        return this.machineStates;
+    }
+
+    /**
+     * 取一个工厂本 tick 的表单；还没生成过时为 {@code null}。
+     *
+     * @param factory 工厂
+     * @return 表单
+     */
+    @Nullable
+    public IoForm formFor(Factory factory) {
+        return this.formBuilder.form(factory.id());
     }
 
     /** 仓库解析器；启动完成后非 null。 */

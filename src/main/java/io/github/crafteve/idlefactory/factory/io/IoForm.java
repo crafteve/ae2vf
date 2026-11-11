@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
@@ -76,6 +78,16 @@ public final class IoForm {
         return this.ordered;
     }
 
+    /**
+     * 按机器查槽位。
+     *
+     * @param machineId 机器 id
+     * @return 槽位；这台机器不在表单上时为 {@code null}
+     */
+    public @Nullable Slot slotOrNull(UUID machineId) {
+        return this.slots.get(machineId);
+    }
+
     /** 是否没有活干。 */
     public boolean isEmpty() {
         return this.ordered.isEmpty();
@@ -120,6 +132,17 @@ public final class IoForm {
         /** 输出规则（与 {@link #outputs()} 一一对应）。 */
         public List<ResourceSpec> outputSpecs() {
             return this.outputSpecs;
+        }
+
+        /**
+         * 按规则查单元。
+         *
+         * @param input 是否输入侧
+         * @param key   规则
+         * @return 单元；规则不在表单上时为 {@code null}
+         */
+        public @Nullable IoUnit unit(boolean input, RuleKey key) {
+            return this.pool.get(new IoUnitKey(this.machine.id(), input, key));
         }
 
         void beginRebuild() {

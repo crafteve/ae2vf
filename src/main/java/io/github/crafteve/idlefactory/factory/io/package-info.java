@@ -1,8 +1,13 @@
 /**
- * 工厂的 IO 执行层：遍历、取面、搬运事务与瞬态。
+ * 工厂的 IO 执行层：表单、排期、搬运事务、账本与历史结论。
  *
- * <p>{@code NodeIoRunner} 按机器库遍历机器，{@code MachineIoRunner} 按 {@code NodeIoGroup} 跑一轮，
- * {@code RuleResolver} 负责取面与 handler，{@code IoTransfer} 是唯一写路径。{@code RunnerState}
- * 存机器的睡眠与面路由瞬态，不写配置、不写存档。</p>
+ * <p>工作清单是 {@code IoForm}，一行是 {@code IoUnit}（机器 + 规则 + 方向）。{@code PassivePlanner}
+ * 按规则择时并排好这一轮的清单，{@code NodeIoRunner} 是薄驱动，{@code MachineIoRunner} 按清单跑，
+ * {@code MachinePortResolver} 是机器侧唯一的选面 / 模拟 / 写入入口，{@code IoTransfer} 是唯一写路径。</p>
+ *
+ * <p>{@code Reason} 是执行结果原因，{@code IoLedger} 记明细（会滚），{@code UnitDigest} 记摘要
+ * （不滚），{@code LedgerAnalyzer} 是两者唯一的更新者。{@code TransferStats} 只回答每秒搬了多少。</p>
+ *
+ * <p>本包不认识节点：规则由表单携带下来，节点只在调用侧存在。不写配置、不写存档。</p>
  */
 package io.github.crafteve.idlefactory.factory.io;

@@ -42,8 +42,9 @@ public final class FactoryNodeSnapshots {
         }
         Factory owner = factory.get();
         long now = player.serverLevel().getGameTime();
-        List<FactoryNodeSnapshotBuilder.NodeView> nodes =
-                FactoryNodeSnapshotBuilder.nodes(owner, runtime.observations(), now);
+        List<FactoryNodeSnapshotBuilder.NodeView> nodes = FactoryNodeSnapshotBuilder.nodes(
+                owner, runtime.observations(), runtime.machineStates(), runtime.formFor(owner),
+                runtime.nodeManager(), now);
         PacketDistributor.sendToPlayer(player, new FactoryNodeTableS2C(
                 containerId, true, owner.config().storageMode() == StorageMode.ME,
                 owner.live().storageOnline(), nodes));

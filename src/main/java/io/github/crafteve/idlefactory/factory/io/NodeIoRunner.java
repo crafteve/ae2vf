@@ -110,15 +110,9 @@ public final class NodeIoRunner {
             return 0L;
         }
         this.recordResult(plan, result, now);
-        DiagStats.MachineStats stats = factory.live().stats().machine(machine.id());
-        // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
-        stats.setRuleReasons(result.inputReasons(), result.outputReasons());
         if (result.movedAnything()) {
-            stats.addMoved(result.fedByKey(), result.pulledByKey(),
-                    result.fedByRule(), result.pulledByRule(), now);
-        } else {
-            stats.markBlocked(result.inputReason(), result.outputReason(),
-                    result.inputFull(), now);
+            factory.live().stats().machine(machine.id())
+                    .addMoved(result.fedByRule(), result.pulledByRule());
         }
         return result.moved();
     }

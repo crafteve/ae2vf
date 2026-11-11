@@ -9,11 +9,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.Health;
+import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
 import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
 import io.github.crafteve.idlefactory.factory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
@@ -99,19 +99,18 @@ final class FactoryNodeRunner {
             if (anchorNode == null) {
                 continue;
             }
+            long now = this.observations.currentTick();
+            long staleTicks = FactoryLimitsConfig.staleHealthTicks();
             for (Node node : factory.config().nodes().all()) {
-                boolean available = true;
-                for (Machine machine : node.machines()) {
-                    if (this.observations.observe(machine.block()).health() != Health.PRESENT) {
-                        available = false;
-                        break;
-                    }
-                }
+                // 健康只由 NodeHealthResolver 一处推导：这里不再自己逐方块判 PRESENT。
+                NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(node,
+                        this.observations, now, staleTicks);
+                boolean available = snapshot.health() != NodeHealth.OFFLINE;
                 specs.add(new NodeManager.Spec(factory.id(), node, anchorNode, level, available));
                 Set<UUID> online = new HashSet<>();
-                for (Machine machine : node.machines()) {
-                    if (this.observations.observe(machine.block()).health() == Health.PRESENT) {
-                        online.add(machine.id());
+                for (NodeHealthResolver.MachineState state : snapshot.machines()) {
+                    if (state.health().isOnline()) {
+                        online.add(state.machine().id());
                     }
                 }
                 onlineMachines.put(node.id(), online);
