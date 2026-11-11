@@ -24,7 +24,7 @@ import net.minecraft.server.level.ServerLevel;
  * <p>面与 handler 的解析在 {@link RuleResolver}；物品变体的展开在 {@link ItemCandidates}。
  * 本类只负责按规则跑事务、汇总本轮结果与逐规则原因。</p>
  *
- * <p>搬成功就记住这个面；{@link IoResult.Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
+ * <p>搬成功就记住这个面；{@link Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
  * 玩家改规则、方块被换、能力失效都会让路由整体作废（观测层的面表代数 +1）。</p>
  *
  * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.machine.MatchMode#IGNORE_COMPONENTS}
@@ -53,10 +53,10 @@ public final class MachineIoRunner {
     public record BlockRun(long fed, long pulled,
             Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
             Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
-            IoResult.Reason lastReason, boolean inputFull,
-            IoResult.Reason inputReason, IoResult.Reason outputReason,
-            Map<RuleKey, IoResult.Reason> inputReasons,
-            Map<RuleKey, IoResult.Reason> outputReasons) {
+            Reason lastReason, boolean inputFull,
+            Reason inputReason, Reason outputReason,
+            Map<RuleKey, Reason> inputReasons,
+            Map<RuleKey, Reason> outputReasons) {
 
         public BlockRun {
             // 逐规则原因会被快照读取，先冻结成只读，避免调用方后续改动影响已发出的视图。
@@ -75,33 +75,34 @@ public final class MachineIoRunner {
         }
     }
 
-    private static IoResult.Reason worse(@Nullable IoResult.Reason current,
-            IoResult.Reason next) {
+    private static Reason worse(@Nullable Reason current,
+            Reason next) {
         if (current == null) {
             return next;
         }
         return severity(next) > severity(current) ? next : current;
     }
 
-    private static int severity(IoResult.Reason reason) {
+    private static int severity(Reason reason) {
         return switch (reason) {
+            case ERROR -> 5;
             case REJECTED -> 4;
-            case NO_HANDLER -> 3;
-            case NO_SPACE -> 2;
-            case NO_ITEM -> 1;
-            case OK -> 0;
+            case NO_FACE -> 3;
+            case FULL -> 2;
+            case NO_MATERIAL -> 1;
+            case RUN, SLEEPING, BUDGET_OUT -> 0;
         };
     }
 
-    private static IoResult.Reason combine(@Nullable IoResult.Reason input,
-            @Nullable IoResult.Reason output) {
-        if (output != null && output != IoResult.Reason.OK) {
+    private static Reason combine(@Nullable Reason input,
+            @Nullable Reason output) {
+        if (output != null && output != Reason.RUN) {
             return output;
         }
-        if (input != null && input != IoResult.Reason.OK) {
+        if (input != null && input != Reason.RUN) {
             return input;
         }
-        return IoResult.Reason.OK;
+        return Reason.RUN;
     }
 
     private MachineIoRunner() {
@@ -132,10 +133,10 @@ public final class MachineIoRunner {
         Map<AEKey, Long> pulledByKey = new LinkedHashMap<>();
         Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
         Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
-        Map<RuleKey, IoResult.Reason> inputReasons = new LinkedHashMap<>();
-        Map<RuleKey, IoResult.Reason> outputReasons = new LinkedHashMap<>();
-        IoResult.Reason inputReason = null;
-        IoResult.Reason outputReason = null;
+        Map<RuleKey, Reason> inputReasons = new LinkedHashMap<>();
+        Map<RuleKey, Reason> outputReasons = new LinkedHashMap<>();
+        Reason inputReason = null;
+        Reason outputReason = null;
         boolean anyInputAccepted = false;
         boolean anyInputRule = false;
         List<ResourceSpec> inputs = slot.inputSpecs();
@@ -161,38 +162,39 @@ public final class MachineIoRunner {
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
-                inputReason = worse(inputReason, IoResult.Reason.NO_HANDLER);
-                inputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
+                inputReason = worse(inputReason, Reason.NO_FACE);
+                inputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
                     inputBudget);
             if (adapters.starved()) {
-                // 本侧额度被前面的规则用完：本轮跳过，不写入原因；也不代表机器拒收。
+                // 本侧额度被前面的规则用完：本轮跳过，不代表机器拒收，但原因必须可见。
+                inputReasons.put(ruleKey, Reason.BUDGET_OUT);
                 anyInputAccepted = true;
                 continue;
             }
             if (adapters.list().isEmpty()) {
-                inputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
-                inputReason = worse(inputReason, IoResult.Reason.NO_ITEM);
+                inputReasons.put(ruleKey, Reason.NO_MATERIAL);
+                inputReason = worse(inputReason, Reason.NO_MATERIAL);
                 // 没有候选 = 仓库当前没有这个物品；机器侧并没有拒收，不能算「输入堵塞」。
                 anyInputAccepted = true;
                 continue;
             }
             long moved = 0L;
-            IoResult.Reason reason = null;
+            Reason reason = null;
             boolean accepted = false;
             for (ResourceAdapter adapter : adapters.list()) {
                 IoResult result = IoTransfer.feed(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
-                if (result.reason() == IoResult.Reason.OK || result.reason() == IoResult.Reason.NO_ITEM) {
-                    // NO_ITEM 只表示仓库没料，机器侧已经点头接收
+                if (result.reason() == Reason.RUN || result.reason() == Reason.NO_MATERIAL) {
+                    // NO_MATERIAL 只表示仓库没料，机器侧已经点头接收
                     accepted = true;
                 }
                 if (result.moved() > 0L) {
                     remember(routes, spec, true, resolved, generation);
-                } else if (result.reason() == IoResult.Reason.REJECTED) {
+                } else if (result.reason() == Reason.REJECTED) {
                     // 有容量却不收：这个面不对，下次重扫
                     clear(routes, spec, true);
                 } else {
@@ -203,8 +205,8 @@ public final class MachineIoRunner {
                 }
             }
             anyInputAccepted |= accepted;
-            IoResult.Reason combined = moved > 0L
-                    ? IoResult.Reason.OK : (reason == null ? IoResult.Reason.NO_ITEM : reason);
+            Reason combined = moved > 0L
+                    ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
             inputReasons.put(ruleKey, combined);
             fed += moved;
             if (moved > 0L) {
@@ -231,38 +233,39 @@ public final class MachineIoRunner {
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
-                outputReason = worse(outputReason, IoResult.Reason.NO_HANDLER);
-                outputReasons.put(ruleKey, IoResult.Reason.NO_HANDLER);
+                outputReason = worse(outputReason, Reason.NO_FACE);
+                outputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
             Adapters adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
                     outputBudget);
             if (adapters.starved()) {
                 // 本侧额度耗尽：本轮不判断方向，交给下一 tick 的轮转；同样不能算机器堵塞。
+                outputReasons.put(ruleKey, Reason.BUDGET_OUT);
                 continue;
             }
             if (adapters.list().isEmpty()) {
-                outputReasons.put(ruleKey, IoResult.Reason.NO_ITEM);
-                outputReason = worse(outputReason, IoResult.Reason.NO_ITEM);
+                outputReasons.put(ruleKey, Reason.NO_MATERIAL);
+                outputReason = worse(outputReason, Reason.NO_MATERIAL);
                 continue;
             }
             long moved = 0L;
-            IoResult.Reason reason = null;
+            Reason reason = null;
             for (ResourceAdapter adapter : adapters.list()) {
                 IoResult result = IoTransfer.pull(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
                 if (result.moved() > 0L) {
                     remember(routes, spec, false, resolved, generation);
-                } else if (result.reason() == IoResult.Reason.REJECTED) {
+                } else if (result.reason() == Reason.REJECTED) {
                     clear(routes, spec, false);
                 } else {
                     IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
                             pos.toShortString(), spec.describe(), result.reason());
                 }
             }
-            IoResult.Reason combined = moved > 0L
-                    ? IoResult.Reason.OK : (reason == null ? IoResult.Reason.NO_ITEM : reason);
+            Reason combined = moved > 0L
+                    ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
             outputReasons.put(ruleKey, combined);
             pulled += moved;
             if (moved > 0L) {
@@ -277,11 +280,11 @@ public final class MachineIoRunner {
         sharedBudget[0] = Math.max(0, sharedBudget[0] - outputUsed);
 
         boolean inputFull = anyInputRule && !anyInputAccepted;
-        IoResult.Reason lastReason = combine(inputReason, outputReason);
+        Reason lastReason = combine(inputReason, outputReason);
         return new BlockRun(fed, pulled, fedByKey, pulledByKey,
                 fedByRule, pulledByRule, lastReason, inputFull,
-                inputReason == null ? IoResult.Reason.OK : inputReason,
-                outputReason == null ? IoResult.Reason.OK : outputReason,
+                inputReason == null ? Reason.RUN : inputReason,
+                outputReason == null ? Reason.RUN : outputReason,
                 inputReasons, outputReasons);
     }
 

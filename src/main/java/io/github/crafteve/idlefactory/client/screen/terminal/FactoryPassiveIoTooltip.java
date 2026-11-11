@@ -11,6 +11,7 @@ import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -78,8 +79,8 @@ final class FactoryPassiveIoTooltip {
             lines.add(line("模式", spec.mode() == MatchMode.EXACT ? "精确" : "模糊"));
         }
         lines.add(line("速率", FactoryLabels.rateText(row.rate(), AeKeySupport.kind(spec.key()))));
-        IoResult.Reason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
-        if (reason != IoResult.Reason.OK) {
+        Reason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
+        if (reason != Reason.RUN) {
             lines.add(line("原因", FactoryLabels.reason(reason, row.input())));
         }
         lines.add(Component.literal("左键改方向 / 面 / 模式，右键删除")

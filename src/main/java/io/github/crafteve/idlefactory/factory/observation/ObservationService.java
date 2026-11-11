@@ -221,7 +221,7 @@ public final class ObservationService implements BlockFacts.Source {
      * 次才刷一次，单次拒收可能只是抖动；两次刷新之间有冷却；窗口内刷太多次就冻结，
      * 防止“报错→刷面表→还报错→再刷”的自激循环把 tick 点着。</p>
      *
-     * <p>槽位级拒收（满了、机器内部不让放）一律按 NO_SPACE 睡，根本不许调这个方法——
+     * <p>槽位级拒收（满了、机器内部不让放）一律按 FULL 睡，根本不许调这个方法——
      * 进到这里的只能是“走这个面递不进去”。</p>
      *
      * @param key 位置

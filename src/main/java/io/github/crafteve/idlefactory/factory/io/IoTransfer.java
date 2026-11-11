@@ -29,25 +29,25 @@ public final class IoTransfer {
     public static IoResult feed(MEStorage storage, ResourceAdapter adapter) {
         long capacity = adapter.capacity();
         if (capacity <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_SPACE);
+            return new IoResult(0L, Reason.FULL);
         }
 
         // 0) 先模拟机器到底收不收，收不下就一个子儿都不动仓库
         long accepted = adapter.insert(capacity, true);
         if (accepted <= 0L) {
             // 有位置却不收：面不对（面配置不允许这个方向），不是「满了」
-            return new IoResult(0L, IoResult.Reason.REJECTED);
+            return new IoResult(0L, Reason.REJECTED);
         }
 
         // 1) 只按机器点头的量从仓库扣
         long available = AeKeySupport.extract(storage, adapter.key(), Math.min(capacity, accepted), true);
         if (available <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_ITEM);
+            return new IoResult(0L, Reason.NO_MATERIAL);
         }
         long want = Math.min(available, accepted);
         long taken = AeKeySupport.extract(storage, adapter.key(), want, false);
         if (taken <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_ITEM);
+            return new IoResult(0L, Reason.NO_MATERIAL);
         }
 
         // 2) 真塞；塞不进的退回仓库
@@ -60,7 +60,7 @@ public final class IoTransfer {
                         refund - refunded, refund, adapter.key().getDisplayName().getString());
             }
         }
-        return new IoResult(inserted, inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
+        return new IoResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
     }
 
     /**
@@ -74,11 +74,11 @@ public final class IoTransfer {
         // 1) 先问仓库：这个资源收不收、收多少
         long available = adapter.extract(Long.MAX_VALUE, true);
         if (available <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_ITEM);
+            return new IoResult(0L, Reason.NO_MATERIAL);
         }
         long accepted = AeKeySupport.insert(storage, adapter.key(), available, true);
         if (accepted <= 0L) {
-            return new IoResult(0L, IoResult.Reason.NO_SPACE);
+            return new IoResult(0L, Reason.FULL);
         }
 
         // 2) 只按仓库点头的量从机器抽
@@ -86,7 +86,7 @@ public final class IoTransfer {
         long taken = adapter.extract(want, false);
         if (taken <= 0L) {
             // 模拟说抽得出来、真抽却为零：这个面不对
-            return new IoResult(0L, IoResult.Reason.REJECTED);
+            return new IoResult(0L, Reason.REJECTED);
         }
 
         // 3) 真塞；塞不进的退回机器
@@ -100,7 +100,7 @@ public final class IoTransfer {
                         refund - refunded, refund, adapter.key().getDisplayName().getString());
             }
         }
-        return new IoResult(inserted, inserted > 0L ? IoResult.Reason.OK : IoResult.Reason.NO_SPACE);
+        return new IoResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
     }
 
 }

@@ -21,6 +21,10 @@ public final class IoUnit {
     private final IoUnitKey key;
     private final Machine machine;
     private final boolean input;
+    /** 本单元的账本（明细，会滚）。 */
+    private final IoLedger ledger = new IoLedger();
+    /** 本单元的历史结论（摘要，不滚）。 */
+    private final UnitDigest digest = new UnitDigest();
     private ResourceSpec spec;
     /** 本轮是否还在表单上；表单重建后为 {@code false} 的单元会被释放。 */
     private boolean seen = true;
@@ -61,6 +65,16 @@ public final class IoUnit {
     /** 当前规则；每 tick 由表单刷新。 */
     public ResourceSpec spec() {
         return this.spec;
+    }
+
+    /** 本单元的账本。 */
+    public IoLedger ledger() {
+        return this.ledger;
+    }
+
+    /** 本单元的历史结论。 */
+    public UnitDigest digest() {
+        return this.digest;
     }
 
     /**

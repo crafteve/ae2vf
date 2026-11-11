@@ -18,6 +18,7 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -56,7 +57,7 @@ final class FactoryPassiveIoModel {
      * @param rate   服务端算好的速率（数量/秒，已按成员求和）
      * @param reason 本轮逐规则原因（已按成员取最坏）
      */
-    record RuleRow(IoSide side, int index, ResourceSpec spec, long rate, IoResult.Reason reason) {
+    record RuleRow(IoSide side, int index, ResourceSpec spec, long rate, Reason reason) {
         /** 是否输入。 */
         boolean input() {
             return this.side == IoSide.INPUT;
@@ -262,32 +263,33 @@ final class FactoryPassiveIoModel {
             IoSide side, List<ResourceSpec> specs) {
         for (int i = 0; i < specs.size(); i++) {
             long rate = 0L;
-            IoResult.Reason reason = IoResult.Reason.OK;
+            Reason reason = Reason.RUN;
             for (FactorySnapshotBuilder.MachineView member : members) {
                 List<Long> rates = side == IoSide.INPUT ? member.inputRates()
                         : member.outputRates();
-                List<IoResult.Reason> reasons = side == IoSide.INPUT ? member.inputReasons()
+                List<Reason> reasons = side == IoSide.INPUT ? member.inputReasons()
                         : member.outputReasons();
                 rate += i < rates.size() ? rates.get(i) : 0L;
                 reason = worse(reason, i < reasons.size() ? reasons.get(i)
-                        : IoResult.Reason.NO_ITEM);
+                        : Reason.NO_MATERIAL);
             }
             rows.add(new RuleRow(side, i, specs.get(i), rate, reason));
         }
     }
 
-    /** 取更坏的原因：REJECTED &gt; NO_HANDLER &gt; NO_SPACE &gt; NO_ITEM &gt; OK。 */
-    private static IoResult.Reason worse(IoResult.Reason left, IoResult.Reason right) {
+    /** 取更坏的原因：ERROR &gt; REJECTED &gt; NO_FACE &gt; FULL &gt; NO_MATERIAL &gt; 其余。 */
+    private static Reason worse(Reason left, Reason right) {
         return severity(right) > severity(left) ? right : left;
     }
 
-    private static int severity(IoResult.Reason reason) {
+    private static int severity(Reason reason) {
         return switch (reason) {
+            case ERROR -> 5;
             case REJECTED -> 4;
-            case NO_HANDLER -> 3;
-            case NO_SPACE -> 2;
-            case NO_ITEM -> 1;
-            case OK -> 0;
+            case NO_FACE -> 3;
+            case FULL -> 2;
+            case NO_MATERIAL -> 1;
+            case RUN, SLEEPING, BUDGET_OUT -> 0;
         };
     }
 }

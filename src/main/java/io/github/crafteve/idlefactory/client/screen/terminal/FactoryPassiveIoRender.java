@@ -19,6 +19,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
@@ -344,7 +345,7 @@ final class FactoryPassiveIoRender {
 
     private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,
             int maxWidth) {
-        IoResult.Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
+        Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? this.theme.statusIdle()
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         String clipped = ellipsize(rateText(rule), maxWidth);
@@ -404,7 +405,7 @@ final class FactoryPassiveIoRender {
                 item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
         String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + FactoryPassiveIoLayout.TILE_W - 2;
-        IoResult.Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
+        Reason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? this.theme.statusIdle()
                 : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
         // 速率和 chip 行同一中线：13px chip 的正文在 +2。

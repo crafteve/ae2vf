@@ -14,6 +14,7 @@ import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
@@ -182,17 +183,17 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
         List<Long> inputRates = readRates(buf, inputs.size());
-        List<IoResult.Reason> inputReasons = readReasons(buf, inputs.size());
+        List<Reason> inputReasons = readReasons(buf, inputs.size());
         List<ResourceSpec> outputs = readRules(buf);
         List<Long> outputRates = readRates(buf, outputs.size());
-        List<IoResult.Reason> outputReasons = readReasons(buf, outputs.size());
+        List<Reason> outputReasons = readReasons(buf, outputs.size());
         long sinceMoveTicks = buf.readVarLong();
         long blockedTicks = buf.readVarLong();
         WorkState workState = readEnum(buf, WorkState.values(), "work state");
         boolean inputFull = buf.readBoolean();
         long sinceInputMoveTicks = buf.readVarLong();
-        IoResult.Reason inputReason = readEnum(buf, IoResult.Reason.values(), "input reason");
-        IoResult.Reason outputReason = readEnum(buf, IoResult.Reason.values(), "output reason");
+        Reason inputReason = readEnum(buf, Reason.values(), "input reason");
+        Reason outputReason = readEnum(buf, Reason.values(), "output reason");
         return new FactorySnapshotBuilder.MachineView(nodeId, nodeName, nodeIconBlockId,
                 nodeMachineCount, machineId, primaryBlock, health, probed, stale,
                 blockId, groupBlockId, beTypeId, presence, ruleCount, inputs, outputs,
@@ -201,7 +202,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,
-            List<IoResult.Reason> reasons) {
+            List<Reason> reasons) {
         int count = Math.min(reasons.size(), NodeIoGroup.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
@@ -209,15 +210,15 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         }
     }
 
-    private static List<IoResult.Reason> readReasons(RegistryFriendlyByteBuf buf, int expected) {
+    private static List<Reason> readReasons(RegistryFriendlyByteBuf buf, int expected) {
         int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxRulesPerSide()),
                 "rule reasons");
-        List<IoResult.Reason> reasons = new ArrayList<>(expected);
+        List<Reason> reasons = new ArrayList<>(expected);
         for (int i = 0; i < count; i++) {
-            reasons.add(readEnum(buf, IoResult.Reason.values(), "rule reason"));
+            reasons.add(readEnum(buf, Reason.values(), "rule reason"));
         }
         while (reasons.size() < expected) {
-            reasons.add(IoResult.Reason.NO_ITEM);
+            reasons.add(Reason.NO_MATERIAL);
         }
         return reasons;
     }

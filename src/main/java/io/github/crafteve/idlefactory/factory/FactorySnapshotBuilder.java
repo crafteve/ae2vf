@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.io.DiagStats;
 import io.github.crafteve.idlefactory.factory.io.IoResult;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
@@ -115,8 +116,8 @@ public final class FactorySnapshotBuilder {
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
             WorkState workState, boolean inputFull, long sinceInputMoveTicks,
-            IoResult.Reason inputReason, IoResult.Reason outputReason,
-            List<IoResult.Reason> inputReasons, List<IoResult.Reason> outputReasons) {
+            Reason inputReason, Reason outputReason,
+            List<Reason> inputReasons, List<Reason> outputReasons) {
 
         public MachineView {
             inputs = List.copyOf(inputs);
@@ -130,13 +131,13 @@ public final class FactorySnapshotBuilder {
         /**
          * 把原因列表补齐到规则条数。
          *
-         * <p>旧快照或服务端尚未产生本轮结果时列表可能偏短；补 {@link IoResult.Reason#NO_ITEM}
+         * <p>旧快照或服务端尚未产生本轮结果时列表可能偏短；补 {@link Reason#NO_MATERIAL}
          * 而不是 {@code OK}，界面才不会把没跑过的规则画成「正常」。</p>
          */
-        private static List<IoResult.Reason> alignReasons(List<IoResult.Reason> reasons, int size) {
-            List<IoResult.Reason> aligned = new ArrayList<>(size);
+        private static List<Reason> alignReasons(List<Reason> reasons, int size) {
+            List<Reason> aligned = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                aligned.add(i < reasons.size() ? reasons.get(i) : IoResult.Reason.NO_ITEM);
+                aligned.add(i < reasons.size() ? reasons.get(i) : Reason.NO_MATERIAL);
             }
             return List.copyOf(aligned);
         }
@@ -212,9 +213,9 @@ public final class FactorySnapshotBuilder {
             }
             // 缺料是「等仓库」，不是「机器不收」；输出满了不算缺料，避免误报。
             if (!this.inputs.isEmpty()
-                    && this.inputReason == IoResult.Reason.NO_ITEM
-                    && this.outputReason != IoResult.Reason.NO_SPACE
-                    && this.outputReason != IoResult.Reason.REJECTED) {
+                    && this.inputReason == Reason.NO_MATERIAL
+                    && this.outputReason != Reason.FULL
+                    && this.outputReason != Reason.REJECTED) {
                 return TotalState.WAITING_MATERIAL;
             }
             if (this.workState == WorkState.IDLE) {
@@ -292,15 +293,15 @@ public final class FactorySnapshotBuilder {
                     outputRates.add(stats == null ? 0L
                             : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
                 }
-                List<IoResult.Reason> inputReasons = new ArrayList<>(inputs.size());
+                List<Reason> inputReasons = new ArrayList<>(inputs.size());
                 for (ResourceSpec spec : inputs) {
-                    inputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                    inputReasons.add(stats == null ? Reason.NO_MATERIAL
                             : stats.ruleReason(true,
                                     new RuleKey(true, spec.key(), spec.face(), spec.mode())));
                 }
-                List<IoResult.Reason> outputReasons = new ArrayList<>(outputs.size());
+                List<Reason> outputReasons = new ArrayList<>(outputs.size());
                 for (ResourceSpec spec : outputs) {
-                    outputReasons.add(stats == null ? IoResult.Reason.NO_ITEM
+                    outputReasons.add(stats == null ? Reason.NO_MATERIAL
                             : stats.ruleReason(false,
                                     new RuleKey(false, spec.key(), spec.face(), spec.mode())));
                 }
@@ -312,10 +313,10 @@ public final class FactorySnapshotBuilder {
                 long sinceInput = stats != null && stats.lastInputMoveTick() > 0L
                         ? Math.max(0L, now - stats.lastInputMoveTick()) : -1L;
                 boolean inputFull = stats != null && stats.inputFull();
-                IoResult.Reason inputReason = stats == null
-                        ? IoResult.Reason.OK : stats.inputReason();
-                IoResult.Reason outputReason = stats == null
-                        ? IoResult.Reason.OK : stats.outputReason();
+                Reason inputReason = stats == null
+                        ? Reason.RUN : stats.inputReason();
+                Reason outputReason = stats == null
+                        ? Reason.RUN : stats.outputReason();
 
                 // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」。
                 ResourceLocation groupBlockId = observation.blockId() != null

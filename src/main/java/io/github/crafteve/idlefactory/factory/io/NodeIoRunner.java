@@ -32,6 +32,8 @@ public final class NodeIoRunner {
     private static final long PROBE_INTERVAL = 100L;
 
     private final RunnerState state = new RunnerState();
+    /** 把执行结果写进账本与结论。 */
+    private final LedgerAnalyzer analyzer = new LedgerAnalyzer();
     /** 模糊物品规则的变体索引；按工厂隔离，TTL 到期重建。 */
     private final Map<UUID, ItemVariantIndex> variants = new HashMap<>();
     /** 已跑过的轮数，用于探针节流。 */
@@ -78,6 +80,7 @@ public final class NodeIoRunner {
         RunnerState.MachineState machineState = this.state.machine(machine.id());
         if (machineState.sleeping) {
             if (now < machineState.wakeAt) {
+                this.recordReason(slot, Reason.SLEEPING, now);
                 return 0L;
             }
             machineState.sleeping = false;
@@ -110,6 +113,7 @@ public final class NodeIoRunner {
             // 只捕 RuntimeException，不捕 Error：OOM / StackOverflow / LinkageError 不是单台
             // 机器的运行期故障，吞掉只会掩盖更严重的问题；捕获后也不带半状态往下跑。
             logFailure(machine, machineState, now, e);
+            this.recordReason(slot, Reason.ERROR, now);
             sleepIfIdle(machineState, now);
             return 0L;
         }
@@ -118,13 +122,14 @@ public final class NodeIoRunner {
         // 都算“路没问题”，清掉连续计数。详见 noteRejected。
         if (observations != null) {
             BlockKey key = target;
-            if (result.inputReason() == IoResult.Reason.REJECTED
-                    || result.outputReason() == IoResult.Reason.REJECTED) {
+            if (result.inputReason() == Reason.REJECTED
+                    || result.outputReason() == Reason.REJECTED) {
                 observations.noteRejected(key);
             } else {
                 observations.noteSuccess(key);
             }
         }
+        this.recordResult(slot, result, now);
         DiagStats.MachineStats stats = factory.live().stats().machine(machine.id());
         // 逐规则原因独立于组级搬运结果：部分规则没搬动时也要让界面看到具体哪条卡住。
         stats.setRuleReasons(result.inputReasons(), result.outputReasons());
@@ -139,6 +144,50 @@ public final class NodeIoRunner {
             sleepIfIdle(machineState, now);
         }
         return result.moved();
+    }
+
+    /**
+     * 把本轮结果按单元写进账本与结论。
+     *
+     * @param slot   本台机器的槽位
+     * @param result 本轮结果
+     * @param now    当前服务端 tick
+     */
+    private void recordResult(IoForm.Slot slot, MachineIoRunner.BlockRun result, long now) {
+        for (IoUnit unit : slot.inputs()) {
+            RuleKey rule = unit.key().rule();
+            Reason reason = result.inputReasons().get(rule);
+            if (reason != null) {
+                this.analyzer.record(unit, reason, now,
+                        result.fedByRule().getOrDefault(rule, 0L), unit.spec().face());
+            }
+        }
+        for (IoUnit unit : slot.outputs()) {
+            RuleKey rule = unit.key().rule();
+            Reason reason = result.outputReasons().get(rule);
+            if (reason != null) {
+                this.analyzer.record(unit, reason, now,
+                        result.pulledByRule().getOrDefault(rule, 0L), unit.spec().face());
+            }
+        }
+    }
+
+    /**
+     * 给槽位里所有单元记同一个原因（没有数量）。
+     *
+     * <p>用于整台机器本轮没跑到：睡觉、异常。界面上「休息中」与「异常」都来自这里。</p>
+     *
+     * @param slot   本台机器的槽位
+     * @param reason 原因
+     * @param now    当前服务端 tick
+     */
+    private void recordReason(IoForm.Slot slot, Reason reason, long now) {
+        for (IoUnit unit : slot.inputs()) {
+            this.analyzer.record(unit, reason, now, 0L, unit.spec().face());
+        }
+        for (IoUnit unit : slot.outputs()) {
+            this.analyzer.record(unit, reason, now, 0L, unit.spec().face());
+        }
     }
 
     private static void sleepIfIdle(RunnerState.MachineState machineState, long now) {

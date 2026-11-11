@@ -51,15 +51,15 @@ public final class DiagStats {
         private final Map<RuleKey, Long> outRuleWindow = new HashMap<>();
         private final Map<RuleKey, Long> inRuleRate = new HashMap<>();
         private final Map<RuleKey, Long> outRuleRate = new HashMap<>();
-        private final Map<RuleKey, IoResult.Reason> inRuleReasons = new HashMap<>();
-        private final Map<RuleKey, IoResult.Reason> outRuleReasons = new HashMap<>();
+        private final Map<RuleKey, Reason> inRuleReasons = new HashMap<>();
+        private final Map<RuleKey, Reason> outRuleReasons = new HashMap<>();
         private long lastMoveTick;
         private long lastInputMoveTick;
         private long blockedSince = -1L;
         private boolean inputFull;
-        private IoResult.Reason lastReason = IoResult.Reason.NO_ITEM;
-        private IoResult.Reason inputReason = IoResult.Reason.OK;
-        private IoResult.Reason outputReason = IoResult.Reason.OK;
+        private Reason lastReason = Reason.NO_MATERIAL;
+        private Reason inputReason = Reason.RUN;
+        private Reason outputReason = Reason.RUN;
 
         /**
          * 记一次成功搬运。
@@ -74,8 +74,8 @@ public final class DiagStats {
                 Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule, long tick) {
             this.lastMoveTick = tick;
             this.blockedSince = -1L;
-            this.inputReason = IoResult.Reason.OK;
-            this.outputReason = IoResult.Reason.OK;
+            this.inputReason = Reason.RUN;
+            this.outputReason = Reason.RUN;
             this.inputFull = false;
             if (!fed.isEmpty()) {
                 this.lastInputMoveTick = tick;
@@ -96,12 +96,12 @@ public final class DiagStats {
          * @param inputFull    所有输入规则都无法接收
          * @param tick         时间
          */
-        public void markBlocked(IoResult.Reason inputReason,
-                IoResult.Reason outputReason, boolean inputFull, long tick) {
+        public void markBlocked(Reason inputReason,
+                Reason outputReason, boolean inputFull, long tick) {
             this.inputReason = inputReason;
             this.outputReason = outputReason;
             this.inputFull = inputFull;
-            this.lastReason = outputReason != IoResult.Reason.OK
+            this.lastReason = outputReason != Reason.RUN
                     ? outputReason : inputReason;
             if (this.blockedSince < 0L) {
                 this.blockedSince = tick;
@@ -124,12 +124,12 @@ public final class DiagStats {
         }
 
         /** 输入侧最近一次原因。 */
-        public IoResult.Reason inputReason() {
+        public Reason inputReason() {
             return this.inputReason;
         }
 
         /** 输出侧最近一次原因。 */
-        public IoResult.Reason outputReason() {
+        public Reason outputReason() {
             return this.outputReason;
         }
 
@@ -171,14 +171,14 @@ public final class DiagStats {
          * 覆盖写入逐规则原因。
          *
          * <p>每轮 IO 都调用一次，先清空再写入，避免已删除的规则留下旧诊断。缺省
-         * 原因用 {@link IoResult.Reason#NO_ITEM}：界面把它解释成「还没有可搬的东西」，
+         * 原因用 {@link Reason#NO_MATERIAL}：界面把它解释成「还没有可搬的东西」，
          * 比「正常」更贴近从未运行过的规则。</p>
          *
          * @param input  逐输入规则原因
          * @param output 逐输出规则原因
          */
-        public void setRuleReasons(Map<RuleKey, IoResult.Reason> input,
-                Map<RuleKey, IoResult.Reason> output) {
+        public void setRuleReasons(Map<RuleKey, Reason> input,
+                Map<RuleKey, Reason> output) {
             this.inRuleReasons.clear();
             this.inRuleReasons.putAll(input);
             this.outRuleReasons.clear();
@@ -190,11 +190,11 @@ public final class DiagStats {
          *
          * @param input 是否输入侧
          * @param key   规则
-         * @return 原因；没有统计时为 {@link IoResult.Reason#NO_ITEM}
+         * @return 原因；没有统计时为 {@link Reason#NO_MATERIAL}
          */
-        public IoResult.Reason ruleReason(boolean input, RuleKey key) {
-            IoResult.Reason reason = (input ? this.inRuleReasons : this.outRuleReasons).get(key);
-            return reason == null ? IoResult.Reason.NO_ITEM : reason;
+        public Reason ruleReason(boolean input, RuleKey key) {
+            Reason reason = (input ? this.inRuleReasons : this.outRuleReasons).get(key);
+            return reason == null ? Reason.NO_MATERIAL : reason;
         }
 
         /** 连续没搬动的起点；{@code -1} 表示当前没卡。 */
@@ -203,7 +203,7 @@ public final class DiagStats {
         }
 
         /** 这一轮没搬动的原因。 */
-        public IoResult.Reason lastReason() {
+        public Reason lastReason() {
             return this.lastReason;
         }
 
