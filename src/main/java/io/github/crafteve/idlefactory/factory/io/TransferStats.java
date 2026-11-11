@@ -34,6 +34,15 @@ public final class TransferStats {
         return this.machines.get(machineId);
     }
 
+    /**
+     * 只保留这些机器的统计（机器删除后不再攒条目）。
+     *
+     * @param keep 仍然存在的机器 id
+     */
+    public void retain(java.util.Set<UUID> keep) {
+        this.machines.keySet().removeIf(id -> !keep.contains(id));
+    }
+
     /** 采样一次速率。由编排层每秒调一次。 */
     public void sample() {
         for (MachineStats stats : this.machines.values()) {

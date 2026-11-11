@@ -11,11 +11,9 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
-import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 
@@ -36,27 +34,21 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class MachineIoRunner {
     /**
-     * 一次组级搬运的结果。
+     * 一次机器搬运的结果：只保留调用方真的会读的分量。
      *
-     * @param fed         补进机器的总数
-     * @param pulled      从机器抽出的总数
-     * @param fedByKey    按资源拆分的补料量
-     * @param pulledByKey 按资源拆分的抽取量
-     * @param fedByRule   按规则拆分的补料量
+     * <p>按资源的总量、侧级原因、输入是否堵塞曾经也在这里，但视图与排期都改读账本与结论后
+     * 就没人读了——两份「为什么不动」只会打架，所以删掉。</p>
+     *
+     * @param fed          补进机器的总数
+     * @param pulled       从机器抽出的总数
+     * @param fedByRule    按规则拆分的补料量
      * @param pulledByRule 按规则拆分的抽取量
-     * @param lastReason  没搬动时的最后一个原因
-     * @param inputFull   所有输入规则都无法接收
-     * @param inputReason 输入侧原因
-     * @param outputReason 输出侧原因
-     * @param inputReasons 逐输入规则的本轮原因，供界面显示每条规则的诊断
+     * @param inputReasons 逐输入规则的本轮原因
      * @param outputReasons 逐输出规则的本轮原因
      * @param faces        逐规则本轮实际用的面，给单元的经验面与账本用
      */
     public record BlockRun(long fed, long pulled,
-            Map<AEKey, Long> fedByKey, Map<AEKey, Long> pulledByKey,
             Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
-            Reason lastReason, boolean inputFull,
-            Reason inputReason, Reason outputReason,
             Map<RuleKey, Reason> inputReasons,
             Map<RuleKey, Reason> outputReasons,
             Map<RuleKey, Direction> faces) {
@@ -84,29 +76,7 @@ public final class MachineIoRunner {
         if (current == null) {
             return next;
         }
-        return severity(next) > severity(current) ? next : current;
-    }
-
-    private static int severity(Reason reason) {
-        return switch (reason) {
-            case ERROR -> 5;
-            case REJECTED -> 4;
-            case NO_FACE -> 3;
-            case FULL -> 2;
-            case NO_MATERIAL -> 1;
-            case RUN, SLEEPING, BUDGET_OUT -> 0;
-        };
-    }
-
-    private static Reason combine(@Nullable Reason input,
-            @Nullable Reason output) {
-        if (output != null && output != Reason.RUN) {
-            return output;
-        }
-        if (input != null && input != Reason.RUN) {
-            return input;
-        }
-        return Reason.RUN;
+        return next.severity() > current.severity() ? next : current;
     }
 
     private MachineIoRunner() {
@@ -132,17 +102,11 @@ public final class MachineIoRunner {
             @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
-        Map<AEKey, Long> fedByKey = new LinkedHashMap<>();
-        Map<AEKey, Long> pulledByKey = new LinkedHashMap<>();
         Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
         Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
         Map<RuleKey, Reason> inputReasons = new LinkedHashMap<>();
         Map<RuleKey, Reason> outputReasons = new LinkedHashMap<>();
         Map<RuleKey, Direction> faces = new LinkedHashMap<>();
-        Reason inputReason = null;
-        Reason outputReason = null;
-        boolean anyInputAccepted = false;
-        boolean anyInputRule = false;
         // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
         // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
         // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
@@ -157,14 +121,12 @@ public final class MachineIoRunner {
         for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
             IoUnit unit = inputs.get(ruleIndex);
             ResourceSpec spec = unit.spec();
-            anyInputRule = true;
             RuleKey ruleKey = unit.key().rule();
             MachinePortResolver.Resolved resolved = MachinePortResolver.resolve(level, pos, spec, true,
                     caps, unit.digest().faceHint());
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
-                inputReason = worse(inputReason, Reason.NO_FACE);
                 inputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
@@ -176,14 +138,11 @@ public final class MachineIoRunner {
             if (adapters.starved()) {
                 // 本侧额度被前面的规则用完：本轮跳过，不代表机器拒收，但原因必须可见。
                 inputReasons.put(ruleKey, Reason.BUDGET_OUT);
-                anyInputAccepted = true;
                 continue;
             }
             if (adapters.list().isEmpty()) {
                 inputReasons.put(ruleKey, Reason.NO_MATERIAL);
-                inputReason = worse(inputReason, Reason.NO_MATERIAL);
                 // 没有候选 = 仓库当前没有这个物品；机器侧并没有拒收，不能算「输入堵塞」。
-                anyInputAccepted = true;
                 continue;
             }
             long moved = 0L;
@@ -205,16 +164,12 @@ public final class MachineIoRunner {
                             adapter.capacity());
                 }
             }
-            anyInputAccepted |= accepted;
             Reason combined = moved > 0L
                     ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
             inputReasons.put(ruleKey, combined);
             fed += moved;
             if (moved > 0L) {
-                fedByKey.merge(spec.key(), moved, Long::sum);
                 fedByRule.merge(ruleKey, moved, Long::sum);
-            } else {
-                inputReason = worse(inputReason, combined);
             }
         }
 
@@ -234,7 +189,6 @@ public final class MachineIoRunner {
             if (resolved == null) {
                 IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
                         pos.toShortString(), spec.describe());
-                outputReason = worse(outputReason, Reason.NO_FACE);
                 outputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
@@ -250,7 +204,6 @@ public final class MachineIoRunner {
             }
             if (adapters.list().isEmpty()) {
                 outputReasons.put(ruleKey, Reason.NO_MATERIAL);
-                outputReason = worse(outputReason, Reason.NO_MATERIAL);
                 continue;
             }
             long moved = 0L;
@@ -270,22 +223,14 @@ public final class MachineIoRunner {
             outputReasons.put(ruleKey, combined);
             pulled += moved;
             if (moved > 0L) {
-                pulledByKey.merge(spec.key(), moved, Long::sum);
                 pulledByRule.merge(ruleKey, moved, Long::sum);
-            } else {
-                outputReason = worse(outputReason, combined);
             }
         }
 
         int outputUsed = outputQuota - outputBudget[0];
         sharedBudget[0] = Math.max(0, sharedBudget[0] - outputUsed);
 
-        boolean inputFull = anyInputRule && !anyInputAccepted;
-        Reason lastReason = combine(inputReason, outputReason);
-        return new BlockRun(fed, pulled, fedByKey, pulledByKey,
-                fedByRule, pulledByRule, lastReason, inputFull,
-                inputReason == null ? Reason.RUN : inputReason,
-                outputReason == null ? Reason.RUN : outputReason,
+        return new BlockRun(fed, pulled, fedByRule, pulledByRule,
                 inputReasons, outputReasons, faces);
     }
 

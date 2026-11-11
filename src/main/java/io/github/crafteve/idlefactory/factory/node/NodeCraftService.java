@@ -10,7 +10,6 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.MachinePortResolver;
-import io.github.crafteve.idlefactory.factory.io.Reason;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.NodeProvider;
 import io.github.crafteve.idlefactory.factory.node.ProviderMode;
@@ -118,6 +117,7 @@ final class NodeCraftService implements ICraftingProvider {
             this.node.logThrottled(this.node.gameTime(), "派单异常：" + e);
             return false;
         }
+        this.markQueueChanged();
         this.node.digest().pending(provider.pendingCount(),
                 provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
         this.node.returnSweep().activate(this.node.gameTime());
@@ -160,7 +160,6 @@ final class NodeCraftService implements ICraftingProvider {
         for (PendingOrder.Line line : order.lines()) {
             MachinePortResolver.Faces.Target target = this.target(faces, line);
             if (target == null) {
-                digest.attempted(0L, Reason.NO_FACE);
                 return;
             }
             targets.add(target);
@@ -170,35 +169,49 @@ final class NodeCraftService implements ICraftingProvider {
         }
         if (maxSets <= 0L) {
             // 塞不下：整单留着，等机器腾出空间。一个都不写。
-            digest.attempted(0L, Reason.FULL);
             return;
         }
-        long delivered = 0L;
-        boolean shortfall = false;
+        List<PendingOrder.Line> remaining = new ArrayList<>();
         for (int index = 0; index < order.lines().size(); index++) {
             PendingOrder.Line line = order.lines().get(index);
             long want = line.amount() * maxSets;
-            long inserted = targets.get(index).target().insert(line.key(), want, Actionable.MODULATE);
-            delivered += inserted;
+            long inserted;
+            try {
+                inserted = targets.get(index).target().insert(line.key(), want, Actionable.MODULATE);
+            } catch (RuntimeException e) {
+                // 这一行可能写进去一部分（未知）：按「整行已交付」处理，绝不重投造成复制；
+                // 后面的行还没动，原样留回队首等下一轮。
+                this.node.logThrottled(now, "投递异常：" + e);
+                for (int rest = index + 1; rest < order.lines().size(); rest++) {
+                    remaining.add(order.lines().get(rest));
+                }
+                break;
+            }
             if (inserted < want) {
-                shortfall = true;
+                // 模拟与提交不一致：差额按固定数量写回队首，下一轮 n=1 精确补齐。
+                remaining.add(new PendingOrder.Line(line.key(), want - inserted, line.face()));
             }
         }
-        provider.removeFirstOrder();
-        if (shortfall) {
-            // 主线程内模拟与提交之间没有其它写入；真出现缺口只能记录，绝不回退成「复制材料」。
-            this.node.logThrottled(now, "投递数量与模拟不一致，已按实际写入结算");
+        if (remaining.isEmpty()) {
+            provider.removeFirstOrder();
+        } else {
+            provider.replaceFirstOrder(new PendingOrder(remaining, order.machineId(),
+                    order.enqueuedAt(), order.orphanedAt()));
         }
-        digest.attempted(delivered, shortfall ? Reason.ERROR : null);
+        this.markQueueChanged();
         this.node.returnSweep().activate(now);
     }
 
+    /** 队列或存档数据变了：让节点在下一 tick 统一落盘。 */
+    private void markQueueChanged() {
+        this.node.markDataChanged();
+    }
     /** 取一行在快照上的目标：先用绑定面，没有就重新选一次。 */
     @Nullable
     private MachinePortResolver.Faces.Target target(MachinePortResolver.Faces faces,
             PendingOrder.Line line) {
         if (line.face() != null) {
-            var raw = faces.target(0, line.face());
+            var raw = faces.target(line.face());
             if (raw != null) {
                 return new MachinePortResolver.Faces.Target(faces.slots().get(0), line.face(), raw);
             }
@@ -217,6 +230,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (order.orphan() && now - order.orphanedAt() > PendingOrder.ORPHAN_TIMEOUT_TICKS) {
             // 网络长时间恢复不了：静默丢弃（只记日志，绝不生成掉落物实体）。
             provider.removeFirstOrder();
+            this.markQueueChanged();
             this.node.logThrottled(now, "孤儿订单超时丢弃：" + order.lines().size() + " 行");
             this.node.digest().pending(provider.pendingCount(),
                     provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
@@ -226,7 +240,7 @@ final class NodeCraftService implements ICraftingProvider {
         if (network == null) {
             // 只在第一次失败时记孤儿时刻，否则每 tick 刷新会让超时永远不触发。
             provider.replaceFirstOrder(order.orphan() ? order : order.asOrphan(now));
-            this.node.digest().attempted(0L, Reason.ERROR);
+            this.markQueueChanged();
             return;
         }
         List<PendingOrder.Line> remaining = new ArrayList<>(order.lines().size());
@@ -251,6 +265,7 @@ final class NodeCraftService implements ICraftingProvider {
             // 同一条款：孤儿时刻只在第一次失败时记，不能每 tick 刷新。
             provider.replaceFirstOrder(order.orphan() ? rest : rest.asOrphan(now));
         }
+        this.markQueueChanged();
         this.node.digest().pending(provider.pendingCount(),
                 provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
     }
@@ -280,6 +295,7 @@ final class NodeCraftService implements ICraftingProvider {
         }
         this.node.logThrottled(now, "节点销毁，队列 " + provider.pendingCount() + " 单已尽力退回网络");
         provider.clearPending();
+        this.markQueueChanged();
         this.node.digest().pending(0, -1L);
     }
 

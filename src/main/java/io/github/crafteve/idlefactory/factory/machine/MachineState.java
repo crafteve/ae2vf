@@ -17,16 +17,15 @@ public final class MachineState {
     }
 
     /**
-     * 唯一写入点：按信号重算状态。
+     * 唯一写入点：由世界事实重算状态。
      *
-     * @param signal 写入信号
-     * @param facts  这个方块的观测事实；没登记过时传未探测的空事实
+     * <p>观测事实与配置变化都汇到这里；结果只由事实决定，所以没有「信号」参数——
+     * 两个分支做同一件事的枚举是假抽象。</p>
+     *
+     * @param facts 这个方块的观测事实；没登记过时传未探测的空事实
      */
-    void apply(MachineSignal signal, BlockFacts facts) {
-        MachineStatus next = switch (signal) {
-            case OBSERVED, CONFIG_CHANGED -> derive(facts);
-        };
-        this.status = next;
+    void apply(BlockFacts facts) {
+        this.status = derive(facts);
     }
 
     /**

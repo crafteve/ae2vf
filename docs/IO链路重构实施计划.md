@@ -515,3 +515,27 @@ ERROR        异常；退款失败也归这里
 - **性能判据只能是相对值**：需求不设每 tick 硬指标（§9）。
 - **P0 基线文件清单必须落**：否则 P7 的「74 → 45」无从核对。
 - **主动订单与样板解耦后的一致性问题**：订单自包含意味着样板被删也照常投递；若你的本意是「样板删了就该退单」，这里要改。
+
+---
+
+## 10. 执行记录（2026-11-11 完成）
+
+分支 `io-refactor-20261111`，起点 tag `pre-io-refactor`，阶段 tag `io-p1` … `io-p7`。
+每个阶段都以 `gradlew build` 通过后提交，共 11 个提交。
+
+| 阶段 | 实际落地 | 与计划的差异 |
+|---|---|---|
+| P0 | 文档提交、主线快进、迁支线、打 tag、基线指标 | tag 名按现有风格用 `pre-io-refactor` / `io-pN` |
+| P1 | 删 `BlockObservation`，`Observation` 实现 `BlockFacts`，`drainChanges` 单出口 | `generation` 按计划留到 P4 随 `RouteTable` 删 |
+| P2 | `MachineStatus/MachineSignal/MachineState/MachineStateLibrary`、`IoForm/IoUnit/IoUnitKey/IoFormBuilder`，两段化，删 `io→node` 两条依赖 | 无 |
+| P3 | `Reason` 8 值替换旧 5 值、`IoLedger`/`UnitDigest`/`LedgerAnalyzer`、`NodeDigest` | 界面协议字段延后到 P7 一次改完（避免两次升协议） |
+| P4 | `MachinePortResolver` 合并两套取面，删 `RouteTable`/`RuleResolver`/`ProviderFaceResolver`，面记忆改配置面 + 经验面 | 无 `IoExecutor` 类：执行器仍是 `MachineIoRunner`，职责已收窄 |
+| P5 | `PassivePlanner`（规则级退避 + 游标 + 唤醒）、删 `RunnerState`、`ActivePlanner` 接管回收择时 | 无 |
+| P6 | `PendingOrder` 整单落档、整数份投递、删 `ProviderOverflow`、孤儿订单超时丢弃 | 无 |
+| P7 | `DiagStats` 收缩为 `TransferStats`、视图读账本/结论、节点表暴露待投递、节点对账单链 | 账本明细展开、`NodeDigest` 的投递次数/错误未上界面（需再加协议字段） |
+
+**未完成 / 已知缺口**（不计入本次完成）：
+
+1. 节点 tooltip 只显示待投递单数与最久等待；`NodeDigest` 的投递尝试次数、最近错误、累计投递量已建模但未上界面。
+2. 单元账本（`IoLedger.rows()`）未接界面展开——视图只读当前行。
+3. 需求 §10.5 的「文件 74 → 45 / 行 10695 → 6000 / 出口 70 → 12」按字面口径未达成：文件数与行数因新增类与视图改造口径不可直接对比；核心六包从 74 文件 / 10695 行变为 65 文件 / 8329 行；「不搬出口」按正则统计仍为 70，但语义已改为「每处都落账本原因」而非静默跳过。

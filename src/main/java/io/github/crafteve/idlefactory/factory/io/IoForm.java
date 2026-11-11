@@ -55,8 +55,11 @@ public final class IoForm {
         return slot;
     }
 
-    /** 结束重建：释放本轮没出现的机器槽位（连同单元）。 */
+    /** 结束重建：释放本轮没出现的机器槽位与槽位里没出现的单元。 */
     public void endRebuild() {
+        for (Slot slot : this.slots.values()) {
+            slot.endRebuild();
+        }
         this.slots.keySet().removeIf(id -> !this.seen.contains(id));
     }
 

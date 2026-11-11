@@ -21,6 +21,15 @@ public final class MachineStateLibrary {
     /** 本轮出现过的机器 id，用于回收已删除机器的条目。 */
     private final Set<UUID> seen = new HashSet<>();
 
+    /**
+     * 当前登记到的机器 id。
+     *
+     * @return 只读集合；给速率统计做清理用
+     */
+    public java.util.Set<UUID> ids() {
+        return java.util.Set.copyOf(this.states.keySet());
+    }
+
     /** 开始一轮刷新：清空「本轮见过」标记。 */
     public void beginRefresh() {
         this.seen.clear();
@@ -35,12 +44,11 @@ public final class MachineStateLibrary {
     public void observed(Machine machine, BlockFacts.Source source) {
         this.seen.add(machine.id());
         MachineState state = this.states.get(machine.id());
-        MachineSignal signal = state == null ? MachineSignal.CONFIG_CHANGED : MachineSignal.OBSERVED;
         if (state == null) {
             state = new MachineState();
             this.states.put(machine.id(), state);
         }
-        state.apply(signal, source.at(machine.block()));
+        state.apply(source.at(machine.block()));
     }
 
     /** 结束一轮刷新：释放本轮没出现的机器状态。 */

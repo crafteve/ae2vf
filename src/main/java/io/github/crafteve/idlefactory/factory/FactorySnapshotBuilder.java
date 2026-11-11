@@ -383,35 +383,13 @@ public final class FactorySnapshotBuilder {
         Reason worst = Reason.RUN;
         int severity = -1;
         for (Reason reason : reasons) {
-            int rank = switch (reason) {
-                case ERROR -> 5;
-                case REJECTED -> 4;
-                case NO_FACE -> 3;
-                case FULL -> 2;
-                case NO_MATERIAL -> 1;
-                case RUN, SLEEPING, BUDGET_OUT -> 0;
-            };
-            if (rank > severity) {
-                severity = rank;
+            if (reason.severity() > severity) {
+                severity = reason.severity();
                 worst = reason;
             }
         }
         return worst;
     }
-
-    /**
-     * 兼容旧调用：没有状态集合与表单时，执行数据按空处理。
-     *
-     * @param factory      工厂
-     * @param observations 观测服务
-     * @param now          当前服务端 tick
-     * @return 视图列表
-     */
-    public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
-            long now) {
-        return machines(factory, observations, null, now);
-    }
-
 
     /**
      * 兼容旧调用：不提供当前 tick，速率/时间字段为空。
@@ -422,7 +400,7 @@ public final class FactorySnapshotBuilder {
      */
     public static List<MachineView> machines(Factory factory,
             @Nullable ObservationService observations) {
-        return machines(factory, observations, 0L);
+        return machines(factory, observations, null, 0L);
     }
 
     /**

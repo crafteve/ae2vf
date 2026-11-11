@@ -283,8 +283,8 @@ public final class MachinePortResolver {
     /**
      * 开一次派单 / 回收用的面快照。
      *
-     * <p>机器只有一个方块，槽位列表因此恒为 1 项；保留列表是因为快照按槽位索引。配置面从
-     * {@code inputs} 里按资源查，经验面归执行层的结语，不进这里。</p>
+     * <p>机器只有一个方块，快照因此只有一个槽位；配置面从 {@code inputs} 里按资源查，
+     * 经验面归执行层的结论，不进这里。</p>
      *
      * @param level  方块所在世界
      * @param pos    方块坐标
@@ -295,15 +295,15 @@ public final class MachinePortResolver {
      */
     public static Faces faces(ServerLevel level, BlockPos pos, @Nullable BlockEntity be,
             List<ResourceSpec> inputs, IActionSource source) {
-        return new Faces(List.of(new Faces.Slot(level, pos, be)), inputs, source);
+        return new Faces(new Faces.Slot(level, pos, be), inputs, source);
     }
 
     /**
-     * 一次派单 / 一次回收里复用的面快照。
+     * 一次派单 / 一次回收里复用的面快照：一个方块、六个面，目标与可抽存储都按面懒解析。
      */
     public static final class Faces {
         /**
-         * 一个已加载的方块。
+         * 已加载的方块。
          *
          * @param level 所在世界
          * @param pos   坐标
@@ -322,63 +322,59 @@ public final class MachinePortResolver {
         public record Target(Slot slot, Direction face, PatternProviderTarget target) {
         }
 
-        private final List<Slot> slots;
+        private final Slot slot;
         private final List<ResourceSpec> inputs;
         private final IActionSource source;
-        private final PatternProviderTarget[] targets;
-        private final boolean[] resolved;
+        private final PatternProviderTarget[] targets = new PatternProviderTarget[FACES.length];
+        private final boolean[] resolved = new boolean[FACES.length];
 
-        private Faces(List<Slot> slots, List<ResourceSpec> inputs, IActionSource source) {
-            this.slots = List.copyOf(slots);
+        private Faces(Slot slot, List<ResourceSpec> inputs, IActionSource source) {
+            this.slot = slot;
             this.inputs = List.copyOf(inputs);
             this.source = source;
-            this.targets = new PatternProviderTarget[this.slots.size() * FACES.length];
-            this.resolved = new boolean[this.targets.length];
         }
 
-        /** 已加载的方块，按机器方块顺序。 */
+        /** 快照覆盖的方块（恒为 1 项，保留列表是为了回收侧按槽位遍历的老接口）。 */
         public List<Slot> slots() {
-            return this.slots;
+            return List.of(this.slot);
         }
 
         /**
-         * 某个方块某个面的派单目标。
+         * 某个面的派单目标。
          *
-         * @param slotIndex 方块下标
-         * @param face      面
+         * @param face 面
          * @return 目标；这个面没有可写的存储时为 {@code null}
          */
         @Nullable
-        public PatternProviderTarget target(int slotIndex, Direction face) {
-            int index = slotIndex * FACES.length + face.get3DDataValue();
+        public PatternProviderTarget target(Direction face) {
+            int index = face.get3DDataValue();
             if (!this.resolved[index]) {
                 this.resolved[index] = true;
-                Slot slot = this.slots.get(slotIndex);
-                this.targets[index] = PatternProviderTarget.get(slot.level(), slot.pos(),
-                        slot.be(), face, this.source);
+                this.targets[index] = PatternProviderTarget.get(this.slot.level(), this.slot.pos(),
+                        this.slot.be(), face, this.source);
             }
             return this.targets[index];
         }
 
         /**
-         * 某个方块某个面的可抽取存储。
+         * 某个面的可抽取存储。
          *
-         * @param slot 方块
          * @param face 面
          * @return 存储；没有时为 {@code null}
          */
         @Nullable
-        public MEStorage storage(Slot slot, Direction face) {
-            BlockEntity be = slot.be();
+        public MEStorage storage(Direction face) {
+            BlockEntity be = this.slot.be();
             MEStorage nativeStorage = be != null
-                    ? slot.level().getCapability(AECapabilities.ME_STORAGE, slot.pos(),
+                    ? this.slot.level().getCapability(AECapabilities.ME_STORAGE, this.slot.pos(),
                             be.getBlockState(), be, face)
-                    : slot.level().getCapability(AECapabilities.ME_STORAGE, slot.pos(), face);
+                    : this.slot.level().getCapability(AECapabilities.ME_STORAGE, this.slot.pos(), face);
             if (nativeStorage != null) {
                 return nativeStorage;
             }
             Map<AEKeyType, ExternalStorageStrategy> strategies =
-                    StackWorldBehaviors.createExternalStorageStrategies(slot.level(), slot.pos(), face);
+                    StackWorldBehaviors.createExternalStorageStrategies(this.slot.level(),
+                            this.slot.pos(), face);
             IdentityHashMap<AEKeyType, MEStorage> wrappers = new IdentityHashMap<>(2);
             for (Map.Entry<AEKeyType, ExternalStorageStrategy> entry : strategies.entrySet()) {
                 MEStorage wrapper = entry.getValue().createWrapper(false, NOOP);
@@ -390,7 +386,7 @@ public final class MachinePortResolver {
         }
 
         /**
-         * 阻挡判定：任何一个方块的任何一个面上还有这台机器的样板输入就整单拒绝。
+         * 阻挡判定：任何一个面上还有这台机器的样板输入就整单拒绝。
          *
          * @param blockedKeys 这台机器所有样板输入的 key 并集（已去组件）
          * @return 是否撞到阻挡
@@ -399,12 +395,10 @@ public final class MachinePortResolver {
             if (blockedKeys.isEmpty()) {
                 return false;
             }
-            for (int slotIndex = 0; slotIndex < this.slots.size(); slotIndex++) {
-                for (Direction face : FACES) {
-                    PatternProviderTarget target = this.target(slotIndex, face);
-                    if (target != null && target.containsPatternInput(blockedKeys)) {
-                        return true;
-                    }
+            for (Direction face : FACES) {
+                PatternProviderTarget target = this.target(face);
+                if (target != null && target.containsPatternInput(blockedKeys)) {
+                    return true;
                 }
             }
             return false;
@@ -420,19 +414,15 @@ public final class MachinePortResolver {
         @Nullable
         public Target select(AEKey key, long amount) {
             Direction preferred = this.ruleFace(key);
-            for (int slotIndex = 0; slotIndex < this.slots.size(); slotIndex++) {
-                if (preferred != null && this.accepts(slotIndex, preferred, key, amount)) {
-                    return new Target(this.slots.get(slotIndex), preferred,
-                            this.target(slotIndex, preferred));
+            if (preferred != null && this.accepts(preferred, key, amount)) {
+                return new Target(this.slot, preferred, this.target(preferred));
+            }
+            for (Direction face : FACES) {
+                if (face == preferred) {
+                    continue;
                 }
-                for (Direction face : FACES) {
-                    if (face == preferred) {
-                        continue;
-                    }
-                    if (this.accepts(slotIndex, face, key, amount)) {
-                        return new Target(this.slots.get(slotIndex), face,
-                                this.target(slotIndex, face));
-                    }
+                if (this.accepts(face, key, amount)) {
+                    return new Target(this.slot, face, this.target(face));
                 }
             }
             return null;
@@ -471,9 +461,9 @@ public final class MachinePortResolver {
             return fuzzy;
         }
 
-        /** 这个方块这个面模拟插入是否至少收 1 个。 */
-        private boolean accepts(int slotIndex, Direction face, AEKey key, long amount) {
-            PatternProviderTarget target = this.target(slotIndex, face);
+        /** 这个面模拟插入是否至少收 1 个。 */
+        private boolean accepts(Direction face, AEKey key, long amount) {
+            PatternProviderTarget target = this.target(face);
             return target != null && target.insert(key, amount, Actionable.SIMULATE) > 0L;
         }
     }

@@ -276,19 +276,8 @@ final class FactoryPassiveIoModel {
         }
     }
 
-    /** 取更坏的原因：ERROR &gt; REJECTED &gt; NO_FACE &gt; FULL &gt; NO_MATERIAL &gt; 其余。 */
+    /** 取更坏的原因；严重度表只在 {@link Reason#severity()} 一处维护。 */
     private static Reason worse(Reason left, Reason right) {
-        return severity(right) > severity(left) ? right : left;
-    }
-
-    private static int severity(Reason reason) {
-        return switch (reason) {
-            case ERROR -> 5;
-            case REJECTED -> 4;
-            case NO_FACE -> 3;
-            case FULL -> 2;
-            case NO_MATERIAL -> 1;
-            case RUN, SLEEPING, BUDGET_OUT -> 0;
-        };
+        return right.severity() > left.severity() ? right : left;
     }
 }

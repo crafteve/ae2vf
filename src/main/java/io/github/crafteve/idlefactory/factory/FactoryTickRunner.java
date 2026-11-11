@@ -1,5 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.Set;
+import java.util.UUID;
+
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.NodeIoRunner;
@@ -95,9 +98,11 @@ final class FactoryTickRunner {
             }
         }
         this.machineStates.endRefresh();
+        Set<UUID> liveMachines = this.machineStates.ids();
 
-        // 执行段：回收 → 队列 → 被动（本次只有被动，回收与队列在后续阶段接进来）。
+        // 执行段：回收与队列由节点层驱动，这里只跑被动表单。
         for (Factory factory : this.manager.all()) {
+            factory.live().stats().retain(liveMachines);
             IoForm form = this.formBuilder.build(factory, this.machineStates);
             this.nodeIoRunner.runFactory(this.server, factory, form, this.observations, now);
         }

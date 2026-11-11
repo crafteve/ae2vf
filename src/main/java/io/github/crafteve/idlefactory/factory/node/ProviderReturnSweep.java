@@ -93,15 +93,14 @@ public final class ProviderReturnSweep {
             if (faces == null) {
                 continue;
             }
-            for (MachinePortResolver.Faces.Slot slot : faces.slots()) {
-                for (Direction face : FACES) {
-                    MEStorage storage = faces.storage(slot, face);
-                    if (storage == null || storage == network) {
-                        continue;
-                    }
-                    facesWithStorage++;
-                    harvested |= this.sweepFace(storage, network, products);
+            // 机器只有一个方块，快照也只覆盖一个方块：直接扫六面。
+            for (Direction face : FACES) {
+                MEStorage storage = faces.storage(face);
+                if (storage == null || storage == network) {
+                    continue;
                 }
+                facesWithStorage++;
+                harvested |= this.sweepFace(storage, network, products);
             }
         }
         this.storageFaces = facesWithStorage;
@@ -147,8 +146,8 @@ public final class ProviderReturnSweep {
             try {
                 inserted = network.insert(key, extracted, Actionable.MODULATE, source);
             } catch (RuntimeException e) {
-                // 抽出来的量已经不在机器里：网络插入抛异常时整份按「没插进去」收回，机器收不下
-                // 的再掉在机器旁。异常不能上抛——NodeManager 只留一条日志，资源两边都不在。
+                // 抽出来的量已经不在机器里：网络插入抛异常时整份按「没插进去」收回；机器也收不下
+                // 就记日志丢弃（D21）。异常不能上抛——NodeManager 只留一条日志，资源两边都不在。
                 this.node.logThrottled(this.node.gameTime(), "回收插入异常：" + e);
                 if (!this.putBack(storage, key, extracted, source)) {
                     this.node.report("回收异常且无处可放：" + extracted + " "
@@ -168,16 +167,16 @@ public final class ProviderReturnSweep {
     }
 
     /**
-     * 把已经从机器抽出来的量塞回机器；塞不下的掉在机器旁。
+     * 把已经从机器抽出来的量塞回机器；塞不下就按 D21 记日志丢弃，不生成掉落物实体。
      *
-     * <p>这是恢复路径，本身必须不抛异常：机器侧插入再炸时按「一点没塞回去」处理，直接走
-     * 掉落兜底。返回 {@code false} 表示连掉落都失败，调用方必须上报。</p>
+     * <p>这是恢复路径，本身必须不抛异常：机器侧插入再炸时按「一点没塞回去」处理。
+     * 返回 {@code false} 表示没有全部塞回去，调用方只上报，不做掉落兜底。</p>
      *
      * @param storage 该面的存储
      * @param key     资源
      * @param amount  数量
      * @param source  动作源
-     * @return 是否全部安置（塞回机器或掉在机器旁）
+     * @return 是否全部塞回机器
      */
     private boolean putBack(MEStorage storage, AEKey key, long amount, IActionSource source) {
         long back;
