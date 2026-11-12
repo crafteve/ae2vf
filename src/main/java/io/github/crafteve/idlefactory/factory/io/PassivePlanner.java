@@ -9,7 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * 被动规划器：决定表单上的哪些单元这一轮跑、按什么顺序跑。
+ * 被动规划器：决定表单上的哪些条目这一轮跑、按什么顺序跑。
  *
  * <p>排期颗粒度是<b>规则</b>，不是机器：一条规则缺料不会拖累同一台机器的其它规则。择时每 tick
  * 用「现在 − 上次尝试」重算，不排未来；跨轮只记两样东西：同侧规则的游标，以及被显式唤醒的
@@ -40,7 +40,7 @@ public final class PassivePlanner {
     private final Map<UUID, Plan> plans = new HashMap<>();
 
     /**
-     * 唤醒一台机器：下一轮所有单元都跑一次，不管退避。
+     * 唤醒一台机器：下一轮所有条目都跑一次，不管退避。
      *
      * @param machineId 机器 id
      */
@@ -73,7 +73,7 @@ public final class PassivePlanner {
      * @param now  当前服务端 tick
      * @return 本轮的输入 / 输出清单（复用对象，调用方只读）
      */
-    public Plan plan(IoForm.Slot slot, long now) {
+    public Plan plan(Form.Slot slot, long now) {
         UUID machineId = slot.machine().id();
         Plan plan = this.plans.computeIfAbsent(machineId, id -> new Plan());
         plan.clear();
@@ -86,17 +86,17 @@ public final class PassivePlanner {
         return plan;
     }
 
-    private void collect(List<IoUnit> target, List<IoUnit> units, int start, long now,
+    private void collect(List<Form.Entry> target, List<Form.Entry> entries, int start, long now,
             boolean force) {
-        int size = units.size();
+        int size = entries.size();
         if (size == 0) {
             return;
         }
         int offset = Math.floorMod(start, size);
         for (int index = 0; index < size; index++) {
-            IoUnit unit = units.get((offset + index) % size);
-            if (force || due(unit, now)) {
-                target.add(unit);
+            Form.Entry entry = entries.get((offset + index) % size);
+            if (force || due(entry, now)) {
+                target.add(entry);
             }
         }
     }
@@ -107,41 +107,41 @@ public final class PassivePlanner {
      * <p>这条合成只服务视图：账本只记执行层真的跑过的那一轮，退避中的空白轮不写账。
      * </p>
      *
-     * @param unit 单元
-     * @param now  当前服务端 tick
+     * @param entry 条目
+     * @param now   当前服务端 tick
      * @return 原因
      */
-    public static Reason displayReason(IoUnit unit, long now) {
-        IoLedger.Row row = unit.ledger().current();
+    public static Reason displayReason(Form.Entry entry, long now) {
+        Analyzer.Ledger.Row row = entry.ledger().current();
         if (row == null) {
             return Reason.NO_MATERIAL;
         }
-        return due(unit, now) ? row.reason() : Reason.SLEEPING;
+        return due(entry, now) ? row.reason() : Reason.SLEEPING;
     }
 
     /**
-     * 这个单元这一轮该不该跑。
+     * 这个条目这一轮该不该跑。
      *
-     * @param unit 单元
-     * @param now  当前服务端 tick
+     * @param entry 条目
+     * @param now   当前服务端 tick
      * @return 该跑为 {@code true}
      */
-    public static boolean due(IoUnit unit, long now) {
-        long last = unit.digest().lastAttemptAt();
+    public static boolean due(Form.Entry entry, long now) {
+        long last = entry.conclusion().lastAttemptAt();
         if (last < 0L || last > now) {
             return true;
         }
-        return now - last >= backoff(unit);
+        return now - last >= backoff(entry);
     }
 
     /**
      * 按上一轮结果算退避。
      *
-     * @param unit 单元
+     * @param entry 条目
      * @return 多少 tick 后允许再试
      */
-    private static long backoff(IoUnit unit) {
-        IoLedger.Row row = unit.ledger().current();
+    private static long backoff(Form.Entry entry) {
+        Analyzer.Ledger.Row row = entry.ledger().current();
         if (row == null) {
             return 0L;
         }
@@ -152,27 +152,27 @@ public final class PassivePlanner {
             case NO_MATERIAL -> NO_MATERIAL_TICKS;
             case FULL -> FULL_TICKS;
             case NO_FACE -> FACE_TICKS;
-            case REJECTED -> Math.min(FACE_TICKS * Math.max(1, unit.digest().rejectStreak()), 100L);
+            case REJECTED -> Math.min(FACE_TICKS * Math.max(1, entry.conclusion().rejectStreak()), 100L);
             case ERROR -> Math.min(
-                    ERROR_BASE_TICKS << Math.min(Math.max(unit.digest().countOf(Reason.ERROR) - 1, 0), 3),
+                    ERROR_BASE_TICKS << Math.min(Math.max(entry.conclusion().countOf(Reason.ERROR) - 1, 0), 3),
                     ERROR_CAP_TICKS);
         };
     }
 
     /**
-     * 一台机器这一轮要跑的单元。
+     * 一台机器这一轮要跑的条目。
      */
     public static final class Plan {
-        private final List<IoUnit> inputs = new ArrayList<>();
-        private final List<IoUnit> outputs = new ArrayList<>();
+        private final List<Form.Entry> inputs = new ArrayList<>();
+        private final List<Form.Entry> outputs = new ArrayList<>();
 
-        /** 本轮的输入单元。 */
-        public List<IoUnit> inputs() {
+        /** 本轮的输入条目。 */
+        public List<Form.Entry> inputs() {
             return this.inputs;
         }
 
-        /** 本轮的输出单元。 */
-        public List<IoUnit> outputs() {
+        /** 本轮的输出条目。 */
+        public List<Form.Entry> outputs() {
             return this.outputs;
         }
 

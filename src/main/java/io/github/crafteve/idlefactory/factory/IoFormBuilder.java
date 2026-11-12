@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.io.IoForm;
+import io.github.crafteve.idlefactory.factory.io.Form;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.machine.MachineStatus;
@@ -24,7 +24,7 @@ import io.github.crafteve.idlefactory.factory.node.Node;
  */
 public final class IoFormBuilder {
     /** 每个工厂复用一张表单，避免每 tick 新建集合。 */
-    private final Map<UUID, IoForm> forms = new HashMap<>();
+    private final Map<UUID, Form> forms = new HashMap<>();
 
     /**
      * 生成一个工厂本 tick 的表单。
@@ -33,15 +33,15 @@ public final class IoFormBuilder {
      * @param states  机器状态集合
      * @return 表单；调用方只读
      */
-    public IoForm build(Factory factory, MachineStateLibrary states) {
-        IoForm form = this.forms.computeIfAbsent(factory.id(), id -> new IoForm());
+    public Form build(Factory factory, MachineStateLibrary states) {
+        Form form = this.forms.computeIfAbsent(factory.id(), id -> new Form());
         form.beginRebuild();
         for (Node node : factory.config().nodes().all()) {
             for (Machine machine : node.machines()) {
                 if (states.status(machine.id()) != MachineStatus.RUN) {
                     continue;
                 }
-                IoForm.Slot slot = form.slot(machine);
+                Form.Slot slot = form.slot(machine);
                 for (ResourceSpec spec : node.io().inputs()) {
                     slot.addInput(spec);
                 }
@@ -60,7 +60,7 @@ public final class IoFormBuilder {
      * @param factoryId 工厂 id
      * @return 表单；还没生成过时为 {@code null}
      */
-    public @Nullable IoForm form(UUID factoryId) {
+    public @Nullable Form form(UUID factoryId) {
         return this.forms.get(factoryId);
     }
 

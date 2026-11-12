@@ -4,7 +4,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
+import io.github.crafteve.idlefactory.factory.io.Form;
 import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
@@ -84,8 +84,6 @@ final class FactoryTickRunner {
         if (this.tickCounter % REFRESH_INTERVAL == 0) {
             for (Factory factory : this.manager.all()) {
                 factory.refreshStorage(this.storageResolver);
-                // 速率采样原本挂在诊断服务的每秒 tick 上，诊断服务删除后由这里接手。
-                factory.live().stats().sample();
             }
         }
 
@@ -102,9 +100,11 @@ final class FactoryTickRunner {
 
         // 执行段：回收与队列由节点层驱动，这里只跑被动表单。
         for (Factory factory : this.manager.all()) {
-            factory.live().stats().retain(liveMachines);
-            IoForm form = this.formBuilder.build(factory, this.machineStates);
+            factory.live().analyzer().retainMachines(liveMachines);
+            Form form = this.formBuilder.build(factory, this.machineStates);
             this.nodeIoRunner.runFactory(this.server, factory, form, this.observations, now);
+            // 速率结算由账房自己数间隔；P3 接入 IoRunner 后，执行顺序也由它统一编排。
+            factory.live().analyzer().tick(now);
         }
 
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {

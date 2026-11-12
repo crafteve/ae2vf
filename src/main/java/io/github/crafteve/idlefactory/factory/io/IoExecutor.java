@@ -88,8 +88,8 @@ public final class IoExecutor {
      * @param storage    仓库
      * @param level      机器所在维度
      * @param pos        机器坐标
-     * @param inputs     本轮要跑的输入单元（规划器已排好顺序）
-     * @param outputs    本轮要跑的输出单元（规划器已排好顺序）
+     * @param inputs     本轮要跑的输入条目（规划器已排好顺序）
+     * @param outputs    本轮要跑的输出条目（规划器已排好顺序）
      * @param caps       能力句柄缓存；{@code null} 时直接查世界
      * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
      * @param now          当前服务端 tick，给变体索引算 TTL
@@ -97,7 +97,7 @@ public final class IoExecutor {
      * @return 本方块结果
      */
     public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
-            List<IoUnit> inputs, List<IoUnit> outputs, @Nullable LevelCapabilityCache caps,
+            List<Form.Entry> inputs, List<Form.Entry> outputs, @Nullable LevelCapabilityCache caps,
             @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
         long fed = 0L;
         long pulled = 0L;
@@ -118,11 +118,11 @@ public final class IoExecutor {
 
         // 顺序由规划器给定（游标轮转在规划器里），执行器只按清单跑。
         for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
-            IoUnit unit = inputs.get(ruleIndex);
-            ResourceSpec spec = unit.spec();
-            RuleKey ruleKey = unit.key().rule();
-            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, true,
-                    caps, unit.digest().faceHint());
+            Form.Entry entry = inputs.get(ruleIndex);
+            ResourceSpec spec = entry.spec();
+            RuleKey ruleKey = entry.key().rule();
+            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, IoSide.INPUT,
+                    caps, entry.conclusion().faceHint());
             if (resolved == null) {
                 // 原因已经进账本，不再逐 tick 打日志：debug 级别下会按规则数刷屏。
                 inputReasons.put(ruleKey, Reason.NO_FACE);
@@ -147,7 +147,7 @@ public final class IoExecutor {
             Reason reason = null;
             boolean accepted = false;
             for (ResourceAdapter adapter : adapters.list()) {
-                IoResult result = IoTransfer.feed(storage, adapter);
+                MoveResult result = IoTransfer.feed(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
                 if (result.reason() == Reason.RUN || result.reason() == Reason.NO_MATERIAL) {
@@ -173,11 +173,11 @@ public final class IoExecutor {
         int outputQuota = outputBudget[0];
 
         for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
-            IoUnit unit = outputs.get(ruleIndex);
-            ResourceSpec spec = unit.spec();
-            RuleKey ruleKey = unit.key().rule();
-            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, false,
-                    caps, unit.digest().faceHint());
+            Form.Entry entry = outputs.get(ruleIndex);
+            ResourceSpec spec = entry.spec();
+            RuleKey ruleKey = entry.key().rule();
+            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, IoSide.OUTPUT,
+                    caps, entry.conclusion().faceHint());
             if (resolved == null) {
                 // 同输入侧：原因进账本，日志留给账本与界面。
                 outputReasons.put(ruleKey, Reason.NO_FACE);
@@ -200,7 +200,7 @@ public final class IoExecutor {
             long moved = 0L;
             Reason reason = null;
             for (ResourceAdapter adapter : adapters.list()) {
-                IoResult result = IoTransfer.pull(storage, adapter);
+                MoveResult result = IoTransfer.pull(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
                 // 搬通了什么都不用做；拒收由分析器清掉经验面。原因只进账本，不逐 tick 打日志。
@@ -253,12 +253,12 @@ public final class IoExecutor {
      * 通道，流体 / 能量根本不进变体展开。用它决定另一侧要不要留额度，避免按「规则列表非空」
      * 判断时把只有流体或精确物品输出的机器也算进去，白白扣掉输入额度。</p>
      *
-     * @param units 一侧的单元
+     * @param entries 一侧的条目
      * @return 存在模糊物品规则时 {@code true}
      */
-    private static boolean usesVariants(List<IoUnit> units) {
-        for (IoUnit unit : units) {
-            if (unit.spec().fuzzy()) {
+    private static boolean usesVariants(List<Form.Entry> entries) {
+        for (Form.Entry entry : entries) {
+            if (entry.spec().fuzzy()) {
                 return true;
             }
         }

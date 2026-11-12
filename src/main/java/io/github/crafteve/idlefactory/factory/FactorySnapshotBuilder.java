@@ -9,10 +9,10 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.io.IoUnit;
+import io.github.crafteve.idlefactory.factory.io.Analyzer;
+import io.github.crafteve.idlefactory.factory.io.Form;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.PassivePlanner;
-import io.github.crafteve.idlefactory.factory.io.TransferStats;
 import io.github.crafteve.idlefactory.factory.io.RuleKey;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
@@ -258,7 +258,7 @@ public final class FactorySnapshotBuilder {
      * 机器视图列表：节点 → 机器摊平，顺序沿用节点库与机器加入顺序。
      *
      * <p>「为什么不动」不再问统计对象：原因与时刻来自表单单元的账本与历史结论，机器在不在
-     * 来自观测事实，速率来自每秒采样的 {@link TransferStats}。三份真相各读各的，不在视图里拼。</p>
+     * 来自观测事实，速率来自每秒采样的 {@link Analyzer.Stats}。三份真相各读各的，不在视图里拼。</p>
      *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
@@ -267,7 +267,7 @@ public final class FactorySnapshotBuilder {
      * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
-            @Nullable IoForm form, long now) {
+            @Nullable Form form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = FactoryLimitsConfig.staleHealthTicks();
@@ -288,31 +288,31 @@ public final class FactorySnapshotBuilder {
                 boolean probed = state != null && state.probed();
                 boolean stale = state != null && state.stale();
 
-                TransferStats.MachineStats stats = factory.live().stats().machineOrNull(machine.id());
-                IoForm.Slot slot = form == null ? null : form.slotOrNull(machine.id());
+                Analyzer.Stats.MachineStats stats = factory.live().analyzer().stats().machineOrNull(machine.id());
+                Form.Slot slot = form == null ? null : form.slotOrNull(machine.id());
                 List<Long> inputRates = new ArrayList<>(inputs.size());
                 for (ResourceSpec spec : inputs) {
                     inputRates.add(stats == null ? 0L
-                            : stats.rateIn(new RuleKey(true, spec.key(), spec.face(), spec.mode())));
+                            : stats.rateIn(new RuleKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode())));
                 }
                 List<Long> outputRates = new ArrayList<>(outputs.size());
                 for (ResourceSpec spec : outputs) {
                     outputRates.add(stats == null ? 0L
-                            : stats.rateOut(new RuleKey(false, spec.key(), spec.face(), spec.mode())));
+                            : stats.rateOut(new RuleKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode())));
                 }
                 List<Reason> inputReasons = new ArrayList<>(inputs.size());
                 long inputSuccessAt = -1L;
                 long blockedSince = -1L;
                 for (ResourceSpec spec : inputs) {
-                    IoUnit unit = slot == null ? null
-                            : slot.unit(true, new RuleKey(true, spec.key(), spec.face(), spec.mode()));
+                    Form.Entry unit = slot == null ? null
+                            : slot.entry(new RuleKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode()));
                     Reason reason = unit == null
                             ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     inputReasons.add(reason);
                     if (unit != null) {
-                        inputSuccessAt = Math.max(inputSuccessAt, unit.digest().lastSuccessAt());
+                        inputSuccessAt = Math.max(inputSuccessAt, unit.conclusion().lastSuccessAt());
                         if (reason != Reason.RUN && reason != Reason.SLEEPING) {
-                            long since = unit.digest().lastAttemptAt();
+                            long since = unit.conclusion().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
                             }
@@ -323,18 +323,18 @@ public final class FactorySnapshotBuilder {
                 long lastSuccessAt = inputSuccessAt;
                 long minIdle = Long.MAX_VALUE;
                 for (ResourceSpec spec : outputs) {
-                    IoUnit unit = slot == null ? null
-                            : slot.unit(false, new RuleKey(false, spec.key(), spec.face(), spec.mode()));
+                    Form.Entry unit = slot == null ? null
+                            : slot.entry(new RuleKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode()));
                     Reason reason = unit == null
                             ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     outputReasons.add(reason);
                     if (unit != null) {
-                        lastSuccessAt = Math.max(lastSuccessAt, unit.digest().lastSuccessAt());
-                        if (unit.digest().lastAttemptAt() >= 0L) {
-                            minIdle = Math.min(minIdle, unit.digest().idleTicks(now));
+                        lastSuccessAt = Math.max(lastSuccessAt, unit.conclusion().lastSuccessAt());
+                        if (unit.conclusion().lastAttemptAt() >= 0L) {
+                            minIdle = Math.min(minIdle, unit.conclusion().idleTicks(now));
                         }
                         if (reason != Reason.RUN && reason != Reason.SLEEPING) {
-                            long since = unit.digest().lastAttemptAt();
+                            long since = unit.conclusion().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
                             }

@@ -76,13 +76,13 @@ public final class IoPortResolver {
      * @param level 机器所在维度
      * @param pos   机器坐标
      * @param spec  规则
-     * @param input {@code true} 表示输入方向
+     * @param side  方向：输入还是输出
      * @param caps  能力句柄缓存；{@code null} 时直接查世界
      * @param hint  经验面；{@code null} 表示没有
      * @return 通道；没有可用 handler 时为 {@code null}
      */
     @Nullable
-    public static Resolved resolve(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+    public static Resolved resolve(ServerLevel level, BlockPos pos, ResourceSpec spec, IoSide side,
             @Nullable LevelCapabilityCache caps, @Nullable Direction hint) {
         Direction configured = spec.face();
         if (configured != null) {
@@ -95,9 +95,9 @@ public final class IoPortResolver {
             }
         }
         return switch (AeKeySupport.kind(spec.key())) {
-            case ITEM -> sweepItem(level, pos, spec, input, caps);
-            case FLUID -> sweepFluid(level, pos, spec, input, caps);
-            case ENERGY -> sweepEnergy(level, pos, spec, input, caps);
+            case ITEM -> sweepItem(level, pos, spec, side, caps);
+            case FLUID -> sweepFluid(level, pos, spec, side, caps);
+            case ENERGY -> sweepEnergy(level, pos, spec, side, caps);
         };
     }
 
@@ -138,14 +138,14 @@ public final class IoPortResolver {
      * 「满了 / 没料」而不是「没有 handler」。</p>
      */
     @Nullable
-    private static Resolved sweepItem(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+    private static Resolved sweepItem(ServerLevel level, BlockPos pos, ResourceSpec spec, IoSide ioSide,
             @Nullable LevelCapabilityCache caps) {
         ItemStack sample = AeKeySupport.toStack(spec.key());
         if (sample.isEmpty()) {
             return null;
         }
         IItemHandler unsided = item(level, pos, caps, null);
-        if (unsided != null && itemAccessible(unsided, sample, spec.fuzzy(), input)) {
+        if (unsided != null && itemAccessible(unsided, sample, spec.fuzzy(), ioSide)) {
             return new Resolved(new ItemAdapter(unsided, sample), null);
         }
         IItemHandler firstSide = null;
@@ -159,7 +159,7 @@ public final class IoPortResolver {
                 firstSide = handler;
                 firstFace = side;
             }
-            if (itemAccessible(handler, sample, spec.fuzzy(), input)) {
+            if (itemAccessible(handler, sample, spec.fuzzy(), ioSide)) {
                 return new Resolved(new ItemAdapter(handler, sample), side);
             }
         }
@@ -179,23 +179,23 @@ public final class IoPortResolver {
      * 就否掉一个只认带组件变体的面。</p>
      */
     private static boolean itemAccessible(IItemHandler handler, ItemStack sample, boolean fuzzy,
-            boolean input) {
+            IoSide ioSide) {
         if (!fuzzy) {
-            return probeItem(handler, sample, input);
+            return probeItem(handler, sample, ioSide);
         }
         ItemStack plain = new ItemStack(sample.getItem());
-        if (probeItem(handler, plain, input)) {
+        if (probeItem(handler, plain, ioSide)) {
             return true;
         }
         if (!ItemStack.isSameItemSameComponents(plain, sample)
-                && probeItem(handler, sample, input)) {
+                && probeItem(handler, sample, ioSide)) {
             return true;
         }
         int slots = Math.min(handler.getSlots(), ItemAdapter.MAX_SCAN_SLOTS);
         for (int slot = 0; slot < slots; slot++) {
             ItemStack inSlot = handler.getStackInSlot(slot);
             if (!inSlot.isEmpty() && inSlot.getItem() == sample.getItem()
-                    && probeItem(handler, inSlot.copyWithCount(1), input)) {
+                    && probeItem(handler, inSlot.copyWithCount(1), ioSide)) {
                 return true;
             }
         }
@@ -205,15 +205,15 @@ public final class IoPortResolver {
     /**
      * 用 1 个物品模拟一次「收 / 抽」。
      */
-    private static boolean probeItem(IItemHandler handler, ItemStack sample, boolean input) {
+    private static boolean probeItem(IItemHandler handler, ItemStack sample, IoSide ioSide) {
         ItemAdapter adapter = new ItemAdapter(handler, sample);
-        return input
+        return ioSide == IoSide.INPUT
                 ? adapter.insert(ITEM_PROBE, true) > 0L
                 : adapter.extract(ITEM_PROBE, true) > 0L;
     }
 
     @Nullable
-    private static Resolved sweepFluid(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+    private static Resolved sweepFluid(ServerLevel level, BlockPos pos, ResourceSpec spec, IoSide ioSide,
             @Nullable LevelCapabilityCache caps) {
         Fluid fluid = BuiltInRegistries.FLUID.get(spec.key().getId());
         if (fluid == Fluids.EMPTY) {
@@ -225,7 +225,7 @@ public final class IoPortResolver {
             if (handler == null) {
                 continue;
             }
-            int amount = input
+            int amount = ioSide == IoSide.INPUT
                     ? handler.fill(probe, IFluidHandler.FluidAction.SIMULATE)
                     : handler.drain(probe, IFluidHandler.FluidAction.SIMULATE).getAmount();
             if (amount > 0) {
@@ -237,7 +237,7 @@ public final class IoPortResolver {
     }
 
     @Nullable
-    private static Resolved sweepEnergy(ServerLevel level, BlockPos pos, ResourceSpec spec, boolean input,
+    private static Resolved sweepEnergy(ServerLevel level, BlockPos pos, ResourceSpec spec, IoSide ioSide,
             @Nullable LevelCapabilityCache caps) {
         for (Direction side : FACES) {
             IEnergyStorage handler = energy(level, pos, caps, side);
@@ -245,7 +245,7 @@ public final class IoPortResolver {
                 continue;
             }
             // 输入看能不能收，输出看能不能抽——旧代码两边都用 receiveEnergy，是错的
-            int probe = input
+            int probe = ioSide == IoSide.INPUT
                     ? handler.receiveEnergy(ENERGY_PROBE, true)
                     : handler.extractEnergy(ENERGY_PROBE, true);
             if (probe > 0) {

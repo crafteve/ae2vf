@@ -7,7 +7,7 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
+import io.github.crafteve.idlefactory.factory.io.Form;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.DispatchMode;
@@ -129,7 +129,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @return 节点视图
      */
     public static List<NodeView> nodes(Factory factory, @Nullable ObservationService observations,
-            @Nullable IoForm form, @Nullable NodeManager nodeManager, long now) {
+            @Nullable Form form, @Nullable NodeManager nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
         // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。

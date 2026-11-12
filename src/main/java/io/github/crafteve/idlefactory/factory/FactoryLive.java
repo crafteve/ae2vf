@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.factory;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.TransferStats;
+import io.github.crafteve.idlefactory.factory.io.Analyzer;
 import io.github.crafteve.idlefactory.factory.storage.EmptyStorage;
 import appeng.api.storage.MEStorage;
 import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
@@ -26,8 +26,8 @@ public final class FactoryLive {
     /** 上一次解析的异常摘要；正常时为 {@code null}。 */
     @Nullable
     private String storageError;
-    /** 诊断数据：事件环 + 搬运计数。 */
-    private final TransferStats stats = new TransferStats();
+    /** 执行账房：账本、结论与搬运速率。 */
+    private final Analyzer analyzer = new Analyzer();
 
     /** 由 {@link Factory} 创建；初始为空仓库、离线。 */
     FactoryLive() {
@@ -45,10 +45,9 @@ public final class FactoryLive {
     }
 
     /** 上一次解析的异常摘要；正常时为 {@code null}。 */
-    @Nullable
-    /** 诊断数据。 */
-    public TransferStats stats() {
-        return this.stats;
+    /** 执行账房：账本、结论与搬运速率（每工厂一份）。 */
+    public Analyzer analyzer() {
+        return this.analyzer;
     }
 
     /**
