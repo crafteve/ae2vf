@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 
 import appeng.api.networking.IGridNode;
 
@@ -34,6 +35,8 @@ public final class NodeManager {
     public static final int MAX_SWEEPS_PER_TICK = 64;
 
     private final MinecraftServer server;
+    /** 工厂共享的端口缓存；所有节点共用同一份，避免每个节点一套机器存储缓存。 */
+    private final PortExecutor ports;
     /** 存档数据变化回调。 */
     private final Runnable dataChanged;
     /** 节点告警出口。 */
@@ -48,11 +51,14 @@ public final class NodeManager {
 
     /**
      * @param server      服务端实例
+     * @param ports       工厂共享的端口缓存
      * @param dataChanged 存档数据变化回调
      * @param notice      节点告警出口
      */
-    public NodeManager(MinecraftServer server, Runnable dataChanged, Consumer<Notice> notice) {
+    public NodeManager(MinecraftServer server, PortExecutor ports, Runnable dataChanged,
+            Consumer<Notice> notice) {
         this.server = server;
+        this.ports = ports;
         this.dataChanged = dataChanged;
         this.notice = notice;
     }
@@ -285,7 +291,7 @@ public final class NodeManager {
             NodeRuntime node;
             try {
                 node = new NodeRuntime(this.server, spec.factoryId(), spec.node(),
-                        spec.anchor(), spec.anchorLevel(), spec.available(), this.notice);
+                        spec.anchor(), spec.anchorLevel(), spec.available(), this.ports, this.notice);
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",
                         spec.node().id(), e.toString());

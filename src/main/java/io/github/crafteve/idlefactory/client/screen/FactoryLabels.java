@@ -224,6 +224,7 @@ public final class FactoryLabels {
             case NO_FACE -> "无可用面";
             case BUDGET_OUT -> "本轮预算用完";
             case REJECTED -> "该面拒收";
+            case FACE_CONFIG_INVALID -> "配置面不可用";
             case ERROR -> "异常";
         };
     }
@@ -242,7 +243,7 @@ public final class FactoryLabels {
             case NO_MATERIAL -> theme.tooltip().idle();
             case FULL -> theme.tooltip().warn();
             case BUDGET_OUT -> theme.tooltip().idle();
-            case NO_FACE, REJECTED, ERROR -> theme.tooltip().error();
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.tooltip().error();
         };
     }
 
@@ -288,7 +289,7 @@ public final class FactoryLabels {
      */
     static int rateColorTooltip(long rate, Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
-            case NO_FACE, REJECTED, ERROR -> theme.tooltip().error();
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.tooltip().error();
             case FULL -> theme.tooltip().warn();
             case RUN, SLEEPING, BUDGET_OUT, NO_MATERIAL ->
                     rate > 0L ? theme.tooltip().ok() : theme.tooltip().idle();
@@ -305,7 +306,7 @@ public final class FactoryLabels {
      */
     public static int rateColorUi(long rate, Reason reason, FactoryGuiTheme theme) {
         return switch (reason) {
-            case NO_FACE, REJECTED, ERROR -> theme.error();
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.error();
             case FULL -> theme.statusWarn();
             case RUN, SLEEPING, BUDGET_OUT, NO_MATERIAL ->
                     rate > 0L ? theme.statusRun() : theme.statusIdle();

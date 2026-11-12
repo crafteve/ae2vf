@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -9,49 +10,55 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 
 import appeng.api.storage.MEStorage;
 
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.Direction;
 
 /**
- * 被动驱动：拿着本 tick 的表单，问规划器「这一轮跑哪些条目」，再交给执行器搬。
+ * 被动驱动：拿着本 tick 的表单，问规划器「这一轮跑哪些条目、走哪个面、搬什么」，再把 Job
+ * 交给执行器逐条跑。
  *
- * <p>它只做三件事：遍历表单槽位（按轮转起点）、问规划器、把结果交给执行器并落账。睡眠、
- * 退避、游标全在 {@link PassivePlanner}；机器在不在是表单的事，这里不再有健康门禁。</p>
+ * <p>它只做三件事：遍历表单槽位（按轮转起点）、问规划器、执行 Job 并落账。睡眠、退避、游标、
+ * 选面、变体展开全在 {@link PassivePlanner}；机器在不在是表单的事，这里不再有健康门禁。</p>
  *
- * <p>异常按机器兜住：第三方 handler 抛异常不能带崩服务端 tick，记一条节流 warn 并按本轮
- * 失败落账，下一轮照常重试。</p>
+ * <p>异常按机器兜住：第三方能力实现抛异常不能带崩服务端 tick，记一条节流 warn 并按本轮
+ * 失败落账，下一轮照常重试。失败结果同时驱动端口失效（{@link PortExecutor}），让下一轮重探面。</p>
  */
 public final class PassiveIoRunner {
     /** 坏机器日志节流间隔（tick）。 */
     private static final long FAILURE_LOG_INTERVAL = 1200L;
 
+    private final PortExecutor ports;
     /** 排期。 */
-    private final PassivePlanner planner = new PassivePlanner();
+    private final PassivePlanner planner;
+    /** 唯一的机器侧写入口。 */
+    private final IoExecutor executor;
     /** 模糊物品规则的变体索引；按工厂隔离，TTL 到期重建。 */
-    private final Map<UUID, ItemVariantIndex> variants = new HashMap<>();
+    private final Map<UUID, VariantPick> variants = new HashMap<>();
     /** 机器 id → 上次异常日志时刻，按机器节流刷屏。 */
     private final Map<UUID, Long> failureLogAt = new HashMap<>();
     /** 已跑过的轮数，用于槽位轮转起点。 */
     private long rounds;
 
     /**
+     * @param ports 工厂共享的端口缓存
+     */
+    public PassiveIoRunner(PortExecutor ports) {
+        this.ports = ports;
+        this.planner = new PassivePlanner(new FacePick(ports));
+        this.executor = new IoExecutor(ports);
+    }
+
+    /**
      * 跑一个工厂本 tick 的表单。
      *
-     * @param server       服务端
-     * @param factory      工厂
-     * @param form         本 tick 的表单
-     * @param observations 观测服务；为 {@code null} 时不给能力缓存
-     * @param now          当前服务端 tick
+     * @param factory 工厂
+     * @param form    本 tick 的表单
+     * @param now     当前服务端 tick
      */
-    public void runFactory(MinecraftServer server, Factory factory, Form form,
-            @Nullable ObservationService observations, long now) {
+    public void runFactory(Factory factory, Form form, long now) {
         if (!factory.live().storageOnline()) {
             this.rounds++;
             return;
@@ -66,7 +73,7 @@ public final class PassiveIoRunner {
         int start = (int) Math.floorMod(this.rounds, (long) slots.size());
         for (int index = 0; index < slots.size(); index++) {
             Form.Slot slot = slots.get((start + index) % slots.size());
-            tickMachine(server, factory, storage, slot, now, observations);
+            this.tickMachine(factory, storage, slot, now);
         }
         this.rounds++;
     }
@@ -76,90 +83,81 @@ public final class PassiveIoRunner {
      *
      * @return 本轮搬动的数量
      */
-    private long tickMachine(MinecraftServer server, Factory factory, MEStorage storage,
-            Form.Slot slot, long now, @Nullable ObservationService observations) {
+    private long tickMachine(Factory factory, MEStorage storage, Form.Slot slot, long now) {
         Machine machine = slot.machine();
-        PassivePlanner.Plan plan = this.planner.plan(slot, now);
+        if (!this.ports.loaded(machine)) {
+            // 未加载不代表机器没了，下一轮再看
+            return 0L;
+        }
+        PassivePlanner.Plan plan;
+        try {
+            VariantPick variantPick = this.variants.computeIfAbsent(factory.id(),
+                    id -> new VariantPick());
+            plan = this.planner.plan(slot, now, variantPick, storage);
+        } catch (RuntimeException e) {
+            // 规划阶段异常（第三方库存读不出来）：整台机器本轮按未搬动处理，不影响其它机器。
+            this.logFailure(machine, now, e);
+            return 0L;
+        }
         if (plan.isEmpty()) {
             return 0L;
         }
         Analyzer analyzer = factory.live().analyzer();
-        BlockKey target = machine.block();
-        ItemVariantIndex factoryVariants = this.variants.computeIfAbsent(factory.id(),
-                id -> new ItemVariantIndex());
-        int[] sharedBudget = {ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK};
-        IoExecutor.BlockRun result;
-        try {
-            ServerLevel level = server.getLevel(target.dimension());
-            if (level == null || !level.isLoaded(target.pos())) {
-                // 未加载不代表机器没了，下一轮再看
-                return 0L;
+        // 同一条规则可能展开成多个变体：按条目汇总成一行账，否则界面上一条规则会冒出好几行。
+        Map<Form.Entry, EntryRun> runs = new LinkedHashMap<>();
+        for (PassivePlanner.Failure failure : plan.failures()) {
+            runs.computeIfAbsent(failure.entry(), entry -> new EntryRun())
+                    .merge(failure.reason(), 0L, null);
+        }
+        for (IoJob job : plan.jobs()) {
+            MoveResult result;
+            try {
+                result = this.executor.move(storage, job);
+            } catch (RuntimeException e) {
+                this.logFailure(machine, now, e);
+                result = new MoveResult(0L, Reason.ERROR);
             }
-            LevelCapabilityCache caps = observations == null
-                    ? null : observations.capabilities(level);
-            result = IoExecutor.runBlock(storage, level, target.pos(), plan.inputs(),
-                    plan.outputs(), caps, factoryVariants, now, sharedBudget);
-        } catch (RuntimeException e) {
-            // 只在这里兜：第三方 handler 在 IoExecutor 内部被调用，异常穿出去会带崩
-            // 整个服务端 tick。更糟的是 IoTransfer 已经先从仓库扣了料才交给机器，异常意味着
-            // 「已扣未给」，这台机器本轮只能按未搬动处理：记节流 warn、落一条 ERROR 账，
-            // 下一轮照常重试，其余机器不受影响。只捕 RuntimeException，不捕 Error。
-            this.logFailure(machine, now, e);
-            this.recordReason(analyzer, plan, Reason.ERROR, now);
-            return 0L;
+            this.invalidateOnFailure(job, result);
+            runs.computeIfAbsent(job.entry(), entry -> new EntryRun())
+                    .merge(result.reason(), result.moved(), job.face());
         }
-        this.recordResult(analyzer, plan, result, now);
-        if (result.movedAnything()) {
-            analyzer.stats().machine(machine.id())
-                    .addMoved(result.fedByRule(), result.pulledByRule());
+        long total = 0L;
+        Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
+        Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
+        for (Map.Entry<Form.Entry, EntryRun> entry : runs.entrySet()) {
+            Form.Entry formEntry = entry.getKey();
+            EntryRun run = entry.getValue();
+            analyzer.record(formEntry, run.reason == null ? Reason.NO_MATERIAL : run.reason,
+                    now, run.moved, run.face);
+            total += run.moved;
+            if (run.moved > 0L) {
+                Map<RuleKey, Long> target = formEntry.side() == IoSide.INPUT
+                        ? fedByRule : pulledByRule;
+                target.merge(formEntry.key().rule(), run.moved, Long::sum);
+            }
         }
-        return result.moved();
+        if (!fedByRule.isEmpty() || !pulledByRule.isEmpty()) {
+            analyzer.stats().machine(machine.id()).addMoved(fedByRule, pulledByRule);
+        }
+        return total;
     }
 
     /**
-     * 把本轮结果按条目写进账本与结论。
+     * 按失败结果失效端口缓存。
      *
-     * @param analyzer 账房
-     * @param plan     本轮执行清单
-     * @param result   本轮结果
-     * @param now      当前服务端 tick
+     * <p>{@code REJECTED} / {@code ERROR} 只失效那个面；{@code NO_FACE} 失效整台机器的六个面
+     * （连面都没选出来，缓存里的面不再可信）；{@code FULL} 不失效——面是对的，只是满了。</p>
+     *
+     * @param job    出问题的 Job
+     * @param result 执行结果
      */
-    private void recordResult(Analyzer analyzer, PassivePlanner.Plan plan,
-            IoExecutor.BlockRun result, long now) {
-        for (Form.Entry entry : plan.inputs()) {
-            RuleKey rule = entry.key().rule();
-            Reason reason = result.inputReasons().get(rule);
-            if (reason != null) {
-                analyzer.record(entry, reason, now,
-                        result.fedByRule().getOrDefault(rule, 0L), result.faces().get(rule));
+    private void invalidateOnFailure(IoJob job, MoveResult result) {
+        switch (result.reason()) {
+            case REJECTED, ERROR -> this.ports.invalidate(job.machine(), job.face());
+            case NO_FACE -> this.ports.invalidateMachine(job.machine());
+            case RUN, SLEEPING, BUDGET_OUT, NO_MATERIAL, FULL, FACE_CONFIG_INVALID -> {
+                // 这些结果说明面本身没问题（配错面是配置问题，不是缓存脏了），不动缓存。
             }
-        }
-        for (Form.Entry entry : plan.outputs()) {
-            RuleKey rule = entry.key().rule();
-            Reason reason = result.outputReasons().get(rule);
-            if (reason != null) {
-                analyzer.record(entry, reason, now,
-                        result.pulledByRule().getOrDefault(rule, 0L), result.faces().get(rule));
-            }
-        }
-    }
-
-    /**
-     * 给清单里所有条目记同一个原因（没有数量）。
-     *
-     * <p>用于整台机器本轮没跑成：异常。界面上「异常」来自这里。</p>
-     *
-     * @param analyzer 账房
-     * @param plan     本轮执行清单
-     * @param reason   原因
-     * @param now      当前服务端 tick
-     */
-    private void recordReason(Analyzer analyzer, PassivePlanner.Plan plan, Reason reason, long now) {
-        for (Form.Entry entry : plan.inputs()) {
-            analyzer.record(entry, reason, now, 0L, null);
-        }
-        for (Form.Entry entry : plan.outputs()) {
-            analyzer.record(entry, reason, now, 0L, null);
         }
     }
 
@@ -190,7 +188,7 @@ public final class PassiveIoRunner {
     }
 
     /**
-     * 丢掉一台机器的排期与日志节流状态（机器被删时）。
+     * 丢掉一台机器的排期、变体索引与日志节流状态（机器被删时）。
      *
      * @param machineId 机器 id
      */
@@ -205,5 +203,27 @@ public final class PassiveIoRunner {
         this.variants.clear();
         this.failureLogAt.clear();
         this.rounds = 0L;
+    }
+
+    /**
+     * 一条规则这一轮的汇总：搬了多少、最坏原因、最后一个面。
+     */
+    private static final class EntryRun {
+        private long moved;
+        @Nullable
+        private Reason reason;
+        @Nullable
+        private Direction face;
+
+        void merge(@Nullable Reason nextReason, long amount, @Nullable Direction usedFace) {
+            this.moved += amount;
+            if (nextReason != null
+                    && (this.reason == null || nextReason.severity() > this.reason.severity())) {
+                this.reason = nextReason;
+            }
+            if (usedFace != null) {
+                this.face = usedFace;
+            }
+        }
     }
 }

@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.Form;
 import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
+import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
@@ -49,7 +50,13 @@ public final class FactoryRuntime {
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
-    private final PassiveIoRunner nodeIoRunner = new PassiveIoRunner();
+    private final PassiveIoRunner nodeIoRunner;
+    /**
+     * 机器侧端口缓存：全服一份，所有工厂与节点共用。
+     *
+     * <p>缓存绑在实例上——再 new 一个就是第二份缓存，失效路径会对不上。</p>
+     */
+    private final PortExecutor ports;
     /**
      * 全服占用索引：统一 id → 认领。
      *
@@ -80,7 +87,9 @@ public final class FactoryRuntime {
 
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
-        this.nodeManager = new NodeManager(server, this::markDirty, this::logNodeNotice);
+        this.ports = new PortExecutor(server);
+        this.nodeIoRunner = new PassiveIoRunner(this.ports);
+        this.nodeManager = new NodeManager(server, this.ports, this::markDirty, this::logNodeNotice);
     }
 
     /**
@@ -106,6 +115,7 @@ public final class FactoryRuntime {
         runtime.save();
         runtime.nodeManager.destroyAll();
         runtime.nodeIoRunner.clear();
+        runtime.ports.clear();
         runtime.machineStates.clear();
         runtime.formBuilder.clear();
         runtime.storageResolver = null;

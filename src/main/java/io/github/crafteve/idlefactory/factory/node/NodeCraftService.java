@@ -10,10 +10,13 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.IoPortResolver;
+import io.github.crafteve.idlefactory.factory.io.CapacityPick;
+import io.github.crafteve.idlefactory.factory.io.FacePick;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.NodeProvider;
-import io.github.crafteve.idlefactory.factory.node.ProviderMode;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
@@ -22,8 +25,10 @@ import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
 import appeng.core.definitions.AEItems;
 
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -35,8 +40,14 @@ import net.minecraft.world.level.Level;
  *
  * <p>样板解码结果、输入的 key 集合（阻挡判定用）与产物 key 集合（回收白名单用）都缓存在这里，
  * 只在样板变化或机器上下线时重建；CPU 的合成规划直接读缓存，不会每 tick 解码样板。</p>
+ *
+ * <p>P2 起机器侧统一走 AE2 的 {@link MEStorage}：选面用 {@link FacePick}，容量用
+ * {@link CapacityPick}，取存储用工厂共享的 {@link PortExecutor}，不再有自己的一套适配器。</p>
  */
 final class NodeCraftService implements ICraftingProvider {
+    /** 固定顺序的六面。 */
+    private static final Direction[] FACES = Direction.values();
+
     private final NodeRuntime node;
     /** 当前能用的样板；机器方块不在时对外仍报空。 */
     private List<IPatternDetails> patterns = List.of();
@@ -45,14 +56,18 @@ final class NodeCraftService implements ICraftingProvider {
     /** 所有样板产物的并集，回收白名单只有这些。 */
     private Set<AEKey> products = Set.of();
     /**
-     * 智能倍率的静态容量缓存：样板 → 探测当时的可装份数。
+     * 智能倍率的容量缓存：样板 → 探测当时的可装份数。
      *
-     * <p>键是样板本身，值是「一台机器能装几份」的上限，不是实时空位；机器逐渐变满后这个值
-     * 可能偏大，收不下的部分由投递按整数份处理，不做每次 push 重探测。</p>
+     * <p>键是样板本身，值是「节点在线机器合计能装几份」的上限，不是实时空位；机器逐渐变满后这个
+     * 值可能偏大，收不下的部分由投递按整数份处理，不做每次 push 重探测。样板增删、机器上下线、
+     * 倍率模式切换时整体作废。</p>
      */
     private final Map<ItemStack, Integer> smartCache = new HashMap<>();
     /** 缓存对应的节点拓扑版本；结构变化后整体作废。 */
     private long smartCacheRevision = -1L;
+    /** 缓存对应的倍率模式；切模式后整体作废。 */
+    @Nullable
+    private MultiplierMode smartCacheMode;
 
     /**
      * @param node 所属机器节点
@@ -77,16 +92,12 @@ final class NodeCraftService implements ICraftingProvider {
         if (!this.patterns.contains(details) || !details.supportsPushInputsToExternalInventory()) {
             return false;
         }
-        // 一次派单只挑一台在线机器，整份货给它；不拆分到别的机器。
+        // 一次派单只挑一台在线机器，整份货给它；不拆分到别的机器（多机分发在 P3）。
         Machine machine = this.node.pickMachine();
         if (machine == null) {
             return false;
         }
-        IoPortResolver.Faces faces = this.node.faces(machine);
-        if (faces == null) {
-            return false;
-        }
-        if (provider.blocking().isOn() && faces.blockingHit(this.patternInputs)) {
+        if (provider.blocking().isOn() && this.blockingHit(machine, this.patternInputs)) {
             return false;
         }
         try {
@@ -100,14 +111,19 @@ final class NodeCraftService implements ICraftingProvider {
             if (needed.isEmpty()) {
                 return false;
             }
+            // 整单放不下就一个都不写：整数份语义下，收不满的面等于给自己埋坑。
+            CapacityPick capacity = this.node.capacityPick();
+            if (capacity.portionsThatFit(machine, needed, this::configuredFace) < 1L) {
+                return false;
+            }
             List<PendingOrder.Line> lines = new ArrayList<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
-                // 按整行数量选面：选个只能收 1 个的面等于给自己埋坑。
-                IoPortResolver.Faces.Target target = faces.select(entry.getKey(), entry.getValue());
-                if (target == null) {
+                FacePick.PickResult pick = this.node.facePick().pick(machine, entry.getKey(),
+                        IoSide.INPUT, this.configuredFace(entry.getKey()), null);
+                if (!pick.picked()) {
                     return false;
                 }
-                lines.add(new PendingOrder.Line(entry.getKey(), entry.getValue(), target.face()));
+                lines.add(new PendingOrder.Line(entry.getKey(), entry.getValue(), pick.face()));
             }
             long now = this.node.gameTime();
             if (!provider.addOrder(new PendingOrder(lines, machine.id(), now, -1L))) {
@@ -129,7 +145,7 @@ final class NodeCraftService implements ICraftingProvider {
      * 每 tick 试投递队首：队列不退避，机器不在就等，机器被删就退回网络。
      *
      * <p>投递按「能完整做几份」算：所有行都能完整塞下的份数 n，n=0 一个都不写，
-     * 避免把机器塞成半份、把后续任务卡死。</p>
+     * 避免把机器塞成半份、把后续任务卡死。P3 起订单可以跨 tick 分批，本阶段仍是一份。</p>
      *
      * @param now 当前游戏时间
      */
@@ -151,28 +167,24 @@ final class NodeCraftService implements ICraftingProvider {
             // 机器没加载：等，订单不丢。
             return;
         }
-        IoPortResolver.Faces faces = this.node.faces(machine);
-        if (faces == null) {
+        PortExecutor ports = this.node.ports();
+        if (!ports.loaded(machine)) {
             // 区块没加载：等。
             return;
         }
-        // 订单里就是「一份」：pushPattern 收到的全部原料（含倍率放大）原样记在 lines 里。
-        // 投递只能按这些数量写，机器容量只决定「这一份现在放不放得下」——
-        // 机器容量不是库存，绝不能拿它放大数量（那会凭空造料）。
-        // 若将来把多份合并成一张订单，要先给 PendingOrder 加 sets 字段，
-        // 再按 n = min(订单份数, 容量能容纳份数) 投递；现在订单恒为一份，n 只有 0 或 1。
-        List<IoPortResolver.Faces.Target> targets = new ArrayList<>(order.lines().size());
+        List<MEStorage> targets = new ArrayList<>(order.lines().size());
         for (PendingOrder.Line line : order.lines()) {
-            IoPortResolver.Faces.Target target = this.target(faces, line);
-            if (target == null) {
+            MEStorage storage = this.storageFor(machine, line, ports);
+            if (storage == null) {
                 return;
             }
-            targets.add(target);
-            long accepted = target.target().insert(line.key(), line.amount(), Actionable.SIMULATE);
+            long accepted = storage.insert(line.key(), line.amount(), Actionable.SIMULATE,
+                    AeKeySupport.SOURCE);
             if (accepted < line.amount()) {
                 // 整数份：整单放不下就一个都不写，等机器腾出空间。
                 return;
             }
+            targets.add(storage);
         }
         List<PendingOrder.Line> remaining = new ArrayList<>();
         for (int index = 0; index < order.lines().size(); index++) {
@@ -180,7 +192,8 @@ final class NodeCraftService implements ICraftingProvider {
             long want = line.amount();
             long inserted;
             try {
-                inserted = targets.get(index).target().insert(line.key(), want, Actionable.MODULATE);
+                inserted = targets.get(index).insert(line.key(), want, Actionable.MODULATE,
+                        AeKeySupport.SOURCE);
             } catch (RuntimeException e) {
                 // 这一行可能写进去一部分（未知）：按「整行已交付」处理，绝不重投造成复制；
                 // 后面的行还没动，原样留回队首等下一轮。
@@ -205,22 +218,94 @@ final class NodeCraftService implements ICraftingProvider {
         this.node.returnSweep().activate(now);
     }
 
+    /**
+     * 取一行要写的存储：订单绑定的面优先，收不下整行就重新选面。
+     *
+     * @param machine 机器
+     * @param line    订单行
+     * @param ports   端口缓存
+     * @return 存储；拿不到时为 {@code null}
+     */
+    @Nullable
+    private MEStorage storageFor(Machine machine, PendingOrder.Line line, PortExecutor ports) {
+        Direction face = line.face();
+        if (face != null) {
+            MEStorage bound = ports.storage(machine, face);
+            if (bound != null
+                    && bound.insert(line.key(), line.amount(), Actionable.SIMULATE,
+                            AeKeySupport.SOURCE) >= line.amount()) {
+                return bound;
+            }
+        }
+        FacePick.PickResult pick = this.node.facePick().pick(machine, line.key(), IoSide.INPUT,
+                this.configuredFace(line.key()), null);
+        return pick.picked() ? ports.storage(machine, pick.face()) : null;
+    }
+
+    /**
+     * 阻挡判定：任何一个面上还有这台机器的样板输入就整单拒绝。
+     *
+     * <p>直接读机器各面的库存，按去组件 key 比较：读库存比逐个样板目标问「有没有这批输入」
+     * 便宜，也正好是 P3 投递时要用的判据。</p>
+     *
+     * @param machine     机器
+     * @param blockedKeys 这台机器所有样板输入的 key 并集（已去组件）
+     * @return 是否撞到阻挡
+     */
+    private boolean blockingHit(Machine machine, Set<AEKey> blockedKeys) {
+        if (blockedKeys.isEmpty()) {
+            return false;
+        }
+        PortExecutor ports = this.node.ports();
+        for (Direction face : FACES) {
+            MEStorage storage = ports.storage(machine, face);
+            if (storage == null) {
+                continue;
+            }
+            KeyCounter counter = new KeyCounter();
+            try {
+                storage.getAvailableStacks(counter);
+            } catch (RuntimeException e) {
+                // 这一面读不出来：不影响其它面的判定，异常不外抛。
+                continue;
+            }
+            for (AEKey key : counter.keySet()) {
+                if (blockedKeys.contains(key.dropSecondary())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 节点输入规则里给这个 key 配的面：先精确、再同注册名的模糊。
+     *
+     * @param key 资源
+     * @return 配置面；没配时为 {@code null}
+     */
+    @Nullable
+    private Direction configuredFace(AEKey key) {
+        Direction fuzzy = null;
+        for (ResourceSpec spec : this.node.node().io().inputs()) {
+            if (spec.face() == null) {
+                continue;
+            }
+            if (spec.key().equals(key)) {
+                return spec.face();
+            }
+            if (fuzzy == null && spec.fuzzy()
+                    && spec.key().getType().equals(key.getType())
+                    && spec.key().getId().equals(key.getId())) {
+                fuzzy = spec.face();
+            }
+        }
+        return fuzzy;
+    }
+
     /** 队列或存档数据变了：让节点在下一 tick 统一落盘。 */
     private void markQueueChanged() {
         this.node.markDataChanged();
-    }
-    /** 取一行在快照上的目标：绑定面收不下整行就重新按数量选面。 */
-    @Nullable
-    private IoPortResolver.Faces.Target target(IoPortResolver.Faces faces,
-            PendingOrder.Line line) {
-        if (line.face() != null) {
-            var bound = faces.target(line.face());
-            if (bound != null
-                    && bound.insert(line.key(), line.amount(), Actionable.SIMULATE) >= line.amount()) {
-                return new IoPortResolver.Faces.Target(faces.slots().get(0), line.face(), bound);
-            }
-        }
-        return faces.select(line.key(), line.amount());
     }
 
     /**
@@ -250,13 +335,13 @@ final class NodeCraftService implements ICraftingProvider {
         List<PendingOrder.Line> remaining = new ArrayList<>(order.lines().size());
         for (PendingOrder.Line line : order.lines()) {
             long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                    this.node.actionSource());
+                    AeKeySupport.SOURCE);
             if (accepted <= 0L) {
                 remaining.add(line);
                 continue;
             }
             long inserted = network.insert(line.key(), Math.min(accepted, line.amount()),
-                    Actionable.MODULATE, this.node.actionSource());
+                    Actionable.MODULATE, AeKeySupport.SOURCE);
             long left = line.amount() - inserted;
             if (left > 0L) {
                 remaining.add(new PendingOrder.Line(line.key(), left, line.face()));
@@ -289,10 +374,10 @@ final class NodeCraftService implements ICraftingProvider {
             if (network != null) {
                 for (PendingOrder.Line line : order.lines()) {
                     long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                            this.node.actionSource());
+                            AeKeySupport.SOURCE);
                     if (accepted > 0L) {
                         network.insert(line.key(), Math.min(accepted, line.amount()),
-                                Actionable.MODULATE, this.node.actionSource());
+                                Actionable.MODULATE, AeKeySupport.SOURCE);
                     }
                 }
             }
@@ -324,6 +409,13 @@ final class NodeCraftService implements ICraftingProvider {
     }
 
     /**
+     * 机器上下线时清掉智能倍率缓存：档位没变，能装几份变了。
+     */
+    void onOnlineChanged() {
+        this.smartCache.clear();
+    }
+
+    /**
      * 重新解码全部样板并通知 CPU。
      *
      * <p>样板槽变化后调：AE2 的合成服务在节点注册时拍快照，不刷新的话 CPU 看到的永远是旧的。</p>
@@ -331,13 +423,16 @@ final class NodeCraftService implements ICraftingProvider {
     void rebuild() {
         NodeProvider provider = this.node.node().provider();
         Level level = this.node.decodeLevel();
-        if (this.smartCacheRevision != this.node.node().topologyRevision()) {
+        boolean modeChanged = this.smartCacheMode != provider.multiplier().mode();
+        if (this.smartCacheRevision != this.node.node().topologyRevision() || modeChanged) {
             this.smartCache.clear();
             this.smartCacheRevision = this.node.node().topologyRevision();
+            this.smartCacheMode = provider.multiplier().mode();
         }
         List<IPatternDetails> decoded = new ArrayList<>();
         Set<AEKey> inputs = new HashSet<>();
         Set<AEKey> outputs = new HashSet<>();
+        Set<ItemStack> liveKeys = new HashSet<>();
         for (int slot = 0; slot < provider.capacity(); slot++) {
             ItemStack stack = provider.pattern(slot);
             // 槽位只收处理样板；老档被手改过时也在这里挡掉，不能拿合成样板去广告。
@@ -348,14 +443,9 @@ final class NodeCraftService implements ICraftingProvider {
             if (details == null) {
                 continue;
             }
+            liveKeys.add(stack.copyWithCount(1));
             int factor = resolveFactor(provider, stack, details);
             ScaledPatternDetails scaled = ScaledPatternDetails.scale(details, factor);
-            if (scaled == null) {
-                // 乘法溢出：跳过并记日志，不产生负数数量。
-                this.node.logThrottled(this.node.gameTime(),
-                        "样板倍率溢出，已跳过：" + details.getDefinition().getId());
-                continue;
-            }
             decoded.add(scaled);
             for (IPatternDetails.IInput input : details.getInputs()) {
                 for (GenericStack possible : input.getPossibleInputs()) {
@@ -366,6 +456,8 @@ final class NodeCraftService implements ICraftingProvider {
                 outputs.add(output.what());
             }
         }
+        // 样板被删掉的条目立即清掉，避免缓存跟着旧样板越攒越多。
+        this.smartCache.keySet().retainAll(liveKeys);
         this.patterns = List.copyOf(decoded);
         this.patternInputs = Set.copyOf(inputs);
         this.products = Set.copyOf(outputs);
@@ -389,10 +481,10 @@ final class NodeCraftService implements ICraftingProvider {
     }
 
     /**
-     * 智能倍率：按「一台机器能装几份」二分探测，缓存静态上限。
+     * 智能倍率：按节点所有在线机器的容量之和取 25%（向下取整，至少 1）。
      *
-     * <p>只用 {@code Actionable.SIMULATE}，绝不写入机器状态；多个输入要求同一倍数都能装下，
-     * 等价于取最小值。探测失败（没有在线机器 / 没有可收面）回退 ×1。</p>
+     * <p>每张样板各算各的：不同样板的每份用量不同，能装的份数自然不同。结果缓存到样板增删、
+     * 机器上下线或倍率模式切换为止；网络压力大时不会每 tick 重扫机器。</p>
      *
      * @param stack   样板物品
      * @param details 原始样板
@@ -410,64 +502,58 @@ final class NodeCraftService implements ICraftingProvider {
     }
 
     /**
-     * 二分探测一台机器能装几份。
+     * 节点全部在线机器的可装份数之和的 25%。
      *
      * @param details 原始样板
-     * @return 可装份数；探测不可用时为 1
+     * @return 份数，至少 1
      */
     private int probeCapacity(IPatternDetails details) {
         List<Machine> online = this.node.onlineMachines();
         if (online.isEmpty()) {
             return 1;
         }
-        IoPortResolver.Faces faces = this.node.faces(online.get(0));
-        if (faces == null) {
+        Map<AEKey, Long> perPortion = perPortion(details);
+        if (perPortion.isEmpty()) {
             return 1;
         }
-        int low = 1;
-        int high = Multiplier.HARD_MAX_FACTOR;
-        int best = 0;
-        while (low <= high) {
-            int mid = (low + high) >>> 1;
-            if (canFit(details, faces, mid)) {
-                best = mid;
-                low = mid + 1;
-            } else {
-                high = mid - 1;
+        CapacityPick capacity = this.node.capacityPick();
+        long total = 0L;
+        for (Machine machine : online) {
+            total += capacity.portionsThatFit(machine, perPortion);
+            if (total > Integer.MAX_VALUE) {
+                total = Integer.MAX_VALUE;
+                break;
             }
         }
-        return Math.max(1, best);
+        return Math.max(1, (int) (total / 4L));
     }
 
     /**
-     * 这份样板按倍数能不能全部塞进这台机器（模拟插入）。
+     * 一张样板「一份」的输入清单：资源 → 用量。
+     *
+     * <p>AE2 的实际消耗 = 模板数量 × {@code getMultiplier()}，所以这里两个都要乘进去；只取第一个
+     * 候选输入（与投递一致），少了 multiplier 会把可装份数估大。</p>
      *
      * @param details 原始样板
-     * @param faces   目标机器的面快照
-     * @param factor  倍数
-     * @return 所有输入都能收下时为 {@code true}
+     * @return 每份输入；乘不出合法数量时返回空表
      */
-    private static boolean canFit(IPatternDetails details, IoPortResolver.Faces faces,
-            int factor) {
+    private static Map<AEKey, Long> perPortion(IPatternDetails details) {
+        Map<AEKey, Long> result = new LinkedHashMap<>();
         for (IPatternDetails.IInput input : details.getInputs()) {
             GenericStack[] possible = input.getPossibleInputs();
             if (possible.length == 0) {
                 continue;
             }
-            long amount;
             try {
-                // AE2 的实际消耗 = 模板数量 × multiplier；少乘 multiplier 会把可装份数估大。
-                amount = Math.multiplyExact(
-                        Math.multiplyExact(possible[0].amount(), input.getMultiplier()),
-                        (long) factor);
+                long amount = Math.multiplyExact(possible[0].amount(), input.getMultiplier());
+                if (amount > 0L) {
+                    result.merge(possible[0].what(), amount, Long::sum);
+                }
             } catch (ArithmeticException e) {
-                return false;
-            }
-            if (faces.select(possible[0].what(), amount) == null) {
-                return false;
+                return Map.of();
             }
         }
-        return true;
+        return result;
     }
 
     /**

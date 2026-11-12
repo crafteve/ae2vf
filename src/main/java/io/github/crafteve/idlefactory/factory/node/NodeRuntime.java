@@ -11,7 +11,9 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.IoPortResolver;
+import io.github.crafteve.idlefactory.factory.io.CapacityPick;
+import io.github.crafteve.idlefactory.factory.io.FacePick;
+import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
@@ -70,6 +72,12 @@ public final class NodeRuntime
     private boolean available;
     /** 逐机器在线标记；由运行时按观测结论注入，provider 派单只挑在线机器。 */
     private final Map<UUID, Boolean> machineOnline = new HashMap<>();
+    /** 工厂共享的端口缓存；机器侧存储一律从这里取。 */
+    private final PortExecutor ports;
+    /** 选面：配置面 → 经验面 → 逐面探。 */
+    private final FacePick facePick;
+    /** 容量查询：主动分配与智能倍率共用。 */
+    private final CapacityPick capacityPick;
     /** 轮询派单游标；只存内存，不写档。 */
     private int dispatchCursor;
     /** 主动侧可观测面：队列深度、卡了多久、最近一次失败原因。 */
@@ -83,16 +91,21 @@ public final class NodeRuntime
      * @param anchor      工厂 ME 锚点节点
      * @param anchorLevel 锚点所在维度，虚拟节点只借它做构造参数
      * @param available   节点内是否至少有一台机器在线
+     * @param ports       工厂共享的端口缓存
      * @param notice      节点告警出口
      */
     NodeRuntime(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
-            ServerLevel anchorLevel, boolean available, Consumer<NodeManager.Notice> notice) {
+            ServerLevel anchorLevel, boolean available, PortExecutor ports,
+            Consumer<NodeManager.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
         this.node = node;
         this.anchor = anchor;
         this.anchorLevel = anchorLevel;
         this.available = available;
+        this.ports = ports;
+        this.facePick = new FacePick(ports);
+        this.capacityPick = new CapacityPick(this.facePick, ports);
         this.notice = notice;
         // 建节点时节点上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
         this.patternsDirty = true;
@@ -303,10 +316,17 @@ public final class NodeRuntime
      * @param online 在线机器 id 集合
      */
     void setOnlineMachines(Set<UUID> online) {
+        if (this.machineOnline.size() == online.size()
+                && online.stream().allMatch(this.machineOnline::containsKey)) {
+            // 集合没变：每轮对账都会调到这里，无脑清缓存会让智能倍率永远重新探测。
+            return;
+        }
         this.machineOnline.clear();
         for (UUID id : online) {
             this.machineOnline.put(id, Boolean.TRUE);
         }
+        // 在线集合变了，智能倍率的「能装几份」跟着变，缓存整体作废。
+        this.craft.onOnlineChanged();
     }
 
     /**
@@ -407,22 +427,19 @@ public final class NodeRuntime
         return this.anchorLevel;
     }
 
-    /**
-     * 开一次派单 / 回收用的面快照：覆盖整台机器的所有方块，类型方块优先。
-     *
-     * @param machine 机器
-     * @return 快照；没有任何方块加载时为 {@code null}
-     */
-    @Nullable
-    IoPortResolver.Faces faces(Machine machine) {
-        BlockKey block = machine.block();
-        ServerLevel level = this.levelOf(block);
-        if (level == null || !level.isLoaded(block.pos())) {
-            // 机器 ONLINE 要求方块可用；未加载就交给健康门禁拦整台机器。
-            return null;
-        }
-        return IoPortResolver.faces(level, block.pos(), level.getBlockEntity(block.pos()),
-                this.node.io().inputs(), this.actionSource());
+    /** 工厂共享的端口缓存：机器侧存储一律从这里取。 */
+    PortExecutor ports() {
+        return this.ports;
+    }
+
+    /** 选面。 */
+    FacePick facePick() {
+        return this.facePick;
+    }
+
+    /** 容量查询。 */
+    CapacityPick capacityPick() {
+        return this.capacityPick;
     }
 
     /**

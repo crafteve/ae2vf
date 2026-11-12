@@ -25,7 +25,9 @@ public enum Reason {
     /** 有容量却不收（面不对），当场清掉面记忆。 */
     REJECTED,
     /** 异常；退款失败也归这里。 */
-    ERROR;
+    ERROR,
+    /** 玩家配的面没有这个能力（配置错误），不自动换别的面重探。 */
+    FACE_CONFIG_INVALID;
 
     /**
      * 严重度：越大越需要用户注意，用于「一列原因取最坏的那个」。
@@ -37,7 +39,7 @@ public enum Reason {
     public int severity() {
         return switch (this) {
             case ERROR -> 5;
-            case REJECTED -> 4;
+            case REJECTED, FACE_CONFIG_INVALID -> 4;
             case NO_FACE -> 3;
             case FULL -> 2;
             case NO_MATERIAL -> 1;

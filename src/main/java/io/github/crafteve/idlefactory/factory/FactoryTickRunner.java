@@ -102,7 +102,7 @@ final class FactoryTickRunner {
         for (Factory factory : this.manager.all()) {
             factory.live().analyzer().retainMachines(liveMachines);
             Form form = this.formBuilder.build(factory, this.machineStates);
-            this.nodeIoRunner.runFactory(this.server, factory, form, this.observations, now);
+            this.nodeIoRunner.runFactory(factory, form, now);
             // 速率结算由账房自己数间隔；P3 接入 IoRunner 后，执行顺序也由它统一编排。
             factory.live().analyzer().tick(now);
         }

@@ -1,267 +1,286 @@
 package io.github.crafteve.idlefactory.factory.io;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
+import appeng.api.config.Actionable;
+import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
 
 /**
- * 一个 IO 组的执行器：对一台机器按配置补料、抽产物。
+ * 机器侧唯一写入口：{@code move} / {@code fill} / {@code refund} / {@code sweep}。
  *
- * <p>面与 handler 的解析在 {@link IoPortResolver}；物品变体的展开在 {@link ItemCandidates}。
- * 本类只负责按规则跑事务、汇总本轮结果与逐规则原因。</p>
+ * <p>被动与主动共用这一个写入口，区别只在两头的存储是谁：被动是「仓库 ↔ 机器」，
+ * 主动是「凭空补进机器」与「产物扫回仓库」。执行器不决定搬什么、不选面——清单由规划器给，
+ * 面由 {@link FacePick} 定。</p>
  *
- * <p>搬成功就记住这个面；{@link Reason#REJECTED}（有容量却不收）说明面不对，踢掉路由下次重扫。
- * 玩家改规则、方块被换、能力失效都会让路由整体作废（观测层的面表代数 +1）。</p>
- *
- * <p><b>物品的模糊规则</b>：{@link io.github.crafteve.idlefactory.factory.machine.MatchMode#IGNORE_COMPONENTS}
- * 会把一条规则展开成多个「一个变体一个适配器」，每个变体走一遍 {@link IoTransfer} 的事务逻辑；
- * 候选变体来自 {@link ItemVariantIndex}（输入）或机器库存（输出）。每 tick 的变体预算为
- * 单规则 8、单机器 16，输入/输出按侧分配，防止变体爆炸时一次打满；规则处理顺序按 tick
- * 轮转，避免后面的规则被饿死。</p>
+ * <p><b>唯一不变式：搬不进目标的东西，不留在半空。</b>所有路径都先模拟再提交，提交少于
+ * 扣减量时把差额退回来源；回退失败只记日志（D21），绝不生成掉落物。</p>
  */
 public final class IoExecutor {
+    /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
+    private static final int ENERGY_PROBE = 1000;
+    /** 其它资源探测的模拟量。 */
+    private static final int ITEM_PROBE = 1;
+    /** 固定顺序的六面。 */
+    private static final Direction[] FACES = Direction.values();
+
+    private final PortExecutor ports;
+
     /**
-     * 一次机器搬运的结果：只保留调用方真的会读的分量。
-     *
-     * <p>按资源的总量、侧级原因、输入是否堵塞曾经也在这里，但视图与排期都改读账本与结论后
-     * 就没人读了——两份「为什么不动」只会打架，所以删掉。</p>
-     *
-     * @param fed          补进机器的总数
-     * @param pulled       从机器抽出的总数
-     * @param fedByRule    按规则拆分的补料量
-     * @param pulledByRule 按规则拆分的抽取量
-     * @param inputReasons 逐输入规则的本轮原因
-     * @param outputReasons 逐输出规则的本轮原因
-     * @param faces        逐规则本轮实际用的面，给单元的经验面与账本用
+     * @param ports 端口缓存；执行器不自己建存储
      */
-    public record BlockRun(long fed, long pulled,
-            Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule,
-            Map<RuleKey, Reason> inputReasons,
-            Map<RuleKey, Reason> outputReasons,
-            Map<RuleKey, Direction> faces) {
-
-        public BlockRun {
-            // 逐规则原因会被快照读取，先冻结成只读，避免调用方后续改动影响已发出的视图。
-            inputReasons = Map.copyOf(inputReasons);
-            outputReasons = Map.copyOf(outputReasons);
-            faces = Map.copyOf(faces);
-        }
-
-        /** 一共搬了多少。 */
-        public long moved() {
-            return this.fed + this.pulled;
-        }
-
-        /** 这一轮是否搬了东西。 */
-        public boolean movedAnything() {
-            return this.fed + this.pulled > 0L;
-        }
-    }
-
-    private static Reason worse(@Nullable Reason current,
-            Reason next) {
-        if (current == null) {
-            return next;
-        }
-        return next.severity() > current.severity() ? next : current;
-    }
-
-    private IoExecutor() {
-        // 纯静态工具类
+    public IoExecutor(PortExecutor ports) {
+        this.ports = ports;
     }
 
     /**
-     * 跑一台机器的一轮。
+     * 执行一条 Job：从 {@code network} 补进机器，或从机器抽回 {@code network}。
      *
-     * @param storage    仓库
-     * @param level      机器所在维度
-     * @param pos        机器坐标
-     * @param inputs     本轮要跑的输入条目（规划器已排好顺序）
-     * @param outputs    本轮要跑的输出条目（规划器已排好顺序）
-     * @param caps       能力句柄缓存；{@code null} 时直接查世界
-     * @param variants   模糊物品规则的变体索引；{@code null} 时模糊输入退化为无候选
-     * @param now          当前服务端 tick，给变体索引算 TTL
-     * @param sharedBudget 本台机器本 tick 共享的变体预算；每个方块按序扣减
-     * @return 本方块结果
+     * <p>面在 Job 里定死；这里只负责取到那个面的存储、跑事务、把「面不对」与「满了」分开：
+     * 目标这一刻一个都收不下时，如果别的面能收，就是面不对（{@link Reason#REJECTED}），
+     * 否则是满了（{@link Reason#FULL}）。前者要清经验面，后者要保住经验面。</p>
+     *
+     * @param network 仓库
+     * @param job     任务
+     * @return 本次结果
      */
-    public static BlockRun runBlock(MEStorage storage, ServerLevel level, BlockPos pos,
-            List<Form.Entry> inputs, List<Form.Entry> outputs, @Nullable LevelCapabilityCache caps,
-            @Nullable ItemVariantIndex variants, long now, int[] sharedBudget) {
-        long fed = 0L;
-        long pulled = 0L;
-        Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
-        Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
-        Map<RuleKey, Reason> inputReasons = new LinkedHashMap<>();
-        Map<RuleKey, Reason> outputReasons = new LinkedHashMap<>();
-        Map<RuleKey, Direction> faces = new LinkedHashMap<>();
-        // 变体预算按侧分配：输出侧预留 4 个变体，输入侧每 tick 最多 16 - 4 = 12 个。
-        // 输入循环先跑，共用一个池时两条模糊输入就能把 16 用光，输出规则每 tick 都被跳过；
-        // 输出侧没有模糊物品规则时它不扣预算，输入可以拿满 16。
-        boolean outputUsesVariants = usesVariants(outputs);
-        int sideAllowance = outputUsesVariants
-                ? ItemCandidates.MAX_VARIANTS_PER_INPUT_TICK
-                : ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK;
-        int[] inputBudget = {Math.min(sideAllowance, Math.max(0, sharedBudget[0]))};
-        int inputQuota = inputBudget[0];
+    public MoveResult move(MEStorage network, IoJob job) {
+        MEStorage machineStorage = this.ports.storage(job.machine(), job.face());
+        if (machineStorage == null) {
+            return new MoveResult(0L, Reason.NO_FACE);
+        }
+        boolean input = job.side() == IoSide.INPUT;
+        MoveResult result = input
+                ? this.transfer(network, machineStorage, job.key(), job.amount())
+                : this.transfer(machineStorage, network, job.key(), job.amount());
+        if (result.reason() != Reason.FULL) {
+            return result;
+        }
+        // 目标一个都收不下：面确实不对时别的面能收。多探一次是为了把 REJECTED 与 FULL 分开，
+        // 只有零结果路径会付出这个代价。
+        return this.otherFaceAccepts(job) ? new MoveResult(0L, Reason.REJECTED) : result;
+    }
 
-        // 顺序由规划器给定（游标轮转在规划器里），执行器只按清单跑。
-        for (int ruleIndex = 0; ruleIndex < inputs.size(); ruleIndex++) {
-            Form.Entry entry = inputs.get(ruleIndex);
-            ResourceSpec spec = entry.spec();
-            RuleKey ruleKey = entry.key().rule();
-            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, IoSide.INPUT,
-                    caps, entry.conclusion().faceHint());
-            if (resolved == null) {
-                // 原因已经进账本，不再逐 tick 打日志：debug 级别下会按规则数刷屏。
-                inputReasons.put(ruleKey, Reason.NO_FACE);
+    /**
+     * 一次搬运事务：源 → 目标。
+     *
+     * <p>顺序固定：先问目标能收多少 → 按这个量从源扣 → 提交 → 差额退回源。先扣再提交会让
+     * 「目标其实不收」变成凭空消失；先提交再扣会让「源其实没料」变成凭空生成。</p>
+     *
+     * @param source 来源
+     * @param target 目标
+     * @param key    资源
+     * @param amount 想搬多少；{@code <= 0} 表示没有量
+     * @return 实际搬动量与原因
+     */
+    public MoveResult transfer(MEStorage source, MEStorage target, AEKey key, long amount) {
+        if (amount <= 0L) {
+            return MoveResult.NOTHING;
+        }
+        long accepted;
+        try {
+            accepted = target.insert(key, amount, Actionable.SIMULATE, AeKeySupport.SOURCE);
+        } catch (RuntimeException e) {
+            this.log("模拟写入目标异常", key, e);
+            return new MoveResult(0L, Reason.ERROR);
+        }
+        if (accepted <= 0L) {
+            return new MoveResult(0L, Reason.FULL);
+        }
+        long available;
+        try {
+            available = source.extract(key, Math.min(amount, accepted), Actionable.SIMULATE,
+                    AeKeySupport.SOURCE);
+        } catch (RuntimeException e) {
+            this.log("模拟从来源抽取异常", key, e);
+            return new MoveResult(0L, Reason.ERROR);
+        }
+        if (available <= 0L) {
+            return new MoveResult(0L, Reason.NO_MATERIAL);
+        }
+        long want = Math.min(available, accepted);
+        long taken;
+        try {
+            taken = source.extract(key, want, Actionable.MODULATE, AeKeySupport.SOURCE);
+        } catch (RuntimeException e) {
+            // 取没取出来是未知的：按「一点没取」处理，下一轮重试；宁可重复也不让料悬空。
+            this.log("从来源抽取异常", key, e);
+            return new MoveResult(0L, Reason.ERROR);
+        }
+        if (taken <= 0L) {
+            return new MoveResult(0L, Reason.NO_MATERIAL);
+        }
+        long inserted;
+        try {
+            inserted = target.insert(key, taken, Actionable.MODULATE, AeKeySupport.SOURCE);
+        } catch (RuntimeException e) {
+            // 写进去多少未知：把本次从源扣走的整笔退回去（可能重复），记 ERROR，不让单卡死。
+            this.log("提交写入目标异常", key, e);
+            this.refund(source, key, taken);
+            return new MoveResult(0L, Reason.ERROR);
+        }
+        long refund = taken - inserted;
+        if (refund > 0L) {
+            this.refund(source, key, refund);
+        }
+        return new MoveResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
+    }
+
+    /**
+     * 凭空补：材料在派单时已经从网络抽走，这里逐行直接写，不回退也不模拟。
+     *
+     * <p>{@code perLine} 已按行聚合（同一行只出现一次，量 = 每份用量 × 份数），所以一张
+     * 81 行的样板就是 81 次 {@code insert}，与份数无关。部分成功是正常路径：返回值就是
+     * 机器实际收下的量，账本按它累加。</p>
+     *
+     * @param machine 机器侧的存储
+     * @param perLine 资源 → 要写的总量
+     * @return 逐行结果
+     */
+    public Map<AEKey, MoveResult> fill(MEStorage machine, Map<AEKey, Long> perLine) {
+        Map<AEKey, MoveResult> results = new LinkedHashMap<>();
+        for (Map.Entry<AEKey, Long> line : perLine.entrySet()) {
+            long amount = line.getValue();
+            if (amount <= 0L) {
                 continue;
             }
-            if (resolved.face() != null) {
-                faces.put(ruleKey, resolved.face());
-            }
-            Adapters adapters = ruleAdapters(storage, resolved, spec, true, variants, now,
-                    inputBudget);
-            if (adapters.starved()) {
-                // 本侧额度被前面的规则用完：本轮跳过，不代表机器拒收，但原因必须可见。
-                inputReasons.put(ruleKey, Reason.BUDGET_OUT);
+            long inserted;
+            try {
+                inserted = machine.insert(line.getKey(), amount, Actionable.MODULATE,
+                        AeKeySupport.SOURCE);
+            } catch (RuntimeException e) {
+                // 这一行写进去多少未知：剩余量留队下一 tick 重试（可能重复，但单不卡死）。
+                this.log("补料写入机器异常", line.getKey(), e);
+                results.put(line.getKey(), new MoveResult(0L, Reason.ERROR));
                 continue;
             }
-            if (adapters.list().isEmpty()) {
-                inputReasons.put(ruleKey, Reason.NO_MATERIAL);
-                // 没有候选 = 仓库当前没有这个物品；机器侧并没有拒收，不能算「输入堵塞」。
+            results.put(line.getKey(), new MoveResult(inserted,
+                    inserted > 0L ? Reason.RUN : Reason.FULL));
+        }
+        return results;
+    }
+
+    /**
+     * 把没交出去的量退回仓库；仓库不收时记日志丢弃，不生成掉落物。
+     *
+     * @param network 仓库
+     * @param key     资源
+     * @param amount  数量
+     * @return 退回去多少
+     */
+    public MoveResult refund(MEStorage network, AEKey key, long amount) {
+        if (amount <= 0L) {
+            return MoveResult.NOTHING;
+        }
+        long inserted;
+        try {
+            inserted = network.insert(key, amount, Actionable.MODULATE, AeKeySupport.SOURCE);
+        } catch (RuntimeException e) {
+            this.log("退回仓库异常", key, e);
+            inserted = 0L;
+        }
+        long lost = amount - inserted;
+        if (lost > 0L) {
+            // 退回失败按 D21 记日志丢弃：不生成掉落物，也不把错误藏起来。
+            IdleFactory.LOGGER.warn("Idle Factory: 退回仓库失败，{} × {} 已按丢弃处理",
+                    lost, AeKeySupport.displayName(key));
+        }
+        return new MoveResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
+    }
+
+    /**
+     * 回收：逐面取机器存储、抽白名单产物、按网络能收多少插入。
+     *
+     * @param machine  机器
+     * @param network  仓库
+     * @param products 产物白名单
+     * @return 逐资源的回收结果；没抽动任何东西时为空表
+     */
+    public Map<AEKey, MoveResult> sweep(Machine machine, MEStorage network, Set<AEKey> products) {
+        Map<AEKey, MoveResult> results = new LinkedHashMap<>();
+        if (products.isEmpty()) {
+            return results;
+        }
+        for (Direction face : FACES) {
+            MEStorage storage = this.ports.storage(machine, face);
+            if (storage == null || storage == network) {
                 continue;
             }
-            long moved = 0L;
-            Reason reason = null;
-            boolean accepted = false;
-            for (ResourceAdapter adapter : adapters.list()) {
-                MoveResult result = IoTransfer.feed(storage, adapter);
-                moved += result.moved();
-                reason = worse(reason, result.reason());
-                if (result.reason() == Reason.RUN || result.reason() == Reason.NO_MATERIAL) {
-                    // NO_MATERIAL 只表示仓库没料，机器侧已经点头接收
-                    accepted = true;
+            Map<AEKey, Long> available;
+            try {
+                available = AeKeySupport.snapshot(storage);
+            } catch (RuntimeException e) {
+                // 某一面读不出来：只失效这一面，其它面继续扫。
+                this.log("读取机器面库存异常", null, e);
+                this.ports.invalidate(machine, face);
+                continue;
+            }
+            for (Map.Entry<AEKey, Long> entry : available.entrySet()) {
+                AEKey key = entry.getKey();
+                long count = entry.getValue();
+                if (count <= 0L || !products.contains(key)) {
+                    continue;
                 }
-                // 搬通了什么都不用做；拒收由分析器清掉经验面。原因只进账本，不逐 tick 打日志。
-            }
-            Reason combined = moved > 0L
-                    ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
-            inputReasons.put(ruleKey, combined);
-            fed += moved;
-            if (moved > 0L) {
-                fedByRule.merge(ruleKey, moved, Long::sum);
+                MoveResult result = this.transfer(storage, network, key, count);
+                results.merge(key, result, IoExecutor::worse);
+                if (result.reason() == Reason.ERROR) {
+                    this.ports.invalidate(machine, face);
+                }
             }
         }
-
-        int inputUsed = inputQuota - inputBudget[0];
-        sharedBudget[0] = Math.max(0, sharedBudget[0] - inputUsed);
-        // 输出实际额度 = 16 - 输入实际用量，再与本台机器剩余共享预算取小。
-        int[] outputBudget = {
-                Math.min(ItemCandidates.MAX_VARIANTS_PER_MACHINE_TICK - inputUsed, sharedBudget[0])};
-        int outputQuota = outputBudget[0];
-
-        for (int ruleIndex = 0; ruleIndex < outputs.size(); ruleIndex++) {
-            Form.Entry entry = outputs.get(ruleIndex);
-            ResourceSpec spec = entry.spec();
-            RuleKey ruleKey = entry.key().rule();
-            IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, IoSide.OUTPUT,
-                    caps, entry.conclusion().faceHint());
-            if (resolved == null) {
-                // 同输入侧：原因进账本，日志留给账本与界面。
-                outputReasons.put(ruleKey, Reason.NO_FACE);
-                continue;
-            }
-            if (resolved.face() != null) {
-                faces.put(ruleKey, resolved.face());
-            }
-            Adapters adapters = ruleAdapters(storage, resolved, spec, false, variants, now,
-                    outputBudget);
-            if (adapters.starved()) {
-                // 本侧额度耗尽：本轮不判断方向，交给下一 tick 的轮转；同样不能算机器堵塞。
-                outputReasons.put(ruleKey, Reason.BUDGET_OUT);
-                continue;
-            }
-            if (adapters.list().isEmpty()) {
-                outputReasons.put(ruleKey, Reason.NO_MATERIAL);
-                continue;
-            }
-            long moved = 0L;
-            Reason reason = null;
-            for (ResourceAdapter adapter : adapters.list()) {
-                MoveResult result = IoTransfer.pull(storage, adapter);
-                moved += result.moved();
-                reason = worse(reason, result.reason());
-                // 搬通了什么都不用做；拒收由分析器清掉经验面。原因只进账本，不逐 tick 打日志。
-            }
-            Reason combined = moved > 0L
-                    ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
-            outputReasons.put(ruleKey, combined);
-            pulled += moved;
-            if (moved > 0L) {
-                pulledByRule.merge(ruleKey, moved, Long::sum);
-            }
-        }
-
-        int outputUsed = outputQuota - outputBudget[0];
-        sharedBudget[0] = Math.max(0, sharedBudget[0] - outputUsed);
-
-        return new BlockRun(fed, pulled, fedByRule, pulledByRule,
-                inputReasons, outputReasons, faces);
+        return results;
     }
 
     /**
-     * 一组搬运通道；{@code starved} 表示本侧预算耗尽，而不是真的没有候选。
-     */
-    private record Adapters(List<ResourceAdapter> list, boolean starved) {
-    }
-
-    /**
-     * 按规则展开出一条或多条搬运通道。
+     * 这台机器在这个面之外，是否还有面能收下这个资源。
      *
-     * <p>非物品规则只有解析出的那一条；物品规则按精确/模糊展开：精确只有一条，模糊在输入侧
-     * 取仓库变体索引、输出侧扫机器库存。</p>
+     * @param job 任务
+     * @return 其它面能收时为 {@code true}
      */
-    private static Adapters ruleAdapters(MEStorage storage, IoPortResolver.Resolved resolved,
-            ResourceSpec spec, boolean input, @Nullable ItemVariantIndex variants, long now,
-            int[] budget) {
-        if (!(resolved.adapter() instanceof ItemAdapter base)) {
-            // 流体/能量没有变体概念，只有一条通道。
-            return new Adapters(List.of(resolved.adapter()), false);
-        }
-        ItemCandidates.Candidates candidates = ItemCandidates.of(storage, base, spec, input,
-                variants, now, budget);
-        List<ResourceAdapter> result = new ArrayList<>(candidates.adapters());
-        return new Adapters(result, candidates.budgetStarved());
-    }
-
-    /**
-     * 这一侧的规则里是否有会扣变体预算的模糊物品规则。
-     *
-     * <p>只有模糊物品规则会进 {@link ItemCandidates} 展开并扣预算：精确物品规则直接返回单条
-     * 通道，流体 / 能量根本不进变体展开。用它决定另一侧要不要留额度，避免按「规则列表非空」
-     * 判断时把只有流体或精确物品输出的机器也算进去，白白扣掉输入额度。</p>
-     *
-     * @param entries 一侧的条目
-     * @return 存在模糊物品规则时 {@code true}
-     */
-    private static boolean usesVariants(List<Form.Entry> entries) {
-        for (Form.Entry entry : entries) {
-            if (entry.spec().fuzzy()) {
-                return true;
+    private boolean otherFaceAccepts(IoJob job) {
+        Machine machine = job.machine();
+        long probe = AeKeySupport.kind(job.key()) == CapabilityKind.ENERGY ? ENERGY_PROBE : ITEM_PROBE;
+        for (Direction face : FACES) {
+            if (face == job.face()) {
+                continue;
+            }
+            MEStorage storage = this.ports.storage(machine, face);
+            if (storage == null) {
+                continue;
+            }
+            try {
+                long accepted = job.side() == IoSide.INPUT
+                        ? storage.insert(job.key(), probe, Actionable.SIMULATE, AeKeySupport.SOURCE)
+                        : storage.extract(job.key(), probe, Actionable.SIMULATE, AeKeySupport.SOURCE);
+                if (accepted > 0L) {
+                    return true;
+                }
+            } catch (RuntimeException ignored) {
+                // 这一面不可用，继续看下一个
             }
         }
         return false;
+    }
+
+    /** 两条结果取更严重的那条，数量相加。 */
+    private static MoveResult worse(MoveResult left, MoveResult right) {
+        return new MoveResult(left.moved() + right.moved(),
+                right.reason().severity() > left.reason().severity() ? right.reason() : left.reason());
+    }
+
+    private void log(String message, @Nullable AEKey key, RuntimeException cause) {
+        IdleFactory.LOGGER.warn("Idle Factory: {}（{}）", message,
+                key == null ? "未知资源" : AeKeySupport.describe(key), cause);
     }
 }

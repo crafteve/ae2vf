@@ -19,8 +19,10 @@ import net.minecraft.world.level.Level;
  * multiplier，模板数量保持原样。两个都乘会让消耗变成倍率的平方。</p>
  *
  * <p>输出没有 multiplier，直接乘倍数；输入与输出同倍，不改变配比。所有数量与倍率的乘法都用
- * {@link Math#multiplyExact}：溢出直接判定这张样板不可用（{@code null}），绝不产生负数数量。
- * 倍率本身由调用方夹在 {@link Multiplier#HARD_MAX_FACTOR} 以内，这里只负责乘法与包装。</p>
+ * {@link Math#multiplyExact}。</p>
+ *
+ * <p><b>溢出按「夹回」处理，不返回 {@code null}</b>：先按这张样板的实际数量算出安全倍数上限，
+ * 再把倍数夹进上限。丢掉整张样板等于玩家写了样板却完全不工作，而夹回至少还能以较小倍数跑。</p>
  *
  * <p>派单时 CPU 已按本类 {@link #getInputs()} 把放大后的输入算进 inputHolder，所以
  * {@link #pushInputsToExternalInventory} 直接用接口默认实现原样推送。委托回原始样板会走它
@@ -43,35 +45,58 @@ public final class ScaledPatternDetails implements IPatternDetails {
     /**
      * 按倍数放大一张样板。
      *
-     * <p>{@code factor <= 1} 时原样返回代理；任何乘法溢出都返回 {@code null}，由调用方跳过
-     * 并记日志。</p>
+     * <p>{@code factor <= 1} 时原样返回代理；倍数超出这张样板的安全上限时先夹回上限，
+     * 保证不会产生负数数量或溢出。</p>
      *
      * @param delegate 原始样板
-     * @param factor   倍数；调用方保证在 1..{@link Multiplier#HARD_MAX_FACTOR}
-     * @return 放大后的样板；溢出时为 {@code null}
+     * @param factor   希望使用的倍数
+     * @return 放大后的样板
      */
     public static ScaledPatternDetails scale(IPatternDetails delegate, int factor) {
-        if (factor <= 1) {
+        int safe = safeFactor(delegate, factor);
+        if (safe <= 1) {
             return new ScaledPatternDetails(delegate, 1, delegate.getInputs(),
                     delegate.getOutputs());
         }
-        try {
-            IPatternDetails.IInput[] originalInputs = delegate.getInputs();
-            IInput[] scaledInputs = new IInput[originalInputs.length];
-            for (int i = 0; i < originalInputs.length; i++) {
-                scaledInputs[i] = new ScaledInput(originalInputs[i], factor);
-            }
-            List<GenericStack> originalOutputs = delegate.getOutputs();
-            List<GenericStack> scaledOutputs = new ArrayList<>(originalOutputs.size());
-            for (GenericStack output : originalOutputs) {
-                scaledOutputs.add(new GenericStack(output.what(),
-                        Math.multiplyExact(output.amount(), (long) factor)));
-            }
-            return new ScaledPatternDetails(delegate, factor, scaledInputs,
-                    List.copyOf(scaledOutputs));
-        } catch (ArithmeticException e) {
-            return null;
+        IPatternDetails.IInput[] originalInputs = delegate.getInputs();
+        IInput[] scaledInputs = new IInput[originalInputs.length];
+        for (int i = 0; i < originalInputs.length; i++) {
+            scaledInputs[i] = new ScaledInput(originalInputs[i], safe);
         }
+        List<GenericStack> originalOutputs = delegate.getOutputs();
+        List<GenericStack> scaledOutputs = new ArrayList<>(originalOutputs.size());
+        for (GenericStack output : originalOutputs) {
+            scaledOutputs.add(new GenericStack(output.what(),
+                    Math.multiplyExact(output.amount(), (long) safe)));
+        }
+        return new ScaledPatternDetails(delegate, safe, scaledInputs, List.copyOf(scaledOutputs));
+    }
+
+    /**
+     * 这张样板能安全使用的最小倍数上限。
+     *
+     * <p>输入侧受 {@code 模板倍数 × 倍数} 约束，输出侧受 {@code 产量 × 倍数} 约束，取两者较小值。
+     * 上限永远不小于 1：数量本身已经溢出的坏样板按 ×1 处理，不会变成 0 份。</p>
+     *
+     * @param delegate 原始样板
+     * @param factor   希望使用的倍数
+     * @return 安全倍数，至少 1
+     */
+    private static int safeFactor(IPatternDetails delegate, int factor) {
+        long cap = factor;
+        for (IPatternDetails.IInput input : delegate.getInputs()) {
+            long multiplier = input.getMultiplier();
+            if (multiplier > 0L) {
+                cap = Math.min(cap, Long.MAX_VALUE / multiplier);
+            }
+        }
+        for (GenericStack output : delegate.getOutputs()) {
+            long amount = output.amount();
+            if (amount > 0L) {
+                cap = Math.min(cap, Long.MAX_VALUE / amount);
+            }
+        }
+        return (int) Math.max(1L, Math.min(cap, Integer.MAX_VALUE));
     }
 
     /** 实际使用的倍数；诊断用。 */
