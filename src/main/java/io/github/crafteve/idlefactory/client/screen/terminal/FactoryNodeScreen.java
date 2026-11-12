@@ -612,16 +612,13 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         if (this.confirmDialog == null) {
             return;
         }
-        // 终端宽度可能小于 240；超出终端就会压到右侧 JEI/EMI 面板上，被它盖住。
-        int width = Math.min(240, this.imageWidth - 12);
-        int height = Math.min(84, this.imageHeight - 12);
-        int x = this.leftPos + (this.imageWidth - width) / 2;
-        int y = this.topPos + (this.imageHeight - height) / 2;
+        // 几何交给浮层自己算：可用区域是终端窗口，压暗区域是整个屏幕——
+        // AE2 左侧工具栏按钮画在 leftPos 之外，只压暗终端会让它们保持亮着。
         this.confirmDialog.open("删除节点", node.name() + "\n" + deleteDetail(node.view()),
                 "删除", () -> FactoryNodeActions.delete(this.menu.containerId, node),
-                new FactoryConfirmDialog.Bounds(x, y, width, height),
                 new FactoryConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
-                        this.imageHeight));
+                        this.imageHeight),
+                new FactoryConfirmDialog.Bounds(0, 0, this.width, this.height));
     }
 
     /**

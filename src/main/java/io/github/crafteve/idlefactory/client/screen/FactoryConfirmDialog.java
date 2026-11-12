@@ -23,7 +23,10 @@ import net.minecraft.client.gui.GuiGraphics;
 public final class FactoryConfirmDialog {
     /** 浮层尺寸。 */
     private static final int WIDTH = 240;
+    private static final int MIN_WIDTH = 160;
     private static final int HEIGHT = 84;
+    /** 说明文字行高。 */
+    private static final int LINE_HEIGHT = 11;
 
     /**
      * 一个矩形。
@@ -41,7 +44,8 @@ public final class FactoryConfirmDialog {
 
     private boolean open;
     private String title = "";
-    private String message = "";
+    /** 已经按宽度折好的说明行；打开时算一次，绘制与测量共用。 */
+    private List<String> lines = List.of();
     private String confirmLabel = "确定";
     @Nullable
     private Runnable onConfirm;
@@ -62,21 +66,39 @@ public final class FactoryConfirmDialog {
     /**
      * 打开确认浮层。
      *
+     * <p>浮层尺寸由说明文字算出来：先按可用宽度折行，再按行数定高度，最后在
+     * {@code area} 里居中。调用方只给「可用区域」与「要压暗的区域」，不再手写宽高。</p>
+     *
      * @param title        标题
      * @param message      说明；可用 {@code \n} 分行
      * @param confirmLabel 确认按钮文字
      * @param onConfirm    确认回调
-     * @param dialog       浮层矩形
-     * @param backdrop     要压暗的父面板
+     * @param area         浮层可用的屏幕区域（通常是终端窗口）
+     * @param backdrop     要压暗的屏幕区域（通常是整个屏幕）
      */
     public void open(String title, String message, String confirmLabel, Runnable onConfirm,
-            Bounds dialog, Bounds backdrop) {
+            Bounds area, Bounds backdrop) {
         this.title = title;
-        this.message = message;
         this.confirmLabel = confirmLabel;
         this.onConfirm = onConfirm;
-        this.dialog = dialog;
         this.backdrop = backdrop;
+
+        int width = Math.max(MIN_WIDTH, Math.min(WIDTH, area.width() - 12));
+        int textWidth = width - 24;
+        List<String> wrapped = wrapMessage(message, textWidth);
+        int contentHeight = 28 + wrapped.size() * LINE_HEIGHT + 28;
+        int height = Math.max(HEIGHT, Math.min(contentHeight, area.height() - 12));
+        // 区域太矮时只画放得下的行，末行加省略号，绝不让文字压到按钮上。
+        // 可用文字高度 = height - 上边 28 - 按钮行 26，再按行高向下取整。
+        int maxLines = Math.max(1, (height - 47) / LINE_HEIGHT);
+        if (wrapped.size() > maxLines) {
+            List<String> limited = new ArrayList<>(wrapped.subList(0, maxLines));
+            limited.set(maxLines - 1, limited.get(maxLines - 1) + "…");
+            wrapped = limited;
+        }
+        this.lines = List.copyOf(wrapped);
+        this.dialog = new Bounds(area.x() + (area.width() - width) / 2,
+                area.y() + (area.height() - height) / 2, width, height);
         this.open = true;
     }
 
@@ -119,17 +141,10 @@ public final class FactoryConfirmDialog {
                 this.theme.textPrimary(), false);
 
         int lineY = box.y() + 28;
-        int textWidth = box.width() - 24;
-        int textBottom = box.y() + box.height() - 30;
-        for (String raw : this.message.split("\n")) {
-            for (String line : wrap(raw, textWidth)) {
-                if (lineY + 10 > textBottom) {
-                    break;
-                }
-                graphics.drawString(this.font, line, box.x() + 12, lineY,
-                        this.theme.textDim(), false);
-                lineY += 11;
-            }
+        for (String line : this.lines) {
+            graphics.drawString(this.font, line, box.x() + 12, lineY, this.theme.textDim(),
+                    false);
+            lineY += LINE_HEIGHT;
         }
 
         int buttonY = box.y() + box.height() - 26;
@@ -225,6 +240,21 @@ public final class FactoryConfirmDialog {
      * @param width 可用宽度
      * @return 折好的行
      */
+    /**
+     * 把整段说明（可能带 {@code \n}）折成行。
+     *
+     * @param message 原文
+     * @param width   可用宽度
+     * @return 折好的行
+     */
+    private List<String> wrapMessage(String message, int width) {
+        List<String> result = new ArrayList<>();
+        for (String raw : message.split("\n")) {
+            result.addAll(wrap(raw, width));
+        }
+        return result;
+    }
+
     private List<String> wrap(String text, int width) {
         List<String> lines = new ArrayList<>();
         String rest = text;
