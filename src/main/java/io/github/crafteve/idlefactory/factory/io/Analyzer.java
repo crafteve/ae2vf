@@ -59,8 +59,10 @@ public final class Analyzer {
     private final Map<UUID, Map<AEKey, FaceHint>> machineFaceHints = new HashMap<>();
     /** 机器 id → 机器结论。 */
     private final Map<UUID, MachineConclusion> machineConclusions = new HashMap<>();
-    /** 经验面补扫的机器轮转表；每次 retain 后刷新。 */
+    /** 经验面补扫的机器轮转表；机器集合变化后才重建。 */
     private UUID[] machineRing = new UUID[0];
+    /** 上一次 retain 的机器集合，用来判断轮转表要不要重建。 */
+    private Set<UUID> retainedMachines = Set.of();
     /** 轮转游标。 */
     private int ringCursor;
     /** 距上次速率结算过了多少 tick。 */
@@ -152,7 +154,12 @@ public final class Analyzer {
         this.stats.retain(keep);
         this.machineFaceHints.keySet().removeIf(id -> !keep.contains(id));
         this.machineConclusions.keySet().removeIf(id -> !keep.contains(id));
-        this.machineRing = keep.toArray(new UUID[0]);
+        // 机器集合没变就不重建轮转表：retain 每 tick 都调，每 tick 新建数组是白白的开销。
+        if (this.retainedMachines.equals(keep)) {
+            return;
+        }
+        this.retainedMachines = Set.copyOf(keep);
+        this.machineRing = this.retainedMachines.toArray(new UUID[0]);
         if (this.ringCursor >= this.machineRing.length) {
             this.ringCursor = 0;
         }
