@@ -101,8 +101,8 @@ final class NodeCraftService implements ICraftingProvider {
             }
             List<PendingOrder.Line> lines = new ArrayList<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
-                // 只要能收 1 个就选它并把面绑进订单：真塞不下由投递按整数份处理。
-                IoPortResolver.Faces.Target target = faces.select(entry.getKey(), 1L);
+                // 按整行数量选面：选个只能收 1 个的面等于给自己埋坑。
+                IoPortResolver.Faces.Target target = faces.select(entry.getKey(), entry.getValue());
                 if (target == null) {
                     return false;
                 }
@@ -155,26 +155,28 @@ final class NodeCraftService implements ICraftingProvider {
             // 区块没加载：等。
             return;
         }
+        // 订单里就是「一份」：pushPattern 收到的全部原料（含倍率放大）原样记在 lines 里。
+        // 投递只能按这些数量写，机器容量只决定「这一份现在放不放得下」——
+        // 机器容量不是库存，绝不能拿它放大数量（那会凭空造料）。
+        // 若将来把多份合并成一张订单，要先给 PendingOrder 加 sets 字段，
+        // 再按 n = min(订单份数, 容量能容纳份数) 投递；现在订单恒为一份，n 只有 0 或 1。
         List<IoPortResolver.Faces.Target> targets = new ArrayList<>(order.lines().size());
-        long maxSets = Long.MAX_VALUE;
         for (PendingOrder.Line line : order.lines()) {
             IoPortResolver.Faces.Target target = this.target(faces, line);
             if (target == null) {
                 return;
             }
             targets.add(target);
-            // 用大数量模拟一次，得到这个面能为该资源完整容纳几份。
-            long probe = target.target().insert(line.key(), Long.MAX_VALUE / 4L, Actionable.SIMULATE);
-            maxSets = Math.min(maxSets, probe / line.amount());
-        }
-        if (maxSets <= 0L) {
-            // 塞不下：整单留着，等机器腾出空间。一个都不写。
-            return;
+            long accepted = target.target().insert(line.key(), line.amount(), Actionable.SIMULATE);
+            if (accepted < line.amount()) {
+                // 整数份：整单放不下就一个都不写，等机器腾出空间。
+                return;
+            }
         }
         List<PendingOrder.Line> remaining = new ArrayList<>();
         for (int index = 0; index < order.lines().size(); index++) {
             PendingOrder.Line line = order.lines().get(index);
-            long want = line.amount() * maxSets;
+            long want = line.amount();
             long inserted;
             try {
                 inserted = targets.get(index).target().insert(line.key(), want, Actionable.MODULATE);
@@ -188,7 +190,7 @@ final class NodeCraftService implements ICraftingProvider {
                 break;
             }
             if (inserted < want) {
-                // 模拟与提交不一致：差额按固定数量写回队首，下一轮 n=1 精确补齐。
+                // 模拟与提交不一致：差额按固定数量写回队首，下一轮精确补齐。
                 remaining.add(new PendingOrder.Line(line.key(), want - inserted, line.face()));
             }
         }
@@ -206,14 +208,15 @@ final class NodeCraftService implements ICraftingProvider {
     private void markQueueChanged() {
         this.node.markDataChanged();
     }
-    /** 取一行在快照上的目标：先用绑定面，没有就重新选一次。 */
+    /** 取一行在快照上的目标：绑定面收不下整行就重新按数量选面。 */
     @Nullable
     private IoPortResolver.Faces.Target target(IoPortResolver.Faces faces,
             PendingOrder.Line line) {
         if (line.face() != null) {
-            var raw = faces.target(line.face());
-            if (raw != null) {
-                return new IoPortResolver.Faces.Target(faces.slots().get(0), line.face(), raw);
+            var bound = faces.target(line.face());
+            if (bound != null
+                    && bound.insert(line.key(), line.amount(), Actionable.SIMULATE) >= line.amount()) {
+                return new IoPortResolver.Faces.Target(faces.slots().get(0), line.face(), bound);
             }
         }
         return faces.select(line.key(), line.amount());

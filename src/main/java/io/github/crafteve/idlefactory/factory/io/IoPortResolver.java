@@ -405,7 +405,7 @@ public final class IoPortResolver {
         }
 
         /**
-         * 给一个 key 选面：规则面优先，其次六面模拟，要求至少能收 1 个。
+         * 给一个 key 选面：规则面优先，其次六面模拟，要求能完整收下这一份数量。
          *
          * @param key    资源
          * @param amount 这一份的数量
@@ -461,10 +461,10 @@ public final class IoPortResolver {
             return fuzzy;
         }
 
-        /** 这个面模拟插入是否至少收 1 个。 */
+        /** 这个面能否完整收下这一份数量：整数份语义下，收不满就不选它。 */
         private boolean accepts(Direction face, AEKey key, long amount) {
             PatternProviderTarget target = this.target(face);
-            return target != null && target.insert(key, amount, Actionable.SIMULATE) > 0L;
+            return target != null && target.insert(key, amount, Actionable.SIMULATE) >= amount;
         }
     }
 }
