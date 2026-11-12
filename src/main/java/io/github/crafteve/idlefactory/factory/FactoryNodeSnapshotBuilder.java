@@ -74,9 +74,6 @@ public final class FactoryNodeSnapshotBuilder {
          * @return 有样板、或有玩家自己配的规则
          */
         public boolean configured() {
-            if (this.patternCount > 0) {
-                return true;
-            }
             return this.ruleCount > 0 && !this.autoEnergyOnly;
         }
     }
@@ -163,9 +160,9 @@ public final class FactoryNodeSnapshotBuilder {
             }
             boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
             NodeRuntime runtime = nodeManager == null ? null : nodeManager.node(node.id());
-            // 只有自动补的 FE 输入规则、没有样板：这种节点删除不需要二次确认。
-            boolean autoEnergyOnly = node.patternCount() == 0
-                    && node.io().outputs().isEmpty()
+            // 规则里只有自动补的 FE 输入规则：这种节点删除不需要二次确认。
+            // 样板不算玩家配置——删节点时样板会退回玩家背包，不会丢。
+            boolean autoEnergyOnly = node.io().outputs().isEmpty()
                     && node.io().inputs().stream().allMatch(spec ->
                             AeKeySupport.isEnergy(spec.key()) && spec.face() == null);
             int pendingCount = runtime == null ? 0 : runtime.digest().pendingCount();

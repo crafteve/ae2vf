@@ -7,7 +7,6 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.capability.LevelCapabilityCache;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
@@ -125,8 +124,7 @@ public final class IoExecutor {
             IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, true,
                     caps, unit.digest().faceHint());
             if (resolved == null) {
-                IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
-                        pos.toShortString(), spec.describe());
+                // 原因已经进账本，不再逐 tick 打日志：debug 级别下会按规则数刷屏。
                 inputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
@@ -156,13 +154,7 @@ public final class IoExecutor {
                     // NO_MATERIAL 只表示仓库没料，机器侧已经点头接收
                     accepted = true;
                 }
-                // 搬通了什么都不用做；拒收由分析器清掉经验面；其余情况只留一条调试日志。
-                if (result.moved() <= 0L && result.reason() != Reason.REJECTED) {
-                    IdleFactory.LOGGER.debug(
-                            "IdleFactory IO feed blocked: machine={} spec={} reason={} capacity={}",
-                            pos.toShortString(), spec.describe(), result.reason(),
-                            adapter.capacity());
-                }
+                // 搬通了什么都不用做；拒收由分析器清掉经验面。原因只进账本，不逐 tick 打日志。
             }
             Reason combined = moved > 0L
                     ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);
@@ -187,8 +179,7 @@ public final class IoExecutor {
             IoPortResolver.Resolved resolved = IoPortResolver.resolve(level, pos, spec, false,
                     caps, unit.digest().faceHint());
             if (resolved == null) {
-                IdleFactory.LOGGER.debug("IdleFactory IO: no adapter, machine={} spec={}",
-                        pos.toShortString(), spec.describe());
+                // 同输入侧：原因进账本，日志留给账本与界面。
                 outputReasons.put(ruleKey, Reason.NO_FACE);
                 continue;
             }
@@ -212,11 +203,7 @@ public final class IoExecutor {
                 IoResult result = IoTransfer.pull(storage, adapter);
                 moved += result.moved();
                 reason = worse(reason, result.reason());
-                // 搬通了什么都不用做；拒收由分析器清掉经验面；其余情况只留一条调试日志。
-                if (result.moved() <= 0L && result.reason() != Reason.REJECTED) {
-                    IdleFactory.LOGGER.debug("IdleFactory IO pull blocked: machine={} spec={} reason={}",
-                            pos.toShortString(), spec.describe(), result.reason());
-                }
+                // 搬通了什么都不用做；拒收由分析器清掉经验面。原因只进账本，不逐 tick 打日志。
             }
             Reason combined = moved > 0L
                     ? Reason.RUN : (reason == null ? Reason.NO_MATERIAL : reason);

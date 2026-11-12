@@ -89,7 +89,7 @@ public final class ItemVariantIndex {
                 continue;
             }
             if (++keys > MAX_KEYS) {
-                IdleFactory.LOGGER.debug("IdleFactory: 模糊变体索引达到 {} 条上限，后续条目被忽略", MAX_KEYS);
+                IdleFactory.LOGGER.trace("IdleFactory: 模糊变体索引达到 {} 条上限，后续条目被忽略", MAX_KEYS);
                 break;
             }
             List<AEKey> list = this.byItem.computeIfAbsent(key.getId(), id -> new ArrayList<>());

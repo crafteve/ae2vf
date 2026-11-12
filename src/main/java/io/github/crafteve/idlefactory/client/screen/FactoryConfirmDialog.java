@@ -1,5 +1,8 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.client.gui.Font;
@@ -98,6 +101,9 @@ public final class FactoryConfirmDialog {
         if (!this.open || box == null || parent == null) {
             return;
         }
+        // 列表里的机器图标走物品批处理，flush 之前不会真正落屏；不先 flush 的话它们会画在
+        // 弹窗底图上面，看起来像弹窗被压到列表下面。这里把已有批次全部落屏再画浮层。
+        graphics.flush();
         graphics.fill(parent.x(), parent.y(), parent.x() + parent.width(),
                 parent.y() + parent.height(), 0x90000000);
         // 浮层内区必须先铺一块完全不透明的底：用半透明分隔线贴图会让背后的机器图标透上来，
@@ -109,10 +115,17 @@ public final class FactoryConfirmDialog {
                 this.theme.textPrimary(), false);
 
         int lineY = box.y() + 28;
-        for (String line : this.message.split("\n")) {
-            graphics.drawString(this.font, this.font.plainSubstrByWidth(line, box.width() - 24),
-                    box.x() + 12, lineY, this.theme.textDim(), false);
-            lineY += 11;
+        int textWidth = box.width() - 24;
+        int textBottom = box.y() + box.height() - 30;
+        for (String raw : this.message.split("\n")) {
+            for (String line : wrap(raw, textWidth)) {
+                if (lineY + 10 > textBottom) {
+                    break;
+                }
+                graphics.drawString(this.font, line, box.x() + 12, lineY,
+                        this.theme.textDim(), false);
+                lineY += 11;
+            }
         }
 
         int buttonY = box.y() + box.height() - 26;
@@ -198,6 +211,27 @@ public final class FactoryConfirmDialog {
             return true;
         }
         return true;
+    }
+
+    /**
+     * 按像素宽度折行：窄终端里说明文字不能硬截断。
+     *
+     * @param text  原文
+     * @param width 可用宽度
+     * @return 折好的行
+     */
+    private List<String> wrap(String text, int width) {
+        List<String> lines = new ArrayList<>();
+        String rest = text;
+        while (!rest.isEmpty() && width > 0) {
+            String head = this.font.plainSubstrByWidth(rest, width);
+            if (head.isEmpty()) {
+                break;
+            }
+            lines.add(head);
+            rest = rest.substring(head.length());
+        }
+        return lines;
     }
 
     private static boolean inside(double mouseX, double mouseY, int x, int y, int width,

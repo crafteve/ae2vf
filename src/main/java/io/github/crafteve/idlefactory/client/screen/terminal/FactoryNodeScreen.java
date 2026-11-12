@@ -609,8 +609,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         if (this.confirmDialog == null) {
             return;
         }
-        int width = 240;
-        int height = 84;
+        // 终端宽度可能小于 240；超出终端就会压到右侧 JEI/EMI 面板上，被它盖住。
+        int width = Math.min(240, this.imageWidth - 12);
+        int height = Math.min(84, this.imageHeight - 12);
         int x = this.leftPos + (this.imageWidth - width) / 2;
         int y = this.topPos + (this.imageHeight - height) / 2;
         this.confirmDialog.open("删除节点", node.name() + "\n有 " + node.view().ruleCount()
