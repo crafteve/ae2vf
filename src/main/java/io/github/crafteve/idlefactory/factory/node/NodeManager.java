@@ -31,8 +31,6 @@ import net.minecraft.server.level.ServerLevel;
 public final class NodeManager {
     /** 每 tick 最多建几个节点。 */
     public static final int MAX_CREATES_PER_TICK = 128;
-    /** 每 tick 最多做几次产物回收扫描；超出的节点顺延到下一 tick。 */
-    public static final int MAX_SWEEPS_PER_TICK = 64;
 
     private final MinecraftServer server;
     /** 工厂共享的端口缓存；所有节点共用同一份，避免每个节点一套机器存储缓存。 */
@@ -169,20 +167,15 @@ public final class NodeManager {
         }
     }
 
-    /** 每 tick 推一次：先补建节点，再让每个节点处理自己的脏数据与产物回收。 */
+    /** 每 tick 推一次：先补建节点，再让每个节点收口自己的脏数据（投递与回收在执行层）。 */
     public void tick() {
         long now = this.server.overworld().getGameTime();
         this.createQueued(now);
 
         boolean changed = false;
-        int sweepBudget = MAX_SWEEPS_PER_TICK;
         for (NodeRuntime node : this.nodes.values()) {
             try {
                 changed |= node.tick();
-                if (sweepBudget > 0 && node.returnSweep().isDue(now)) {
-                    node.returnSweep().sweep(now);
-                    sweepBudget--;
-                }
             } catch (RuntimeException e) {
                 // 单个节点炸掉不能影响别的节点，也不能把 tick 抛出去。
                 node.logThrottled(now, "节点 tick 异常：" + e);

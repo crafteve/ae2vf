@@ -7,51 +7,44 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.io.CapacityPick;
-import io.github.crafteve.idlefactory.factory.io.FacePick;
-import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.io.PortExecutor;
+import io.github.crafteve.idlefactory.factory.io.DispatchOrder;
+import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
-import appeng.api.config.Actionable;
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
 import appeng.api.networking.crafting.ICraftingProvider;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
-import appeng.api.storage.MEStorage;
 import appeng.core.definitions.AEItems;
 
-import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
- * 机器的虚拟样板供应器：把机器上的样板广告给 CPU，并接住 CPU 派来的一份输入。
+ * 机器的虚拟样板供应器：把机器上的样板广告给 CPU，并接住 CPU 派来的材料。
  *
  * <p>这是挂到虚拟节点上的 {@link ICraftingProvider} 服务，生命周期跟着节点走。AE2 的节点服务
  * 只能在 {@code create} 之前挂，所以它常驻，样板为空时就是「没有任何样板的供应器」。</p>
  *
- * <p>样板解码结果、输入的 key 集合（阻挡判定用）与产物 key 集合（回收白名单用）都缓存在这里，
- * 只在样板变化或机器上下线时重建；CPU 的合成规划直接读缓存，不会每 tick 解码样板。</p>
+ * <p>P3 起它只留 AE2 协议：广告、{@code pushPattern}（校验 + 拆份 + 入队）与 {@code isBusy}。
+ * 选面、分配机器、退避与回收全在执行层：{@code pushPattern} 不碰机器，也<b>不做阻挡判定</b>
+ * ——「所有机器都挡」要先扫一遍所有机器库存，一点都不便宜，那个判断跟着投递走。</p>
  *
- * <p>P2 起机器侧统一走 AE2 的 {@link MEStorage}：选面用 {@link FacePick}，容量用
- * {@link CapacityPick}，取存储用工厂共享的 {@link PortExecutor}，不再有自己的一套适配器。</p>
+ * <p>样板解码结果、输入的 key 集合与产物 key 集合都缓存在这里，只在样板变化或机器上下线时
+ * 重建；CPU 的合成规划直接读缓存，不会每 tick 解码样板。</p>
  */
 final class NodeCraftService implements ICraftingProvider {
-    /** 固定顺序的六面。 */
-    private static final Direction[] FACES = Direction.values();
-
     private final NodeRuntime node;
     /** 当前能用的样板；机器方块不在时对外仍报空。 */
     private List<IPatternDetails> patterns = List.of();
-    /** 所有样板输入的并集，已去掉组件（AE2 的阻挡判定按这个比较）。 */
+    /** 所有样板输入的并集，已去掉组件（阻挡判定按这个比较）。 */
     private Set<AEKey> patternInputs = Set.of();
     /** 所有样板产物的并集，回收白名单只有这些。 */
     private Set<AEKey> products = Set.of();
@@ -92,16 +85,8 @@ final class NodeCraftService implements ICraftingProvider {
         if (!this.patterns.contains(details) || !details.supportsPushInputsToExternalInventory()) {
             return false;
         }
-        // 一次派单只挑一台在线机器，整份货给它；不拆分到别的机器（多机分发在 P3）。
-        Machine machine = this.node.pickMachine();
-        if (machine == null) {
-            return false;
-        }
-        if (provider.blocking().isOn() && this.blockingHit(machine, this.patternInputs)) {
-            return false;
-        }
         try {
-            // 收集这一单的全部资源与数量（数量比即样板比例）：只记录，不写机器。
+            // 收集这一单的全部资源与数量：数量比即样板比例。
             Map<AEKey, Long> needed = new LinkedHashMap<>();
             details.pushInputsToExternalInventory(inputHolder, (key, amount) -> {
                 if (amount > 0L) {
@@ -111,22 +96,32 @@ final class NodeCraftService implements ICraftingProvider {
             if (needed.isEmpty()) {
                 return false;
             }
-            // 整单放不下就一个都不写：整数份语义下，收不满的面等于给自己埋坑。
-            CapacityPick capacity = this.node.capacityPick();
-            if (capacity.portionsThatFit(machine, needed, this::configuredFace) < 1L) {
-                return false;
-            }
-            List<PendingOrder.Line> lines = new ArrayList<>(needed.size());
+            // 拆份：倍率样板一次派下来的量是「原量 × 倍数」，按倍数拆回每份用量，
+            // 这样订单可以分给多台机器、跨 tick 交。交叉校验失败就整单按一份处理，绝不猜。
+            long portions = this.factorOf(details);
+            Map<AEKey, Long> perPortion = new LinkedHashMap<>(needed.size());
             for (Map.Entry<AEKey, Long> entry : needed.entrySet()) {
-                FacePick.PickResult pick = this.node.facePick().pick(machine, entry.getKey(),
-                        IoSide.INPUT, this.configuredFace(entry.getKey()), null);
-                if (!pick.picked()) {
+                if (portions <= 1L || entry.getValue() % portions != 0L) {
+                    portions = 1L;
+                    break;
+                }
+                perPortion.put(entry.getKey(), entry.getValue() / portions);
+            }
+            if (portions <= 1L) {
+                perPortion.clear();
+                perPortion.putAll(needed);
+                portions = 1L;
+            }
+            List<DispatchOrder.Line> lines = new ArrayList<>(perPortion.size());
+            for (Map.Entry<AEKey, Long> entry : perPortion.entrySet()) {
+                if (entry.getValue() <= 0L) {
                     return false;
                 }
-                lines.add(new PendingOrder.Line(entry.getKey(), entry.getValue(), pick.face()));
+                lines.add(new DispatchOrder.Line(entry.getKey(), entry.getValue()));
             }
             long now = this.node.gameTime();
-            if (!provider.addOrder(new PendingOrder(lines, machine.id(), now, -1L))) {
+            DispatchQueue queue = provider.pending();
+            if (!queue.enqueue(DispatchOrder.create(UUID.randomUUID(), lines, portions, now))) {
                 return false;
             }
         } catch (RuntimeException e) {
@@ -134,263 +129,23 @@ final class NodeCraftService implements ICraftingProvider {
             this.node.logThrottled(this.node.gameTime(), "派单异常：" + e);
             return false;
         }
-        this.markQueueChanged();
-        this.node.digest().pending(provider.pendingCount(),
-                provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
-        this.node.returnSweep().activate(this.node.gameTime());
+        this.node.markDataChanged();
         return true;
     }
 
     /**
-     * 每 tick 试投递队首：队列不退避，机器不在就等，机器被删就退回网络。
+     * 这次派单对应的倍数：倍率样板才能拆份，普通样板恒为 1。
      *
-     * <p>投递按「能完整做几份」算：所有行都能完整塞下的份数 n，n=0 一个都不写，
-     * 避免把机器塞成半份、把后续任务卡死。P3 起订单可以跨 tick 分批，本阶段仍是一份。</p>
-     *
-     * @param now 当前游戏时间
+     * @param details CPU 派下来的样板（可能已被倍率放大）
+     * @return 份数，至少 1
      */
-    void deliver(long now) {
-        NodeProvider provider = this.node.node().provider();
-        PendingOrder order = provider.firstOrder();
-        NodeDigest digest = this.node.digest();
-        if (order == null) {
-            digest.pending(0, -1L);
-            return;
-        }
-        digest.pending(provider.pendingCount(), order.enqueuedAt());
-        Machine machine = order.machineId() == null ? null : this.node.machine(order.machineId());
-        if (machine == null) {
-            this.returnOrDiscard(provider, order, now);
-            return;
-        }
-        if (!this.node.isAvailable()) {
-            // 机器没加载：等，订单不丢。
-            return;
-        }
-        PortExecutor ports = this.node.ports();
-        if (!ports.loaded(machine)) {
-            // 区块没加载：等。
-            return;
-        }
-        List<MEStorage> targets = new ArrayList<>(order.lines().size());
-        for (PendingOrder.Line line : order.lines()) {
-            MEStorage storage = this.storageFor(machine, line, ports);
-            if (storage == null) {
-                return;
-            }
-            long accepted = storage.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                    AeKeySupport.SOURCE);
-            if (accepted < line.amount()) {
-                // 整数份：整单放不下就一个都不写，等机器腾出空间。
-                return;
-            }
-            targets.add(storage);
-        }
-        List<PendingOrder.Line> remaining = new ArrayList<>();
-        for (int index = 0; index < order.lines().size(); index++) {
-            PendingOrder.Line line = order.lines().get(index);
-            long want = line.amount();
-            long inserted;
-            try {
-                inserted = targets.get(index).insert(line.key(), want, Actionable.MODULATE,
-                        AeKeySupport.SOURCE);
-            } catch (RuntimeException e) {
-                // 这一行可能写进去一部分（未知）：按「整行已交付」处理，绝不重投造成复制；
-                // 后面的行还没动，原样留回队首等下一轮。
-                this.node.logThrottled(now, "投递异常：" + e);
-                for (int rest = index + 1; rest < order.lines().size(); rest++) {
-                    remaining.add(order.lines().get(rest));
-                }
-                break;
-            }
-            if (inserted < want) {
-                // 模拟与提交不一致：差额按固定数量写回队首，下一轮精确补齐。
-                remaining.add(new PendingOrder.Line(line.key(), want - inserted, line.face()));
-            }
-        }
-        if (remaining.isEmpty()) {
-            provider.removeFirstOrder();
-        } else {
-            provider.replaceFirstOrder(new PendingOrder(remaining, order.machineId(),
-                    order.enqueuedAt(), order.orphanedAt()));
-        }
-        this.markQueueChanged();
-        this.node.returnSweep().activate(now);
-    }
-
-    /**
-     * 取一行要写的存储：订单绑定的面优先，收不下整行就重新选面。
-     *
-     * @param machine 机器
-     * @param line    订单行
-     * @param ports   端口缓存
-     * @return 存储；拿不到时为 {@code null}
-     */
-    @Nullable
-    private MEStorage storageFor(Machine machine, PendingOrder.Line line, PortExecutor ports) {
-        Direction face = line.face();
-        if (face != null) {
-            MEStorage bound = ports.storage(machine, face);
-            if (bound != null
-                    && bound.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                            AeKeySupport.SOURCE) >= line.amount()) {
-                return bound;
-            }
-        }
-        FacePick.PickResult pick = this.node.facePick().pick(machine, line.key(), IoSide.INPUT,
-                this.configuredFace(line.key()), null);
-        return pick.picked() ? ports.storage(machine, pick.face()) : null;
-    }
-
-    /**
-     * 阻挡判定：任何一个面上还有这台机器的样板输入就整单拒绝。
-     *
-     * <p>直接读机器各面的库存，按去组件 key 比较：读库存比逐个样板目标问「有没有这批输入」
-     * 便宜，也正好是 P3 投递时要用的判据。</p>
-     *
-     * @param machine     机器
-     * @param blockedKeys 这台机器所有样板输入的 key 并集（已去组件）
-     * @return 是否撞到阻挡
-     */
-    private boolean blockingHit(Machine machine, Set<AEKey> blockedKeys) {
-        if (blockedKeys.isEmpty()) {
-            return false;
-        }
-        PortExecutor ports = this.node.ports();
-        for (Direction face : FACES) {
-            MEStorage storage = ports.storage(machine, face);
-            if (storage == null) {
-                continue;
-            }
-            KeyCounter counter = new KeyCounter();
-            try {
-                storage.getAvailableStacks(counter);
-            } catch (RuntimeException e) {
-                // 这一面读不出来：不影响其它面的判定，异常不外抛。
-                continue;
-            }
-            for (AEKey key : counter.keySet()) {
-                if (blockedKeys.contains(key.dropSecondary())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * 节点输入规则里给这个 key 配的面：先精确、再同注册名的模糊。
-     *
-     * @param key 资源
-     * @return 配置面；没配时为 {@code null}
-     */
-    @Nullable
-    private Direction configuredFace(AEKey key) {
-        Direction fuzzy = null;
-        for (ResourceSpec spec : this.node.node().io().inputs()) {
-            if (spec.face() == null) {
-                continue;
-            }
-            if (spec.key().equals(key)) {
-                return spec.face();
-            }
-            if (fuzzy == null && spec.fuzzy()
-                    && spec.key().getType().equals(key.getType())
-                    && spec.key().getId().equals(key.getId())) {
-                fuzzy = spec.face();
-            }
-        }
-        return fuzzy;
-    }
-
-    /** 队列或存档数据变了：让节点在下一 tick 统一落盘。 */
-    private void markQueueChanged() {
-        this.node.markDataChanged();
-    }
-
-    /**
-     * 目标机器已被删：把订单退回 ME 网络；网络也不收就留成孤儿等重试，超时才丢弃。
-     *
-     * @param provider 供应器
-     * @param order    订单
-     * @param now      当前游戏时间
-     */
-    private void returnOrDiscard(NodeProvider provider, PendingOrder order, long now) {
-        if (order.orphan() && now - order.orphanedAt() > PendingOrder.ORPHAN_TIMEOUT_TICKS) {
-            // 网络长时间恢复不了：静默丢弃（只记日志，绝不生成掉落物实体）。
-            provider.removeFirstOrder();
-            this.markQueueChanged();
-            this.node.logThrottled(now, "孤儿订单超时丢弃：" + order.lines().size() + " 行");
-            this.node.digest().pending(provider.pendingCount(),
-                    provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
-            return;
-        }
-        var network = this.node.networkStorage();
-        if (network == null) {
-            // 只在第一次失败时记孤儿时刻，否则每 tick 刷新会让超时永远不触发。
-            provider.replaceFirstOrder(order.orphan() ? order : order.asOrphan(now));
-            this.markQueueChanged();
-            return;
-        }
-        List<PendingOrder.Line> remaining = new ArrayList<>(order.lines().size());
-        for (PendingOrder.Line line : order.lines()) {
-            long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                    AeKeySupport.SOURCE);
-            if (accepted <= 0L) {
-                remaining.add(line);
-                continue;
-            }
-            long inserted = network.insert(line.key(), Math.min(accepted, line.amount()),
-                    Actionable.MODULATE, AeKeySupport.SOURCE);
-            long left = line.amount() - inserted;
-            if (left > 0L) {
-                remaining.add(new PendingOrder.Line(line.key(), left, line.face()));
-            }
-        }
-        if (remaining.isEmpty()) {
-            provider.removeFirstOrder();
-        } else {
-            PendingOrder rest = order.withLines(remaining);
-            // 同一条款：孤儿时刻只在第一次失败时记，不能每 tick 刷新。
-            provider.replaceFirstOrder(order.orphan() ? rest : rest.asOrphan(now));
-        }
-        this.markQueueChanged();
-        this.node.digest().pending(provider.pendingCount(),
-                provider.firstOrder() == null ? -1L : provider.firstOrder().enqueuedAt());
-    }
-
-    /**
-     * 节点销毁前把队列里的单全部退回网络；退不回的直接丢弃（只记日志，不生成掉落物）。
-     *
-     * @param now 当前游戏时间
-     */
-    void returnAllOrders(long now) {
-        NodeProvider provider = this.node.node().provider();
-        if (provider.pendingCount() == 0) {
-            return;
-        }
-        var network = this.node.networkStorage();
-        for (PendingOrder order : provider.pending()) {
-            if (network != null) {
-                for (PendingOrder.Line line : order.lines()) {
-                    long accepted = network.insert(line.key(), line.amount(), Actionable.SIMULATE,
-                            AeKeySupport.SOURCE);
-                    if (accepted > 0L) {
-                        network.insert(line.key(), Math.min(accepted, line.amount()),
-                                Actionable.MODULATE, AeKeySupport.SOURCE);
-                    }
-                }
-            }
-        }
-        this.node.logThrottled(now, "节点销毁，队列 " + provider.pendingCount() + " 单已尽力退回网络");
-        provider.clearPending();
-        this.markQueueChanged();
-        this.node.digest().pending(0, -1L);
+    private long factorOf(IPatternDetails details) {
+        return details instanceof ScaledPatternDetails scaled ? Math.max(1, scaled.factor()) : 1L;
     }
 
     @Override
     public boolean isBusy() {
-        return this.node.node().provider().pendingCount() > 0;
+        return this.node.node().provider().pending().size() > 0;
     }
 
     /** 机器上所有样板的输入 key 并集。 */
@@ -445,8 +200,7 @@ final class NodeCraftService implements ICraftingProvider {
             }
             liveKeys.add(stack.copyWithCount(1));
             int factor = resolveFactor(provider, stack, details);
-            ScaledPatternDetails scaled = ScaledPatternDetails.scale(details, factor);
-            decoded.add(scaled);
+            decoded.add(ScaledPatternDetails.scale(details, factor));
             for (IPatternDetails.IInput input : details.getInputs()) {
                 for (GenericStack possible : input.getPossibleInputs()) {
                     inputs.add(possible.what().dropSecondary());

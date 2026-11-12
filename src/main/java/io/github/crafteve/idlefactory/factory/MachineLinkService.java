@@ -7,7 +7,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
+import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -34,7 +34,7 @@ import net.minecraft.world.level.block.Block;
 final class MachineLinkService {
     private final FactoryManager manager;
     private final NodeManager nodeManager;
-    private final PassiveIoRunner nodeIoRunner;
+    private final IoRunner nodeIoRunner;
     private final NodeLibraryService nodeLibrary;
     private final MinecraftServer server;
 
@@ -46,7 +46,7 @@ final class MachineLinkService {
      * @param server       服务端
      */
     MachineLinkService(FactoryManager manager, NodeManager nodeManager,
-            PassiveIoRunner nodeIoRunner, NodeLibraryService nodeLibrary,
+            IoRunner nodeIoRunner, NodeLibraryService nodeLibrary,
             MinecraftServer server) {
         this.manager = manager;
         this.nodeManager = nodeManager;

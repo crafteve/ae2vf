@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.node;
+package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.Locale;
 
@@ -7,8 +7,9 @@ import org.jetbrains.annotations.Nullable;
 /**
  * 节点级派单模式：顺序、轮询。
  *
- * <p>一次派单只选一台在线机器，整份货给它；派单模式只决定从哪一台开始挑，
- * 不决定拆分。新节点默认 {@link #ROUND_ROBIN}，避免总是喂第一台。</p>
+ * <p>派单模式是执行语义，所以类型住在 {@code io}：节点只持久化这个值。两种模式的分配方式
+ * 见 {@code ActivePlanner}：顺序是逐台塞满，轮询是多机平均分。新节点默认
+ * {@link #ROUND_ROBIN}，避免总是喂第一台。</p>
  */
 public enum DispatchMode {
     /** 顺序：总是从第一台在线机器开始尝试。 */

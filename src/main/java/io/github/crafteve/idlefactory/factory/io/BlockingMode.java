@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.node;
+package io.github.crafteve.idlefactory.factory.io;
 
 import java.util.Locale;
 
@@ -7,6 +7,9 @@ import java.util.Locale;
  *
  * <p>语义照 AE2 的样板供应器：判据只看样板的输入 key，升级插件这类不在输入集合里的东西
  * 不算阻挡物；粒度是整台机器，不是单个面。默认 {@link #OFF}。</p>
+ *
+ * <p>类型住在 {@code io}：节点只持久化这个值，判定跟着「这一单要投给哪台机器」走，由
+ * {@code ActivePlanner} 在投递时执行。</p>
  */
 public enum BlockingMode {
     /** 不阻挡：CPU 能推多少推多少，塞不下的部分进待写入队列。 */

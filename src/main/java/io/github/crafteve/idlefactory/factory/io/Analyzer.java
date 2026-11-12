@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.factory.io;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -10,41 +11,117 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.factory.machine.Machine;
+
+import appeng.api.stacks.AEKey;
+
 import net.minecraft.core.Direction;
 
 /**
- * 一个工厂的执行账房：账本、结论、速率统计三件套的唯一维护者。
+ * 一个工厂的账房：账本、结论、速率与经验面四件套的唯一维护者。
  *
- * <p>它只记不判：执行器报结果，规划器与界面读。账本是明细（会滚掉），结论是摘要（不滚），
- * 统计只回答「每秒搬了多少」。退避与择时由规划器算，本类只给原料。</p>
+ * <p>只记不判：Runner 报结果，Planner 与界面读。它不碰世界、不做决策、不写存档、不起线程；
+ * 时间永远是参数，淘汰逻辑可以脱离游戏单独验证。</p>
  *
- * <p>账本与结论的实例挂在 {@link Form.Entry} 上，条目离开表单即随之释放；本类负责写入，
- * 并按工厂维护速率窗口。不读世界、不写存档、不起线程。</p>
+ * <p>三个抽屉：</p>
+ * <ul>
+ *   <li>{@link Ledger}：变化序列，会滚，每个目标 8 行；</li>
+ *   <li>{@link Conclusion}：被动侧每条规则的摘要，不滚；</li>
+ *   <li>{@link Stats}：每秒入 / 出速率窗口。</li>
+ * </ul>
+ *
+ * <p>主动侧另有 {@link NodeConclusion}（每节点）与 {@link MachineConclusion}（每机器），
+ * 外加 {@link FaceHint} 经验面：被动按条目存，主动按「机器 + 资源」存。</p>
+ *
+ * <p>生命周期：条目离开表单 → 账本与结论随条目释放；机器删除 → 清经验面、机器结论与统计；
+ * 节点删除 → 清节点账本与结论。淘汰与清理都在本类内部，外部只负责「到点了叫它一声」。</p>
  */
 public final class Analyzer {
     /** 每个目标保留的账本行数。 */
     public static final int LEDGER_CAPACITY = 8;
     /** 速率结算间隔（tick）：每秒把窗口结算成速率。 */
     private static final int SAMPLE_INTERVAL = 20;
+    /** 每 tick 补扫多少台机器的经验面。 */
+    private static final int SWEEP_BATCH = 16;
+    /** 主动经验面的过期时间（tick）。 */
+    public static final long FACE_HINT_TTL_TICKS = 1200L;
+    /** 每台机器的经验面条数栅栏：正常玩法摸不到，只防「同一台机器被灌进上千个资源」。 */
+    public static final int FACE_HINT_FENCE = 512;
 
     /** 按机器、按规则的搬运速率。 */
     private final Stats stats = new Stats();
+    /** 节点 id → 主动侧账本。 */
+    private final Map<UUID, Ledger> nodeLedgers = new HashMap<>();
+    /** 节点 id → 主动侧结论。 */
+    private final Map<UUID, NodeConclusion> nodeConclusions = new HashMap<>();
+    /** 机器 id → (资源 → 经验面)。 */
+    private final Map<UUID, Map<AEKey, FaceHint>> machineFaceHints = new HashMap<>();
+    /** 机器 id → 机器结论。 */
+    private final Map<UUID, MachineConclusion> machineConclusions = new HashMap<>();
+    /** 经验面补扫的机器轮转表；每次 retain 后刷新。 */
+    private UUID[] machineRing = new UUID[0];
+    /** 轮转游标。 */
+    private int ringCursor;
     /** 距上次速率结算过了多少 tick。 */
     private int sinceSample;
 
     /**
-     * 记一次执行结果：同时写账本与结论。
+     * 记一次被动执行结果：同时写账本与结论。
      *
      * @param entry  执行条目
      * @param reason 原因
      * @param now    当前服务端 tick
      * @param amount 本次搬动的数量
      * @param face   本次用的面
+     * @return 这次结果是否搬到了东西（方便调用方累计速率）
      */
-    public void record(Form.Entry entry, Reason reason, long now, long amount,
+    public boolean record(Form.Entry entry, Reason reason, long now, long amount,
             @Nullable Direction face) {
-        entry.ledger().append(reason, now, amount, face);
+        entry.ledger().append(reason, now, amount, face, null, null, null);
         entry.conclusion().record(reason, now, amount, face);
+        return amount > 0L;
+    }
+
+    /**
+     * 记一次主动执行结果：写节点账本，并累加已送达量。
+     *
+     * @param nodeId    节点 id
+     * @param reason    原因
+     * @param now       当前服务端 tick
+     * @param amount    本次搬动的数量
+     * @param orderId   订单 id；回收等非订单动作为 {@code null}
+     * @param key       资源；回收时为空
+     * @param machineId 目标机器；{@code null} 表示没定机器
+     * @param face      用的面
+     */
+    public void recordActive(UUID nodeId, Reason reason, long now, long amount,
+            @Nullable UUID orderId, @Nullable AEKey key, @Nullable UUID machineId,
+            @Nullable Direction face) {
+        this.nodeLedger(nodeId).append(reason, now, amount, face, orderId, key, machineId);
+        NodeConclusion conclusion = this.nodeConclusion(nodeId);
+        if (reason != Reason.RUN) {
+            // 只记「最近一次失败原因」：成功不该盖掉玩家要看的诊断。
+            conclusion.lastReason = reason;
+        }
+        conclusion.deliveredTotal += amount;
+        if (amount > 0L) {
+            // 有进展：清掉退避原料，下一轮立刻可试。
+            conclusion.lastSuccessAt = now;
+        }
+    }
+
+    /**
+     * 更新节点的队列状态（单数与队首时刻）。
+     *
+     * @param nodeId     节点 id
+     * @param count      队列单数
+     * @param oldestAt   队首入队时刻；队列空时传 {@code -1}
+     */
+    public void nodeQueue(UUID nodeId, int count, long oldestAt) {
+        NodeConclusion conclusion = this.nodeConclusion(nodeId);
+        conclusion.pendingCount = count;
+        conclusion.pendingOldestAt = count == 0 ? -1L : oldestAt;
     }
 
     /** 按机器、按规则的搬运速率。 */
@@ -53,9 +130,9 @@ public final class Analyzer {
     }
 
     /**
-     * 每工厂每 tick 调一次：自己数间隔结算速率，不依赖外部节奏。
+     * 每工厂每 tick 调一次：自己数间隔结算速率，并轮转补扫经验面的过期条目。
      *
-     * @param now 当前服务端 tick（保留给以后的 TTL 与结论清理）
+     * @param now 当前服务端 tick
      */
     public void tick(long now) {
         this.sinceSample++;
@@ -63,25 +140,252 @@ public final class Analyzer {
             this.sinceSample = 0;
             this.stats.sample();
         }
+        this.sweepFaceHints(now);
     }
 
     /**
-     * 只保留这些机器的速率统计（机器删除后不再攒条目）。
+     * 只保留这些机器的统计、经验面与机器结论（机器删除后不再攒条目）。
      *
      * @param keep 仍然存在的机器 id
      */
     public void retainMachines(Set<UUID> keep) {
         this.stats.retain(keep);
+        this.machineFaceHints.keySet().removeIf(id -> !keep.contains(id));
+        this.machineConclusions.keySet().removeIf(id -> !keep.contains(id));
+        this.machineRing = keep.toArray(new UUID[0]);
+        if (this.ringCursor >= this.machineRing.length) {
+            this.ringCursor = 0;
+        }
+    }
+
+    /**
+     * 只保留这些节点的账本与结论（节点删除后不再攒条目）。
+     *
+     * @param keep 仍然存在的节点 id
+     */
+    public void retainNodes(Set<UUID> keep) {
+        this.nodeLedgers.keySet().removeIf(id -> !keep.contains(id));
+        this.nodeConclusions.keySet().removeIf(id -> !keep.contains(id));
+    }
+
+    /**
+     * 主动侧经验面：上一次真搬通的面；读的时候顺手刷活跃时刻并惰性清过期。
+     *
+     * @param machine 机器
+     * @param key     资源（按去组件比较，模糊变体共用一条）
+     * @param now     当前服务端 tick
+     * @return 经验面；没有或已过期时为 {@code null}
+     */
+    @Nullable
+    public Direction machineFaceHint(Machine machine, AEKey key, long now) {
+        Map<AEKey, FaceHint> hints = this.machineFaceHints.get(machine.id());
+        if (hints == null) {
+            return null;
+        }
+        AEKey identity = key.dropSecondary();
+        FaceHint hint = hints.get(identity);
+        if (hint == null) {
+            return null;
+        }
+        if (now - hint.lastUsedTick() > FACE_HINT_TTL_TICKS) {
+            hints.remove(identity);
+            return null;
+        }
+        hints.put(identity, hint.used(now));
+        return hint.face();
+    }
+
+    /**
+     * 记一次主动搬通的面。
+     *
+     * @param machine 机器
+     * @param key     资源
+     * @param face    本次用的面
+     * @param now     当前服务端 tick
+     */
+    public void recordMachineFace(Machine machine, AEKey key, Direction face, long now) {
+        Map<AEKey, FaceHint> hints = this.machineFaceHints.computeIfAbsent(machine.id(),
+                id -> new HashMap<>());
+        AEKey identity = key.dropSecondary();
+        hints.put(identity, new FaceHint(face, now));
+        if (hints.size() > FACE_HINT_FENCE) {
+            this.evictOldest(machine, hints);
+        }
+    }
+
+    /**
+     * 清掉某个资源的主动经验面（只有它自己的那条失效）。
+     *
+     * @param machine 机器
+     * @param key     资源
+     */
+    public void clearMachineFace(Machine machine, AEKey key) {
+        Map<AEKey, FaceHint> hints = this.machineFaceHints.get(machine.id());
+        if (hints != null) {
+            hints.remove(key.dropSecondary());
+        }
+    }
+
+    /**
+     * 清掉一台机器的全部经验面；观测代数变化时用（方块换了，面全不算数）。
+     *
+     * @param machine 机器
+     */
+    public void clearMachineFaces(Machine machine) {
+        this.machineFaceHints.remove(machine.id());
+    }
+
+    /**
+     * 这台机器是否处在阻挡退避里。
+     *
+     * @param machine 机器
+     * @param now     当前服务端 tick
+     * @return 还在退避里为 {@code true}
+     */
+    public boolean machineBlocked(Machine machine, long now) {
+        MachineConclusion conclusion = this.machineConclusions.get(machine.id());
+        return conclusion != null && now < conclusion.blockedUntil();
+    }
+
+    /**
+     * 记「这台机器被挡」，退避一段时间内不再读它的库存。
+     *
+     * @param machine 机器
+     * @param until   退避到期 tick
+     */
+    public void markMachineBlocked(Machine machine, long until) {
+        this.machineConclusions.computeIfAbsent(machine.id(), id -> new MachineConclusion(until))
+                .block(until);
+    }
+
+    /**
+     * 清掉一台机器的阻挡缓存（机器删除 / 观测代数变化）。
+     *
+     * @param machine 机器
+     */
+    public void clearMachineBlocked(Machine machine) {
+        this.machineConclusions.remove(machine.id());
+    }
+
+    /** 一个节点的主动侧结论。 */
+    public NodeConclusion nodeConclusion(UUID nodeId) {
+        return this.nodeConclusions.computeIfAbsent(nodeId, id -> new NodeConclusion());
+    }
+
+    /** 一个节点的主动侧账本。 */
+    public Ledger nodeLedger(UUID nodeId) {
+        return this.nodeLedgers.computeIfAbsent(nodeId, id -> new Ledger());
+    }
+
+    private void evictOldest(Machine machine, Map<AEKey, FaceHint> hints) {
+        AEKey oldestKey = null;
+        long oldest = Long.MAX_VALUE;
+        for (Map.Entry<AEKey, FaceHint> entry : hints.entrySet()) {
+            if (entry.getValue().lastUsedTick() < oldest) {
+                oldest = entry.getValue().lastUsedTick();
+                oldestKey = entry.getKey();
+            }
+        }
+        if (oldestKey != null) {
+            hints.remove(oldestKey);
+            IdleFactory.LOGGER.debug("Idle Factory: 机器 {} 的经验面超过 {} 条，淘汰最久未用的一条",
+                    machine.shortId(), FACE_HINT_FENCE);
+        }
+    }
+
+    private void sweepFaceHints(long now) {
+        int size = this.machineRing.length;
+        if (size == 0) {
+            return;
+        }
+        int budget = Math.min(SWEEP_BATCH, size);
+        for (int step = 0; step < budget; step++) {
+            UUID machineId = this.machineRing[this.ringCursor % size];
+            this.ringCursor = (this.ringCursor + 1) % size;
+            Map<AEKey, FaceHint> hints = this.machineFaceHints.get(machineId);
+            if (hints == null) {
+                continue;
+            }
+            hints.values().removeIf(hint -> now - hint.lastUsedTick() > FACE_HINT_TTL_TICKS);
+            if (hints.isEmpty()) {
+                this.machineFaceHints.remove(machineId);
+            }
+        }
+    }
+
+    /**
+     * 主动经验面的一条：面 + 最近使用时刻。
+     *
+     * @param face         面
+     * @param lastUsedTick 最近一次搬通 / 命中的 tick
+     */
+    public record FaceHint(Direction face, long lastUsedTick) {
+        FaceHint used(long now) {
+            return new FaceHint(this.face, now);
+        }
+    }
+
+    /** 主动侧机器结论：阻挡缓存与退避时刻。 */
+    public static final class MachineConclusion {
+        /** 阻挡退避到期 tick；{@code 0} 表示没有退避。 */
+        private long blockedUntil;
+
+        MachineConclusion(long blockedUntil) {
+            this.blockedUntil = blockedUntil;
+        }
+
+        /** 阻挡退避到期 tick。 */
+        public long blockedUntil() {
+            return this.blockedUntil;
+        }
+
+        void block(long until) {
+            this.blockedUntil = Math.max(this.blockedUntil, until);
+        }
+    }
+
+    /** 主动侧节点结论：队列深度、最近失败原因与累计送达量。 */
+    public static final class NodeConclusion {
+        private int pendingCount;
+        private long pendingOldestAt = -1L;
+        @Nullable
+        private Reason lastReason;
+        private long deliveredTotal;
+        private long lastSuccessAt = -1L;
+
+        /** 队列里还有几单。 */
+        public int pendingCount() {
+            return this.pendingCount;
+        }
+
+        /** 队首入队的时刻；没有单时为 {@code -1}。 */
+        public long pendingOldestAt() {
+            return this.pendingOldestAt;
+        }
+
+        /** 最近一次失败原因；没失败过为 {@code null}。 */
+        @Nullable
+        public Reason lastReason() {
+            return this.lastReason;
+        }
+
+        /** 累计送达量（按实际写入累加）。 */
+        public long deliveredTotal() {
+            return this.deliveredTotal;
+        }
+
+        /** 最近一次有进展的时刻；没有为 {@code -1}。 */
+        public long lastSuccessAt() {
+            return this.lastSuccessAt;
+        }
     }
 
     /**
      * 一个目标的账本：环形有界的「变化序列」。
      *
-     * <p>它记的是变化不是时间线：连续同原因、同面的结果合并成一行（次数与累计数量累加），
-     * 原因或面一变就开新行。当前结论就是最新那一行，不另外存一份。</p>
-     *
-     * <p>容量固定 {@link Analyzer#LEDGER_CAPACITY} 行，满了覆盖最旧的；条目离开表单时整本账
-     * 随条目一起释放。</p>
+     * <p>它记的是变化不是时间线：连续同原因、同面、同订单 / 资源的结果合并成一行（次数与累计
+     * 数量累加），任一要素一变就开新行。被动行的订单 / 资源 / 机器三项为空——Entry 身份已经
+     * 唯一确定它们，不重复存；主动行才带。</p>
      */
     public static final class Ledger {
         /**
@@ -93,32 +397,44 @@ public final class Analyzer {
          * @param count     这一串发生了几次
          * @param amount    这一串累计搬动的数量
          * @param face      用的面；{@code null} 表示不限面或没定面
+         * @param orderId   主动侧订单；被动侧为 {@code null}
+         * @param key       主动侧资源；被动侧为 {@code null}
+         * @param machineId 主动侧机器；被动侧为 {@code null}
          */
         public record Row(Reason reason, long firstTick, long lastTick, int count, long amount,
-                @Nullable Direction face) {
+                @Nullable Direction face, @Nullable UUID orderId, @Nullable AEKey key,
+                @Nullable UUID machineId) {
         }
 
         private final Row[] rows = new Row[LEDGER_CAPACITY];
-        /** 下一行的写入位置。 */
         private int head;
         private int size;
 
         /**
-         * 追加一次结果；与最新一行同原因同面时合并。
+         * 追加一次结果；与最新一行同原因同面同目标时合并。
          *
-         * @param reason 原因
-         * @param tick   发生时刻
-         * @param amount 本次搬动的数量
-         * @param face   用的面
+         * @param reason    原因
+         * @param tick      发生时刻
+         * @param amount    本次搬动的数量
+         * @param face      用的面
+         * @param orderId   主动侧订单；被动侧传 {@code null}
+         * @param key       主动侧资源；被动侧传 {@code null}
+         * @param machineId 主动侧机器；被动侧传 {@code null}
          */
-        public void append(Reason reason, long tick, long amount, @Nullable Direction face) {
+        public void append(Reason reason, long tick, long amount, @Nullable Direction face,
+                @Nullable UUID orderId, @Nullable AEKey key, @Nullable UUID machineId) {
             Row newest = this.current();
-            if (newest != null && newest.reason() == reason && Objects.equals(newest.face(), face)) {
+            if (newest != null && newest.reason() == reason && Objects.equals(newest.face(), face)
+                    && Objects.equals(newest.orderId(), orderId)
+                    && Objects.equals(newest.key(), key)
+                    && Objects.equals(newest.machineId(), machineId)) {
                 this.rows[this.newestIndex()] = new Row(reason, newest.firstTick(), tick,
-                        newest.count() + 1, newest.amount() + amount, face);
+                        newest.count() + 1, newest.amount() + amount, face, orderId, key,
+                        machineId);
                 return;
             }
-            this.rows[this.head] = new Row(reason, tick, tick, 1, amount, face);
+            this.rows[this.head] = new Row(reason, tick, tick, 1, amount, face, orderId, key,
+                    machineId);
             this.head = (this.head + 1) % LEDGER_CAPACITY;
             if (this.size < LEDGER_CAPACITY) {
                 this.size++;
@@ -144,11 +460,11 @@ public final class Analyzer {
          * @return 只读列表
          */
         public List<Row> rows() {
-            Row[] snapshot = new Row[this.size];
+            List<Row> snapshot = new ArrayList<>(this.size);
             for (int index = 0; index < this.size; index++) {
-                snapshot[index] = this.rows[this.indexFromNewest(index)];
+                snapshot.add(this.rows[this.indexFromNewest(index)]);
             }
-            return List.of(snapshot);
+            return List.copyOf(snapshot);
         }
 
         private int newestIndex() {
@@ -161,7 +477,7 @@ public final class Analyzer {
     }
 
     /**
-     * 一个目标的历史结论：账本压成的一组数。
+     * 一个执行条目的历史结论：账本压成的一组数。
      *
      * <p>这是值对象，只给规划器与界面读；账本是明细（会滚掉），这里是摘要（不滚）。
      * 命名后缀语义固定：{@code At} 是绝对时刻，{@code Ticks} 是连续时长，

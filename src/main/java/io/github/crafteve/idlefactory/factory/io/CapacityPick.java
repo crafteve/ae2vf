@@ -54,6 +54,41 @@ public final class CapacityPick {
     }
 
     /**
+     * 这台机器在指定面上能完整收下几份。
+     *
+     * <p>面已经由调用方（主动规划器按经验面 / 配置面）定好，这里只模拟，不再选面。主动投递
+     * 必须走这条：容量与随后写入的面必须是同一批，否则会出现「按 A 面算容量、写进 B 面」。</p>
+     *
+     * @param machine    机器
+     * @param perPortion 每行资源 → 一份的用量
+     * @param faces      每行资源 → 面上的选择结果
+     * @return 可装份数；任何一行没有面时为 {@code 0}
+     */
+    public long portionsThatFit(Machine machine, Map<AEKey, Long> perPortion,
+            Map<AEKey, Direction> faces) {
+        if (perPortion.isEmpty()) {
+            return 0L;
+        }
+        long best = Long.MAX_VALUE;
+        for (Map.Entry<AEKey, Long> line : perPortion.entrySet()) {
+            Direction face = faces.get(line.getKey());
+            long amount = line.getValue();
+            if (face == null || amount <= 0L) {
+                return 0L;
+            }
+            MEStorage storage = this.ports.storage(machine, face);
+            if (storage == null) {
+                return 0L;
+            }
+            best = Math.min(best, this.fitOnFace(storage, line.getKey(), amount));
+            if (best <= 0L) {
+                return 0L;
+            }
+        }
+        return best == Long.MAX_VALUE ? 0L : best;
+    }
+
+    /**
      * 这台机器能完整收下几份，并按玩家配置的面优先。
      *
      * <p>配置面必须参与模拟：pushPattern 用配置面判定能不能收，投递也走同一个面；两处如果
@@ -69,27 +104,16 @@ public final class CapacityPick {
         if (perPortion.isEmpty()) {
             return 0L;
         }
-        long best = Long.MAX_VALUE;
-        for (Map.Entry<AEKey, Long> line : perPortion.entrySet()) {
-            long amount = line.getValue();
-            if (amount <= 0L) {
-                return 0L;
-            }
-            FacePick.PickResult pick = this.facePick.pick(machine, line.getKey(), IoSide.INPUT,
-                    configured.apply(line.getKey()), null);
+        Map<AEKey, Direction> faces = new java.util.LinkedHashMap<>();
+        for (AEKey key : perPortion.keySet()) {
+            FacePick.PickResult pick = this.facePick.pick(machine, key, IoSide.INPUT,
+                    configured.apply(key), null);
             if (!pick.picked()) {
                 return 0L;
             }
-            MEStorage storage = this.ports.storage(machine, pick.face());
-            if (storage == null) {
-                return 0L;
-            }
-            best = Math.min(best, this.fitOnFace(storage, line.getKey(), amount));
-            if (best <= 0L) {
-                return 0L;
-            }
+            faces.put(key, pick.face());
         }
-        return best == Long.MAX_VALUE ? 0L : best;
+        return this.portionsThatFit(machine, perPortion, faces);
     }
 
     /**

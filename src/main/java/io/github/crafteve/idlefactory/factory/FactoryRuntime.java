@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.Form;
-import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
+import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
@@ -50,7 +50,7 @@ public final class FactoryRuntime {
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
-    private final PassiveIoRunner nodeIoRunner;
+    private final IoRunner nodeIoRunner;
     /**
      * 机器侧端口缓存：全服一份，所有工厂与节点共用。
      *
@@ -88,7 +88,7 @@ public final class FactoryRuntime {
     private FactoryRuntime(MinecraftServer server) {
         this.server = server;
         this.ports = new PortExecutor(server);
-        this.nodeIoRunner = new PassiveIoRunner(this.ports);
+        this.nodeIoRunner = new IoRunner(this.ports);
         this.nodeManager = new NodeManager(server, this.ports, this::markDirty, this::logNodeNotice);
     }
 
@@ -169,8 +169,8 @@ public final class FactoryRuntime {
         return this.links;
     }
 
-    /** IO 执行器。 */
-    public PassiveIoRunner nodeIoRunner() {
+    /** IO 编排器。 */
+    public IoRunner nodeIoRunner() {
         return this.nodeIoRunner;
     }
 
@@ -307,8 +307,8 @@ public final class FactoryRuntime {
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
                 this.server, this.manager, this.observations, this.nodeManager);
         this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
-                this.observations, this.storageResolver, observationRunner, nodeRunner,
-                this.machineStates, this.formBuilder);
+                this.nodeManager, this.observations, this.storageResolver, observationRunner,
+                nodeRunner, this.machineStates, this.formBuilder);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
 

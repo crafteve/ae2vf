@@ -7,11 +7,13 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.factory.io.DispatchOrder;
+import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
 import io.github.crafteve.idlefactory.factory.io.Form;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
-import io.github.crafteve.idlefactory.factory.node.DispatchMode;
-import io.github.crafteve.idlefactory.factory.node.BlockingMode;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
+import io.github.crafteve.idlefactory.factory.io.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
@@ -165,8 +167,10 @@ public final class FactoryNodeSnapshotBuilder {
             boolean autoEnergyOnly = node.io().outputs().isEmpty()
                     && node.io().inputs().stream().allMatch(spec ->
                             AeKeySupport.isEnergy(spec.key()) && spec.face() == null);
-            int pendingCount = runtime == null ? 0 : runtime.digest().pendingCount();
-            long pendingOldestAt = runtime == null ? -1L : runtime.digest().pendingOldestAt();
+            DispatchQueue queue = runtime == null ? null : runtime.pendingQueue();
+            int pendingCount = queue == null ? 0 : queue.size();
+            DispatchOrder head = queue == null ? null : queue.first();
+            long pendingOldestAt = head == null ? -1L : head.enqueuedAt();
             nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
                     node.ruleCount(), node.patternCount(), autoEnergyOnly, pendingCount,
                     pendingOldestAt,

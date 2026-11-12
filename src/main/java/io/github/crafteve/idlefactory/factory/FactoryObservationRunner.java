@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
+import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -39,7 +39,7 @@ final class FactoryObservationRunner {
     private final MinecraftServer server;
     private final FactoryManager manager;
     private final ObservationService observations;
-    private final PassiveIoRunner nodeIoRunner;
+    private final IoRunner nodeIoRunner;
     private final NodeManager nodeManager;
     private final FactoryNoticeHandler notices;
     /** 档案变更出口：类型迁移时落盘、触发对账并推链接快照。 */
@@ -63,7 +63,7 @@ final class FactoryObservationRunner {
      * @param publish       档案变更出口
      */
     FactoryObservationRunner(MinecraftServer server, FactoryManager manager,
-            ObservationService observations, PassiveIoRunner nodeIoRunner,
+            ObservationService observations, IoRunner nodeIoRunner,
             NodeManager nodeManager, FactoryNoticeHandler notices, Consumer<Factory> publish) {
         this.server = server;
         this.manager = manager;

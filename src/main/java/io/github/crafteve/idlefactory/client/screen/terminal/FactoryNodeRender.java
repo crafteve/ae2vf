@@ -131,7 +131,7 @@ final class FactoryNodeRender {
                 multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
 
         boolean roundRobin = row.view().provider().dispatch()
-                == io.github.crafteve.idlefactory.factory.node.DispatchMode.ROUND_ROBIN;
+                == io.github.crafteve.idlefactory.factory.io.DispatchMode.ROUND_ROBIN;
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),

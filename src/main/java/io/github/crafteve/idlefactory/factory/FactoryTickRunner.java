@@ -1,14 +1,19 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.Form;
-import io.github.crafteve.idlefactory.factory.io.PassiveIoRunner;
+import io.github.crafteve.idlefactory.factory.io.DispatchState;
+import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.factory.node.NodeManager;
+import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
 
@@ -38,7 +43,8 @@ final class FactoryTickRunner {
 
     private final MinecraftServer server;
     private final FactoryManager manager;
-    private final PassiveIoRunner nodeIoRunner;
+    private final IoRunner nodeIoRunner;
+    private final NodeManager nodeManager;
     private final ObservationService observations;
     private final StorageResolver storageResolver;
     private final FactoryObservationRunner observationRunner;
@@ -50,7 +56,8 @@ final class FactoryTickRunner {
     /**
      * @param server            服务端
      * @param manager           工厂档案柜
-     * @param nodeIoRunner      执行器
+     * @param nodeIoRunner      执行编排
+     * @param nodeManager       虚拟节点管理器
      * @param observations      观测服务
      * @param storageResolver   仓库解析器
      * @param observationRunner 观测输入与迁移消费
@@ -58,13 +65,14 @@ final class FactoryTickRunner {
      * @param machineStates     机器状态集合
      * @param formBuilder       表单生成器
      */
-    FactoryTickRunner(MinecraftServer server, FactoryManager manager, PassiveIoRunner nodeIoRunner,
-            ObservationService observations, StorageResolver storageResolver,
+    FactoryTickRunner(MinecraftServer server, FactoryManager manager, IoRunner nodeIoRunner,
+            NodeManager nodeManager, ObservationService observations, StorageResolver storageResolver,
             FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner,
             MachineStateLibrary machineStates, IoFormBuilder formBuilder) {
         this.server = server;
         this.manager = manager;
         this.nodeIoRunner = nodeIoRunner;
+        this.nodeManager = nodeManager;
         this.observations = observations;
         this.storageResolver = storageResolver;
         this.observationRunner = observationRunner;
@@ -98,12 +106,11 @@ final class FactoryTickRunner {
         this.machineStates.endRefresh();
         Set<UUID> liveMachines = this.machineStates.ids();
 
-        // 执行段：回收与队列由节点层驱动，这里只跑被动表单。
+        // 执行段：回收 → 主动 → 被动由 IoRunner 统一编排；这里只负责收集输入与收口账房。
         for (Factory factory : this.manager.all()) {
-            factory.live().analyzer().retainMachines(liveMachines);
             Form form = this.formBuilder.build(factory, this.machineStates);
-            this.nodeIoRunner.runFactory(factory, form, now);
-            // 速率结算由账房自己数间隔；P3 接入 IoRunner 后，执行顺序也由它统一编排。
+            this.nodeIoRunner.run(factory, form, this.dispatchStates(factory), liveMachines, now);
+            // 速率结算与经验面补扫由账房自己数间隔。
             factory.live().analyzer().tick(now);
         }
 
@@ -111,5 +118,25 @@ final class FactoryTickRunner {
             IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
         }
+    }
+
+    /**
+     * 收集一个工厂各节点的主动侧输入。
+     *
+     * <p>节点运行时还没建出来（锚点未就绪 / 正在分帧创建）时跳过：这一 tick 没有可投的队列入口，
+     * 订单留在节点记录里，等下 tick 再交。</p>
+     *
+     * @param factory 工厂
+     * @return 各节点的输入，顺序与节点库一致
+     */
+    private List<DispatchState> dispatchStates(Factory factory) {
+        List<DispatchState> states = new ArrayList<>(factory.config().nodes().size());
+        for (Node node : factory.config().nodes().all()) {
+            NodeRuntime runtime = this.nodeManager.node(node.id());
+            if (runtime != null) {
+                states.add(runtime.dispatchState());
+            }
+        }
+        return states;
     }
 }

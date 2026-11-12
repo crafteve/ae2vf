@@ -64,7 +64,8 @@ public final class IoExecutor {
         MoveResult result = input
                 ? this.transfer(network, machineStorage, job.key(), job.amount())
                 : this.transfer(machineStorage, network, job.key(), job.amount());
-        if (result.reason() != Reason.FULL) {
+        if (result.reason() != Reason.FULL || !input) {
+            // 输出侧的 FULL 只可能是仓库满，不存在「面不对」；只有输入侧才需要再探一次。
             return result;
         }
         // 目标一个都收不下：面确实不对时别的面能收。多探一次是为了把 REJECTED 与 FULL 分开，

@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -12,9 +13,13 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.io.CapacityPick;
+import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
+import io.github.crafteve.idlefactory.factory.io.DispatchState;
 import io.github.crafteve.idlefactory.factory.io.FacePick;
 import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.storage.EmptyStorage;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.GridHelper;
@@ -31,6 +36,7 @@ import appeng.helpers.patternprovider.PatternContainer;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 
 /**
@@ -56,8 +62,6 @@ public final class NodeRuntime
     private final Consumer<NodeManager.Notice> notice;
     private final NodeCraftService craft;
     private final NodePatternInventory patternInventory;
-    private final ActivePlanner activePlanner;
-    private final ProviderReturnSweep returnSweep;
     private final NodeTerminalGroup terminal;
     private final IManagedGridNode managed;
     private final IActionSource actionSource;
@@ -78,10 +82,6 @@ public final class NodeRuntime
     private final FacePick facePick;
     /** 容量查询：主动分配与智能倍率共用。 */
     private final CapacityPick capacityPick;
-    /** 轮询派单游标；只存内存，不写档。 */
-    private int dispatchCursor;
-    /** 主动侧可观测面：队列深度、卡了多久、最近一次失败原因。 */
-    private final NodeDigest digest = new NodeDigest();
     private long nextWarnTick;
 
     /**
@@ -112,8 +112,6 @@ public final class NodeRuntime
 
         this.craft = new NodeCraftService(this);
         this.patternInventory = new NodePatternInventory(this);
-        this.activePlanner = new ActivePlanner();
-        this.returnSweep = new ProviderReturnSweep(this, this.activePlanner);
         this.terminal = new NodeTerminalGroup(server, node, available);
 
         this.managed = GridHelper.createManagedNode(this, this)
@@ -177,7 +175,11 @@ public final class NodeRuntime
      */
     void detachReturning() {
         try {
-            this.craft.returnAllOrders(this.gameTime());
+            // 队列属于节点：拆节点时把剩余量全部退回网络，退不回按 D21 记日志丢弃。
+            MEStorage network = this.networkStorage();
+            DispatchQueue.RefundReport report = this.node.provider().pending().refundAll(
+                    network == null ? EmptyStorage.INSTANCE : network, this.gameTime());
+            this.logThrottled(this.gameTime(), "拆节点，队列 " + report.orders() + " 单已尽力退回网络");
         } catch (RuntimeException e) {
             this.logThrottled(this.gameTime(), "拆节点时退回订单失败：" + e);
         }
@@ -198,8 +200,6 @@ public final class NodeRuntime
      */
     boolean tick() {
         boolean changed = false;
-        // 队列不退避，每 tick 都试；投递成功会激活产物回收。
-        this.craft.deliver(this.gameTime());
         if (this.patternsDirty) {
             this.craft.rebuild();
             // 先建后清：rebuild 抛异常时标记还留着，下一 tick 自然重试；
@@ -209,6 +209,10 @@ public final class NodeRuntime
         }
         if (this.dataDirty) {
             this.dataDirty = false;
+            changed = true;
+        }
+        // 队列由执行层直接改（投递进度、退避），节点每 tick 收口一次脏标记。
+        if (this.node.provider().pending().consumeDirty()) {
             changed = true;
         }
         return changed;
@@ -226,9 +230,6 @@ public final class NodeRuntime
         this.available = next;
         this.terminal.setAvailable(next);
         this.craft.publish();
-        if (next) {
-            this.returnSweep.activate(this.gameTime());
-        }
     }
 
     /**
@@ -242,8 +243,7 @@ public final class NodeRuntime
         if (capacityChanged) {
             this.terminal.refreshCapacity();
         }
-        // 新样板可能带来新产物，别让回收还停在最慢的退避档上。
-        this.returnSweep.activate(this.gameTime());
+        // 新样板可能带来新产物；回收节奏由执行层按队列增长 / 收获自行激活，这里不越界。
     }
 
     /** 标记样板需要重新解码（倍率 / 样板槽变化）；下一次节点 tick 统一重建。 */
@@ -355,22 +355,28 @@ public final class NodeRuntime
     }
 
     /**
-     * 按派单模式挑一台在线机器；一次派单只会用这一台。
+     * 打包这一 tick 主动侧需要的输入。
      *
-     * @return 目标机器；没有在线机器时为 {@code null}
+     * <p>只交值：队列（活引用）、在线机器、派单模式、阻挡开关、样板输入、产物白名单与输入配置面。
+     * 执行层不认识节点，节点也不认识执行器。</p>
+     *
+     * @return 主动侧输入
      */
-    @Nullable
-    Machine pickMachine() {
-        List<Machine> online = this.onlineMachines();
-        if (online.isEmpty()) {
-            return null;
+    public DispatchState dispatchState() {
+        Map<AEKey, Direction> inputFaces = new LinkedHashMap<>();
+        for (ResourceSpec spec : this.node.io().inputs()) {
+            if (spec.face() != null) {
+                inputFaces.put(spec.key(), spec.face());
+            }
         }
-        if (this.node.provider().dispatch() == DispatchMode.SEQUENTIAL) {
-            return online.get(0);
+        NodeProvider provider = this.node.provider();
+        Set<UUID> members = new java.util.HashSet<>(this.node.machines().size());
+        for (Machine machine : this.node.machines()) {
+            members.add(machine.id());
         }
-        int index = Math.floorMod(this.dispatchCursor, online.size());
-        this.dispatchCursor = index + 1;
-        return online.get(index);
+        return new DispatchState(this.node.id(), provider.pending(), this.onlineMachines(),
+                provider.dispatch(), provider.blocking(), this.craft.patternInputs(),
+                this.craft.products(), inputFaces, members);
     }
 
     /**
@@ -427,6 +433,11 @@ public final class NodeRuntime
         return this.anchorLevel;
     }
 
+    /** 待投递队列（只读用途：界面与快照读单数）；写入口在 {@link DispatchQueue}。 */
+    public DispatchQueue pendingQueue() {
+        return this.node.provider().pending();
+    }
+
     /** 工厂共享的端口缓存：机器侧存储一律从这里取。 */
     PortExecutor ports() {
         return this.ports;
@@ -470,21 +481,6 @@ public final class NodeRuntime
     /** 产物白名单：所有样板产物的 key 并集。 */
     Set<AEKey> products() {
         return this.craft.products();
-    }
-
-    /** 产物回收：节奏与白名单调度都在它里面。 */
-    public ProviderReturnSweep returnSweep() {
-        return this.returnSweep;
-    }
-
-    /** 主动规划器：队列与回收的择时都归它。 */
-    public ActivePlanner activePlanner() {
-        return this.activePlanner;
-    }
-
-    /** 主动侧可观测面（只读）。 */
-    public NodeDigest digest() {
-        return this.digest;
     }
 
 

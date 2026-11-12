@@ -4,7 +4,7 @@ import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
 import io.github.crafteve.idlefactory.client.wand.WandSession;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
-import io.github.crafteve.idlefactory.factory.node.DispatchMode;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
