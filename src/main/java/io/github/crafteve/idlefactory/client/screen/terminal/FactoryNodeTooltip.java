@@ -115,12 +115,29 @@ final class FactoryNodeTooltip {
         return lines;
     }
 
+    /**
+     * 悬停提示里说明「要删掉什么」：规则、样板，还是两者都有。
+     *
+     * @param view 节点视图
+     * @return 说明文字
+     */
+    private static String configuredText(FactoryNodeSnapshotBuilder.NodeView view) {
+        int rules = view.ruleCount();
+        int patterns = view.patternCount();
+        if (rules > 0 && patterns > 0) {
+            return "该节点有 " + rules + " 条规则、" + patterns + " 份样板";
+        }
+        if (patterns > 0) {
+            return "该节点有 " + patterns + " 份样板（会退回背包）";
+        }
+        return "该节点有 " + rules + " 条规则";
+    }
+
     private static List<Component> delete(NodeRow node) {
         List<Component> lines = new ArrayList<>(3);
         lines.add(Component.literal("删除节点").withStyle(ChatFormatting.BOLD));
         if (node.view().configured()) {
-            lines.add(Component.literal("该节点有 " + node.view().ruleCount() + " 条规则、"
-                    + node.view().patternCount() + " 份样板").withStyle(ChatFormatting.GRAY));
+            lines.add(Component.literal(configuredText(node.view())).withStyle(ChatFormatting.GRAY));
             lines.add(Component.literal("点击后弹窗确认").withStyle(ChatFormatting.DARK_GRAY));
         } else if (node.view().autoEnergyOnly()) {
             lines.add(Component.literal("只有接入时自动补的 FE 规则，直接删除")

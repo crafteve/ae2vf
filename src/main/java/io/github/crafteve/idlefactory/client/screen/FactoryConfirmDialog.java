@@ -23,6 +23,17 @@ public final class FactoryConfirmDialog {
     private static final int HEIGHT = 84;
 
     /**
+     * 浮层整体的 z 偏移。
+     *
+     * <p>GUI 的普通填充 / 贴图都在 z=0，但 {@code GuiGraphics.renderItem} 会把物品图标
+     * 平移到 z=150、数量文字平移到 z=200，而 {@code RenderType.gui()} 开着深度测试（LEQUAL）。
+     * 深度更小的先赢，所以「后画」的 z=0 弹窗永远盖不住「先画」的 z=150 图标。
+     * 这里整体抬到 300：高于物品与数量，低于原版 tooltip 的 400。改这个值等于改层级，
+     * 不要在各处零散加 z。</p>
+     */
+    private static final float DIALOG_Z = 300.0F;
+
+    /**
      * 一个矩形。
      *
      * @param x      左边缘
@@ -101,9 +112,10 @@ public final class FactoryConfirmDialog {
         if (!this.open || box == null || parent == null) {
             return;
         }
-        // 列表里的机器图标走物品批处理，flush 之前不会真正落屏；不先 flush 的话它们会画在
-        // 弹窗底图上面，看起来像弹窗被压到列表下面。这里把已有批次全部落屏再画浮层。
+        // 先把已有批次落屏（物品图标是延迟批处理的），再整体抬 z 画浮层。
         graphics.flush();
+        graphics.pose().pushPose();
+        graphics.pose().translate(0.0F, 0.0F, DIALOG_Z);
         graphics.fill(parent.x(), parent.y(), parent.x() + parent.width(),
                 parent.y() + parent.height(), 0x90000000);
         // 浮层内区必须先铺一块完全不透明的底：用半透明分隔线贴图会让背后的机器图标透上来，
@@ -136,6 +148,7 @@ public final class FactoryConfirmDialog {
         drawButton(graphics, cancelX, buttonY, cancelW, "取消", false, mouseX, mouseY);
         drawButton(graphics, confirmX, buttonY, confirmW, this.confirmLabel, true,
                 mouseX, mouseY);
+        graphics.pose().popPose();
     }
 
     private void drawButton(GuiGraphics graphics, int x, int y, int w, String label,

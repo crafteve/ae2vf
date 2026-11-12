@@ -74,7 +74,7 @@ public final class FactoryNodeSnapshotBuilder {
          * @return 有样板、或有玩家自己配的规则
          */
         public boolean configured() {
-            return this.ruleCount > 0 && !this.autoEnergyOnly;
+            return this.patternCount > 0 || (this.ruleCount > 0 && !this.autoEnergyOnly);
         }
     }
 

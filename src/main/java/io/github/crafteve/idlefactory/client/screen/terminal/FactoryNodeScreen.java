@@ -20,6 +20,7 @@ import appeng.core.AEConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
@@ -191,8 +192,10 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
         drawContent(graphics, hover);
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
+        // 浮层打开时不再画底层的 tooltip：原版 tooltip 在 z=400，会压在弹窗上。
+        boolean dialogOpen = this.confirmDialog != null && this.confirmDialog.isOpen();
         List<Component> tooltip = FactoryNodeTooltip.of(this.model.rows(), hover);
-        if (!tooltip.isEmpty()) {
+        if (!tooltip.isEmpty() && !dialogOpen) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
         if (this.confirmDialog != null) {
@@ -614,12 +617,32 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int height = Math.min(84, this.imageHeight - 12);
         int x = this.leftPos + (this.imageWidth - width) / 2;
         int y = this.topPos + (this.imageHeight - height) / 2;
-        this.confirmDialog.open("删除节点", node.name() + "\n有 " + node.view().ruleCount()
-                        + " 条 IO 规则、" + node.view().patternCount() + " 份样板，删除后不可恢复。",
+        this.confirmDialog.open("删除节点", node.name() + "\n" + deleteDetail(node.view()),
                 "删除", () -> FactoryNodeActions.delete(this.menu.containerId, node),
                 new FactoryConfirmDialog.Bounds(x, y, width, height),
                 new FactoryConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
                         this.imageHeight));
+    }
+
+    /**
+     * 删除确认里说清楚「删掉的是什么」：规则、样板，还是两者都有。
+     *
+     * <p>样板删节点时会退回背包，所以单独提一句；自动补的 FE 规则会和节点一起消失，
+     * 下次接机器会再补，不需要在弹窗里吓人。</p>
+     *
+     * @param view 节点视图
+     * @return 说明文字
+     */
+    private static String deleteDetail(FactoryNodeSnapshotBuilder.NodeView view) {
+        int rules = view.ruleCount();
+        int patterns = view.patternCount();
+        if (rules > 0 && patterns > 0) {
+            return "有 " + rules + " 条 IO 规则、" + patterns + " 份样板，删除后不可恢复。";
+        }
+        if (patterns > 0) {
+            return "有 " + patterns + " 份样板（会退回背包），删除后不可恢复。";
+        }
+        return "有 " + rules + " 条 IO 规则，删除后不可恢复。";
     }
 
     /**
