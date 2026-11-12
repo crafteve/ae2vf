@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -9,9 +10,17 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import appeng.api.stacks.AEKey;
+
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
+import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.factory.io.IoSide;
+import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
@@ -204,7 +213,70 @@ final class WandService {
             refresh(block);
         }
         UUID nodeId = candidate != null ? candidate.id() : base.id();
+        autoAddEnergyRule(factory, nodeId, draft.added());
         return WandCommitOutcome.success(nodeId, draft.added().size(), draft.removed().size());
+    }
+
+    /**
+     * 是不是「接入时自动补的 FE 输入规则」：FE key、不限面。
+     *
+     * <p>玩家用机器行按钮加出来的形状相同，但那种规则本来就是一次点击就能重建的，
+     * 拆机器时允许一起丢掉；输出侧的 FE 规则是玩家显式翻过去的，仍然拦住删除。</p>
+     *
+     * @param spec 规则
+     * @return 是自动形状的 FE 输入规则
+     */
+    private static boolean isAutoEnergy(ResourceSpec spec) {
+        return AeKeySupport.isEnergy(spec.key()) && spec.face() == null;
+    }
+
+    /**
+     * 新接入的机器带 FE 能力时，给节点补一条输入 FE 规则。
+     *
+     * <p>规则归节点不归机器，所以一次接入只补一条；节点里已经有 FE 输入或输出规则时不补
+     * （玩家手动删掉或翻成输出都应该被尊重）。没装 Applied Flux 时没有 FE 这类资源，静默跳过。
+     * 规则上限、重复校验交给 {@link NodeActions#addRule}，这里只决定「要不要尝试」。</p>
+     *
+     * @param factory 工厂
+     * @param nodeId  落库后的节点 id
+     * @param added   本次新接入的方块
+     */
+    private void autoAddEnergyRule(Factory factory, UUID nodeId, Collection<BlockKey> added) {
+        AEKey energy = AeKeySupport.energy();
+        if (energy == null || this.observations == null || added.isEmpty()) {
+            return;
+        }
+        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        if (found.isEmpty()) {
+            return;
+        }
+        for (ResourceSpec spec : found.get().io().inputs()) {
+            if (spec.key().equals(energy)) {
+                return;
+            }
+        }
+        for (ResourceSpec spec : found.get().io().outputs()) {
+            if (spec.key().equals(energy)) {
+                return;
+            }
+        }
+        boolean hasEnergy = false;
+        for (BlockKey block : added) {
+            FaceTable table = this.observations.ensureFaces(block);
+            if (!table.facesFor(CapabilityKind.ENERGY).isEmpty()
+                    || table.unsided().contains(CapabilityKind.ENERGY)) {
+                hasEnergy = true;
+                break;
+            }
+        }
+        if (!hasEnergy) {
+            return;
+        }
+        NodeActions.Result result = NodeActions.addRule(factory, nodeId, IoSide.INPUT, energy,
+                null, MatchMode.EXACT);
+        if (!result.ok()) {
+            IdleFactory.LOGGER.debug("Idle Factory: 自动补 FE 规则未写入：{}", result.message());
+        }
     }
 
     /**
@@ -275,6 +347,7 @@ final class WandService {
             return mapAddFailure(outcome.result(), block);
         }
         refresh(block);
+        autoAddEnergyRule(factory, candidate.id(), List.of(block));
         return WandCommitOutcome.success(candidate.id(), 1, 0);
     }
 
@@ -297,7 +370,11 @@ final class WandService {
         if (node.machineCount() > 1) {
             return WandCommitOutcome.failure(WandFailure.MEMBER_NOT_REMOVABLE);
         }
-        if (node.ruleCount() > 0) {
+        // 自动补的 FE 输入规则（无面、输入侧）不算玩家配置：否则接一台 FE 机器就再也拆不掉。
+        long blockingRules = node.io().inputs().stream()
+                .filter(spec -> !isAutoEnergy(spec)).count()
+                + node.io().outputs().size();
+        if (blockingRules > 0L) {
             return WandCommitOutcome.failure(WandFailure.DELETE_BLOCKED,
                     WandDeleteReason.HAS_RULES, List.of(block), 1);
         }

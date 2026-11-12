@@ -96,7 +96,7 @@ final class FactoryPassiveIoRender {
             FactoryCard.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
                     viewport.width() - 1, box.bottom() - box.top(),
                     FactoryCard.Level.MACHINE, true);
-            drawMachineRow(graphics, viewport, block, top, bottom);
+            drawMachineRow(graphics, viewport, block, box, top, bottom, hover);
             if (layout.view() == FactoryPassiveIoView.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
             } else {
@@ -183,8 +183,8 @@ final class FactoryPassiveIoRender {
             case ADD -> {
                 // 卡片空白区是拖入目标，悬停不铺色：拖拽高亮由 JEI / EMI 自己画。
             }
-            case CHIP_DIR, CHIP_FACE, CHIP_MODE -> {
-                // chip 的高亮在 drawChip 内部按 chip 矩形画，这里不再叠第二层。
+            case ENERGY, CHIP_DIR, CHIP_FACE, CHIP_MODE -> {
+                // 键帽的高亮在绘制时按自己的矩形画，这里不再叠第二层。
             }
         }
     }
@@ -206,11 +206,13 @@ final class FactoryPassiveIoRender {
      * @param graphics    画布
      * @param viewport    视口
      * @param block       块
+     * @param box         块几何（FE 按钮要和命中用同一份坐标）
      * @param top         机器行上边缘（屏幕坐标）
      * @param blockBottom 机器大卡片下边缘（屏幕坐标）
+     * @param hover       当前悬停；FE 按钮自己提亮
      */
     private void drawMachineRow(GuiGraphics graphics, Viewport viewport, BlockView block,
-            int top, int blockBottom) {
+            BlockBox box, int top, int blockBottom, @Nullable Hit hover) {
         int left = FactoryPassiveIoLayout.bodyX(viewport) + FactoryPassiveIoLayout.ROW_INSET;
         // 右边界排掉卡片最右 1px 竖边，深色带只铺在内区，卡片亮边 / 暗边保持完整。
         int right = FactoryPassiveIoLayout.bodyX(viewport) + viewport.width() - 2;
@@ -231,14 +233,47 @@ final class FactoryPassiveIoRender {
         int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
         // 状态灯占最右 3px；数量用原版物品数量修饰器，叠在图标右下角，和背包一致。
         int lampX = contentRight - 5;
+        boolean hasEnergy = AeKeySupport.energy() != null;
+        // FE 按钮占住状态灯左侧；名字可用宽度要把按钮让出来，不能压到按钮上。
+        int nameRight = hasEnergy ? FactoryPassiveIoLayout.feButtonX(viewport) - 2 : lampX - 4;
         if (block.machineCount() > 1) {
             graphics.renderItemDecorations(this.font,
                     icon.copyWithCount(block.machineCount()), slotX + 1, top + 2);
         }
         graphics.drawString(this.font,
-                ellipsize(block.name(), lampX - 4 - nameX), nameX, top + 6,
+                ellipsize(block.name(), nameRight - nameX), nameX, top + 6,
                 this.theme.textPrimary(), false);
         FactoryNineSlice.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
+        if (hasEnergy) {
+            drawEnergyButton(graphics, viewport, box, top, hover);
+        }
+    }
+
+    /**
+     * 画机器行右侧的 FE 快捷按钮：13px 键帽 + 缩小的「FE」两字。
+     *
+     * <p>两字放不进 9px 内区，横竖都缩到 0.75；按钮只在装了 Applied Flux 时出现，
+     * 没装时这里根本没有 FE 这类资源，画出来只会误导。</p>
+     *
+     * @param graphics 画布
+     * @param viewport 视口
+     * @param box      块几何
+     * @param top      机器行上边缘（屏幕坐标）
+     * @param hover    当前悬停
+     */
+    private void drawEnergyButton(GuiGraphics graphics, Viewport viewport, BlockBox box, int top,
+            @Nullable Hit hover) {
+        int x = FactoryPassiveIoLayout.feButtonX(viewport);
+        int y = FactoryPassiveIoLayout.feButtonY(top);
+        boolean hovered = hover != null && hover.kind() == FactoryPassiveIoLayout.Kind.ENERGY
+                && hover.block() == box.index();
+        FactoryKeycap.draw(graphics, this.theme, x, y, FactoryPassiveIoLayout.FE_BUTTON,
+                FactoryPassiveIoLayout.FE_BUTTON, this.theme.bevelLight(), true, hovered);
+        graphics.pose().pushPose();
+        graphics.pose().translate(x + 2, y + 4, 0.0F);
+        graphics.pose().scale(0.75F, 0.75F, 1.0F);
+        graphics.drawString(this.font, "FE", 0, 0, this.theme.textPrimary(), false);
+        graphics.pose().popPose();
     }
 
     private void drawListBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -469,6 +504,10 @@ final class FactoryPassiveIoRender {
     }
 
     private static String modeLabel(ResourceSpec spec) {
+        // 只有物品有精确 / 模糊之分；流体、FE 等固定精确，显示「—」而不是可点的「精」。
+        if (!(spec.key() instanceof AEItemKey)) {
+            return "—";
+        }
         return spec.mode() == io.github.crafteve.idlefactory.factory.machine.MatchMode.EXACT
                 ? "精" : "模";
     }

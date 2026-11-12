@@ -47,11 +47,25 @@ final class FactoryPassiveIoTooltip {
         BlockView block = blocks.get(hit.block());
         return switch (hit.kind()) {
             case MACHINE -> machine(block);
+            case ENERGY -> energy();
             case ADD -> List.of(
                     Component.literal("从 JEI 拖到这里新建行"),
                     Component.literal("新规则默认作为输入").withStyle(ChatFormatting.GRAY));
             default -> rule(block, block.rules().get(hit.rule()));
         };
+    }
+
+    /**
+     * FE 快捷按钮的提示：只说明点下去会发生什么，不重复规则行信息。
+     *
+     * @return 文本行
+     */
+    private static List<Component> energy() {
+        return List.of(
+                Component.literal("FE 输入").withStyle(ChatFormatting.BOLD),
+                Component.literal("点一下：给这个节点加一条输入 FE 规则")
+                        .withStyle(ChatFormatting.GRAY),
+                Component.literal("加完可用规则上的「入」切成输出").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static List<Component> machine(BlockView block) {

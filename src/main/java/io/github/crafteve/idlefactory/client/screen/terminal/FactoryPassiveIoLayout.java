@@ -6,6 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 /**
@@ -69,6 +70,8 @@ final class FactoryPassiveIoLayout {
     static final int TILE_INSET = 2;
     /** 磁贴里名字的 x 偏移：图标凹槽之后再空 2px。 */
     static final int TILE_NAME_X = TILE_INSET + SLOT + 2;
+    /** 机器行右侧 FE 快捷按钮的边长；与 chip 同规格。 */
+    static final int FE_BUTTON = CHIP;
 
     /**
      * 内容视口。
@@ -99,6 +102,8 @@ final class FactoryPassiveIoLayout {
     enum Kind {
         /** 机器行。 */
         MACHINE,
+        /** 机器行右侧的 FE 快捷按钮：点一下给节点补一条输入 FE 规则。 */
+        ENERGY,
         /** 规则行 / 磁贴（非 chip 区域）。 */
         RULE,
         /** 方向 chip。 */
@@ -236,6 +241,13 @@ final class FactoryPassiveIoLayout {
                 if (localY >= box.top() + MACHINE_ROW_H) {
                     return null;
                 }
+                // 没装 Applied Flux 时没有 FE 这类资源，按钮不画也不占命中。
+                int buttonY = feButtonY(box.top());
+                if (AeKeySupport.energy() != null
+                        && localY >= buttonY && localY < buttonY + FE_BUTTON
+                        && inside(localX, feButtonX(this.viewport), FE_BUTTON)) {
+                    return new Hit(Kind.ENERGY, box.index(), -1);
+                }
                 return new Hit(Kind.MACHINE, box.index(), -1);
             }
             return this.view == FactoryPassiveIoView.LIST
@@ -338,6 +350,25 @@ final class FactoryPassiveIoLayout {
     /** 规则行名字 x。 */
     static int nameX(Viewport viewport) {
         return slotX(viewport) + RULE_ICON + GAP;
+    }
+
+    /**
+     * 机器行 FE 按钮的 x。
+     *
+     * <p>放在状态灯左侧，和灯、卡片右边缘各留 2px；按钮本身与规则行的 chip 同规格。</p>
+     */
+    static int feButtonX(Viewport viewport) {
+        return contentRight(viewport) - 5 - GAP - FE_BUTTON;
+    }
+
+    /**
+     * 机器行 FE 按钮的 y。
+     *
+     * @param rowTop 机器行上边缘（屏幕或内容坐标均可，只用到相对偏移）
+     * @return 按钮上边缘
+     */
+    static int feButtonY(int rowTop) {
+        return rowTop + 1 + (MACHINE_ROW_H - 1 - FE_BUTTON) / 2;
     }
 
     /** 速率列 x。 */

@@ -25,6 +25,7 @@ import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Kind;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
@@ -524,6 +525,13 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             return;
         }
         BlockView block = this.model.blocks().get(hit.block());
+        if (hit.kind() == Kind.ENERGY) {
+            // FE 按钮不挂在规则行上，必须先于规则下标守卫处理。
+            if (button == 0) {
+                FactoryPassiveIoActions.addEnergy(this.menu.containerId, block);
+            }
+            return;
+        }
         if (hit.rule() < 0 || hit.rule() >= block.rules().size()) {
             return;
         }

@@ -9,6 +9,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 
 import net.minecraft.core.Direction;
@@ -99,6 +100,28 @@ final class FactoryPassiveIoActions {
         PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
                 FactoryRuleActionC2S.Action.REMOVE, block.nodeId(), rule.side(),
                 rule.spec().key(), rule.spec().face(), rule.spec().mode()));
+    }
+
+    /**
+     * 机器行 FE 按钮：加一条输入 FE 规则。
+     *
+     * <p>不依赖 JEI 搜索（FE 不是可浏览的配料），按钮是 FE 规则的主要入口；加了以后玩家
+     * 可以用规则行的「入」chip 翻成输出。</p>
+     *
+     * @param containerId 菜单容器 id
+     * @param block       机器块
+     */
+    static void addEnergy(int containerId, FactoryPassiveIoModel.BlockView block) {
+        AEKey key = AeKeySupport.energy();
+        if (key == null) {
+            // 没装 Applied Flux：没有 FE 这类资源，按钮本来也不该出现。
+            return;
+        }
+        IdleFactory.LOGGER.info("[ui-probe] add-energy block={} node={} key={}",
+                block.name(), block.nodeId(), key.getId());
+        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
+                FactoryRuleActionC2S.Action.ADD, block.nodeId(), IoSide.INPUT, key, null,
+                MatchMode.EXACT));
     }
 
     /**
