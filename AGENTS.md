@@ -57,7 +57,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 命名后缀固定：
 
-`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析
+`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析 · `Form` 每 tick 工作清单 · `Unit` 执行单元 · `Planner` 规划器（择时与排序） · `Executor` 执行器（无跨轮记忆） · `Ledger` 账本（变化序列） · `Digest` 历史结论 · `Analyzer` 分析器（账本与结论的唯一维护者） · `Pick` 执行侧查询器（探面 / 查变体，只读不写）
 
 硬条款：
 
@@ -74,16 +74,18 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - 配置（最高信息，写档）：节点的成员机器与 IO 规则、`factory` 的节点库与仓库地址。只描述搬什么，不执行。
 - 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面与执行门禁都只读它，读路径不探世界。
-- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `NodeIoRunner → MachineIoRunner → IoTransfer`；结果只留在本轮统计里，不回写配置。
+- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `PassiveIoRunner → IoExecutor → IoPortResolver → IoTransfer`；结果写进账本与结论（不写档），不回写配置。
 
 各包职责：
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头与节点库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是界面与绑定杖的行政入口，`NodeActions` 管节点规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `io`：执行层。`NodeIoRunner` 遍历节点与机器、做睡眠、读观测门禁；`MachineIoRunner` 按规则调搬运；`RuleResolver` 负责取面与 handler：玩家配的面 > 路由表 > 扫面；物品先试无向 handler，无向不可用（缺失或只读）时逐面探测，规则里显式配了 `face` 的物品规则仍优先用配置面；`ItemCandidates` / `ItemVariantIndex` 负责模糊物品规则的变体展开；`IoTransfer` 是唯一写路径；`RunnerState` 存睡眠瞬态；`RouteTable` 只记流体 / 能量搬通的面。
+- `io`：执行层。表单（`IoForm` / `IoUnit`）是唯一工作清单，不在表上的单元执行层不认识；`PassiveIoRunner` 拿表单跑被动一轮；`PassivePlanner` 按规则级排期（择时、游标、退避）；`IoExecutor` 按清单跑一台机器的事务；`IoPortResolver` 是机器侧唯一写入口（配置面 > 经验面 > 探面），被动与主动共用；`IoTransfer` 是唯一搬运事务；`IoLedger` / `UnitDigest` / `LedgerAnalyzer` 记短期明细与长期结论。**`io` 不依赖 `node`**：表单把「机器 + 一条规则」直接交下来，执行层不需要节点容器。
 
-调用链：`ServerTick → FactoryRuntime → FactoryTickRunner → NodeIoRunner → MachineIoRunner → IoTransfer → MEStorage / ResourceAdapter`。
+调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ PassiveIoRunner → PassivePlanner → IoExecutor → IoPortResolver → IoTransfer → MEStorage / ResourceAdapter`。
 
-失败原因沿链上抛：`OK`、`NO_ITEM`、`NO_SPACE`、`NO_HANDLER`、`REJECTED`。`REJECTED`（有容量却不收）说明面不对，要踢路由（物品规则没有路由条目，下一轮重新探面）；`NO_SPACE`（满了）是正常状态，保住路由。
+调用链（主动，旁路）：`AE2 CPU → NodeCraftService.pushPattern（校验 + 整单入队）→ 下一 tick NodeCraftService.deliver → IoPortResolver → 机器`；产物由 `ProviderReturnSweep` 扫回网络。
+
+失败原因沿链上抛（`io/Reason`，8 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
 
 ### 2.3 数据层
 
@@ -107,8 +109,8 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 目标体量：上百台机器、16 个容器。
 
-- 睡眠：机器级，100 tick 未搬动才睡；观测按状态退避。
-- 预算：观测 8 次/tick，标脏 32 次/tick，工作状态 16 次/tick。
+- 退避：规则级（不是机器级），按上一轮原因分档——`NO_MATERIAL` 5 tick、`FULL` 10 tick、`NO_FACE` 20 tick、`REJECTED` 20×连续拒收（封顶 100）、`ERROR` 20→100、`SLEEPING` 200 tick；一次都没试过的单元立刻跑。观测按状态退避。
+- 预算：观测 64 次/tick（`FactoryLimitsConfig.DEFAULT_OBSERVATION_BUDGET`，硬上限 256），脏位置 64 次/tick，工作状态 16 次/tick。
 - 复探：PRESENT 100 tick，UNLOADED 40 tick，MISSING 100 → 1200 tick，工作状态 10 tick。
 - IO：固定每 tick 一轮（原本可由 `/idf diag io` 调整，指令删除后固定）。
 - 上限：节点 4096、单节点机器 256、全厂机器 8192、规则每侧 16、仓库快照 1024。
@@ -148,7 +150,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 4.1 命名
 
-Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Machine、MachineIoGroup、IO 规则、Observation、Storage、Anchor、Ref、Runner，不用 `Target`，也不再引入 Line。
+Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Machine、IO 规则、Observation、Storage、Anchor、Ref、Runner、Planner、Executor、Ledger、Digest，不用 `Target`，也不再引入 Line。
 
 ### 4.2 注释
 
@@ -249,7 +251,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoTransfer.java` · `NodeIoRunner.java` · `MachineIoRunner.java` · `RuleResolver.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoTransfer.java` · `IoForm.java` · `IoUnit.java` · `PassiveIoRunner.java` · `PassivePlanner.java` · `IoExecutor.java` · `IoPortResolver.java` · `IoLedger.java` · `UnitDigest.java` · `LedgerAnalyzer.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -276,6 +278,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
     - **机械的类型替换用 bash 批量替换 + 编译器收敛**，不要逐文件人工 read→edit（40 个文件约 80 次工具往返）。批量替换的安全做法见 4.3。
 20. `FactorySortMode` 的声明顺序同时是档位按钮的循环顺序、物品组件与线协议的 ordinal：只许末尾追加、不许重排，否则旧终端里的排序档位会错位。
+21. **单元离开表单即释放账本与结论**（这是 2026-11-12 确认的预期行为，不是 bug）：机器短暂 UNLOADED（玩家跨区块）再回来，会从零开始——`faceHint` 丢、`idleTicks` 清零、退避重置，表现为「回来第一轮全速重探面」。只有需要给宽限期时才改，别当缺陷修。
 
 ### 6.3 文档偏差
 
