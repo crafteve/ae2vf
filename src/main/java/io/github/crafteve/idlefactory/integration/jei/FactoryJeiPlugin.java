@@ -9,11 +9,13 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -152,12 +154,35 @@ public final class FactoryJeiPlugin implements IModPlugin {
     @Nullable
     private static AEKey toKey(Object ingredient) {
         if (ingredient instanceof ItemStack stack && !stack.isEmpty()) {
-            return AEItemKey.of(stack);
+            return keyOfItem(stack);
         }
         if (ingredient instanceof FluidStack fluid && !fluid.isEmpty()) {
             return AEFluidKey.of(fluid);
         }
+        if (ingredient instanceof FeIngredient) {
+            // FE 是独立配料：拖它就是要一条 FE 规则；没装 Applied Flux 时没有 FE 这类资源。
+            return AeKeySupport.energy();
+        }
         return null;
+    }
+
+    /**
+     * 物品配料转资源 key：先拆 AE2 的「包裹通用堆栈」，再按普通物品处理。
+     *
+     * <p>包裹堆栈是 AE2 用来在终端之间传非物品资源的包装纸（FE、流体、化学品都可能装在里面）。
+     * 不拆的话规则会写成「搬这张纸」，机器永远收不到里面的资源。</p>
+     *
+     * @param stack 物品配料
+     * @return 资源 key
+     */
+    private static AEKey keyOfItem(ItemStack stack) {
+        if (GenericStack.isWrapped(stack)) {
+            GenericStack inner = GenericStack.unwrapItemStack(stack);
+            if (inner != null) {
+                return inner.what();
+            }
+        }
+        return AEItemKey.of(stack);
     }
 
     private static final class PassiveIoGhostHandler

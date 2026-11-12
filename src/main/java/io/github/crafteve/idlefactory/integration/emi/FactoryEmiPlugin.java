@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.GenericStack;
 
 import dev.emi.emi.api.EmiDragDropHandler;
 import dev.emi.emi.api.EmiEntrypoint;
@@ -57,6 +58,13 @@ public final class FactoryEmiPlugin implements EmiPlugin {
         EmiStack stack = ingredient.getEmiStacks().get(0);
         ItemStack item = stack.getItemStack();
         if (!item.isEmpty()) {
+            // 同 JEI：AE2 包裹通用堆栈只是包装纸，规则要落在里面的资源上。
+            if (GenericStack.isWrapped(item)) {
+                GenericStack inner = GenericStack.unwrapItemStack(item);
+                if (inner != null) {
+                    return inner.what();
+                }
+            }
             return AEItemKey.of(item);
         }
         if (stack.getKey() instanceof Fluid fluid) {
