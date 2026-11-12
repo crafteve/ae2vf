@@ -227,12 +227,15 @@ public final class Analyzer {
     }
 
     /**
-     * 清掉一台机器的全部经验面；观测代数变化时用（方块换了，面全不算数）。
+     * 丢掉一台机器的全部主动侧状态：经验面与阻挡缓存。
      *
-     * @param machine 机器
+     * <p>机器被删或同 id 的方块被换掉时调：方块换了，面与退避都不再算数。</p>
+     *
+     * @param machineId 机器 id
      */
-    public void clearMachineFaces(Machine machine) {
-        this.machineFaceHints.remove(machine.id());
+    public void forgetMachine(UUID machineId) {
+        this.machineFaceHints.remove(machineId);
+        this.machineConclusions.remove(machineId);
     }
 
     /**
@@ -256,15 +259,6 @@ public final class Analyzer {
     public void markMachineBlocked(Machine machine, long until) {
         this.machineConclusions.computeIfAbsent(machine.id(), id -> new MachineConclusion(until))
                 .block(until);
-    }
-
-    /**
-     * 清掉一台机器的阻挡缓存（机器删除 / 观测代数变化）。
-     *
-     * @param machine 机器
-     */
-    public void clearMachineBlocked(Machine machine) {
-        this.machineConclusions.remove(machine.id());
     }
 
     /** 一个节点的主动侧结论。 */
@@ -526,11 +520,6 @@ public final class Analyzer {
                     this.rejectStreak = 0;
                 }
             }
-        }
-
-        /** 第一次尝试的时刻；没试过为 {@code -1}。 */
-        public long firstAttemptAt() {
-            return this.firstAttemptAt;
         }
 
         /** 最近一次尝试的时刻；没试过为 {@code -1}。 */

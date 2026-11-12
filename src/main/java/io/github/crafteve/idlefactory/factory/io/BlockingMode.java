@@ -12,7 +12,7 @@ import java.util.Locale;
  * {@code ActivePlanner} 在投递时执行。</p>
  */
 public enum BlockingMode {
-    /** 不阻挡：CPU 能推多少推多少，塞不下的部分进待写入队列。 */
+    /** 不阻挡：CPU 能推多少推多少，塞不下的部分进待投递队列。 */
     OFF,
     /** 阻挡：机器里还有样板输入时，这份样板不推。 */
     ON;

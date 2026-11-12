@@ -101,6 +101,7 @@ final class MachineLinkService {
             this.nodeManager.removeNode(base.id());
             // 睡眠、面路由都是按机器 id 存的内存状态；不清掉，同 id 重连会继承旧睡眠
             for (Machine machine : base.machines()) {
+                factory.live().analyzer().forgetMachine(machine.id());
                 this.nodeIoRunner.forget(machine.id());
             }
             int returned = returnPatterns(factory, base, receiver);
@@ -112,6 +113,7 @@ final class MachineLinkService {
         }
         // 成员变了：结构版本随之变化，对账会把节点整体重建，样板缓存也在那时重算。
         for (UUID machineId : removedMachineIds) {
+            factory.live().analyzer().forgetMachine(machineId);
             this.nodeIoRunner.forget(machineId);
         }
         return new TopologyOutcome(true, 0, false, result);

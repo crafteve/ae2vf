@@ -810,6 +810,14 @@
 
 在修订获批前，以 ADR 为准。
 
+以下条目来自 ADR-042（IO 执行层重构），同样待批准后修改 `AGENTS.md`：
+
+6. `2.1 命名后缀固定` 增加 `Form`（表单，内嵌 `Entry` / `Entry.Key`）与 `Job`（一次性任务；只带机器 / 方向 / 面 / 资源 / 量，不带结果）。
+7. `2.1 命名后缀固定` 增补定位：`Order` 一单待投递、`Queue` 多单排队（唯一写入口）、`State` 一 tick 的输入值对象、`Pick` 执行侧只读查询器（探面 / 容量 / 变体）、`Runner` 每 tick 编排。
+8. `2.2 三层信息` 执行层类名更新：`IoForm` / `IoUnit` → `Form` / `Form.Entry`，`IoUnitDigest` 合并进 `Analyzer`，`IoTransfer` 合并进 `IoExecutor.move`，`IoPortResolver` 拆成 `FacePick` + `PortExecutor`。
+9. `6.2 坑` 第 6 条删除「必须先试无向、再逐面找」的表述：机器侧统一走 AE2 `MEStorage`，面由 `FacePick` 决定，物品规则不再单独走无向兜底。
+10. `2.2 三层信息` 调用链更新为 `ServerTick → FactoryRuntime → FactoryTickRunner → IoRunner → ActivePlanner / PassivePlanner → IoExecutor → PortExecutor`。
+
 ---
 
 ## ADR-039 轻量化：删除命令行、第一版工作台与多方块，机器与方块统一
@@ -899,3 +907,36 @@
 - 状态档与距离档会随快照（约每秒）重排；打开改名框 / 删除确认框时冻结。
 - 名称排序按 Unicode 码位，不接拼音；中文名的顺序是码位顺序，不是拼音顺序。
 - 三张自绘图标（状态 / IO 规则数 / 距离）由 `tools/gui/gen_textures.py` 生成，Java 只 blit；旧的三档继续用 AE2 的 `SORT_BY_NAME / SORT_BY_MOD / SORT_BY_AMOUNT`，方向用 `ARROW_UP / ARROW_DOWN`。
+
+
+---
+
+## ADR-042 IO 执行层：统一 MEStorage，规划器出 Job，Analyzer 记账
+
+**状态**：已决定（2026-11-12，按 `docs/IO执行层重构计划.md` 第 7 轮执行）
+
+**决定**：
+
+1. **表单只有一个类**：`Form` 内嵌 `Entry` / `Entry.Key`，一条规则一行；条目离开表单即释放账本与结论（机器短暂 UNLOADED 再回来从零开始，这是预期行为）。
+2. **机器侧统一走 AE2 `MEStorage`**：删除 `ResourceAdapter` 与物品 / 流体 / 能量三个适配器；`PortExecutor` 按「机器 + 面」缓存 `MEStorage`，失效只有两个入口——动作失败（`REJECTED` / `ERROR` 失效该面、`NO_FACE` 失效整台机器）与生命周期（机器 / 节点删除时 `drop`）。缓存不做世界检查，取用直接命中。
+3. **选面与容量分开**：`FacePick` 只回答走哪个面（配置面 → 经验面 → 逐面探；配置面无效不兜底，记 `FACE_CONFIG_INVALID`）；`CapacityPick` 只回答这一轮能装几份（逐行模拟取最小）。执行器不选面、不决定搬多少。
+4. **规划器出 Job，执行器只跑事务**：被动由 `PassivePlanner` 产出 `IoJob`，主动由 `ActivePlanner` 产出 `Fill`；`IoExecutor` 只有 `move` / `fill` / `refund` / `sweep` 四个写入口，`moved` 一律是机器侧实际收下 / 交出的量，是记账的唯一依据。
+5. **主动队列属于节点**：`DispatchOrder` 带订单 id、`perPortion`（不带面）、总份数、`donePortions`、`openBatches`、轮询起点与退避时刻；`DispatchQueue` 是内存与存档的唯一写入口，`refundAll` 供删节点与以后的手动按钮用。节点只把 `DispatchState` 交给执行层，`io` 不 import `node`。
+6. **派单拆到执行层**：`pushPattern` 只做校验 + 拆份 + 入队，不选机、不选面、不做阻挡判定；分配、阻挡、退避与孤儿超时都在 `ActivePlanner`。多机分配：顺序逐台塞满，轮询多机平均分；半份优先补齐且不挪到别的机器。
+7. **执行顺序固定为 回收 → 主动 → 被动**，由 `IoRunner` 统一编排，异常按机器 / 节点兜住。
+8. **Analyzer 只记不判**：被动账本按条目、主动账本按节点；结论含节点队列状态与 `deliveredTotal`、机器阻挡缓存；经验面被动存条目结论、主动存「机器 + 资源」（TTL 1200 tick，每机器 512 条栅栏），淘汰与清理都在 Analyzer 内部。
+9. **网络协议**：`Reason` 末尾新增 `FACE_CONFIG_INVALID`（severity 4），`PROTOCOL_VERSION` 35 → 36。
+10. **常量位置**：`io` 内部使用的上限（端口缓存栅栏、经验面 TTL / 栅栏、退避阶梯、扫描上限）留在使用它们的 `io` 类里，不放进 `factory.FactoryLimitsConfig`——否则 `io` 会反向依赖 `factory`，破坏单向依赖。
+
+**理由**：
+
+- 一个概念一处定义：资源身份 `AEKey`、观测键 `BlockKey`、规则 `ResourceSpec`，执行层不再有自己的资源适配体系。
+- 可测与可推演：选面（`FacePick`）、容量（`CapacityPick`）、事务（`IoExecutor`）三者拆开后，每个都能脱离游戏单独验证。
+- 队列归节点：删一台机器不再作废整单，材料也不会因为机器掉线被反复退款。
+
+**后果**：
+
+- 存档：`Provider` 里的队列格式换成 §6 新字段，旧 `Pending` 格式直接丢弃（D26 允许重建世界）。
+- 行为变化：主动一单可分给多台机器、跨 tick 交付；智能倍率不再有 64 倍业务截断，改为「在线机器容量之和的 25%」；倍率溢出从「丢整张样板」改为「夹回安全倍数」。
+- 文件数：`io` 23 → 21、`node` 22 → 16（计划 §4.4 的 18 / 17 是估算时漏算了搬家与拆分的净增，以实际为准）。
+- `AGENTS.md` 的命名后缀与坑条修改见上面的修订提案，需单独批准。
