@@ -57,7 +57,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 命名后缀固定：
 
-`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析 · `Form` 每 tick 工作清单 · `Unit` 执行单元 · `Planner` 规划器（择时与排序） · `Executor` 执行器（无跨轮记忆） · `Ledger` 账本（变化序列） · `Digest` 历史结论 · `Analyzer` 分析器（账本与结论的唯一维护者） · `Pick` 执行侧查询器（探面 / 查变体，只读不写）
+`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析 · `Form` 表单（每 tick 的工作清单，内嵌 `Entry` / `Entry.Key`） · `Job` 一次性搬运任务（机器 / 方向 / 面 / 资源 / 量，不带结果） · `Order` 一单待投递（跨 tick、可拆给多台机器） · `Queue` 多单排队（内存与存档的唯一写入口） · `State` 一 tick 的输入值对象 · `Planner` 规划器（择时、排序与分配） · `Executor` 执行器（无跨轮记忆） · `Ledger` 账本（变化序列） · `Analyzer` 分析器（账本、结论、速率与经验面的唯一维护者） · `Pick` 执行侧查询器（探面 / 容量 / 变体，只读不写）
 
 硬条款：
 
@@ -74,18 +74,20 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 - 配置（最高信息，写档）：节点的成员机器与 IO 规则、`factory` 的节点库与仓库地址。只描述搬什么，不执行。
 - 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面与执行门禁都只读它，读路径不探世界。
-- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `PassiveIoRunner → IoExecutor → IoPortResolver → IoTransfer`；结果写进账本与结论（不写档），不回写配置。
+- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `IoRunner → ActivePlanner / PassivePlanner → IoExecutor → PortExecutor`；结果写进 `Analyzer` 的账本与结论（不写档），不回写配置。
 
 各包职责：
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头与节点库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是界面与绑定杖的行政入口，`NodeActions` 管节点规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `io`：执行层。表单（`IoForm` / `IoUnit`）是唯一工作清单，不在表上的单元执行层不认识；`PassiveIoRunner` 拿表单跑被动一轮；`PassivePlanner` 按规则级排期（择时、游标、退避）；`IoExecutor` 按清单跑一台机器的事务；`IoPortResolver` 是机器侧唯一写入口（配置面 > 经验面 > 探面），被动与主动共用；`IoTransfer` 是唯一搬运事务；`IoLedger` / `UnitDigest` / `LedgerAnalyzer` 记短期明细与长期结论。**`io` 不依赖 `node`**：表单把「机器 + 一条规则」直接交下来，执行层不需要节点容器。
+- `io`：执行层。`Form`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`Analyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 不依赖 `node`**：节点只把 `DispatchState` 交下来，执行层不需要节点容器。
 
-调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ PassiveIoRunner → PassivePlanner → IoExecutor → IoPortResolver → IoTransfer → MEStorage / ResourceAdapter`。
+调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
 
-调用链（主动，旁路）：`AE2 CPU → NodeCraftService.pushPattern（校验 + 整单入队）→ 下一 tick NodeCraftService.deliver → IoPortResolver → 机器`；产物由 `ProviderReturnSweep` 扫回网络。
+调用链（主动，旁路）：`AE2 CPU → NodeCraftService.pushPattern（校验 + 拆份 + 入队）→ 同一 tick 内 IoRunner → ActivePlanner（CapacityPick / FacePick）→ IoExecutor.fill → 机器`；产物由 `IoRunner` 调 `IoExecutor.sweep` 扫回网络。
 
-失败原因沿链上抛（`io/Reason`，8 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
+执行顺序固定：回收 → 主动 → 被动。
+
+失败原因沿链上抛（`io/Reason`，9 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常、`FACE_CONFIG_INVALID` 玩家配的面没有这个能力（不兜底、不换面）。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
 
 ### 2.3 数据层
 
@@ -109,7 +111,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 目标体量：上百台机器、16 个容器。
 
-- 退避：规则级（不是机器级），按上一轮原因分档——`NO_MATERIAL` 5 tick、`FULL` 10 tick、`NO_FACE` 20 tick、`REJECTED` 20×连续拒收（封顶 100）、`ERROR` 20→100、`SLEEPING` 200 tick；一次都没试过的单元立刻跑。观测按状态退避。
+- 退避：规则级（不是机器级），按上一轮原因分档——`NO_MATERIAL` 5 tick、`FULL` 10 tick、`NO_FACE` 20 tick、`REJECTED` 20×连续拒收（封顶 100）、`ERROR` 20→100、`SLEEPING` 200 tick；一次都没试过的条目立刻跑。观测按状态退避。主动单另有 5 / 10 / 20 / 40 / 80（封顶 100）的卡单退避。
 - 预算：观测 64 次/tick（`FactoryLimitsConfig.DEFAULT_OBSERVATION_BUDGET`，硬上限 256），脏位置 64 次/tick，工作状态 16 次/tick。
 - 复探：PRESENT 100 tick，UNLOADED 40 tick，MISSING 100 → 1200 tick，工作状态 10 tick。
 - IO：固定每 tick 一轮（原本可由 `/idf diag io` 调整，指令删除后固定）。
@@ -150,7 +152,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 4.1 命名
 
-Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Machine、IO 规则、Observation、Storage、Anchor、Ref、Runner、Planner、Executor、Ledger、Digest，不用 `Target`，也不再引入 Line。
+Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、包小写。领域词用 Factory、Machine、IO 规则、Observation、Storage、Anchor、Ref、Runner、Planner、Executor、Ledger、Analyzer，不用 `Target`；`Line` 只作为「订单里的一行」，不再引入产线。
 
 ### 4.2 注释
 
@@ -251,7 +253,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoTransfer.java` · `IoForm.java` · `IoUnit.java` · `PassiveIoRunner.java` · `PassivePlanner.java` · `IoExecutor.java` · `IoPortResolver.java` · `IoLedger.java` · `UnitDigest.java` · `LedgerAnalyzer.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `ItemVariantIndex.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoRunner.java` · `Form.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `Analyzer.java` · `IoJob.java` · `DispatchOrder.java` · `DispatchQueue.java` · `DispatchState.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -260,7 +262,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 3. 能力监听器必须强引用（NeoForge 存 WeakReference）；监听器里只标脏，不查世界；负结果要缓存。
 4. `NO_SPACE` 与 `REJECTED` 不能混：前者是满，后者是面不对。
 5. `UNLOADED` 不进失联通知，只在节点健康里体现。
-6. 物品规则默认无向（GUI 不提供面；旧档与常规规则 `face == null`），但执行时不能只查无向 handler：Mekanism 的 `side == null` 物品句柄是只读代理，必须先试无向、不可用再逐面找可接收 / 可抽出的面；规则里显式配了 `face` 的物品规则仍优先用配置面。物品规则不写路由表（模糊变体可能落在不同面）；流体 / FE 一直按面。
+6. 物品规则默认无向（GUI 不提供面；旧档与常规规则 `face == null`），但执行时不再自己试无向 handler：机器侧统一走 AE2 `MEStorage`，面由 `FacePick` 决定（配置面 → 经验面 → 逐面探），`PortExecutor` 按面取存储。规则里显式配了 `face` 的优先用配置面，配置面无效记 `FACE_CONFIG_INVALID`，不自动换面。物品规则不写路由表（模糊变体可能落在不同面）；流体 / FE 一直按面。
 7. FE 探面用 1000 FE，Mekanism 的 FE↔J 换算会截断小数值。
 8. 容器优先级：高的先填、低的先抽；同优先级组内两阶段，组间不合并。
 9. 仓库离线 = 空仓库，表现为没料，不是报错。
@@ -278,10 +280,12 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
     - **机械的类型替换用 bash 批量替换 + 编译器收敛**，不要逐文件人工 read→edit（40 个文件约 80 次工具往返）。批量替换的安全做法见 4.3。
 20. `FactorySortMode` 的声明顺序同时是档位按钮的循环顺序、物品组件与线协议的 ordinal：只许末尾追加、不许重排，否则旧终端里的排序档位会错位。
-21. **单元离开表单即释放账本与结论**（这是 2026-11-12 确认的预期行为，不是 bug）：机器短暂 UNLOADED（玩家跨区块）再回来，会从零开始——`faceHint` 丢、`idleTicks` 清零、退避重置，表现为「回来第一轮全速重探面」。只有需要给宽限期时才改，别当缺陷修。
+21. **条目离开表单即释放账本与结论**（这是 2026-11-12 确认的预期行为，不是 bug）：机器短暂 UNLOADED（玩家跨区块）再回来，会从零开始——`faceHint` 丢、`idleTicks` 清零、退避重置，表现为「回来第一轮全速重探面」。只有需要给宽限期时才改，别当缺陷修。
 
 ### 6.3 文档偏差
 
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
 - 2026-11-11 修正 §1.2：原文写「主动合成未实现」，与代码不符（`NodeCraftService`、
-  `ProviderMode.ACTIVE`、`ProviderReturnSweep` 等早已实现）。
+  `ProviderMode.ACTIVE` 等早已实现）。
+- 2026-11-12 按 ADR-042 修正 §2.1 / §2.2 / §4.1 / §6.1 / §6.2：执行层类名与调用链换成
+  `Form` / `IoRunner` / `FacePick` / `PortExecutor` / `Analyzer` 一系，删掉「单元」与无向兜底的旧说法。
