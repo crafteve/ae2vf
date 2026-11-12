@@ -113,6 +113,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         NodeStatusCodec.write(buf, node.status());
         buf.writeVarInt(node.ruleCount());
         buf.writeVarInt(node.patternCount());
+        buf.writeBoolean(node.autoEnergyOnly());
         buf.writeVarInt(node.pendingCount());
         buf.writeLong(node.pendingOldestAt());
         buf.writeBoolean(node.provider().available());
@@ -133,6 +134,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         NodeStatus status = NodeStatusCodec.read(buf);
         int ruleCount = buf.readVarInt();
         int patternCount = buf.readVarInt();
+        boolean autoEnergyOnly = buf.readBoolean();
         int pendingCount = buf.readVarInt();
         long pendingOldestAt = buf.readLong();
         boolean available = buf.readBoolean();
@@ -147,7 +149,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
             members.add(readMember(buf));
         }
         return new FactoryNodeSnapshotBuilder.NodeView(nodeId, name, typeBlockId, status,
-                ruleCount, patternCount, pendingCount, pendingOldestAt,
+                ruleCount, patternCount, autoEnergyOnly, pendingCount, pendingOldestAt,
                 new FactoryNodeSnapshotBuilder.ProviderView(available, blocking, multiplier,
                         dispatch), members);
     }

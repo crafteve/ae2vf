@@ -100,8 +100,10 @@ public final class FactoryConfirmDialog {
         }
         graphics.fill(parent.x(), parent.y(), parent.x() + parent.width(),
                 parent.y() + parent.height(), 0x90000000);
-        FactoryNineSlice.fill(graphics, FactoryGuiTextures.DIVIDER_DARK, box.x() + 3, box.y() + 3,
-                box.width(), box.height());
+        // 浮层内区必须先铺一块完全不透明的底：用半透明分隔线贴图会让背后的机器图标透上来，
+        // 看起来像浮层被压在内容下面（z 值问题），实际是底色没盖住。
+        graphics.fill(box.x() + 1, box.y() + 1, box.x() + box.width() - 1,
+                box.y() + box.height() - 1, this.theme.panelBg());
         FactoryNineSlice.panel(graphics, box.x(), box.y(), box.width(), box.height());
         graphics.drawString(this.font, this.title, box.x() + 12, box.y() + 10,
                 this.theme.textPrimary(), false);

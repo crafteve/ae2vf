@@ -122,6 +122,9 @@ final class FactoryNodeTooltip {
             lines.add(Component.literal("该节点有 " + node.view().ruleCount() + " 条规则、"
                     + node.view().patternCount() + " 份样板").withStyle(ChatFormatting.GRAY));
             lines.add(Component.literal("点击后弹窗确认").withStyle(ChatFormatting.DARK_GRAY));
+        } else if (node.view().autoEnergyOnly()) {
+            lines.add(Component.literal("只有接入时自动补的 FE 规则，直接删除")
+                    .withStyle(ChatFormatting.GRAY));
         } else {
             lines.add(Component.literal("没有规则与样板，确认后删除")
                     .withStyle(ChatFormatting.GRAY));

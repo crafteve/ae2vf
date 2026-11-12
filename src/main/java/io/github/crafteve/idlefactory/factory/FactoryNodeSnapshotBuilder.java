@@ -15,6 +15,7 @@ import io.github.crafteve.idlefactory.factory.node.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
+import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.factory.observation.ObservationService;
 import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
@@ -44,6 +45,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param status       节点状态：服务端唯一聚合结果，客户端只读
      * @param ruleCount        节点 IO 规则总数
      * @param patternCount     已放样板数
+     * @param autoEnergyOnly   规则里只有「接入时自动补的 FE 输入规则」；这种节点删除不用二次确认
      * @param pendingCount     待写入队列的单数
      * @param pendingOldestAt  队首入队时刻；队列空时为 -1
      * @param provider         provider 组的状态
@@ -51,7 +53,7 @@ public final class FactoryNodeSnapshotBuilder {
      */
     public record NodeView(java.util.UUID nodeId, @Nullable String name,
             ResourceLocation typeBlockId, NodeStatus status, int ruleCount, int patternCount,
-            int pendingCount, long pendingOldestAt, ProviderView provider,
+            boolean autoEnergyOnly, int pendingCount, long pendingOldestAt, ProviderView provider,
             List<MemberView> members) {
 
         public NodeView {
@@ -63,9 +65,19 @@ public final class FactoryNodeSnapshotBuilder {
             return this.members.size();
         }
 
-        /** 是否已有 IO 规则或样板；删除确认弹窗用。 */
+        /**
+         * 删除前要不要二次确认。
+         *
+         * <p>只有「接入时自动补的 FE 输入规则」不算玩家配置：这种节点点删除直接删，
+         * 规则反正会在下次接机器时再补回来。</p>
+         *
+         * @return 有样板、或有玩家自己配的规则
+         */
         public boolean configured() {
-            return this.ruleCount > 0 || this.patternCount > 0;
+            if (this.patternCount > 0) {
+                return true;
+            }
+            return this.ruleCount > 0 && !this.autoEnergyOnly;
         }
     }
 
@@ -151,10 +163,16 @@ public final class FactoryNodeSnapshotBuilder {
             }
             boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
             NodeRuntime runtime = nodeManager == null ? null : nodeManager.node(node.id());
+            // 只有自动补的 FE 输入规则、没有样板：这种节点删除不需要二次确认。
+            boolean autoEnergyOnly = node.patternCount() == 0
+                    && node.io().outputs().isEmpty()
+                    && node.io().inputs().stream().allMatch(spec ->
+                            AeKeySupport.isEnergy(spec.key()) && spec.face() == null);
             int pendingCount = runtime == null ? 0 : runtime.digest().pendingCount();
             long pendingOldestAt = runtime == null ? -1L : runtime.digest().pendingOldestAt();
             nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
-                    node.ruleCount(), node.patternCount(), pendingCount, pendingOldestAt,
+                    node.ruleCount(), node.patternCount(), autoEnergyOnly, pendingCount,
+                    pendingOldestAt,
                     new ProviderView(available, node.provider().blocking(),
                             node.provider().multiplier(), node.provider().dispatch()),
                     members));

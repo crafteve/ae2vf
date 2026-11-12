@@ -504,10 +504,7 @@ final class FactoryPassiveIoRender {
     }
 
     private static String modeLabel(ResourceSpec spec) {
-        // 只有物品有精确 / 模糊之分；流体、FE 等固定精确，显示「—」而不是可点的「精」。
-        if (!(spec.key() instanceof AEItemKey)) {
-            return "—";
-        }
+        // 非物品固定精确，chip 仍然写「精」但灰显禁用，保持和物品规则同一套外形。
         return spec.mode() == io.github.crafteve.idlefactory.factory.machine.MatchMode.EXACT
                 ? "精" : "模";
     }
