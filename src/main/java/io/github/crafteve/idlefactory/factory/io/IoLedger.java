@@ -74,6 +74,10 @@ public final class IoLedger {
     /**
      * 从新到旧的全部行。
      *
+     * <p>目前没有任何界面读者：视图只读 {@link #current()}。这里提前留出明细口，等 UI 细化
+     * （账本展开）时再接，届时不需要改动账本结构。当前阶段只做 IO 底层重构，终端展示不在
+     * 本次范围内。</p>
+     *
      * @return 行列表；空账时为空列表
      */
     public List<Row> rows() {
