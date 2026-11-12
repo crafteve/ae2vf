@@ -106,8 +106,8 @@ public final class NodeActions {
     /**
      * 设置节点的倍率。
      *
-     * <p>倍率只改变 AE2 看到的样板份数，不改 IO 规则；改完要让样板重新广告，CPU 才能读到新的
-     * 样板数量。</p>
+     * <p>倍率只改变 AE2 看到的样板份数，不改 IO 规则。改完必须作废样板缓存：CPU 读的是缓存里
+     * 那批按旧倍率放大好的样板，只重发广告不会重算。</p>
      *
      * @param factory 工厂
      * @param nodeId  节点 id
@@ -125,7 +125,7 @@ public final class NodeActions {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
             runtime.markDirty();
-            runtime.nodeManager().refreshPatterns(nodeId);
+            runtime.nodeManager().markPatternsDirty(nodeId);
         }
         return Result.ok("倍率已改为 " + describeMultiplier(next));
     }

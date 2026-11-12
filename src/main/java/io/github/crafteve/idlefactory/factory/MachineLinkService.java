@@ -110,8 +110,7 @@ final class MachineLinkService {
         if (result != NodeLibrary.Result.REPLACED) {
             return new TopologyOutcome(false, 0, false, result);
         }
-        // 成员变了：样板广告要按新机器集合重算
-        this.nodeManager.refreshPatterns(base.id());
+        // 成员变了：结构版本随之变化，对账会把节点整体重建，样板缓存也在那时重算。
         for (UUID machineId : removedMachineIds) {
             this.nodeIoRunner.forget(machineId);
         }

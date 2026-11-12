@@ -204,14 +204,17 @@ public final class NodeManager {
     }
 
     /**
-     * 让一个节点重新向 CPU 广告样板；模式 / 倍率切换后调用。
+     * 作废一个节点的样板缓存：下一 tick 重新解码并按当前倍率重新广告。
+     *
+     * <p>倍率变化必须走这里。只让 CPU 重读（{@code requestPatternUpdate}）读到的是旧缓存，
+     * 放大后的样板是在重建时才生成的。</p>
      *
      * @param nodeId 节点 id
      */
-    public void refreshPatterns(UUID nodeId) {
+    public void markPatternsDirty(UUID nodeId) {
         NodeRuntime node = this.nodes.get(nodeId);
         if (node != null) {
-            node.requestPatternUpdate();
+            node.markPatternsDirty();
         }
     }
 

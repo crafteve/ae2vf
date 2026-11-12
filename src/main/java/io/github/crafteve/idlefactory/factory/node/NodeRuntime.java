@@ -192,7 +192,7 @@ public final class NodeRuntime
             // 先建后清：rebuild 抛异常时标记还留着，下一 tick 自然重试；
             // 先清再建会让 CPU 永远看旧样板。
             this.patternsDirty = false;
-            changed = true;
+            // 重建只换内存里的样板缓存，不改落盘数据，所以不计入 changed。
         }
         if (this.dataDirty) {
             this.dataDirty = false;

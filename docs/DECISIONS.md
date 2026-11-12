@@ -737,7 +737,7 @@
 
 **后果**：
 
-- `factory/node/ScaledPatternDetails` 包装 `IPatternDetails`，输入 / 输出 / multiplier 同倍放大。
+- `factory/node/ScaledPatternDetails` 包装 `IPatternDetails`：只放大每个输入的 `getMultiplier()` 与产物数量，输入模板数量不动（AE2 的实际消耗 = 模板数量 × multiplier，两层都乘会变成倍率平方）；派单时按接口默认实现把 CPU 算好的 inputHolder 原样推出，不委托原样板。
 - `NodeCraftService` 负责选机器、选面、部分插入与余量入队。
 - 端到端倍率验收留到 P12 统一游戏内测试。
 

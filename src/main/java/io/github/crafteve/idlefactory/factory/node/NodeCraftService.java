@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.factory.node;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,7 +50,7 @@ final class NodeCraftService implements ICraftingProvider {
      * <p>键是样板本身，值是「一台机器能装几份」的上限，不是实时空位；机器逐渐变满后这个值
      * 可能偏大，收不下的部分由投递按整数份处理，不做每次 push 重探测。</p>
      */
-    private final java.util.Map<ItemStack, Integer> smartCache = new java.util.HashMap<>();
+    private final Map<ItemStack, Integer> smartCache = new HashMap<>();
     /** 缓存对应的节点拓扑版本；结构变化后整体作废。 */
     private long smartCacheRevision = -1L;
 
@@ -455,7 +456,10 @@ final class NodeCraftService implements ICraftingProvider {
             }
             long amount;
             try {
-                amount = Math.multiplyExact(possible[0].amount(), (long) factor);
+                // AE2 的实际消耗 = 模板数量 × multiplier；少乘 multiplier 会把可装份数估大。
+                amount = Math.multiplyExact(
+                        Math.multiplyExact(possible[0].amount(), input.getMultiplier()),
+                        (long) factor);
             } catch (ArithmeticException e) {
                 return false;
             }
