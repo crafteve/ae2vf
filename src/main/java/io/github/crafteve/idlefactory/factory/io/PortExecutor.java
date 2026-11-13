@@ -13,13 +13,18 @@ import io.github.crafteve.idlefactory.factory.machine.Machine;
 
 import appeng.api.AECapabilities;
 import appeng.api.behaviors.ExternalStorageStrategy;
+import appeng.api.config.Actionable;
+import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.AEKeyType;
+import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import appeng.me.storage.CompositeStorage;
 import appeng.parts.automation.StackWorldBehaviors;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -202,6 +207,46 @@ public final class PortExecutor {
                 wrappers.put(entry.getKey(), wrapper);
             }
         }
-        return wrappers.isEmpty() ? null : new CompositeStorage(wrappers);
+        return wrappers.isEmpty() ? null : new LiveStorage(new CompositeStorage(wrappers));
+    }
+
+    /**
+     * 外部存储的读穿包装：库存快照每次现扫，不做跨 tick 缓存。
+     *
+     * <p>AE2 的 {@link CompositeStorage} 自带一份库存缓存，只在 {@code onTick()} 或内部
+     * 写入成功时刷新；它本来是给存储总线那种「注册进 AE2 调度、每 tick 被 tick」的用法准备的。
+     * 本类把实例跨 tick 缓存下来后，没有任何人 tick 它，{@code getAvailableStacks} 会永远返回
+     * 第一次访问时的快照——机器后来产出的东西看不见，回收与模糊输出就会一直判定「没料」。
+     * 这里在读库存前强制刷新一次，写路径（{@code insert} / {@code extract}）本来就是直达
+     * 方块能力、不经过缓存，原样转调。</p>
+     */
+    private static final class LiveStorage implements MEStorage {
+        private final CompositeStorage delegate;
+
+        LiveStorage(CompositeStorage delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+            return this.delegate.insert(what, amount, mode, source);
+        }
+
+        @Override
+        public long extract(AEKey what, long amount, Actionable mode, IActionSource source) {
+            return this.delegate.extract(what, amount, mode, source);
+        }
+
+        @Override
+        public void getAvailableStacks(KeyCounter out) {
+            // onTick() 会清掉「需要重建」标记并重扫所有子存储；随后 getAvailableStacks 拷出的就是新快照。
+            this.delegate.onTick();
+            this.delegate.getAvailableStacks(out);
+        }
+
+        @Override
+        public Component getDescription() {
+            return this.delegate.getDescription();
+        }
     }
 }
