@@ -89,6 +89,51 @@ public final class CapacityPick {
     }
 
     /**
+     * 这台机器对这份样板的总容量份数：当前空位 + 机器里已有的同种输入。
+     *
+     * <p>智能倍率必须按「容量」而不是「空位」：倍数写进样板广告后长期固定，按空位算会随机器
+     * 内容漂移（剩多少就变成多少），同一个槽位一会儿是 48、一会儿是 37。把已在机器里的同种
+     * 输入加回来，结果就与空 / 满无关，只在拓扑或槽位被别的物品占用时才变。</p>
+     *
+     * <p>只统计同一行、同一个面：面与投递用的面一致，避免「按 A 面算容量、写进 B 面」。</p>
+     *
+     * @param machine    机器
+     * @param perPortion 每行资源 → 一份的用量
+     * @param configured 资源 → 玩家配置的面
+     * @return 可装份数；任何一行没有面时为 {@code 0}
+     */
+    public long capacityPortions(Machine machine, Map<AEKey, Long> perPortion,
+            Function<AEKey, Direction> configured) {
+        if (perPortion.isEmpty()) {
+            return 0L;
+        }
+        long best = Long.MAX_VALUE;
+        for (Map.Entry<AEKey, Long> line : perPortion.entrySet()) {
+            AEKey key = line.getKey();
+            long amount = line.getValue();
+            if (amount <= 0L) {
+                return 0L;
+            }
+            FacePick.Result pick = this.facePick.pick(machine, key, IoSide.INPUT,
+                    configured.apply(key), null);
+            if (!pick.picked()) {
+                return 0L;
+            }
+            MEStorage storage = this.ports.storage(machine, pick.face());
+            if (storage == null) {
+                return 0L;
+            }
+            long free = this.fitOnFace(storage, key, amount);
+            long held = AeKeySupport.snapshot(storage).getOrDefault(key, 0L);
+            best = Math.min(best, free + held / amount);
+            if (best <= 0L) {
+                return 0L;
+            }
+        }
+        return best == Long.MAX_VALUE ? 0L : best;
+    }
+
+    /**
      * 这台机器能完整收下几份，并按玩家配置的面优先。
      *
      * <p>配置面必须参与模拟：pushPattern 用配置面判定能不能收，投递也走同一个面；两处如果

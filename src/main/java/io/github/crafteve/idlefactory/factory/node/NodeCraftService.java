@@ -15,6 +15,7 @@ import io.github.crafteve.idlefactory.factory.io.CapacityPick;
 import io.github.crafteve.idlefactory.factory.io.DispatchOrder;
 import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
+import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 
 import appeng.api.crafting.IPatternDetails;
 import appeng.api.crafting.PatternDetailsHelper;
@@ -24,6 +25,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.core.definitions.AEItems;
 
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
@@ -51,9 +53,9 @@ final class NodeCraftService implements ICraftingProvider {
     /**
      * 智能倍率的容量缓存：样板 → 探测当时的可装份数。
      *
-     * <p>键是样板本身，值是「节点在线机器合计能装几份」的上限，不是实时空位；机器逐渐变满后这个
-     * 值可能偏大，收不下的部分由投递按整数份处理，不做每次 push 重探测。样板增删、机器上下线、
-     * 倍率模式切换时整体作废。</p>
+     * <p>键是样板本身，值是「节点在线机器的容量之和」的 25%（按容量算，不是实时空位：机器里
+     * 已有的同种输入会加回来，避免倍率随机器内容漂移）。收不下的部分由投递按整数份处理，不做
+     * 每次 push 重探测。样板增删、机器上下线、倍率模式切换时整体作废。</p>
      */
     private final Map<ItemStack, Integer> smartCache = new HashMap<>();
     /** 缓存对应的节点拓扑版本；结构变化后整体作废。 */
@@ -237,8 +239,9 @@ final class NodeCraftService implements ICraftingProvider {
     /**
      * 智能倍率：按节点所有在线机器的容量之和取 25%（向下取整，至少 1）。
      *
-     * <p>每张样板各算各的：不同样板的每份用量不同，能装的份数自然不同。结果缓存到样板增删、
-     * 机器上下线或倍率模式切换为止；网络压力大时不会每 tick 重扫机器。</p>
+     * <p>每张样板各算各的：不同样板的每份用量不同，能装的份数自然不同。容量 = 当前空位 +
+     * 机器里已有的同种输入，所以机器空着还是满着不影响结果；面用与投递同一套配置面。
+     * 结果缓存到样板增删、机器上下线或倍率模式切换为止；网络压力大时不会每 tick 重扫机器。</p>
      *
      * @param stack   样板物品
      * @param details 原始样板
@@ -256,7 +259,11 @@ final class NodeCraftService implements ICraftingProvider {
     }
 
     /**
-     * 节点全部在线机器的可装份数之和的 25%。
+     * 节点全部在线机器的容量之和的 25%。
+     *
+     * <p>用 {@link CapacityPick#capacityPortions} 而不是 {@code portionsThatFit}：后者算的是
+     * 实时空位，机器里还剩多少料，倍率就跟着变，同一个槽位会给出 37 这种既不是空位也不是容量的
+     * 数字。容量把已在机器里的同种输入加回来，结果只跟机器本身能装多少有关。</p>
      *
      * @param details 原始样板
      * @return 份数，至少 1
@@ -270,16 +277,32 @@ final class NodeCraftService implements ICraftingProvider {
         if (perPortion.isEmpty()) {
             return 1;
         }
+        Map<AEKey, Direction> configured = this.configuredInputFaces();
         CapacityPick capacity = this.node.capacityPick();
         long total = 0L;
         for (Machine machine : online) {
-            total += capacity.portionsThatFit(machine, perPortion);
+            total += capacity.capacityPortions(machine, perPortion, configured::get);
             if (total > Integer.MAX_VALUE) {
                 total = Integer.MAX_VALUE;
                 break;
             }
         }
         return Math.max(1, (int) (total / 4L));
+    }
+
+    /**
+     * 玩家给节点配的输入面：与投递用的是同一份配置。
+     *
+     * @return 资源 → 面；没配面的资源不在表里
+     */
+    private Map<AEKey, Direction> configuredInputFaces() {
+        Map<AEKey, Direction> faces = new LinkedHashMap<>();
+        for (ResourceSpec spec : this.node.node().io().inputs()) {
+            if (spec.face() != null) {
+                faces.put(spec.key(), spec.face());
+            }
+        }
+        return faces;
     }
 
     /**
