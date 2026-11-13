@@ -10,7 +10,7 @@ import net.minecraft.core.Direction;
  * 一条可直接执行的搬运任务：把某个资源按某个面上限搬一次。
  *
  * <p>Job 是「一次性」的：规划器这一 tick 产出，执行器这一 tick 执行完就丢，不跨轮保存。
- * 结果由 {@link MoveResult} 返回，Job 自己不带结果——同一个 Job 概念如果既装输入又装输出，
+ * 结果由 {@link IoResult} 返回，Job 自己不带结果——同一个 Job 概念如果既装输入又装输出，
  * 下一轮就没法复用了。</p>
  *
  * <p>面在这里定死：选面由规划器调 {@link FacePick} 完成，执行器不再选面。</p>
@@ -20,7 +20,7 @@ import net.minecraft.core.Direction;
  * @param key    资源（模糊规则已展开到具体变体）
  * @param amount 这一轮的量的上限；{@code <= 0} 不是合法 Job
  */
-public record IoJob(Form.Entry entry, Direction face, AEKey key, long amount) {
+public record IoJob(IoForm.Entry entry, Direction face, AEKey key, long amount) {
     /** 任务所属机器。 */
     public Machine machine() {
         return this.entry.machine();
@@ -32,7 +32,7 @@ public record IoJob(Form.Entry entry, Direction face, AEKey key, long amount) {
     }
 
     /** 任务所属规则的运行时身份。 */
-    public RuleKey rule() {
+    public IoKey rule() {
         return this.entry.key().rule();
     }
 }

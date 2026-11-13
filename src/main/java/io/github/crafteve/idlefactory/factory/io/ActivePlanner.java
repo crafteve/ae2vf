@@ -22,7 +22,7 @@ import net.minecraft.core.Direction;
  * 主动规划器：决定主动侧这一 tick 把哪些单、按几份、投给哪些机器，以及产物什么时候回收。
  *
  * <p>它只排「这一 tick」：退避用绝对时刻重算，不排未来。订单不绑机器，规划器按
- * {@link DispatchMode} 在节点的在线机器上分配：</p>
+ * {@link DispatchSwitch} 在节点的在线机器上分配：</p>
  * <ul>
  *   <li>顺序：从第一台开始逐台塞满，塞满换下一台；</li>
  *   <li>轮询：多机平均分——先算目标份数，逐台取 min，一轮分不完再来一轮。</li>
@@ -130,7 +130,7 @@ public final class ActivePlanner {
      * @param now      当前服务端 tick
      * @return 要执行的填充任务与要退回的量
      */
-    public Plan plan(DispatchState state, Analyzer analyzer, long now) {
+    public Plan plan(DispatchState state, IoAnalyzer analyzer, long now) {
         Plan plan = new Plan();
         // 一台机器每 tick 最多读一次库存：多个订单共用这一份结果。
         Map<UUID, Map<AEKey, Long>> inventories = new HashMap<>();
@@ -154,7 +154,7 @@ public final class ActivePlanner {
     /**
      * 补齐半份：逐台机器算还差多少，产出补齐任务；机器被删就把没写进去的量退回网络。
      */
-    private void planBatches(Plan plan, DispatchState state, DispatchOrder order, Analyzer analyzer,
+    private void planBatches(Plan plan, DispatchState state, DispatchOrder order, IoAnalyzer analyzer,
             Map<UUID, Map<AEKey, Long>> inventories, long now) {
         int fillsBefore = plan.fills.size();
         int refundsBefore = plan.refunds.size();
@@ -165,7 +165,7 @@ public final class ActivePlanner {
             if (machine == null) {
                 if (!state.memberMachines().contains(machineId)) {
                     // 机器被删：半份里没写进去的量退回网络。先退，退完再决定这一份算不算结束。
-                    plan.refunds.add(new Refund(order.id(), machineId, order, batch));
+                    plan.refunds.add(new RefundRequest(order.id(), machineId, order, batch));
                     continue;
                 }
                 // 成员机器只是没加载：等它回来，订单与半份都不动。
@@ -187,10 +187,10 @@ public final class ActivePlanner {
                 }
             }
             if (lines.isEmpty()) {
-                plan.fills.add(new Fill(order.id(), machine.id(), 1L, true, List.of()));
+                plan.fills.add(new FillRequest(order.id(), machine.id(), 1L, true, List.of()));
                 continue;
             }
-            plan.fills.add(new Fill(order.id(), machine.id(), 1L, true, lines));
+            plan.fills.add(new FillRequest(order.id(), machine.id(), 1L, true, lines));
         }
         if (plan.fills.size() == fillsBefore && plan.refunds.size() == refundsBefore) {
             this.stall(state, order, now);
@@ -200,7 +200,7 @@ public final class ActivePlanner {
     /**
      * 分配新份数。
      */
-    private void planPortions(Plan plan, DispatchState state, DispatchOrder order, Analyzer analyzer,
+    private void planPortions(Plan plan, DispatchState state, DispatchOrder order, IoAnalyzer analyzer,
             Map<UUID, Map<AEKey, Long>> inventories, long now) {
         long remaining = order.remainingPortions();
         if (remaining <= 0L) {
@@ -235,7 +235,7 @@ public final class ActivePlanner {
         }
         long before = remaining;
         long placed;
-        if (state.dispatch() == DispatchMode.SEQUENTIAL) {
+        if (state.dispatch() == DispatchSwitch.SEQUENTIAL) {
             placed = this.allocateSequential(plan, order, candidates, remaining);
         } else {
             placed = this.allocateRoundRobin(plan, order, candidates, remaining, state);
@@ -365,13 +365,13 @@ public final class ActivePlanner {
     /**
      * 把一条订单的 n 份摊成「一台机器的一批行」。
      */
-    private Fill fill(DispatchOrder order, Candidate candidate, long count) {
+    private FillRequest fill(DispatchOrder order, Candidate candidate, long count) {
         List<FillLine> lines = new ArrayList<>(order.perPortion().size());
         for (DispatchOrder.Line line : order.perPortion()) {
             lines.add(new FillLine(line.key(), candidate.faces.get(line.key()),
                     line.amount() * count));
         }
-        return new Fill(order.id(), candidate.machine.id(), count, false, lines);
+        return new FillRequest(order.id(), candidate.machine.id(), count, false, lines);
     }
 
     /**
@@ -386,8 +386,8 @@ public final class ActivePlanner {
      * @param analyzer 账房：成功时记经验面
      * @param now      当前服务端 tick
      */
-    public void applyFill(DispatchState state, Fill fill, Map<AEKey, MoveResult> results,
-            Analyzer analyzer, long now) {
+    public void applyFill(DispatchState state, FillRequest fill, Map<AEKey, IoResult> results,
+            IoAnalyzer analyzer, long now) {
         DispatchOrder order = findOrder(state, fill.orderId);
         if (order == null) {
             return;
@@ -398,19 +398,19 @@ public final class ActivePlanner {
         boolean anyError = false;
         for (int index = 0; index < order.perPortion().size(); index++) {
             AEKey key = order.perPortion().get(index).key();
-            MoveResult result = results.get(key);
+            IoResult result = results.get(key);
             if (result == null) {
                 continue;
             }
             moved[index] = result.moved();
-            if (result.reason() == Reason.ERROR) {
+            if (result.reason() == IoReason.ERROR) {
                 anyError = true;
             }
             Direction face = fillFace(fill, key);
             if (machine != null && result.moved() > 0L && face != null) {
                 analyzer.recordMachineFace(machine, key, face, now);
             }
-            if (result.reason() == Reason.REJECTED && machine != null) {
+            if (result.reason() == IoReason.REJECTED && machine != null) {
                 analyzer.clearMachineFace(machine, key);
             }
         }
@@ -424,7 +424,7 @@ public final class ActivePlanner {
     /**
      * 新份数的回写：算完整份数，余量记成半份。
      */
-    private void applyPortions(DispatchState state, DispatchOrder order, Fill fill, long[] moved,
+    private void applyPortions(DispatchState state, DispatchOrder order, FillRequest fill, long[] moved,
             boolean anyError) {
         long complete = fill.portions;
         for (int index = 0; index < order.perPortion().size(); index++) {
@@ -455,8 +455,8 @@ public final class ActivePlanner {
     /**
      * 半份补齐的回写：全补齐才算一份，否则更新还差多少。
      */
-    private void applyTopUp(DispatchState state, DispatchOrder order, Fill fill, long[] moved,
-            boolean anyError, Analyzer analyzer, long now) {
+    private void applyTopUp(DispatchState state, DispatchOrder order, FillRequest fill, long[] moved,
+            boolean anyError, IoAnalyzer analyzer, long now) {
         DispatchOrder.OpenBatch batch = order.openBatches().get(fill.machineId);
         if (batch == null) {
             return;
@@ -484,8 +484,8 @@ public final class ActivePlanner {
      * @param analyzer  账房
      * @param now       当前服务端 tick
      */
-    public void applyRefund(DispatchState state, Refund refund, Map<AEKey, Long> refunded,
-            Analyzer analyzer, long now) {
+    public void applyRefund(DispatchState state, RefundRequest refund, Map<AEKey, Long> refunded,
+            IoAnalyzer analyzer, long now) {
         DispatchOrder order = findOrder(state, refund.orderId);
         if (order == null) {
             return;
@@ -524,7 +524,7 @@ public final class ActivePlanner {
      * 孤儿订单：网络恢复后把剩余量退回并出队；超时就丢弃。
      */
     private void planOrphan(Plan plan, DispatchState state, DispatchOrder order, long now) {
-        plan.orphans.add(new Refund(order.id(), null, order, null));
+        plan.orphans.add(new RefundRequest(order.id(), null, order, null));
     }
 
     /**
@@ -534,11 +534,11 @@ public final class ActivePlanner {
      */
     @Nullable
     private Map<AEKey, Direction> resolveFaces(Machine machine, DispatchOrder order,
-            DispatchState state, Analyzer analyzer, long now) {
+            DispatchState state, IoAnalyzer analyzer, long now) {
         Map<AEKey, Direction> faces = new LinkedHashMap<>();
         for (DispatchOrder.Line line : order.perPortion()) {
             Direction hint = analyzer.machineFaceHint(machine, line.key(), now);
-            FacePick.PickResult pick = this.facePick.pick(machine, line.key(), IoSide.INPUT,
+            FacePick.Result pick = this.facePick.pick(machine, line.key(), IoSide.INPUT,
                     state.inputFace(line.key()), hint);
             if (!pick.picked()) {
                 return null;
@@ -551,7 +551,7 @@ public final class ActivePlanner {
     /**
      * 这台机器这一刻是否被阻挡；被挡就记退避，期间不再读库存。
      */
-    private boolean blocked(DispatchState state, Machine machine, Analyzer analyzer,
+    private boolean blocked(DispatchState state, Machine machine, IoAnalyzer analyzer,
             Map<UUID, Map<AEKey, Long>> inventories, long now) {
         if (!state.blocking().isOn()) {
             return false;
@@ -645,7 +645,7 @@ public final class ActivePlanner {
     /**
      * 取填充里某一行的面。
      */
-    private static Direction fillFace(Fill fill, AEKey key) {
+    private static Direction fillFace(FillRequest fill, AEKey key) {
         for (FillLine line : fill.lines) {
             if (line.key.equals(key)) {
                 return line.face;
@@ -703,9 +703,9 @@ public final class ActivePlanner {
      * @param topUp     是否在补半份
      * @param lines     逐行（资源、面、要写的量）
      */
-    public record Fill(UUID orderId, UUID machineId, long portions, boolean topUp,
+    public record FillRequest(UUID orderId, UUID machineId, long portions, boolean topUp,
             List<FillLine> lines) {
-        public Fill {
+        public FillRequest {
             lines = List.copyOf(lines);
         }
     }
@@ -728,7 +728,7 @@ public final class ActivePlanner {
      * @param order     订单快照
      * @param batch     半份；整单退回时为 {@code null}
      */
-    public record Refund(UUID orderId, @Nullable UUID machineId, DispatchOrder order,
+    public record RefundRequest(UUID orderId, @Nullable UUID machineId, DispatchOrder order,
             @Nullable DispatchOrder.OpenBatch batch) {
     }
 
@@ -736,22 +736,22 @@ public final class ActivePlanner {
      * 一 tick 的规划结果。
      */
     public static final class Plan {
-        private final List<Fill> fills = new ArrayList<>();
-        private final List<Refund> refunds = new ArrayList<>();
-        private final List<Refund> orphans = new ArrayList<>();
+        private final List<FillRequest> fills = new ArrayList<>();
+        private final List<RefundRequest> refunds = new ArrayList<>();
+        private final List<RefundRequest> orphans = new ArrayList<>();
 
         /** 填充任务。 */
-        public List<Fill> fills() {
+        public List<FillRequest> fills() {
             return this.fills;
         }
 
         /** 半份退回请求。 */
-        public List<Refund> refunds() {
+        public List<RefundRequest> refunds() {
             return this.refunds;
         }
 
         /** 整单退回请求。 */
-        public List<Refund> orphans() {
+        public List<RefundRequest> orphans() {
             return this.orphans;
         }
     }

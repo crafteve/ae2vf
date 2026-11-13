@@ -19,8 +19,8 @@ import net.minecraft.core.Direction;
  * 玩家意图，经验面是上一轮真搬通过的面，替它们模拟一次既贵又会把「这轮满了」误判成「面不对」。
  * 两者都没有才逐面建存储、模拟一次，拿到第一个能收下 / 抽得出的面。</p>
  *
- * <p>失败分两种：{@link Reason#FACE_CONFIG_INVALID} 表示玩家配的面根本没有能力（配置错误，
- * 不兜底、不换面）；{@link Reason#NO_FACE} 表示机器没加载或六个面都拿不到。只读，不写经验面。</p>
+ * <p>失败分两种：{@link IoReason#FACE_CONFIG_INVALID} 表示玩家配的面根本没有能力（配置错误，
+ * 不兜底、不换面）；{@link IoReason#NO_FACE} 表示机器没加载或六个面都拿不到。只读，不写经验面。</p>
  */
 public final class FacePick {
     /** 能量面探测用的模拟量：Mekanism 的 FE↔J 换算会在小数值上截断。 */
@@ -39,21 +39,21 @@ public final class FacePick {
      * @param face    选中的面；失败时为 {@code null}
      * @param failure 失败原因；成功时为 {@code null}
      */
-    public record PickResult(@Nullable Direction face, @Nullable Reason failure) {
-        public PickResult {
+    public record Result(@Nullable Direction face, @Nullable IoReason failure) {
+        public Result {
             if ((face == null) == (failure == null)) {
                 throw new IllegalArgumentException("选面结果必须二者其一");
             }
         }
 
         /** 成功。 */
-        public static PickResult ok(Direction face) {
-            return new PickResult(face, null);
+        public static Result ok(Direction face) {
+            return new Result(face, null);
         }
 
         /** 失败。 */
-        public static PickResult fail(Reason reason) {
-            return new PickResult(null, reason);
+        public static Result fail(IoReason reason) {
+            return new Result(null, reason);
         }
 
         /** 是否选到了面。 */
@@ -81,27 +81,27 @@ public final class FacePick {
      * @param hint       经验面；{@code null} 表示没有
      * @return 选面结果
      */
-    public PickResult pick(Machine machine, AEKey key, IoSide side, @Nullable Direction configured,
+    public Result pick(Machine machine, AEKey key, IoSide side, @Nullable Direction configured,
             @Nullable Direction hint) {
         if (!this.ports.loaded(machine)) {
-            return PickResult.fail(Reason.NO_FACE);
+            return Result.fail(IoReason.NO_FACE);
         }
         if (configured != null) {
             // 配置面无效不兜底：这是玩家配置问题，替玩家猜会把问题藏起来。
             return this.ports.storage(machine, configured) == null
-                    ? PickResult.fail(Reason.FACE_CONFIG_INVALID)
-                    : PickResult.ok(configured);
+                    ? Result.fail(IoReason.FACE_CONFIG_INVALID)
+                    : Result.ok(configured);
         }
         if (hint != null && this.ports.storage(machine, hint) != null) {
-            return PickResult.ok(hint);
+            return Result.ok(hint);
         }
         for (Direction face : FACES) {
             MEStorage storage = this.ports.storage(machine, face);
             if (storage != null && this.accepts(storage, key, side)) {
-                return PickResult.ok(face);
+                return Result.ok(face);
             }
         }
-        return PickResult.fail(Reason.NO_FACE);
+        return Result.fail(IoReason.NO_FACE);
     }
 
     /**

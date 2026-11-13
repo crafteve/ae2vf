@@ -48,29 +48,29 @@ public final class IoExecutor {
      * 执行一条 Job：从 {@code network} 补进机器，或从机器抽回 {@code network}。
      *
      * <p>面在 Job 里定死；这里只负责取到那个面的存储、跑事务、把「面不对」与「满了」分开：
-     * 目标这一刻一个都收不下时，如果别的面能收，就是面不对（{@link Reason#REJECTED}），
-     * 否则是满了（{@link Reason#FULL}）。前者要清经验面，后者要保住经验面。</p>
+     * 目标这一刻一个都收不下时，如果别的面能收，就是面不对（{@link IoReason#REJECTED}），
+     * 否则是满了（{@link IoReason#FULL}）。前者要清经验面，后者要保住经验面。</p>
      *
      * @param network 仓库
      * @param job     任务
      * @return 本次结果
      */
-    public MoveResult move(MEStorage network, IoJob job) {
+    public IoResult move(MEStorage network, IoJob job) {
         MEStorage machineStorage = this.ports.storage(job.machine(), job.face());
         if (machineStorage == null) {
-            return new MoveResult(0L, Reason.NO_FACE);
+            return new IoResult(0L, IoReason.NO_FACE);
         }
         boolean input = job.side() == IoSide.INPUT;
-        MoveResult result = input
+        IoResult result = input
                 ? this.transfer(network, machineStorage, job.key(), job.amount())
                 : this.transfer(machineStorage, network, job.key(), job.amount());
-        if (result.reason() != Reason.FULL || !input) {
+        if (result.reason() != IoReason.FULL || !input) {
             // 输出侧的 FULL 只可能是仓库满，不存在「面不对」；只有输入侧才需要再探一次。
             return result;
         }
         // 目标一个都收不下：面确实不对时别的面能收。多探一次是为了把 REJECTED 与 FULL 分开，
         // 只有零结果路径会付出这个代价。
-        return this.otherFaceAccepts(job) ? new MoveResult(0L, Reason.REJECTED) : result;
+        return this.otherFaceAccepts(job) ? new IoResult(0L, IoReason.REJECTED) : result;
     }
 
     /**
@@ -85,19 +85,19 @@ public final class IoExecutor {
      * @param amount 想搬多少；{@code <= 0} 表示没有量
      * @return 实际搬动量与原因
      */
-    public MoveResult transfer(MEStorage source, MEStorage target, AEKey key, long amount) {
+    public IoResult transfer(MEStorage source, MEStorage target, AEKey key, long amount) {
         if (amount <= 0L) {
-            return MoveResult.NOTHING;
+            return IoResult.NOTHING;
         }
         long accepted;
         try {
             accepted = target.insert(key, amount, Actionable.SIMULATE, AeKeySupport.SOURCE);
         } catch (RuntimeException e) {
             this.log("模拟写入目标异常", key, e);
-            return new MoveResult(0L, Reason.ERROR);
+            return new IoResult(0L, IoReason.ERROR);
         }
         if (accepted <= 0L) {
-            return new MoveResult(0L, Reason.FULL);
+            return new IoResult(0L, IoReason.FULL);
         }
         long available;
         try {
@@ -105,10 +105,10 @@ public final class IoExecutor {
                     AeKeySupport.SOURCE);
         } catch (RuntimeException e) {
             this.log("模拟从来源抽取异常", key, e);
-            return new MoveResult(0L, Reason.ERROR);
+            return new IoResult(0L, IoReason.ERROR);
         }
         if (available <= 0L) {
-            return new MoveResult(0L, Reason.NO_MATERIAL);
+            return new IoResult(0L, IoReason.NO_MATERIAL);
         }
         long want = Math.min(available, accepted);
         long taken;
@@ -117,10 +117,10 @@ public final class IoExecutor {
         } catch (RuntimeException e) {
             // 取没取出来是未知的：按「一点没取」处理，下一轮重试；宁可重复也不让料悬空。
             this.log("从来源抽取异常", key, e);
-            return new MoveResult(0L, Reason.ERROR);
+            return new IoResult(0L, IoReason.ERROR);
         }
         if (taken <= 0L) {
-            return new MoveResult(0L, Reason.NO_MATERIAL);
+            return new IoResult(0L, IoReason.NO_MATERIAL);
         }
         long inserted;
         try {
@@ -129,13 +129,13 @@ public final class IoExecutor {
             // 写进去多少未知：把本次从源扣走的整笔退回去（可能重复），记 ERROR，不让单卡死。
             this.log("提交写入目标异常", key, e);
             this.refund(source, key, taken);
-            return new MoveResult(0L, Reason.ERROR);
+            return new IoResult(0L, IoReason.ERROR);
         }
         long refund = taken - inserted;
         if (refund > 0L) {
             this.refund(source, key, refund);
         }
-        return new MoveResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
+        return new IoResult(inserted, inserted > 0L ? IoReason.RUN : IoReason.FULL);
     }
 
     /**
@@ -149,8 +149,8 @@ public final class IoExecutor {
      * @param perLine 资源 → 要写的总量
      * @return 逐行结果
      */
-    public Map<AEKey, MoveResult> fill(MEStorage machine, Map<AEKey, Long> perLine) {
-        Map<AEKey, MoveResult> results = new LinkedHashMap<>();
+    public Map<AEKey, IoResult> fill(MEStorage machine, Map<AEKey, Long> perLine) {
+        Map<AEKey, IoResult> results = new LinkedHashMap<>();
         for (Map.Entry<AEKey, Long> line : perLine.entrySet()) {
             long amount = line.getValue();
             if (amount <= 0L) {
@@ -163,11 +163,11 @@ public final class IoExecutor {
             } catch (RuntimeException e) {
                 // 这一行写进去多少未知：剩余量留队下一 tick 重试（可能重复，但单不卡死）。
                 this.log("补料写入机器异常", line.getKey(), e);
-                results.put(line.getKey(), new MoveResult(0L, Reason.ERROR));
+                results.put(line.getKey(), new IoResult(0L, IoReason.ERROR));
                 continue;
             }
-            results.put(line.getKey(), new MoveResult(inserted,
-                    inserted > 0L ? Reason.RUN : Reason.FULL));
+            results.put(line.getKey(), new IoResult(inserted,
+                    inserted > 0L ? IoReason.RUN : IoReason.FULL));
         }
         return results;
     }
@@ -180,9 +180,9 @@ public final class IoExecutor {
      * @param amount  数量
      * @return 退回去多少
      */
-    public MoveResult refund(MEStorage network, AEKey key, long amount) {
+    public IoResult refund(MEStorage network, AEKey key, long amount) {
         if (amount <= 0L) {
-            return MoveResult.NOTHING;
+            return IoResult.NOTHING;
         }
         long inserted;
         try {
@@ -197,7 +197,7 @@ public final class IoExecutor {
             IdleFactory.LOGGER.warn("Idle Factory: 退回仓库失败，{} × {} 已按丢弃处理",
                     lost, AeKeySupport.displayName(key));
         }
-        return new MoveResult(inserted, inserted > 0L ? Reason.RUN : Reason.FULL);
+        return new IoResult(inserted, inserted > 0L ? IoReason.RUN : IoReason.FULL);
     }
 
     /**
@@ -208,8 +208,8 @@ public final class IoExecutor {
      * @param products 产物白名单
      * @return 逐资源的回收结果；没抽动任何东西时为空表
      */
-    public Map<AEKey, MoveResult> sweep(Machine machine, MEStorage network, Set<AEKey> products) {
-        Map<AEKey, MoveResult> results = new LinkedHashMap<>();
+    public Map<AEKey, IoResult> sweep(Machine machine, MEStorage network, Set<AEKey> products) {
+        Map<AEKey, IoResult> results = new LinkedHashMap<>();
         if (products.isEmpty()) {
             return results;
         }
@@ -233,9 +233,9 @@ public final class IoExecutor {
                 if (count <= 0L || !products.contains(key)) {
                     continue;
                 }
-                MoveResult result = this.transfer(storage, network, key, count);
+                IoResult result = this.transfer(storage, network, key, count);
                 results.merge(key, result, IoExecutor::worse);
-                if (result.reason() == Reason.ERROR) {
+                if (result.reason() == IoReason.ERROR) {
                     this.ports.invalidate(machine, face);
                 }
             }
@@ -275,8 +275,8 @@ public final class IoExecutor {
     }
 
     /** 两条结果取更严重的那条，数量相加。 */
-    private static MoveResult worse(MoveResult left, MoveResult right) {
-        return new MoveResult(left.moved() + right.moved(),
+    private static IoResult worse(IoResult left, IoResult right) {
+        return new IoResult(left.moved() + right.moved(),
                 right.reason().severity() > left.reason().severity() ? right.reason() : left.reason());
     }
 

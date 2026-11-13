@@ -8,12 +8,12 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.io.Reason;
-import io.github.crafteve.idlefactory.factory.io.Analyzer;
-import io.github.crafteve.idlefactory.factory.io.Form;
+import io.github.crafteve.idlefactory.factory.io.IoReason;
+import io.github.crafteve.idlefactory.factory.io.IoAnalyzer;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.io.PassivePlanner;
-import io.github.crafteve.idlefactory.factory.io.RuleKey;
+import io.github.crafteve.idlefactory.factory.io.IoKey;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -118,8 +118,8 @@ public final class FactorySnapshotBuilder {
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
             WorkState workState, boolean inputFull, long sinceInputMoveTicks,
-            Reason inputReason, Reason outputReason,
-            List<Reason> inputReasons, List<Reason> outputReasons) {
+            IoReason inputReason, IoReason outputReason,
+            List<IoReason> inputReasons, List<IoReason> outputReasons) {
 
         public MachineView {
             inputs = List.copyOf(inputs);
@@ -133,13 +133,13 @@ public final class FactorySnapshotBuilder {
         /**
          * 把原因列表补齐到规则条数。
          *
-         * <p>旧快照或服务端尚未产生本轮结果时列表可能偏短；补 {@link Reason#NO_MATERIAL}
+         * <p>旧快照或服务端尚未产生本轮结果时列表可能偏短；补 {@link IoReason#NO_MATERIAL}
          * 而不是 {@code OK}，界面才不会把没跑过的规则画成「正常」。</p>
          */
-        private static List<Reason> alignReasons(List<Reason> reasons, int size) {
-            List<Reason> aligned = new ArrayList<>(size);
+        private static List<IoReason> alignReasons(List<IoReason> reasons, int size) {
+            List<IoReason> aligned = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                aligned.add(i < reasons.size() ? reasons.get(i) : Reason.NO_MATERIAL);
+                aligned.add(i < reasons.size() ? reasons.get(i) : IoReason.NO_MATERIAL);
             }
             return List.copyOf(aligned);
         }
@@ -215,9 +215,9 @@ public final class FactorySnapshotBuilder {
             }
             // 缺料是「等仓库」，不是「机器不收」；输出满了不算缺料，避免误报。
             if (!this.inputs.isEmpty()
-                    && this.inputReason == Reason.NO_MATERIAL
-                    && this.outputReason != Reason.FULL
-                    && this.outputReason != Reason.REJECTED) {
+                    && this.inputReason == IoReason.NO_MATERIAL
+                    && this.outputReason != IoReason.FULL
+                    && this.outputReason != IoReason.REJECTED) {
                 return TotalState.WAITING_MATERIAL;
             }
             if (this.workState == WorkState.IDLE) {
@@ -258,7 +258,7 @@ public final class FactorySnapshotBuilder {
      * 机器视图列表：节点 → 机器摊平，顺序沿用节点库与机器加入顺序。
      *
      * <p>「为什么不动」不再问统计对象：原因与时刻来自表单条目的账本与历史结论，机器在不在
-     * 来自观测事实，速率来自每秒采样的 {@link Analyzer.Stats}。三份真相各读各的，不在视图里拼。</p>
+     * 来自观测事实，速率来自每秒采样的 {@link IoAnalyzer.Stats}。三份真相各读各的，不在视图里拼。</p>
      *
      * @param factory      工厂
      * @param observations 观测服务；{@code null} 时所有机器显示为未探测
@@ -267,7 +267,7 @@ public final class FactorySnapshotBuilder {
      * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
-            @Nullable Form form, long now) {
+            @Nullable IoForm form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = FactoryLimitsConfig.staleHealthTicks();
@@ -288,30 +288,30 @@ public final class FactorySnapshotBuilder {
                 boolean probed = state != null && state.probed();
                 boolean stale = state != null && state.stale();
 
-                Analyzer.Stats.MachineStats stats = factory.live().analyzer().stats().machineOrNull(machine.id());
-                Form.Slot slot = form == null ? null : form.slotOrNull(machine.id());
+                IoAnalyzer.Stats.MachineStats stats = factory.live().analyzer().stats().machineOrNull(machine.id());
+                IoForm.Slot slot = form == null ? null : form.slotOrNull(machine.id());
                 List<Long> inputRates = new ArrayList<>(inputs.size());
                 for (ResourceSpec spec : inputs) {
                     inputRates.add(stats == null ? 0L
-                            : stats.rateIn(new RuleKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode())));
+                            : stats.rateIn(new IoKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode())));
                 }
                 List<Long> outputRates = new ArrayList<>(outputs.size());
                 for (ResourceSpec spec : outputs) {
                     outputRates.add(stats == null ? 0L
-                            : stats.rateOut(new RuleKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode())));
+                            : stats.rateOut(new IoKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode())));
                 }
-                List<Reason> inputReasons = new ArrayList<>(inputs.size());
+                List<IoReason> inputReasons = new ArrayList<>(inputs.size());
                 long inputSuccessAt = -1L;
                 long blockedSince = -1L;
                 for (ResourceSpec spec : inputs) {
-                    Form.Entry unit = slot == null ? null
-                            : slot.entry(new RuleKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode()));
-                    Reason reason = unit == null
-                            ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
+                    IoForm.Entry unit = slot == null ? null
+                            : slot.entry(new IoKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode()));
+                    IoReason reason = unit == null
+                            ? IoReason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     inputReasons.add(reason);
                     if (unit != null) {
                         inputSuccessAt = Math.max(inputSuccessAt, unit.conclusion().lastSuccessAt());
-                        if (reason != Reason.RUN && reason != Reason.SLEEPING) {
+                        if (reason != IoReason.RUN && reason != IoReason.SLEEPING) {
                             long since = unit.conclusion().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
@@ -319,21 +319,21 @@ public final class FactorySnapshotBuilder {
                         }
                     }
                 }
-                List<Reason> outputReasons = new ArrayList<>(outputs.size());
+                List<IoReason> outputReasons = new ArrayList<>(outputs.size());
                 long lastSuccessAt = inputSuccessAt;
                 long minIdle = Long.MAX_VALUE;
                 for (ResourceSpec spec : outputs) {
-                    Form.Entry unit = slot == null ? null
-                            : slot.entry(new RuleKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode()));
-                    Reason reason = unit == null
-                            ? Reason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
+                    IoForm.Entry unit = slot == null ? null
+                            : slot.entry(new IoKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode()));
+                    IoReason reason = unit == null
+                            ? IoReason.NO_MATERIAL : PassivePlanner.displayReason(unit, now);
                     outputReasons.add(reason);
                     if (unit != null) {
                         lastSuccessAt = Math.max(lastSuccessAt, unit.conclusion().lastSuccessAt());
                         if (unit.conclusion().lastAttemptAt() >= 0L) {
                             minIdle = Math.min(minIdle, unit.conclusion().idleTicks(now));
                         }
-                        if (reason != Reason.RUN && reason != Reason.SLEEPING) {
+                        if (reason != IoReason.RUN && reason != IoReason.SLEEPING) {
                             long since = unit.conclusion().lastAttemptAt();
                             if (since >= 0L) {
                                 blockedSince = blockedSince < 0L ? since : Math.min(blockedSince, since);
@@ -351,10 +351,10 @@ public final class FactorySnapshotBuilder {
                 long blocked = blockedSince < 0L ? -1L : Math.max(0L, now - blockedSince);
                 long sinceInput = inputSuccessAt < 0L ? -1L : Math.max(0L, now - inputSuccessAt);
                 boolean inputFull = !inputReasons.isEmpty() && inputReasons.stream()
-                        .allMatch(reason -> reason == Reason.FULL || reason == Reason.REJECTED
-                                || reason == Reason.NO_FACE);
-                Reason inputReason = worst(inputReasons);
-                Reason outputReason = worst(outputReasons);
+                        .allMatch(reason -> reason == IoReason.FULL || reason == IoReason.REJECTED
+                                || reason == IoReason.NO_FACE);
+                IoReason inputReason = worst(inputReasons);
+                IoReason outputReason = worst(outputReasons);
 
                 // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」。
                 ResourceLocation groupBlockId = observation.blockId() != null
@@ -379,10 +379,10 @@ public final class FactorySnapshotBuilder {
      * @param reasons 原因列表
      * @return 最坏原因；空列表按正常
      */
-    private static Reason worst(List<Reason> reasons) {
-        Reason worst = Reason.RUN;
+    private static IoReason worst(List<IoReason> reasons) {
+        IoReason worst = IoReason.RUN;
         int severity = -1;
-        for (Reason reason : reasons) {
+        for (IoReason reason : reasons) {
             if (reason.severity() > severity) {
                 severity = reason.severity();
                 worst = reason;

@@ -24,7 +24,7 @@ import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
  * <p>槽位与条目都跨 tick 复用：每 tick 只做 mark-seen / add / drop，不新建集合。条目身份由
  * {@link Entry.Key}（机器 + 规则）唯一确定，规则的面或匹配模式变了就视为新条目。</p>
  */
-public final class Form {
+public final class IoForm {
     /** 机器 id → 槽位；插入顺序即配置顺序，执行时按它轮转。 */
     private final Map<UUID, Slot> slots = new LinkedHashMap<>();
     /** 本轮出现过的机器 id。 */
@@ -114,7 +114,7 @@ public final class Form {
          * @param rule 规则运行时身份（自带方向）
          * @return 条目；规则不在表单上时为 {@code null}
          */
-        public @Nullable Entry entry(RuleKey rule) {
+        public @Nullable Entry entry(IoKey rule) {
             return this.pool.get(new Entry.Key(this.machine.id(), rule));
         }
 
@@ -149,7 +149,7 @@ public final class Form {
         }
 
         private Entry entry(ResourceSpec spec, IoSide side) {
-            RuleKey rule = new RuleKey(side, spec.key(), spec.face(), spec.mode());
+            IoKey rule = new IoKey(side, spec.key(), spec.face(), spec.mode());
             Entry entry = this.pool.get(new Entry.Key(this.machine.id(), rule));
             if (entry == null) {
                 entry = new Entry(new Entry.Key(this.machine.id(), rule), this.machine, spec);
@@ -170,7 +170,7 @@ public final class Form {
      *   <li>1024 台 × 16 条规则的规模下，每 tick 全量新建对象是没必要的开销。</li>
      * </ul>
      *
-     * <p><b>数量必须每 tick 刷新</b>：{@link RuleKey} 不含 {@code amount}，玩家只改数量时身份不变，
+     * <p><b>数量必须每 tick 刷新</b>：{@link IoKey} 不含 {@code amount}，玩家只改数量时身份不变，
      * 不刷新就会一直用旧数量搬。</p>
      */
     public static final class Entry {
@@ -178,20 +178,20 @@ public final class Form {
          * 条目身份：机器 + 规则。
          *
          * <p>规则归节点、执行归机器，所以身份必须带机器 id：同一条规则作用在 N 台机器上是 N 个条目。
-         * {@link RuleKey} 自己带方向，因此这里不再另存一份，避免同一概念写两处。</p>
+         * {@link IoKey} 自己带方向，因此这里不再另存一份，避免同一概念写两处。</p>
          *
          * @param machineId 机器 id
          * @param rule      规则运行时身份
          */
-        public record Key(UUID machineId, RuleKey rule) {
+        public record Key(UUID machineId, IoKey rule) {
         }
 
         private final Key key;
         private final Machine machine;
         /** 本条目的账本（明细，会滚）。 */
-        private final Analyzer.Ledger ledger = new Analyzer.Ledger();
+        private final IoAnalyzer.Ledger ledger = new IoAnalyzer.Ledger();
         /** 本条目的历史结论（摘要，不滚）。 */
-        private final Analyzer.Conclusion conclusion = new Analyzer.Conclusion();
+        private final IoAnalyzer.Conclusion conclusion = new IoAnalyzer.Conclusion();
         private ResourceSpec spec;
         /** 本轮是否还在表单上；表单重建后为 {@code false} 的条目会被释放。 */
         private boolean seen = true;
@@ -233,12 +233,12 @@ public final class Form {
         }
 
         /** 本条目的账本。 */
-        public Analyzer.Ledger ledger() {
+        public IoAnalyzer.Ledger ledger() {
             return this.ledger;
         }
 
         /** 本条目的历史结论。 */
-        public Analyzer.Conclusion conclusion() {
+        public IoAnalyzer.Conclusion conclusion() {
             return this.conclusion;
         }
 

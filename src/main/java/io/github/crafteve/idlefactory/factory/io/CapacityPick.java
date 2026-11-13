@@ -106,7 +106,7 @@ public final class CapacityPick {
         }
         Map<AEKey, Direction> faces = new java.util.LinkedHashMap<>();
         for (AEKey key : perPortion.keySet()) {
-            FacePick.PickResult pick = this.facePick.pick(machine, key, IoSide.INPUT,
+            FacePick.Result pick = this.facePick.pick(machine, key, IoSide.INPUT,
                     configured.apply(key), null);
             if (!pick.picked()) {
                 return 0L;

@@ -92,7 +92,7 @@ public final class PassivePlanner {
      * @param network  仓库
      * @return 本轮的 Job 清单与失败清单（复用对象，调用方只读）
      */
-    public Plan plan(Form.Slot slot, long now, VariantPick variants, MEStorage network) {
+    public Plan plan(IoForm.Slot slot, long now, VariantPick variants, MEStorage network) {
         UUID machineId = slot.machine().id();
         Plan plan = this.plans.computeIfAbsent(machineId, id -> new Plan());
         plan.clear();
@@ -121,7 +121,7 @@ public final class PassivePlanner {
      * 输出预留 {@link VariantPick#VARIANT_BUDGET_RESERVED_FOR_OUTPUT} 个，避免两条模糊输入就把
      * 池子用光、输出规则每 tick 都被跳过。</p>
      */
-    private int sideAllowance(Form.Slot slot, IoSide side) {
+    private int sideAllowance(IoForm.Slot slot, IoSide side) {
         if (side == IoSide.INPUT) {
             return this.usesVariants(slot.outputs())
                     ? VariantPick.MAX_VARIANTS_PER_INPUT_TICK
@@ -130,7 +130,7 @@ public final class PassivePlanner {
         return VariantPick.MAX_VARIANTS_PER_MACHINE_TICK;
     }
 
-    private void collect(Plan plan, Form.Slot slot, List<Form.Entry> entries, int start, long now,
+    private void collect(Plan plan, IoForm.Slot slot, List<IoForm.Entry> entries, int start, long now,
             boolean force, Machine machine, VariantPick variants, MEStorage network, int[] budget) {
         int size = entries.size();
         if (size == 0) {
@@ -138,7 +138,7 @@ public final class PassivePlanner {
         }
         int offset = Math.floorMod(start, size);
         for (int index = 0; index < size; index++) {
-            Form.Entry entry = entries.get((offset + index) % size);
+            IoForm.Entry entry = entries.get((offset + index) % size);
             if (!force && !due(entry, now)) {
                 continue;
             }
@@ -149,11 +149,11 @@ public final class PassivePlanner {
     /**
      * 排一条规则：选面 → 展开变体 → 逐变体产出一个 Job。
      */
-    private void planEntry(Plan plan, Form.Entry entry, Machine machine, VariantPick variants,
+    private void planEntry(Plan plan, IoForm.Entry entry, Machine machine, VariantPick variants,
             MEStorage network, long now, int[] budget) {
         ResourceSpec spec = entry.spec();
         IoSide side = entry.side();
-        FacePick.PickResult pick = this.facePick.pick(machine, spec.key(), side, spec.face(),
+        FacePick.Result pick = this.facePick.pick(machine, spec.key(), side, spec.face(),
                 entry.conclusion().faceHint());
         if (!pick.picked()) {
             plan.failures.add(new Failure(entry, pick.failure()));
@@ -166,7 +166,7 @@ public final class PassivePlanner {
         if (candidates.isEmpty()) {
             // 额度耗尽是「没排上」，不是「没料」：两者不能混，否则界面会报错。
             plan.failures.add(new Failure(entry,
-                    budget[0] <= 0 ? Reason.BUDGET_OUT : Reason.NO_MATERIAL));
+                    budget[0] <= 0 ? IoReason.BUDGET_OUT : IoReason.NO_MATERIAL));
             return;
         }
         long amount = spec.amount() <= 0L ? Long.MAX_VALUE : spec.amount();
@@ -178,8 +178,8 @@ public final class PassivePlanner {
     /**
      * 这一侧的规则里是否有会扣变体额度的模糊物品规则。
      */
-    private boolean usesVariants(List<Form.Entry> entries) {
-        for (Form.Entry entry : entries) {
+    private boolean usesVariants(List<IoForm.Entry> entries) {
+        for (IoForm.Entry entry : entries) {
             if (entry.spec().fuzzy()) {
                 return true;
             }
@@ -197,12 +197,12 @@ public final class PassivePlanner {
      * @param now   当前服务端 tick
      * @return 原因
      */
-    public static Reason displayReason(Form.Entry entry, long now) {
-        Analyzer.Ledger.Row row = entry.ledger().current();
+    public static IoReason displayReason(IoForm.Entry entry, long now) {
+        IoAnalyzer.Ledger.Row row = entry.ledger().current();
         if (row == null) {
-            return Reason.NO_MATERIAL;
+            return IoReason.NO_MATERIAL;
         }
-        return due(entry, now) ? row.reason() : Reason.SLEEPING;
+        return due(entry, now) ? row.reason() : IoReason.SLEEPING;
     }
 
     /**
@@ -212,7 +212,7 @@ public final class PassivePlanner {
      * @param now   当前服务端 tick
      * @return 该跑为 {@code true}
      */
-    public static boolean due(Form.Entry entry, long now) {
+    public static boolean due(IoForm.Entry entry, long now) {
         long last = entry.conclusion().lastAttemptAt();
         if (last < 0L || last > now) {
             return true;
@@ -226,8 +226,8 @@ public final class PassivePlanner {
      * @param entry 条目
      * @return 多少 tick 后允许再试
      */
-    private static long backoff(Form.Entry entry) {
-        Analyzer.Ledger.Row row = entry.ledger().current();
+    private static long backoff(IoForm.Entry entry) {
+        IoAnalyzer.Ledger.Row row = entry.ledger().current();
         if (row == null) {
             return 0L;
         }
@@ -240,7 +240,7 @@ public final class PassivePlanner {
             case NO_FACE, FACE_CONFIG_INVALID -> FACE_TICKS;
             case REJECTED -> Math.min(FACE_TICKS * Math.max(1, entry.conclusion().rejectStreak()), 100L);
             case ERROR -> Math.min(
-                    ERROR_BASE_TICKS << Math.min(Math.max(entry.conclusion().countOf(Reason.ERROR) - 1, 0), 3),
+                    ERROR_BASE_TICKS << Math.min(Math.max(entry.conclusion().countOf(IoReason.ERROR) - 1, 0), 3),
                     ERROR_CAP_TICKS);
         };
     }
@@ -251,7 +251,7 @@ public final class PassivePlanner {
      * @param entry  条目
      * @param reason 为什么这一轮没排上
      */
-    public record Failure(Form.Entry entry, @Nullable Reason reason) {
+    public record Failure(IoForm.Entry entry, @Nullable IoReason reason) {
     }
 
     /**

@@ -18,7 +18,7 @@ import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
 import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.io.Reason;
+import io.github.crafteve.idlefactory.factory.io.IoReason;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
@@ -56,7 +56,7 @@ final class FactoryPassiveIoModel {
      * @param rate   服务端算好的速率（数量/秒，已按成员求和）
      * @param reason 本轮逐规则原因（已按成员取最坏）
      */
-    record RuleRow(IoSide side, int index, ResourceSpec spec, long rate, Reason reason) {
+    record RuleRow(IoSide side, int index, ResourceSpec spec, long rate, IoReason reason) {
         /** 是否输入。 */
         boolean input() {
             return this.side == IoSide.INPUT;
@@ -262,22 +262,22 @@ final class FactoryPassiveIoModel {
             IoSide side, List<ResourceSpec> specs) {
         for (int i = 0; i < specs.size(); i++) {
             long rate = 0L;
-            Reason reason = Reason.RUN;
+            IoReason reason = IoReason.RUN;
             for (FactorySnapshotBuilder.MachineView member : members) {
                 List<Long> rates = side == IoSide.INPUT ? member.inputRates()
                         : member.outputRates();
-                List<Reason> reasons = side == IoSide.INPUT ? member.inputReasons()
+                List<IoReason> reasons = side == IoSide.INPUT ? member.inputReasons()
                         : member.outputReasons();
                 rate += i < rates.size() ? rates.get(i) : 0L;
                 reason = worse(reason, i < reasons.size() ? reasons.get(i)
-                        : Reason.NO_MATERIAL);
+                        : IoReason.NO_MATERIAL);
             }
             rows.add(new RuleRow(side, i, specs.get(i), rate, reason));
         }
     }
 
-    /** 取更坏的原因；严重度表只在 {@link Reason#severity()} 一处维护。 */
-    private static Reason worse(Reason left, Reason right) {
+    /** 取更坏的原因；严重度表只在 {@link IoReason#severity()} 一处维护。 */
+    private static IoReason worse(IoReason left, IoReason right) {
         return right.severity() > left.severity() ? right : left;
     }
 }

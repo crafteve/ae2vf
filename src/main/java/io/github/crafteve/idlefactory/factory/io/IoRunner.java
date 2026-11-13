@@ -71,9 +71,9 @@ public final class IoRunner {
      * @param liveMachines 当前仍存在的机器 id（清理账房用）
      * @param now          当前服务端 tick
      */
-    public void run(Factory factory, Form form, List<DispatchState> dispatches,
+    public void run(Factory factory, IoForm form, List<DispatchState> dispatches,
             Set<UUID> liveMachines, long now) {
-        Analyzer analyzer = factory.live().analyzer();
+        IoAnalyzer analyzer = factory.live().analyzer();
         try {
             if (!factory.live().storageOnline()) {
                 // 仓库离线就是没料：不跑搬运，但账房仍然要收口。
@@ -127,7 +127,7 @@ public final class IoRunner {
      * 回收段：节点到期就扫它的在线机器，产物按白名单回网络。
      */
     private void recover(Factory factory, List<DispatchState> dispatches, MEStorage network,
-            Analyzer analyzer, long now) {
+            IoAnalyzer analyzer, long now) {
         ActivePlanner planner = this.activePlanner(factory.id());
         for (DispatchState state : dispatches) {
             if (!planner.sweepDue(state.nodeId(), now)) {
@@ -135,17 +135,17 @@ public final class IoRunner {
             }
             boolean harvested = false;
             for (Machine machine : state.onlineMachines()) {
-                Map<AEKey, MoveResult> results;
+                Map<AEKey, IoResult> results;
                 try {
                     results = this.executor.sweep(machine, network, state.products());
                 } catch (RuntimeException e) {
                     this.logFailure(machine, now, e);
-                    analyzer.recordActive(state.nodeId(), Reason.ERROR, now, 0L, null, null,
+                    analyzer.recordActive(state.nodeId(), IoReason.ERROR, now, 0L, null, null,
                             machine.id(), null);
                     continue;
                 }
-                for (Map.Entry<AEKey, MoveResult> entry : results.entrySet()) {
-                    MoveResult result = entry.getValue();
+                for (Map.Entry<AEKey, IoResult> entry : results.entrySet()) {
+                    IoResult result = entry.getValue();
                     analyzer.recordActive(state.nodeId(), result.reason(), now, result.moved(),
                             null, entry.getKey(), machine.id(), null);
                     harvested |= result.movedAnything();
@@ -163,7 +163,7 @@ public final class IoRunner {
      * 主动段：规划一节点这一 tick 的投递，执行填充与退回。
      */
     private void active(Factory factory, List<DispatchState> dispatches, MEStorage network,
-            Analyzer analyzer, long now) {
+            IoAnalyzer analyzer, long now) {
         ActivePlanner planner = this.activePlanner(factory.id());
         for (DispatchState state : dispatches) {
             ActivePlanner.Plan plan;
@@ -174,13 +174,13 @@ public final class IoRunner {
                         state.nodeId().toString().substring(0, 8), e.toString());
                 continue;
             }
-            for (ActivePlanner.Fill fill : plan.fills()) {
+            for (ActivePlanner.FillRequest fill : plan.fills()) {
                 this.executeFill(state, fill, network, analyzer, planner, now);
             }
-            for (ActivePlanner.Refund refund : plan.refunds()) {
+            for (ActivePlanner.RefundRequest refund : plan.refunds()) {
                 this.executeBatchRefund(state, refund, network, analyzer, planner, now);
             }
-            for (ActivePlanner.Refund orphan : plan.orphans()) {
+            for (ActivePlanner.RefundRequest orphan : plan.orphans()) {
                 this.executeOrphan(state, orphan, network, analyzer, now);
             }
             DispatchOrder first = state.queue().first();
@@ -192,8 +192,8 @@ public final class IoRunner {
     /**
      * 执行一条填充任务：按面分组后逐组写入，再把结果回写订单。
      */
-    private void executeFill(DispatchState state, ActivePlanner.Fill fill, MEStorage network,
-            Analyzer analyzer, ActivePlanner planner, long now) {
+    private void executeFill(DispatchState state, ActivePlanner.FillRequest fill, MEStorage network,
+            IoAnalyzer analyzer, ActivePlanner planner, long now) {
         Machine machine = null;
         for (Machine candidate : state.onlineMachines()) {
             if (candidate.id().equals(fill.machineId())) {
@@ -210,33 +210,33 @@ public final class IoRunner {
             byFace.computeIfAbsent(line.face(), face -> new LinkedHashMap<>())
                     .merge(line.key(), line.amount(), Long::sum);
         }
-        Map<AEKey, MoveResult> results = new LinkedHashMap<>();
+        Map<AEKey, IoResult> results = new LinkedHashMap<>();
         boolean moved = false;
         for (Map.Entry<Direction, Map<AEKey, Long>> group : byFace.entrySet()) {
             MEStorage storage = this.ports.storage(machine, group.getKey());
             if (storage == null) {
                 for (AEKey key : group.getValue().keySet()) {
-                    results.put(key, new MoveResult(0L, Reason.NO_FACE));
+                    results.put(key, new IoResult(0L, IoReason.NO_FACE));
                 }
                 continue;
             }
-            Map<AEKey, MoveResult> part;
+            Map<AEKey, IoResult> part;
             try {
                 part = this.executor.fill(storage, group.getValue());
             } catch (RuntimeException e) {
                 this.logFailure(machine, now, e);
                 for (AEKey key : group.getValue().keySet()) {
-                    results.put(key, new MoveResult(0L, Reason.ERROR));
+                    results.put(key, new IoResult(0L, IoReason.ERROR));
                 }
                 continue;
             }
             results.putAll(part);
-            for (Map.Entry<AEKey, MoveResult> entry : part.entrySet()) {
-                MoveResult result = entry.getValue();
+            for (Map.Entry<AEKey, IoResult> entry : part.entrySet()) {
+                IoResult result = entry.getValue();
                 analyzer.recordActive(state.nodeId(), result.reason(), now, result.moved(),
                         fill.orderId(), entry.getKey(), machine.id(), group.getKey());
                 moved |= result.movedAnything();
-                if (result.reason() == Reason.REJECTED || result.reason() == Reason.ERROR) {
+                if (result.reason() == IoReason.REJECTED || result.reason() == IoReason.ERROR) {
                     this.ports.invalidate(machine, group.getKey());
                 }
             }
@@ -250,8 +250,8 @@ public final class IoRunner {
     /**
      * 执行一次半份退回：逐行退网络，再按退干净的多少更新订单。
      */
-    private void executeBatchRefund(DispatchState state, ActivePlanner.Refund refund,
-            MEStorage network, Analyzer analyzer, ActivePlanner planner, long now) {
+    private void executeBatchRefund(DispatchState state, ActivePlanner.RefundRequest refund,
+            MEStorage network, IoAnalyzer analyzer, ActivePlanner planner, long now) {
         DispatchOrder order = refund.order();
         DispatchOrder.OpenBatch batch = refund.batch();
         if (batch == null) {
@@ -264,7 +264,7 @@ public final class IoRunner {
                 continue;
             }
             AEKey key = order.perPortion().get(index).key();
-            MoveResult result = this.executor.refund(network, key, amount);
+            IoResult result = this.executor.refund(network, key, amount);
             refunded.merge(key, result.moved(), Long::sum);
             analyzer.recordActive(state.nodeId(), result.reason(), now, result.moved(),
                     refund.orderId(), key, refund.machineId(), null);
@@ -275,8 +275,8 @@ public final class IoRunner {
     /**
      * 执行整单退回：把剩余量尽力还回网络后出队，退不回按 D21 记日志丢弃。
      */
-    private void executeOrphan(DispatchState state, ActivePlanner.Refund orphan, MEStorage network,
-            Analyzer analyzer, long now) {
+    private void executeOrphan(DispatchState state, ActivePlanner.RefundRequest orphan, MEStorage network,
+            IoAnalyzer analyzer, long now) {
         DispatchOrder order = orphan.order();
         long[] remaining = order.remainingAmounts();
         long lost = 0L;
@@ -286,7 +286,7 @@ public final class IoRunner {
                 continue;
             }
             AEKey key = order.perPortion().get(index).key();
-            MoveResult result = this.executor.refund(network, key, amount);
+            IoResult result = this.executor.refund(network, key, amount);
             analyzer.recordActive(state.nodeId(), result.reason(), now, result.moved(),
                     order.id(), key, null, null);
             lost += amount - result.moved();
@@ -300,9 +300,9 @@ public final class IoRunner {
     /**
      * 被动段：逐机器问规划器，再执行 Job 并落账。
      */
-    private void passive(Factory factory, Form form, MEStorage network, Analyzer analyzer,
+    private void passive(Factory factory, IoForm form, MEStorage network, IoAnalyzer analyzer,
             long now) {
-        List<Form.Slot> slots = form.slots();
+        List<IoForm.Slot> slots = form.slots();
         if (slots.isEmpty()) {
             this.rounds++;
             return;
@@ -310,7 +310,7 @@ public final class IoRunner {
         // 机器轮转：每轮从不同的槽位开始，避免固定顺序总是先喂第一台机器。
         int start = (int) Math.floorMod(this.rounds, (long) slots.size());
         for (int index = 0; index < slots.size(); index++) {
-            Form.Slot slot = slots.get((start + index) % slots.size());
+            IoForm.Slot slot = slots.get((start + index) % slots.size());
             this.tickMachine(factory, network, analyzer, slot, now);
         }
         this.rounds++;
@@ -319,7 +319,7 @@ public final class IoRunner {
     /**
      * 跑一台机器的一轮被动搬运。
      */
-    private void tickMachine(Factory factory, MEStorage network, Analyzer analyzer, Form.Slot slot,
+    private void tickMachine(Factory factory, MEStorage network, IoAnalyzer analyzer, IoForm.Slot slot,
             long now) {
         Machine machine = slot.machine();
         if (!this.ports.loaded(machine)) {
@@ -340,32 +340,32 @@ public final class IoRunner {
             return;
         }
         // 同一条规则可能展开成多个变体：按条目汇总成一行账，否则界面上一条规则会冒出好几行。
-        Map<Form.Entry, EntryRun> runs = new LinkedHashMap<>();
+        Map<IoForm.Entry, EntryRun> runs = new LinkedHashMap<>();
         for (PassivePlanner.Failure failure : plan.failures()) {
             runs.computeIfAbsent(failure.entry(), entry -> new EntryRun())
                     .merge(failure.reason(), 0L, null);
         }
         for (IoJob job : plan.jobs()) {
-            MoveResult result;
+            IoResult result;
             try {
                 result = this.executor.move(network, job);
             } catch (RuntimeException e) {
                 this.logFailure(machine, now, e);
-                result = new MoveResult(0L, Reason.ERROR);
+                result = new IoResult(0L, IoReason.ERROR);
             }
             this.invalidateOnFailure(job, result);
             runs.computeIfAbsent(job.entry(), entry -> new EntryRun())
                     .merge(result.reason(), result.moved(), job.face());
         }
-        Map<RuleKey, Long> fedByRule = new LinkedHashMap<>();
-        Map<RuleKey, Long> pulledByRule = new LinkedHashMap<>();
-        for (Map.Entry<Form.Entry, EntryRun> entry : runs.entrySet()) {
-            Form.Entry formEntry = entry.getKey();
+        Map<IoKey, Long> fedByRule = new LinkedHashMap<>();
+        Map<IoKey, Long> pulledByRule = new LinkedHashMap<>();
+        for (Map.Entry<IoForm.Entry, EntryRun> entry : runs.entrySet()) {
+            IoForm.Entry formEntry = entry.getKey();
             EntryRun run = entry.getValue();
-            analyzer.record(formEntry, run.reason == null ? Reason.NO_MATERIAL : run.reason,
+            analyzer.record(formEntry, run.reason == null ? IoReason.NO_MATERIAL : run.reason,
                     now, run.moved, run.face);
             if (run.moved > 0L) {
-                Map<RuleKey, Long> target = formEntry.side() == IoSide.INPUT
+                Map<IoKey, Long> target = formEntry.side() == IoSide.INPUT
                         ? fedByRule : pulledByRule;
                 target.merge(formEntry.key().rule(), run.moved, Long::sum);
             }
@@ -381,7 +381,7 @@ public final class IoRunner {
      * <p>{@code REJECTED} / {@code ERROR} 只失效那个面；{@code NO_FACE} 失效整台机器的六个面
      * （连面都没选出来，缓存里的面不再可信）；{@code FULL} 不失效——面是对的，只是满了。</p>
      */
-    private void invalidateOnFailure(IoJob job, MoveResult result) {
+    private void invalidateOnFailure(IoJob job, IoResult result) {
         switch (result.reason()) {
             case REJECTED, ERROR -> this.ports.invalidate(job.machine(), job.face());
             case NO_FACE -> this.ports.invalidateMachine(job.machine());
@@ -460,11 +460,11 @@ public final class IoRunner {
     private static final class EntryRun {
         private long moved;
         @Nullable
-        private Reason reason;
+        private IoReason reason;
         @Nullable
         private Direction face;
 
-        void merge(@Nullable Reason nextReason, long amount, @Nullable Direction usedFace) {
+        void merge(@Nullable IoReason nextReason, long amount, @Nullable Direction usedFace) {
             this.moved += amount;
             if (nextReason != null
                     && (this.reason == null || nextReason.severity() > this.reason.severity())) {

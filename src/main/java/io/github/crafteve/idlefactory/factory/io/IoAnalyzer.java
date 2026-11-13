@@ -37,7 +37,7 @@ import net.minecraft.core.Direction;
  * <p>生命周期：条目离开表单 → 账本与结论随条目释放；机器删除 → 清经验面、机器结论与统计；
  * 节点删除 → 清节点账本与结论。淘汰与清理都在本类内部，外部只负责「到点了叫它一声」。</p>
  */
-public final class Analyzer {
+public final class IoAnalyzer {
     /** 每个目标保留的账本行数。 */
     public static final int LEDGER_CAPACITY = 8;
     /** 速率结算间隔（tick）：每秒把窗口结算成速率。 */
@@ -78,7 +78,7 @@ public final class Analyzer {
      * @param face   本次用的面
      * @return 这次结果是否搬到了东西（方便调用方累计速率）
      */
-    public boolean record(Form.Entry entry, Reason reason, long now, long amount,
+    public boolean record(IoForm.Entry entry, IoReason reason, long now, long amount,
             @Nullable Direction face) {
         entry.ledger().append(reason, now, amount, face, null, null, null);
         entry.conclusion().record(reason, now, amount, face);
@@ -97,12 +97,12 @@ public final class Analyzer {
      * @param machineId 目标机器；{@code null} 表示没定机器
      * @param face      用的面
      */
-    public void recordActive(UUID nodeId, Reason reason, long now, long amount,
+    public void recordActive(UUID nodeId, IoReason reason, long now, long amount,
             @Nullable UUID orderId, @Nullable AEKey key, @Nullable UUID machineId,
             @Nullable Direction face) {
         this.nodeLedger(nodeId).append(reason, now, amount, face, orderId, key, machineId);
         NodeConclusion conclusion = this.nodeConclusion(nodeId);
-        if (reason != Reason.RUN) {
+        if (reason != IoReason.RUN) {
             // 只记「最近一次失败原因」：成功不该盖掉玩家要看的诊断。
             conclusion.lastReason = reason;
         }
@@ -350,7 +350,7 @@ public final class Analyzer {
         private int pendingCount;
         private long pendingOldestAt = -1L;
         @Nullable
-        private Reason lastReason;
+        private IoReason lastReason;
         private long deliveredTotal;
         private long lastSuccessAt = -1L;
 
@@ -366,7 +366,7 @@ public final class Analyzer {
 
         /** 最近一次失败原因；没失败过为 {@code null}。 */
         @Nullable
-        public Reason lastReason() {
+        public IoReason lastReason() {
             return this.lastReason;
         }
 
@@ -402,7 +402,7 @@ public final class Analyzer {
          * @param key       主动侧资源；被动侧为 {@code null}
          * @param machineId 主动侧机器；被动侧为 {@code null}
          */
-        public record Row(Reason reason, long firstTick, long lastTick, int count, long amount,
+        public record Row(IoReason reason, long firstTick, long lastTick, int count, long amount,
                 @Nullable Direction face, @Nullable UUID orderId, @Nullable AEKey key,
                 @Nullable UUID machineId) {
         }
@@ -422,7 +422,7 @@ public final class Analyzer {
          * @param key       主动侧资源；被动侧传 {@code null}
          * @param machineId 主动侧机器；被动侧传 {@code null}
          */
-        public void append(Reason reason, long tick, long amount, @Nullable Direction face,
+        public void append(IoReason reason, long tick, long amount, @Nullable Direction face,
                 @Nullable UUID orderId, @Nullable AEKey key, @Nullable UUID machineId) {
             Row newest = this.current();
             if (newest != null && newest.reason() == reason && Objects.equals(newest.face(), face)
@@ -493,7 +493,7 @@ public final class Analyzer {
         /** 连续被拒次数；不是拒收时清零。 */
         private int rejectStreak;
         /** 各原因累计次数。 */
-        private final Map<Reason, Integer> reasonCounts = new EnumMap<>(Reason.class);
+        private final Map<IoReason, Integer> reasonCounts = new EnumMap<>(IoReason.class);
         /** 经验面：搬通过的面，写入失败时就地清除。 */
         @Nullable
         private Direction faceHint;
@@ -506,7 +506,7 @@ public final class Analyzer {
          * @param amount 本次搬动的数量
          * @param face   本次用的面
          */
-        public void record(Reason reason, long now, long amount, @Nullable Direction face) {
+        public void record(IoReason reason, long now, long amount, @Nullable Direction face) {
             if (this.firstAttemptAt < 0L) {
                 this.firstAttemptAt = now;
             }
@@ -520,7 +520,7 @@ public final class Analyzer {
                     this.faceHint = face;
                 }
             } else {
-                if (reason == Reason.REJECTED) {
+                if (reason == IoReason.REJECTED) {
                     this.rejectStreak++;
                     this.clearFaceHint();
                 } else {
@@ -565,7 +565,7 @@ public final class Analyzer {
          * @param reason 原因
          * @return 次数
          */
-        public int countOf(Reason reason) {
+        public int countOf(IoReason reason) {
             return this.reasonCounts.getOrDefault(reason, 0);
         }
 
@@ -620,7 +620,7 @@ public final class Analyzer {
             this.machines.keySet().removeIf(id -> !keep.contains(id));
         }
 
-        /** 采样一次速率。由 {@link Analyzer#tick(long)} 每秒调一次。 */
+        /** 采样一次速率。由 {@link IoAnalyzer#tick(long)} 每秒调一次。 */
         void sample() {
             for (MachineStats stats : this.machines.values()) {
                 stats.sample();
@@ -629,10 +629,10 @@ public final class Analyzer {
 
         /** 一台机器的搬运速率。 */
         public static final class MachineStats {
-            private final Map<RuleKey, Long> inRuleWindow = new HashMap<>();
-            private final Map<RuleKey, Long> outRuleWindow = new HashMap<>();
-            private final Map<RuleKey, Long> inRuleRate = new HashMap<>();
-            private final Map<RuleKey, Long> outRuleRate = new HashMap<>();
+            private final Map<IoKey, Long> inRuleWindow = new HashMap<>();
+            private final Map<IoKey, Long> outRuleWindow = new HashMap<>();
+            private final Map<IoKey, Long> inRuleRate = new HashMap<>();
+            private final Map<IoKey, Long> outRuleRate = new HashMap<>();
 
             /**
              * 记一次成功搬运（进窗口，采样时结算成速率）。
@@ -640,11 +640,11 @@ public final class Analyzer {
              * @param fedByRule    按规则拆分的补料量
              * @param pulledByRule 按规则拆分的抽取量
              */
-            public void addMoved(Map<RuleKey, Long> fedByRule, Map<RuleKey, Long> pulledByRule) {
-                for (Map.Entry<RuleKey, Long> entry : fedByRule.entrySet()) {
+            public void addMoved(Map<IoKey, Long> fedByRule, Map<IoKey, Long> pulledByRule) {
+                for (Map.Entry<IoKey, Long> entry : fedByRule.entrySet()) {
                     this.inRuleWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
                 }
-                for (Map.Entry<RuleKey, Long> entry : pulledByRule.entrySet()) {
+                for (Map.Entry<IoKey, Long> entry : pulledByRule.entrySet()) {
                     this.outRuleWindow.merge(entry.getKey(), entry.getValue(), Long::sum);
                 }
             }
@@ -655,7 +655,7 @@ public final class Analyzer {
              * @param key 规则
              * @return 数量/秒
              */
-            public long rateIn(RuleKey key) {
+            public long rateIn(IoKey key) {
                 Long value = this.inRuleRate.get(key);
                 return value == null ? 0L : value;
             }
@@ -666,7 +666,7 @@ public final class Analyzer {
              * @param key 规则
              * @return 数量/秒
              */
-            public long rateOut(RuleKey key) {
+            public long rateOut(IoKey key) {
                 Long value = this.outRuleRate.get(key);
                 return value == null ? 0L : value;
             }

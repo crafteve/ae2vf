@@ -9,8 +9,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.BlockingMode;
-import io.github.crafteve.idlefactory.factory.io.DispatchMode;
+import io.github.crafteve.idlefactory.factory.io.BlockingSwitch;
+import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
 import io.github.crafteve.idlefactory.factory.io.DispatchOrder;
 import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
 
@@ -65,7 +65,7 @@ public final class NodeProvider {
     private static final String TAG_DISPATCH = "Dispatch";
 
     /** 阻挡开关。 */
-    private BlockingMode blocking = BlockingMode.OFF;
+    private BlockingSwitch blocking = BlockingSwitch.OFF;
     /** 主动 / 被动模式。 */
     private ProviderMode mode = ProviderMode.PASSIVE;
     /** 玩家是否手动切过模式；手动切过之后不再按样板自动切换。 */
@@ -73,7 +73,7 @@ public final class NodeProvider {
     /** 倍率：关 / 固定 / 智能。 */
     private Multiplier multiplier = Multiplier.off();
     /** 派单模式：顺序 / 轮询；新节点默认轮询。 */
-    private DispatchMode dispatch = DispatchMode.ROUND_ROBIN;
+    private DispatchSwitch dispatch = DispatchSwitch.ROUND_ROBIN;
     /** 样板槽容量；{@code patterns.size()} 永远等于它。 */
     private int capacity = DEFAULT_CAPACITY;
     /** 样板槽，定长、空槽为 {@link ItemStack#EMPTY}。 */
@@ -87,7 +87,7 @@ public final class NodeProvider {
     }
 
     /** 阻挡开关。 */
-    public BlockingMode blocking() {
+    public BlockingSwitch blocking() {
         return this.blocking;
     }
 
@@ -96,8 +96,8 @@ public final class NodeProvider {
      *
      * @param mode 新开关；{@code null} 按不阻挡处理
      */
-    public void setBlocking(@Nullable BlockingMode mode) {
-        this.blocking = mode == null ? BlockingMode.OFF : mode;
+    public void setBlocking(@Nullable BlockingSwitch mode) {
+        this.blocking = mode == null ? BlockingSwitch.OFF : mode;
     }
 
     /** 主动 / 被动模式。 */
@@ -133,7 +133,7 @@ public final class NodeProvider {
     }
 
     /** 派单模式：顺序 / 轮询。 */
-    public DispatchMode dispatch() {
+    public DispatchSwitch dispatch() {
         return this.dispatch;
     }
 
@@ -142,8 +142,8 @@ public final class NodeProvider {
      *
      * @param next 新模式；{@code null} 按轮询处理
      */
-    public void setDispatch(@Nullable DispatchMode next) {
-        this.dispatch = next == null ? DispatchMode.ROUND_ROBIN : next;
+    public void setDispatch(@Nullable DispatchSwitch next) {
+        this.dispatch = next == null ? DispatchSwitch.ROUND_ROBIN : next;
     }
 
     /** 样板槽容量。 */
@@ -300,13 +300,13 @@ public final class NodeProvider {
      */
     public static NodeProvider load(CompoundTag tag, HolderLookup.Provider registries) {
         NodeProvider provider = new NodeProvider();
-        provider.blocking = BlockingMode.read(tag.getString(TAG_BLOCKING));
+        provider.blocking = BlockingSwitch.read(tag.getString(TAG_BLOCKING));
         provider.mode = ProviderMode.read(tag.getString(TAG_MODE));
         provider.modePinned = tag.getBoolean(TAG_MODE_PINNED);
         provider.multiplier = new Multiplier(MultiplierMode.read(tag.getString(TAG_MULTIPLIER_MODE)),
                 tag.contains(TAG_MULTIPLIER_FACTOR)
                         ? tag.getInt(TAG_MULTIPLIER_FACTOR) : Multiplier.MIN_FACTOR);
-        provider.dispatch = DispatchMode.read(tag.getString(TAG_DISPATCH));
+        provider.dispatch = DispatchSwitch.read(tag.getString(TAG_DISPATCH));
 
         ListTag patternList = tag.getList(TAG_PATTERNS, Tag.TAG_COMPOUND);
         List<ItemStack> loaded = new ArrayList<>(patternList.size());

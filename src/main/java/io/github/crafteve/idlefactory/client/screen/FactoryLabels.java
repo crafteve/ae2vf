@@ -4,7 +4,7 @@ import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.Reason;
+import io.github.crafteve.idlefactory.factory.io.IoReason;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
@@ -215,7 +215,7 @@ public final class FactoryLabels {
      * @param input  是否输入侧
      * @return 中文诊断
      */
-    public static String reason(Reason reason, boolean input) {
+    public static String reason(IoReason reason, boolean input) {
         return switch (reason) {
             case RUN -> "正常";
             case SLEEPING -> "休息中";
@@ -236,7 +236,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int tooltipReasonColor(Reason reason, FactoryGuiTheme theme) {
+    static int tooltipReasonColor(IoReason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case RUN -> theme.tooltip().ok();
             case SLEEPING -> theme.tooltip().idle();
@@ -287,7 +287,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    static int rateColorTooltip(long rate, Reason reason, FactoryGuiTheme theme) {
+    static int rateColorTooltip(long rate, IoReason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.tooltip().error();
             case FULL -> theme.tooltip().warn();
@@ -304,7 +304,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return ARGB 颜色
      */
-    public static int rateColorUi(long rate, Reason reason, FactoryGuiTheme theme) {
+    public static int rateColorUi(long rate, IoReason reason, FactoryGuiTheme theme) {
         return switch (reason) {
             case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.error();
             case FULL -> theme.statusWarn();
@@ -321,10 +321,10 @@ public final class FactoryLabels {
      *
      * @param rate   上一秒速率
      * @param reason 最近一轮原因
-     * @return 有流量时为 {@link Reason#RUN}，否则原样返回
+     * @return 有流量时为 {@link IoReason#RUN}，否则原样返回
      */
-    public static Reason effectiveReason(long rate, Reason reason) {
-        return rate > 0L ? Reason.RUN : reason;
+    public static IoReason effectiveReason(long rate, IoReason reason) {
+        return rate > 0L ? IoReason.RUN : reason;
     }
 
     /**
@@ -336,7 +336,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return 文本组件
      */
-    static Component rate(long rate, CapabilityKind kind, Reason reason,
+    static Component rate(long rate, CapabilityKind kind, IoReason reason,
             FactoryGuiTheme theme) {
         int color = rateColorTooltip(rate, reason, theme);
         return coloredBold(rateText(rate, kind), color);
@@ -350,7 +350,7 @@ public final class FactoryLabels {
      * @param theme  主题
      * @return 文本组件
      */
-    static Component state(Reason reason, boolean input, FactoryGuiTheme theme) {
+    static Component state(IoReason reason, boolean input, FactoryGuiTheme theme) {
         return Component.empty()
                 .append(colored("状态：", theme.tooltip().label()))
                 .append(coloredBold(reason(reason, input), tooltipReasonColor(reason, theme)));

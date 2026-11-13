@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.Form;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.io.PortExecutor;
 import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
@@ -149,7 +149,7 @@ public final class FactoryRuntime {
      * @return 表单
      */
     @Nullable
-    public Form formFor(Factory factory) {
+    public IoForm formFor(Factory factory) {
         return this.formBuilder.form(factory.id());
     }
 

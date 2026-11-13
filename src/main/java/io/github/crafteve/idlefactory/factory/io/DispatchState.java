@@ -32,7 +32,7 @@ import net.minecraft.core.Direction;
  * @param inputFaces     样板输入的配置面：资源 → 面（玩家给输入规则配的面）
  */
 public record DispatchState(UUID nodeId, DispatchQueue queue, List<Machine> onlineMachines,
-        DispatchMode dispatch, BlockingMode blocking, Set<AEKey> patternInputs,
+        DispatchSwitch dispatch, BlockingSwitch blocking, Set<AEKey> patternInputs,
         Set<AEKey> products, Map<AEKey, Direction> inputFaces, Set<UUID> memberMachines) {
 
     public DispatchState {
@@ -51,8 +51,8 @@ public record DispatchState(UUID nodeId, DispatchQueue queue, List<Machine> onli
      * @return 空状态
      */
     public static DispatchState empty(UUID nodeId, DispatchQueue queue) {
-        return new DispatchState(nodeId, queue, List.of(), DispatchMode.ROUND_ROBIN,
-                BlockingMode.OFF, Set.of(), Set.of(), Map.of(), Set.of());
+        return new DispatchState(nodeId, queue, List.of(), DispatchSwitch.ROUND_ROBIN,
+                BlockingSwitch.OFF, Set.of(), Set.of(), Map.of(), Set.of());
     }
 
     /**

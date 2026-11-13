@@ -6,7 +6,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.Form;
+import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.io.DispatchState;
 import io.github.crafteve.idlefactory.factory.io.IoRunner;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
@@ -108,7 +108,7 @@ final class FactoryTickRunner {
 
         // 执行段：回收 → 主动 → 被动由 IoRunner 统一编排；这里只负责收集输入与收口账房。
         for (Factory factory : this.manager.all()) {
-            Form form = this.formBuilder.build(factory, this.machineStates);
+            IoForm form = this.formBuilder.build(factory, this.machineStates);
             this.nodeIoRunner.run(factory, form, this.dispatchStates(factory), liveMachines, now);
             // 速率结算与经验面补扫由账房自己数间隔。
             factory.live().analyzer().tick(now);

@@ -9,7 +9,7 @@ package io.github.crafteve.idlefactory.factory.io;
  *
  * <p>{@link #RUN} 既包含「搬了」也包含「跑了但没量」，有没有量看账本行的数量字段。</p>
  */
-public enum Reason {
+public enum IoReason {
     /** 这一轮正常执行。 */
     RUN,
     /** 执行层择时判定本轮不跑（连续空转，见条目的结论）。 */
