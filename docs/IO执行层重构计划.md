@@ -4,6 +4,7 @@
 > 状态：**已确认**（第 7 轮，2026-11-12 用户确认，可交给执行代理按 P1 → P4 落地）。生成日期 2026-11-12；修订：单 `IoRunner`、`CapacityPick`、多机平均分与半份记账、卡单忙不退款、订单 id、`dispatchScanLimit`、`portions` 命名、`RuleKey` 换 `IoSide`、`DispatchMode` / `BlockingMode` 类型归 io、端口缓存失败驱动失效；本轮清空待定项。
 > 范围：只动执行层（`io` / `node` 的执行部分），不动界面、不动配置层、不做自动输出。
 > 执行状态：P1 → P4 已落地（2026-11-12），提交按阶段分开；`AGENTS.md` 的命名后缀 / 坑条修订仍待用户单独批准（见 `docs/DECISIONS.md` 的修订提案）。
+> 类名以 `docs/DECISIONS.md` 的 ADR-043 为准：本计划正文里的 `Form` / `RuleKey` / `Reason` / `MoveResult` / `Analyzer` 现名为 `IoForm` / `IoKey` / `IoReason` / `IoResult` / `IoAnalyzer`。
 
 ---
 

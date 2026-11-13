@@ -940,3 +940,40 @@
 - 行为变化：主动一单可分给多台机器、跨 tick 交付；智能倍率不再有 64 倍业务截断，改为「在线机器容量之和的 25%」；倍率溢出从「丢整张样板」改为「夹回安全倍数」。
 - 文件数：`io` 23 → 21、`node` 22 → 16（计划 §4.4 的 18 / 17 是估算时漏算了搬家与拆分的净增，以实际为准）。
 - `AGENTS.md` 的命名后缀与坑条修改见上面的修订提案，需单独批准。
+
+
+---
+
+## ADR-043 类命名：限定词 + 后缀
+
+**状态**：已决定（2026-11-13）
+
+**决定**：
+
+1. **类名 = 限定词 + 后缀**。后缀表达「这是哪种东西」，限定词表达「谁的 / 哪个子领域的」；只有三种限定词来源：
+   - 层名：`Io`；
+   - 子领域：`Dispatch`；
+   - 主题或功能词：`Blocking`、`Multiplier`、`Provider`、`Active`、`Passive`、`Face`、`Capacity`、`Variant`、`Port`。
+2. **后缀只取两张表**（`AGENTS.md` §2.1）：角色后缀（`Service` / `Runner` / `Planner` / `Executor` / `Analyzer` / `Pick` / `Ledger` / `Manager` / `Library` / `Resolver` / `Adapter` / `Builder` / `Handler` / `Store` / `Stats` / `Render` / `Messages` / `Refs`）与值后缀（`Form` / `Job` / `Order` / `Queue` / `State` / `Side` / `Mode` / `Reason` / `Result` / `Spec` / `Key` / `Status` / `Health` / `Group` / `Hint` / `Conclusion`）。
+3. **`Mode` 统一表示互斥取值**：两值开关（`BlockingMode`、`DispatchMode`）与多档位（`MultiplierMode`、`ProviderMode`、`MatchMode`）都叫 `Mode`，不设 `Switch` 后缀。
+4. **状态三分不许串**：`Health` 只答「在不在」，`Status` 只答「能不能干活」，`State` 只答「此刻是什么」。
+5. **包的领域根类型可以裸名**（`Node`、`Machine`），其余一律要有可读限定词。
+6. **`io` 包按此规范落地**（21 个顶层类，零裸名）：
+   - `Io*`：`IoForm`、`IoKey`、`IoSide`、`IoReason`、`IoResult`、`IoJob`、`IoExecutor`、`IoRunner`、`IoAnalyzer`；
+   - 功能策略：`ActivePlanner`、`PassivePlanner`、`FacePick`、`CapacityPick`、`VariantPick`、`PortExecutor`；
+   - 主动队列：`DispatchOrder`、`DispatchQueue`、`DispatchState`；
+   - 开关：`BlockingMode`、`DispatchMode`。
+   嵌套类型：`FacePick.Result`、`ActivePlanner.FillRequest` / `RefundRequest`。
+7. **旧名对照**（ADR-042 正文里的名字按此读）：`Form` → `IoForm`，`RuleKey` → `IoKey`，`Reason` → `IoReason`，`MoveResult` → `IoResult`，`Analyzer` → `IoAnalyzer`；`BlockingMode` / `DispatchMode` 名字不变（后缀在 `Switch` 与 `Mode` 之间来回过一次，最终定为 `Mode`）。
+
+**理由**：
+
+- 只有后缀的裸名（`Side`、`Reason`、`Form`、`RuleKey`）在跨包 import 时答不出「是什么的」，限定词提供这个答案；`IoKey` 的 Javadoc 另外写死「不是资源键」。
+- 包名不能当限定词用：`io.Reason` 在 `client` 里读作 `Reason.RUN`，没有上下文；`io.IoReason` 自解释。
+- 一个后缀只表达一件事，才能机械检查：`Mode` 一旦允许「开关用 Switch」，`DispatchMode` 与 `BlockingMode` 就会分家；统一成 `Mode` 后两者同构。
+
+**后果**：
+
+- 协议不变：`IoReason` 的枚举 ordinal 与声明顺序未动，`PROTOCOL_VERSION` 仍为 36。
+- `AGENTS.md` §2.1 已同步两张后缀表与第 9 条硬条款；§6.3 记录本次偏差修正。
+- `node` 包按用户要求暂不动：`Multiplier` → `MultiplierSpec`、`ScaledPatternDetails` → `ScaledPattern` 仍待办。

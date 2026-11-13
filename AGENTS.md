@@ -57,7 +57,11 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 命名后缀固定：
 
-`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析 · `Form` 表单（每 tick 的工作清单，内嵌 `Entry` / `Entry.Key`） · `Job` 一次性搬运任务（机器 / 方向 / 面 / 资源 / 量，不带结果） · `Order` 一单待投递（跨 tick、可拆给多台机器） · `Queue` 多单排队（内存与存档的唯一写入口） · `State` 一 tick 的输入值对象 · `Planner` 规划器（择时、排序与分配） · `Executor` 执行器（无跨轮记忆） · `Ledger` 账本（变化序列） · `Analyzer` 分析器（账本、结论、速率与经验面的唯一维护者） · `Pick` 执行侧查询器（探面 / 容量 / 变体，只读不写）
+`Service` 业务入口 · `Runner` 每 tick 执行 · `Store` 存档容器 · `Manager` 内存索引 · `Library` 集合 · `Ref` 不可变引用 · `Anchor` 仓库地址 · `Resolver` 后端解析 · `Adapter` 能力适配 · `Builder` 视图组装 · `Handler` 消息处理 · `Stats` 统计 · `Render` 渲染 · `Messages` 文案 · `Refs` 引用解析 · `Planner` 规划器（择时、排序与分配） · `Executor` 执行器（无跨轮记忆） · `Ledger` 账本（变化序列） · `Analyzer` 分析器（账本、结论、速率与经验面的唯一维护者） · `Pick` 执行侧查询器（探面 / 容量 / 变体，只读不写）
+
+值类型与结构后缀（第二张表，和角色后缀同样硬）：
+
+`Form` 表单（每 tick 的工作清单，内嵌 `Entry` / `Entry.Key`） · `Job` 一次性搬运任务（机器 / 方向 / 面 / 资源 / 量，不带结果） · `Order` 一单待投递（跨 tick、可拆给多台机器） · `Queue` 多单排队（内存与存档的唯一写入口） · `State` 一 tick 的输入或快照 · `Side` 方向 · `Mode` 互斥取值（**两值开关与多档位都叫 `Mode`，不设 `Switch`**） · `Reason` 一次操作的原因（可含成功值） · `Result` 单个目标一次操作的返回值 · `Spec` 不可变配置值组合 · `Key` 不可变身份 · `Status` 推导结论（能不能干活） · `Health` 探活结论（在不在） · `Group` 同类元素的有序集合 · `Hint` 经验值 · `Conclusion` 历史结论
 
 硬条款：
 
@@ -69,17 +73,18 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。资源 key 一律用 AE2 的 `AEKey`，它本身是不可变值对象，不需要额外例外。
 7. 单文件超过约 400 行先给拆分方案，不边想边改。
 8. 新建包、新建文件、改数据层交互结构（record 字段 / NBT / 网络字段 / 跨包签名），计划里必须逐项列出：文件、职责、依赖方向、迁移顺序。等你确认后再动手。
+9. **类名 = 限定词 + 后缀。** 后缀只取上面两张表；限定词说明「谁的 / 哪个子领域的」，只有三种来源：层名（`Io`）、子领域（`Dispatch`）、主题或功能词（`Blocking`、`Multiplier`、`Provider`、`Active`、`Passive`、`Face`、`Capacity`、`Variant`、`Port`）。包的领域根类型（`Node`、`Machine`）可以裸名，其余一律要有可读限定词：`Analyzer` 不合格，`IoAnalyzer` 合格。状态三分不许串：`Health` 只答在不在，`Status` 只答能不能干活，`State` 只答此刻是什么。
 
 ### 2.2 三层信息：配置 / 观测 / io
 
 - 配置（最高信息，写档）：节点的成员机器与 IO 规则、`factory` 的节点库与仓库地址。只描述搬什么，不执行。
 - 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面与执行门禁都只读它，读路径不探世界。
-- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `IoRunner → ActivePlanner / PassivePlanner → IoExecutor → PortExecutor`；结果写进 `Analyzer` 的账本与结论（不写档），不回写配置。
+- 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `IoRunner → ActivePlanner / PassivePlanner → IoExecutor → PortExecutor`；结果写进 `IoAnalyzer` 的账本与结论（不写档），不回写配置。
 
 各包职责：
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头与节点库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是界面与绑定杖的行政入口，`NodeActions` 管节点规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `io`：执行层。`Form`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`Analyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 不依赖 `node`**：节点只把 `DispatchState` 交下来，执行层不需要节点容器。
+- `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 不依赖 `node`**：节点只把 `DispatchState` 交下来，执行层不需要节点容器。
 
 调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
 
@@ -87,7 +92,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 执行顺序固定：回收 → 主动 → 被动。
 
-失败原因沿链上抛（`io/Reason`，9 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常、`FACE_CONFIG_INVALID` 玩家配的面没有这个能力（不兜底、不换面）。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
+失败原因沿链上抛（`io/IoReason`，9 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常、`FACE_CONFIG_INVALID` 玩家配的面没有这个能力（不兜底、不换面）。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
 
 ### 2.3 数据层
 
@@ -253,7 +258,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoRunner.java` · `Form.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `Analyzer.java` · `IoJob.java` · `DispatchOrder.java` · `DispatchQueue.java` · `DispatchState.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchOrder.java` · `DispatchQueue.java` · `DispatchState.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -289,3 +294,5 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
   `ProviderMode.ACTIVE` 等早已实现）。
 - 2026-11-12 按 ADR-042 修正 §2.1 / §2.2 / §4.1 / §6.1 / §6.2：执行层类名与调用链换成
   `Form` / `IoRunner` / `FacePick` / `PortExecutor` / `Analyzer` 一系，删掉「单元」与无向兜底的旧说法。
+- 2026-11-13 按 ADR-043 修正 §2.1：加入「限定词 + 后缀」规则与值类型后缀表；`io` 包类名统一为
+  `IoForm` / `IoKey` / `IoSide` / `IoReason` / `IoResult` / `IoJob` / `IoExecutor` / `IoRunner` / `IoAnalyzer`。
