@@ -7,8 +7,8 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.NodeActions;
-import io.github.crafteve.idlefactory.factory.io.BlockingSwitch;
-import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
+import io.github.crafteve.idlefactory.factory.io.BlockingMode;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.FactoryNodeSnapshots;
@@ -75,7 +75,7 @@ public record FactoryNodeProviderC2S(int containerId, UUID nodeId, ProviderSetti
             Factory factory = found.get();
             NodeActions.Result result = switch (payload.setting()) {
                 case BLOCKING -> NodeActions.setBlocking(factory, payload.nodeId(),
-                        payload.value() == 0 ? BlockingSwitch.OFF : BlockingSwitch.ON);
+                        payload.value() == 0 ? BlockingMode.OFF : BlockingMode.ON);
                 case MULTIPLIER -> handleMultiplier(factory, payload);
                 case DISPATCH -> handleDispatch(factory, payload);
             };
@@ -112,7 +112,7 @@ public record FactoryNodeProviderC2S(int containerId, UUID nodeId, ProviderSetti
      */
     private static NodeActions.Result handleDispatch(Factory factory,
             FactoryNodeProviderC2S payload) {
-        DispatchSwitch[] modes = DispatchSwitch.values();
+        DispatchMode[] modes = DispatchMode.values();
         if (payload.value() < 0 || payload.value() >= modes.length) {
             return NodeActions.Result.err("派单模式非法");
         }

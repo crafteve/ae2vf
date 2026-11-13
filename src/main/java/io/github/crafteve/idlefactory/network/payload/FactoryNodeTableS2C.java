@@ -11,8 +11,8 @@ import io.github.crafteve.idlefactory.client.network.ClientNodeTableHandler;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.BlockingSwitch;
-import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
+import io.github.crafteve.idlefactory.factory.io.BlockingMode;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -138,10 +138,10 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         int pendingCount = buf.readVarInt();
         long pendingOldestAt = buf.readLong();
         boolean available = buf.readBoolean();
-        BlockingSwitch blocking = readEnum(buf, BlockingSwitch.values(), "blocking");
+        BlockingMode blocking = readEnum(buf, BlockingMode.values(), "blocking");
         Multiplier multiplier = new Multiplier(readEnum(buf, MultiplierMode.values(), "multiplier mode"),
                 buf.readVarInt());
-        DispatchSwitch dispatch = readEnum(buf, DispatchSwitch.values(), "dispatch");
+        DispatchMode dispatch = readEnum(buf, DispatchMode.values(), "dispatch");
         int memberCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode()),
                 "members");
         List<FactoryNodeSnapshotBuilder.MemberView> members = new ArrayList<>(memberCount);

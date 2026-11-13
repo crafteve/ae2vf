@@ -12,8 +12,8 @@ import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
 import io.github.crafteve.idlefactory.factory.io.IoForm;
 import io.github.crafteve.idlefactory.factory.machine.Machine;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
-import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
-import io.github.crafteve.idlefactory.factory.io.BlockingSwitch;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
+import io.github.crafteve.idlefactory.factory.io.BlockingMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
 import io.github.crafteve.idlefactory.factory.node.NodeManager;
 import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
@@ -88,8 +88,8 @@ public final class FactoryNodeSnapshotBuilder {
      * @param multiplier  倍率
      * @param dispatch    派单模式
      */
-    public record ProviderView(boolean available, BlockingSwitch blocking, Multiplier multiplier,
-            DispatchSwitch dispatch) {
+    public record ProviderView(boolean available, BlockingMode blocking, Multiplier multiplier,
+            DispatchMode dispatch) {
     }
 
     /**

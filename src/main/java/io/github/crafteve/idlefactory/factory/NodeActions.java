@@ -9,8 +9,8 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.io.IoSide;
 import io.github.crafteve.idlefactory.factory.machine.MatchMode;
 import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.io.BlockingSwitch;
-import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
+import io.github.crafteve.idlefactory.factory.io.BlockingMode;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.factory.node.Node;
@@ -88,12 +88,12 @@ public final class NodeActions {
      * @param mode    新开关；{@code null} 按不阻挡处理
      * @return 结果
      */
-    public static Result setBlocking(Factory factory, UUID nodeId, @Nullable BlockingSwitch mode) {
+    public static Result setBlocking(Factory factory, UUID nodeId, @Nullable BlockingMode mode) {
         Optional<Node> found = factory.config().nodes().byId(nodeId);
         if (found.isEmpty()) {
             return Result.err("找不到节点");
         }
-        BlockingSwitch next = mode == null ? BlockingSwitch.OFF : mode;
+        BlockingMode next = mode == null ? BlockingMode.OFF : mode;
         found.get().provider().setBlocking(next);
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime != null) {
@@ -138,7 +138,7 @@ public final class NodeActions {
      * @param mode    新模式
      * @return 结果
      */
-    public static Result setDispatch(Factory factory, UUID nodeId, DispatchSwitch mode) {
+    public static Result setDispatch(Factory factory, UUID nodeId, DispatchMode mode) {
         Optional<Node> found = factory.config().nodes().byId(nodeId);
         if (found.isEmpty()) {
             return Result.err("找不到节点");
@@ -148,7 +148,7 @@ public final class NodeActions {
         if (runtime != null) {
             runtime.markDirty();
         }
-        return Result.ok("派单已改为" + (mode == DispatchSwitch.ROUND_ROBIN ? "轮询" : "顺序"));
+        return Result.ok("派单已改为" + (mode == DispatchMode.ROUND_ROBIN ? "轮询" : "顺序"));
     }
 
     /**

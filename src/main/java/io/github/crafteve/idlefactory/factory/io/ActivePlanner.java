@@ -22,7 +22,7 @@ import net.minecraft.core.Direction;
  * 主动规划器：决定主动侧这一 tick 把哪些单、按几份、投给哪些机器，以及产物什么时候回收。
  *
  * <p>它只排「这一 tick」：退避用绝对时刻重算，不排未来。订单不绑机器，规划器按
- * {@link DispatchSwitch} 在节点的在线机器上分配：</p>
+ * {@link DispatchMode} 在节点的在线机器上分配：</p>
  * <ul>
  *   <li>顺序：从第一台开始逐台塞满，塞满换下一台；</li>
  *   <li>轮询：多机平均分——先算目标份数，逐台取 min，一轮分不完再来一轮。</li>
@@ -235,7 +235,7 @@ public final class ActivePlanner {
         }
         long before = remaining;
         long placed;
-        if (state.dispatch() == DispatchSwitch.SEQUENTIAL) {
+        if (state.dispatch() == DispatchMode.SEQUENTIAL) {
             placed = this.allocateSequential(plan, order, candidates, remaining);
         } else {
             placed = this.allocateRoundRobin(plan, order, candidates, remaining, state);

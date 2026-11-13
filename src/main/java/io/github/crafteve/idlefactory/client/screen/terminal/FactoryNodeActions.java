@@ -4,7 +4,7 @@ import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
 import io.github.crafteve.idlefactory.client.wand.WandSession;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
-import io.github.crafteve.idlefactory.factory.io.DispatchSwitch;
+import io.github.crafteve.idlefactory.factory.io.DispatchMode;
 import io.github.crafteve.idlefactory.factory.node.Multiplier;
 import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
@@ -155,8 +155,8 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void toggleDispatch(int containerId, NodeRow node) {
-        DispatchSwitch next = node.view().provider().dispatch() == DispatchSwitch.ROUND_ROBIN
-                ? DispatchSwitch.SEQUENTIAL : DispatchSwitch.ROUND_ROBIN;
+        DispatchMode next = node.view().provider().dispatch() == DispatchMode.ROUND_ROBIN
+                ? DispatchMode.SEQUENTIAL : DispatchMode.ROUND_ROBIN;
         PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
                 FactoryNodeProviderC2S.ProviderSetting.DISPATCH, next.ordinal(), 1));
     }
