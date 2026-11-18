@@ -28,13 +28,13 @@ public enum CommandKind {
     /** 改派单模式。 */
     PROVIDER_DISPATCH(Scope.NODE, true, false),
     /** 绑定杖 toggle 机器。 */
-    WAND_TOGGLE(Scope.BLOCK, true, true),
+    WAND_TOGGLE(Scope.BLOCK, true, false),
     /** 绑定杖提交草稿。 */
     WAND_COMMIT(Scope.FACTORY, true, false),
     /** 设置仓库锚点。 */
-    SET_ANCHOR(Scope.BLOCK, true, true),
+    SET_ANCHOR(Scope.BLOCK, true, false),
     /** 清空仓库锚点。 */
-    CLEAR_ANCHOR(Scope.BLOCK, true, true),
+    CLEAR_ANCHOR(Scope.BLOCK, true, false),
     /** 节点类型迁移：SYSTEM、失败下一轮再试。 */
     NODE_TYPE_MIGRATE(Scope.NODE, false, true);
 

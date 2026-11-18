@@ -48,6 +48,11 @@ public final class CommandController {
             return CommandResult.of(CommandReason.OK);
         }
         Factory factory = runtime.manager().byOwner(player.getUUID()).orElse(null);
+        if (factory == null) {
+            // 世界命令（绑定杖）可能在玩家还没开过终端时发出：按需建厂，免得每次都回「你还没有工厂」。
+            ensureFactory(player);
+            factory = runtime.manager().byOwner(player.getUUID()).orElse(null);
+        }
         CommandReason denied = CommandGate.check(command, runtime, factory, player);
         if (denied != null) {
             return CommandResult.of(denied);

@@ -28,5 +28,5 @@
   "wand.panel.empty": "草稿里没有机器",
   "wand.panel.issues": "先修正 %s 处",
   "wand.panel.removed": "删除",
-  "wand.panel.hint": "Esc 返回 · 滚轮翻页 · 右键继续加机器",
+  "wand.panel.hint": "Esc 返回 · 滚轮翻页 · 右键继续加机器"
 }

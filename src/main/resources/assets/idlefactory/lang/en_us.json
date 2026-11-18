@@ -28,5 +28,5 @@
   "wand.panel.empty": "The draft has no machines",
   "wand.panel.issues": "Fix %s issue(s) first",
   "wand.panel.removed": "Remove",
-  "wand.panel.hint": "Esc back - scroll - right-click to add",
+  "wand.panel.hint": "Esc back - scroll - right-click to add"
 }
