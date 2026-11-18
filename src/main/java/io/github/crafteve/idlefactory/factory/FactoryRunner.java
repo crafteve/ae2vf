@@ -67,7 +67,6 @@ final class FactoryRunner implements ObservationChangeListener {
     private final LiveNodeRunner nodeRunner;
     private final IoFormBuilder formBuilder;
     private final MeStorageResolver storageResolver;
-    private final FactoryNoticeHandler notices;
     /** 每 tick 复用的被引用集合。 */
     private final Set<BlockKey> referenced = new HashSet<>();
     private int tickCounter;
@@ -82,14 +81,12 @@ final class FactoryRunner implements ObservationChangeListener {
      * @param nodeRunner        节点对账与推进
      * @param formBuilder       表单生成器
      * @param storageResolver   仓库解析器
-     * @param notices           失联通知聚合
      */
     FactoryRunner(MinecraftServer server, FactoryManager manager,
             ObservationRunner observationRunner, ObservationReader observations,
             IoRunner nodeIoRunner, LiveNodeApply nodeApply, LiveNodeRunner nodeRunner,
 
-            IoFormBuilder formBuilder, MeStorageResolver storageResolver,
-            FactoryNoticeHandler notices) {
+            IoFormBuilder formBuilder, MeStorageResolver storageResolver) {
         this.server = server;
         this.manager = manager;
         this.observationRunner = observationRunner;
@@ -99,7 +96,6 @@ final class FactoryRunner implements ObservationChangeListener {
         this.nodeRunner = nodeRunner;
         this.formBuilder = formBuilder;
         this.storageResolver = storageResolver;
-        this.notices = notices;
     }
 
     /** 推进一 tick。 */
@@ -137,7 +133,6 @@ final class FactoryRunner implements ObservationChangeListener {
             factory.analyzer().tick(now);
         }
 
-        this.notices.flush(this.server, this.manager);
 
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
             IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",
@@ -265,17 +260,8 @@ final class FactoryRunner implements ObservationChangeListener {
                 continue;
             }
             Machine machine = machineFound.get();
-            switch (change.to()) {
-                case MISSING, NO_DIMENSION -> this.notices.missing(factory.id());
-                case PRESENT -> {
-                    if (change.from() != Health.UNKNOWN) {
-                        this.nodeIoRunner.wake(machine.id());
-                        this.notices.restored(factory.id());
-                    }
-                }
-                default -> {
-                    // UNLOADED / UNKNOWN 不处理
-                }
+            if (change.to() == Health.PRESENT && change.from() != Health.UNKNOWN) {
+                this.nodeIoRunner.wake(machine.id());
             }
         }
     }
