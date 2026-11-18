@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.view.NodeStatus;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;

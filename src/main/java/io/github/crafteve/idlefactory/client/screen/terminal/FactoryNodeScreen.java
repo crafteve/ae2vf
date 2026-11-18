@@ -653,7 +653,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param view 节点视图
      * @return 说明文字
      */
-    private static String deleteDetail(FactoryNodeSnapshotBuilder.NodeView view) {
+    private static String deleteDetail(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
         int rules = view.ruleCount();
         int patterns = view.patternCount();
         if (rules > 0 && patterns > 0) {

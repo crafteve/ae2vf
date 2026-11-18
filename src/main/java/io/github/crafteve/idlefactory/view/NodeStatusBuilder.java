@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory;
+package io.github.crafteve.idlefactory.view;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -6,8 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineView;
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.TotalState;
+import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineSnapshot;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 /**
@@ -25,8 +24,8 @@ import io.github.crafteve.idlefactory.observation.NodeHealth;
  *
  * <p>服务端只在这里算一次，结果随快照下发；客户端只读，不再自己拼。</p>
  */
-public final class NodeStatusResolver {
-    private NodeStatusResolver() {
+public final class NodeStatusBuilder {
+    private NodeStatusBuilder() {
         // 纯静态聚合
     }
 
@@ -40,7 +39,7 @@ public final class NodeStatusResolver {
      * @param members   该节点的全部成员机器视图；空列表按「没有成员」处理
      * @return 节点状态
      */
-    public static NodeStatus resolve(int ruleCount, List<MachineView> members) {
+    public static NodeStatus resolve(int ruleCount, List<MachineSnapshot> members) {
         if (members.isEmpty()) {
             // 没有成员就没有任何可观测事实：probed 必须是 false，总状态按离线兜底。
             return new NodeStatus(false, false, NodeHealth.OFFLINE, TotalState.OFFLINE);
@@ -54,7 +53,7 @@ public final class NodeStatusResolver {
         boolean waitingMaterial = false;
         boolean inputOk = false;
         boolean idle = false;
-        for (MachineView member : members) {
+        for (MachineSnapshot member : members) {
             if (!member.probed()) {
                 allProbed = false;
             }
@@ -109,9 +108,9 @@ public final class NodeStatusResolver {
      * @param machines 整厂机器视图
      * @return 节点 id → 该节点的成员视图；顺序按机器表首次出现
      */
-    static Map<UUID, List<MachineView>> groupByNode(List<MachineView> machines) {
-        Map<UUID, List<MachineView>> grouped = new LinkedHashMap<>();
-        for (MachineView machine : machines) {
+    public static Map<UUID, List<MachineSnapshot>> groupByNode(List<MachineSnapshot> machines) {
+        Map<UUID, List<MachineSnapshot>> grouped = new LinkedHashMap<>();
+        for (MachineSnapshot machine : machines) {
             grouped.computeIfAbsent(machine.nodeId(), ignored -> new ArrayList<>()).add(machine);
         }
         return grouped;
@@ -123,10 +122,10 @@ public final class NodeStatusResolver {
      * @param machines 整厂机器视图
      * @return 节点 id → 节点状态；顺序按机器表首次出现
      */
-    public static Map<UUID, NodeStatus> byNode(List<MachineView> machines) {
-        Map<UUID, List<MachineView>> grouped = groupByNode(machines);
+    public static Map<UUID, NodeStatus> byNode(List<MachineSnapshot> machines) {
+        Map<UUID, List<MachineSnapshot>> grouped = groupByNode(machines);
         Map<UUID, NodeStatus> statuses = new LinkedHashMap<>(grouped.size());
-        for (Map.Entry<UUID, List<MachineView>> entry : grouped.entrySet()) {
+        for (Map.Entry<UUID, List<MachineSnapshot>> entry : grouped.entrySet()) {
             // 机器表把节点规则数冗余在每台机器上，组内取值相同；这里只读这个节点级字段，
             // 不再让 resolver 去挑成员。
             int ruleCount = entry.getValue().get(0).ruleCount();

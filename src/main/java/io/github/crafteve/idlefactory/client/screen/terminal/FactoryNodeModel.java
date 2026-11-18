@@ -24,7 +24,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
  */
 final class FactoryNodeModel {
     private final FactoryGuiTheme theme;
-    private List<FactoryNodeSnapshotBuilder.NodeView> nodes = List.of();
+    private List<FactoryNodeSnapshotBuilder.NodeSnapshot> nodes = List.of();
     private boolean hasFactory;
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
@@ -41,7 +41,7 @@ final class FactoryNodeModel {
      * @param status 状态展示
      * @param label  行标签；多机时是 #1、#2，单机时是方块名
      */
-    record MemberRow(FactoryNodeSnapshotBuilder.MemberView member, FactoryStatus status,
+    record MemberRow(FactoryNodeSnapshotBuilder.MemberSnapshot member, FactoryStatus status,
             String label) {
     }
 
@@ -53,7 +53,7 @@ final class FactoryNodeModel {
      * @param name   显示名（自定义名或方块名）
      * @param members 机器行
      */
-    record NodeRow(FactoryNodeSnapshotBuilder.NodeView view, FactoryStatus status, String name,
+    record NodeRow(FactoryNodeSnapshotBuilder.NodeSnapshot view, FactoryStatus status, String name,
             List<MemberRow> members) {
         NodeRow {
             members = List.copyOf(members);
@@ -153,7 +153,7 @@ final class FactoryNodeModel {
      */
     private void rebuild() {
         List<NodeRow> next = new ArrayList<>(this.nodes.size());
-        for (FactoryNodeSnapshotBuilder.NodeView view : this.nodes) {
+        for (FactoryNodeSnapshotBuilder.NodeSnapshot view : this.nodes) {
             String name = displayName(view);
             FactoryStatus status = FactoryStatus.of(view.status(), this.theme);
             if (!this.query.isEmpty() && !this.query.matches(fields(view, name, status))) {
@@ -176,9 +176,9 @@ final class FactoryNodeModel {
      * @return 排序键
      */
     private FactorySortKey sortKey(NodeRow row) {
-        FactoryNodeSnapshotBuilder.NodeView view = row.view();
+        FactoryNodeSnapshotBuilder.NodeSnapshot view = row.view();
         long nearest = FactorySortKey.UNREACHABLE_DISTANCE;
-        for (FactoryNodeSnapshotBuilder.MemberView member : view.members()) {
+        for (FactoryNodeSnapshotBuilder.MemberSnapshot member : view.members()) {
             long distance = FactorySortKey.distance(this.sortContext.playerDimension(),
                     this.sortContext.playerPos(), member.block().dimension(),
                     member.block().pos());
@@ -189,10 +189,10 @@ final class FactoryNodeModel {
                 nearest, row.nodeId());
     }
 
-    private List<MemberRow> members(FactoryNodeSnapshotBuilder.NodeView view) {
+    private List<MemberRow> members(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
         List<MemberRow> rows = new ArrayList<>(view.members().size());
         for (int i = 0; i < view.members().size(); i++) {
-            FactoryNodeSnapshotBuilder.MemberView member = view.members().get(i);
+            FactoryNodeSnapshotBuilder.MemberSnapshot member = view.members().get(i);
             rows.add(new MemberRow(member, FactoryStatus.of(view.status(), this.theme), "#" + (i + 1)));
         }
         return rows;
@@ -204,13 +204,13 @@ final class FactoryNodeModel {
      * @param view 节点视图
      * @return 显示名
      */
-    static String displayName(FactoryNodeSnapshotBuilder.NodeView view) {
+    static String displayName(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
         return view.name() != null ? view.name() : FactoryLabels.blockName(view.typeBlockId());
     }
 
-    private FactorySearchQuery.Fields fields(FactoryNodeSnapshotBuilder.NodeView view,
+    private FactorySearchQuery.Fields fields(FactoryNodeSnapshotBuilder.NodeSnapshot view,
             String name, FactoryStatus status) {
-        FactoryNodeSnapshotBuilder.MemberView first =
+        FactoryNodeSnapshotBuilder.MemberSnapshot first =
                 view.members().isEmpty() ? null : view.members().get(0);
         return FactoryNodeSearchFields.of(name, view.typeBlockId(), view.status(),
                 first == null ? null : first.dimensionId().toString(),

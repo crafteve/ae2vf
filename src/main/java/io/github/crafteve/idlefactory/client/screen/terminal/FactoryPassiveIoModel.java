@@ -15,8 +15,8 @@ import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
 import io.github.crafteve.idlefactory.client.screen.FactorySortKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.NodeStatus;
-import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
+import io.github.crafteve.idlefactory.view.NodeStatus;
+import io.github.crafteve.idlefactory.view.NodeStatusBuilder;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.io.IoSide;
@@ -37,7 +37,7 @@ import net.minecraft.resources.ResourceLocation;
  */
 final class FactoryPassiveIoModel {
     private final FactoryGuiTheme theme;
-    private List<FactorySnapshotBuilder.MachineView> machines = List.of();
+    private List<FactorySnapshotBuilder.MachineSnapshot> machines = List.of();
     private boolean hasFactory;
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
@@ -72,8 +72,8 @@ final class FactoryPassiveIoModel {
      * @param status     节点状态的展示映射
      * @param rules      输入在前、输出在后（节点规则）
      */
-    record BlockView(FactorySnapshotBuilder.MachineView machine,
-            List<FactorySnapshotBuilder.MachineView> members, NodeStatus nodeStatus,
+    record BlockView(FactorySnapshotBuilder.MachineSnapshot machine,
+            List<FactorySnapshotBuilder.MachineSnapshot> members, NodeStatus nodeStatus,
             FactoryStatus status, List<RuleRow> rules) {
         BlockView {
             members = List.copyOf(members);
@@ -190,17 +190,17 @@ final class FactoryPassiveIoModel {
      * <p>过滤只作用于成员机器层：命中一台机器就把整个节点铺开，不做规则级过滤。</p>
      */
     private void rebuild() {
-        Map<UUID, List<FactorySnapshotBuilder.MachineView>> byNode = new LinkedHashMap<>();
-        for (FactorySnapshotBuilder.MachineView machine : this.machines) {
+        Map<UUID, List<FactorySnapshotBuilder.MachineSnapshot>> byNode = new LinkedHashMap<>();
+        for (FactorySnapshotBuilder.MachineSnapshot machine : this.machines) {
             byNode.computeIfAbsent(machine.nodeId(), ignored -> new ArrayList<>()).add(machine);
         }
         List<BlockView> next = new ArrayList<>(byNode.size());
-        for (List<FactorySnapshotBuilder.MachineView> members : byNode.values()) {
-            FactorySnapshotBuilder.MachineView anchor = members.get(0);
+        for (List<FactorySnapshotBuilder.MachineSnapshot> members : byNode.values()) {
+            FactorySnapshotBuilder.MachineSnapshot anchor = members.get(0);
             // 节点状态只读服务端下发的结论；缺失时用同一聚合函数兜底，绝不拿第一台自己拼。
             NodeStatus status = this.nodeStatuses.get(anchor.nodeId());
             if (status == null) {
-                status = NodeStatusResolver.resolve(anchor.ruleCount(), members);
+                status = NodeStatusBuilder.resolve(anchor.ruleCount(), members);
             }
             if (!this.query.isEmpty()) {
                 String name = anchor.nodeName() != null && !anchor.nodeName().isEmpty()
@@ -229,9 +229,9 @@ final class FactoryPassiveIoModel {
      * @return 排序键
      */
     private FactorySortKey sortKey(BlockView block) {
-        FactorySnapshotBuilder.MachineView anchor = block.machine();
+        FactorySnapshotBuilder.MachineSnapshot anchor = block.machine();
         long nearest = FactorySortKey.UNREACHABLE_DISTANCE;
-        for (FactorySnapshotBuilder.MachineView member : block.members()) {
+        for (FactorySnapshotBuilder.MachineSnapshot member : block.members()) {
             long distance = FactorySortKey.distance(this.sortContext.playerDimension(),
                     this.sortContext.playerPos(), member.primaryBlock().dimension(),
                     member.pos());
@@ -250,20 +250,20 @@ final class FactoryPassiveIoModel {
      * @param anchor  代表机器（规则相同的来源）
      * @return 输入在前、输出在后的规则行
      */
-    private static List<RuleRow> rules(List<FactorySnapshotBuilder.MachineView> members,
-            FactorySnapshotBuilder.MachineView anchor) {
+    private static List<RuleRow> rules(List<FactorySnapshotBuilder.MachineSnapshot> members,
+            FactorySnapshotBuilder.MachineSnapshot anchor) {
         List<RuleRow> rows = new ArrayList<>(anchor.inputs().size() + anchor.outputs().size());
         append(rows, members, IoSide.INPUT, anchor.inputs());
         append(rows, members, IoSide.OUTPUT, anchor.outputs());
         return rows;
     }
 
-    private static void append(List<RuleRow> rows, List<FactorySnapshotBuilder.MachineView> members,
+    private static void append(List<RuleRow> rows, List<FactorySnapshotBuilder.MachineSnapshot> members,
             IoSide side, List<ResourceSpec> specs) {
         for (int i = 0; i < specs.size(); i++) {
             long rate = 0L;
             IoReason reason = IoReason.RUN;
-            for (FactorySnapshotBuilder.MachineView member : members) {
+            for (FactorySnapshotBuilder.MachineSnapshot member : members) {
                 List<Long> rates = side == IoSide.INPUT ? member.inputRates()
                         : member.outputRates();
                 List<IoReason> reasons = side == IoSide.INPUT ? member.inputReasons()

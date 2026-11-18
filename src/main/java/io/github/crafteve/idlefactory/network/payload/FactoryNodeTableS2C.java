@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.network.ModNetwork;
-import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
 
 import io.netty.handler.codec.DecoderException;
@@ -42,7 +42,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param nodes         节点视图
  */
 public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean storageOnline,
-        List<FactoryNodeSnapshotBuilder.NodeView> nodes)
+        List<FactoryNodeSnapshotBuilder.NodeSnapshot> nodes)
         implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:node_table}。 */
@@ -82,7 +82,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         buf.writeBoolean(payload.hasFactory());
         buf.writeBoolean(payload.storageOnline());
         buf.writeVarInt(payload.nodes().size());
-        for (FactoryNodeSnapshotBuilder.NodeView node : payload.nodes()) {
+        for (FactoryNodeSnapshotBuilder.NodeSnapshot node : payload.nodes()) {
             writeNode(buf, node);
         }
     }
@@ -92,7 +92,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         boolean hasFactory = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
         int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
-        List<FactoryNodeSnapshotBuilder.NodeView> nodes = new ArrayList<>(count);
+        List<FactoryNodeSnapshotBuilder.NodeSnapshot> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
         }
@@ -100,7 +100,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
     }
 
     private static void writeNode(RegistryFriendlyByteBuf buf,
-            FactoryNodeSnapshotBuilder.NodeView node) {
+            FactoryNodeSnapshotBuilder.NodeSnapshot node) {
         buf.writeUUID(node.nodeId());
         buf.writeBoolean(node.name() != null);
         if (node.name() != null) {
@@ -119,12 +119,12 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         buf.writeVarInt(node.provider().multiplier().factor());
         buf.writeByte(node.provider().dispatch().ordinal());
         buf.writeVarInt(node.members().size());
-        for (FactoryNodeSnapshotBuilder.MemberView member : node.members()) {
+        for (FactoryNodeSnapshotBuilder.MemberSnapshot member : node.members()) {
             writeMember(buf, member);
         }
     }
 
-    private static FactoryNodeSnapshotBuilder.NodeView readNode(RegistryFriendlyByteBuf buf) {
+    private static FactoryNodeSnapshotBuilder.NodeSnapshot readNode(RegistryFriendlyByteBuf buf) {
         UUID nodeId = buf.readUUID();
         String name = buf.readBoolean() ? buf.readUtf(Node.HARD_MAX_NAME_LENGTH) : null;
         ResourceLocation typeBlockId = ResourceLocation.STREAM_CODEC.decode(buf);
@@ -141,18 +141,18 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         DispatchMode dispatch = readEnum(buf, DispatchMode.values(), "dispatch");
         int memberCount = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode()),
                 "members");
-        List<FactoryNodeSnapshotBuilder.MemberView> members = new ArrayList<>(memberCount);
+        List<FactoryNodeSnapshotBuilder.MemberSnapshot> members = new ArrayList<>(memberCount);
         for (int i = 0; i < memberCount; i++) {
             members.add(readMember(buf));
         }
-        return new FactoryNodeSnapshotBuilder.NodeView(nodeId, name, typeBlockId, status,
+        return new FactoryNodeSnapshotBuilder.NodeSnapshot(nodeId, name, typeBlockId, status,
                 ruleCount, patternCount, autoEnergyOnly, pendingCount, pendingOldestAt,
-                new FactoryNodeSnapshotBuilder.ProviderView(available, blocking, multiplier,
+                new FactoryNodeSnapshotBuilder.ProviderSnapshot(available, blocking, multiplier,
                         dispatch), members);
     }
 
     private static void writeMember(RegistryFriendlyByteBuf buf,
-            FactoryNodeSnapshotBuilder.MemberView member) {
+            FactoryNodeSnapshotBuilder.MemberSnapshot member) {
         buf.writeUUID(member.machineId());
         ResourceLocation.STREAM_CODEC.encode(buf, member.block().dimension().location());
         buf.writeLong(member.block().pos().asLong());
@@ -162,7 +162,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         buf.writeBoolean(member.stale());
     }
 
-    private static FactoryNodeSnapshotBuilder.MemberView readMember(RegistryFriendlyByteBuf buf) {
+    private static FactoryNodeSnapshotBuilder.MemberSnapshot readMember(RegistryFriendlyByteBuf buf) {
         UUID machineId = buf.readUUID();
         BlockKey block = BlockKey.of(
                 ResourceKey.create(Registries.DIMENSION, ResourceLocation.STREAM_CODEC.decode(buf)),
@@ -171,7 +171,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         MachineHealth health = readEnum(buf, MachineHealth.values(), "member health");
         boolean probed = buf.readBoolean();
         boolean stale = buf.readBoolean();
-        return new FactoryNodeSnapshotBuilder.MemberView(machineId, block, blockId, health, probed,
+        return new FactoryNodeSnapshotBuilder.MemberSnapshot(machineId, block, blockId, health, probed,
                 stale);
     }
 

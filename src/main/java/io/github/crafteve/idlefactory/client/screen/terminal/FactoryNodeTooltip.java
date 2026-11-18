@@ -78,7 +78,7 @@ final class FactoryNodeTooltip {
                     + waitedText(node.view().pendingOldestAt())));
         }
         if (!node.members().isEmpty()) {
-            FactoryNodeSnapshotBuilder.MemberView first = node.members().get(0).member();
+            FactoryNodeSnapshotBuilder.MemberSnapshot first = node.members().get(0).member();
             lines.add(line("位置", first.dimensionId() + " "
                     + first.primaryPos().toShortString()));
         }
@@ -121,7 +121,7 @@ final class FactoryNodeTooltip {
      * @param view 节点视图
      * @return 说明文字
      */
-    private static String configuredText(FactoryNodeSnapshotBuilder.NodeView view) {
+    private static String configuredText(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
         int rules = view.ruleCount();
         int patterns = view.patternCount();
         if (rules > 0 && patterns > 0) {
@@ -154,7 +154,7 @@ final class FactoryNodeTooltip {
             return List.of();
         }
         MemberRow member = node.members().get(index);
-        FactoryNodeSnapshotBuilder.MemberView view = member.member();
+        FactoryNodeSnapshotBuilder.MemberSnapshot view = member.member();
         List<Component> lines = new ArrayList<>(4);
         lines.add(Component.literal(member.label()).withStyle(ChatFormatting.BOLD));
         lines.add(Component.literal(view.dimensionId() + " "
@@ -169,7 +169,7 @@ final class FactoryNodeTooltip {
         if (index < 0 || index >= node.members().size()) {
             return List.of();
         }
-        FactoryNodeSnapshotBuilder.MemberView view = node.members().get(index).member();
+        FactoryNodeSnapshotBuilder.MemberSnapshot view = node.members().get(index).member();
         return List.of(
                 Component.literal("定位").withStyle(ChatFormatting.BOLD),
                 Component.literal(view.dimensionId() + " "

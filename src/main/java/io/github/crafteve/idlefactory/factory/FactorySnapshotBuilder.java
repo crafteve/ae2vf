@@ -34,6 +34,7 @@ import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.node.NodeIo;
 
 import io.github.crafteve.idlefactory.observation.ObservationReader;
+import io.github.crafteve.idlefactory.view.TotalState;
 
 import io.github.crafteve.idlefactory.observation.BlockFacts;
 
@@ -56,18 +57,6 @@ import net.minecraft.world.level.Level;
  * <p><b>这里不许探世界</b>：所有状态都从 {@link ObservationReader} 的缓存里读。</p>
  */
 public final class FactorySnapshotBuilder {
-    /** 界面上的总状态，由 WS + IO 推导。 */
-    public enum TotalState {
-        RUNNING,
-        IDLE,
-        WAITING_MATERIAL,
-        INPUT_OK,
-        INPUT_BLOCKED,
-        OFFLINE,
-        UNCONFIGURED,
-        UNKNOWN
-    }
-
     private FactorySnapshotBuilder() {
         // 纯静态工具类
     }
@@ -123,7 +112,7 @@ public final class FactorySnapshotBuilder {
      * @param inputReasons   与 inputs 顺序一致的逐规则原因
      * @param outputReasons  与 outputs 顺序一致的逐规则原因
      */
-    public record MachineView(UUID nodeId, @Nullable String nodeName,
+    public record MachineSnapshot(UUID nodeId, @Nullable String nodeName,
             @Nullable ResourceLocation nodeIconBlockId, int nodeMachineCount,
             UUID machineId, BlockKey primaryBlock,
             MachineHealth health, boolean probed, boolean stale,
@@ -136,7 +125,7 @@ public final class FactorySnapshotBuilder {
             IoReason inputReason, IoReason outputReason,
             List<IoReason> inputReasons, List<IoReason> outputReasons) {
 
-        public MachineView {
+        public MachineSnapshot {
             inputs = List.copyOf(inputs);
             outputs = List.copyOf(outputs);
             inputRates = List.copyOf(inputRates);
@@ -281,9 +270,9 @@ public final class FactorySnapshotBuilder {
      * @param now          当前服务端 tick
      * @return 视图列表
      */
-    public static List<MachineView> machines(Factory factory, @Nullable ObservationReader observations,
+    public static List<MachineSnapshot> machines(Factory factory, @Nullable ObservationReader observations,
             @Nullable IoForm form, long now) {
-        List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
+        List<MachineSnapshot> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = IdleFactoryConfig.staleHealthTicks();
         for (Node node : factory.config().nodes().all()) {
@@ -377,7 +366,7 @@ public final class FactorySnapshotBuilder {
                         : (observations == null ? null : observations.lastBlockId(typeBlock));
                 WorkState workState = observations == null
                         ? WorkState.UNKNOWN : observations.workState(typeBlock);
-                views.add(new MachineView(node.id(), node.name(), node.typeBlockId(),
+                views.add(new MachineSnapshot(node.id(), node.name(), node.typeBlockId(),
                         node.machineCount(), machine.id(), typeBlock,
                         health, probed, stale,
                         observation.blockId(), groupBlockId, observation.beTypeId(),
@@ -416,7 +405,7 @@ public final class FactorySnapshotBuilder {
      * @param observations 观测服务
      * @return 视图列表
      */
-    public static List<MachineView> machines(Factory factory,
+    public static List<MachineSnapshot> machines(Factory factory,
             @Nullable ObservationReader observations) {
         return machines(factory, observations, null, 0L);
     }
@@ -439,9 +428,9 @@ public final class FactorySnapshotBuilder {
      * @param views   机器视图
      * @return 汇总
      */
-    public static FactoryHealth health(Factory factory, List<MachineView> views) {
+    public static FactoryHealth health(Factory factory, List<MachineSnapshot> views) {
         int active = 0;
-        for (MachineView view : views) {
+        for (MachineSnapshot view : views) {
             if (view.health().isOnline()) {
                 active++;
             }
@@ -456,7 +445,7 @@ public final class FactorySnapshotBuilder {
      * @param view 视图
      * @return 状态文本
      */
-    public static String describe(MachineView view) {
+    public static String describe(MachineSnapshot view) {
         return view.health().describe();
     }
 }

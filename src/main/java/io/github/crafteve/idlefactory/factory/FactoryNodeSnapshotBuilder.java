@@ -7,6 +7,8 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.view.NodeStatus;
+import io.github.crafteve.idlefactory.view.NodeStatusBuilder;
 import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.io.IoForm;
@@ -28,8 +30,8 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 把工厂的节点库整理成节点管理终端直接可用的视图。
  *
- * <p>视图按节点 → 成员 → 方块三层建模：{@code NodeView} 带节点状态、类型方块、provider 与成员；
- * {@code MemberView} 带机器健康与唯一的方块位置。节点状态由 {@link NodeStatusResolver}
+ * <p>视图按节点 → 成员 → 方块三层建模：{@code NodeSnapshot} 带节点状态、类型方块、provider 与成员；
+ * {@code MemberSnapshot} 带机器健康与唯一的方块位置。节点状态由 {@link NodeStatusBuilder}
  * 一处聚合：探没过期看全体成员，在干什么按最需要管的那台，结果与成员登记顺序无关。</p>
  */
 public final class FactoryNodeSnapshotBuilder {
@@ -52,12 +54,12 @@ public final class FactoryNodeSnapshotBuilder {
      * @param provider         provider 组的状态
      * @param members          节点下的机器
      */
-    public record NodeView(java.util.UUID nodeId, @Nullable String name,
+    public record NodeSnapshot(java.util.UUID nodeId, @Nullable String name,
             ResourceLocation typeBlockId, NodeStatus status, int ruleCount, int patternCount,
-            boolean autoEnergyOnly, int pendingCount, long pendingOldestAt, ProviderView provider,
-            List<MemberView> members) {
+            boolean autoEnergyOnly, int pendingCount, long pendingOldestAt, ProviderSnapshot provider,
+            List<MemberSnapshot> members) {
 
-        public NodeView {
+        public NodeSnapshot {
             members = List.copyOf(members);
         }
 
@@ -87,7 +89,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param multiplier  倍率
      * @param dispatch    派单模式
      */
-    public record ProviderView(boolean available, BlockingMode blocking, Multiplier multiplier,
+    public record ProviderSnapshot(boolean available, BlockingMode blocking, Multiplier multiplier,
             DispatchMode dispatch) {
     }
 
@@ -101,7 +103,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param probed    是否探测过
      * @param stale     健康是否过期
      */
-    public record MemberView(java.util.UUID machineId, BlockKey block,
+    public record MemberSnapshot(java.util.UUID machineId, BlockKey block,
             @Nullable ResourceLocation blockId, MachineHealth health, boolean probed,
             boolean stale) {
 
@@ -129,33 +131,33 @@ public final class FactoryNodeSnapshotBuilder {
      * @param now          当前服务端 tick
      * @return 节点视图
      */
-    public static List<NodeView> nodes(Factory factory, @Nullable ObservationReader observations,
+    public static List<NodeSnapshot> nodes(Factory factory, @Nullable ObservationReader observations,
             @Nullable IoForm form, @Nullable LiveNodeApply nodeManager, long now) {
-        List<FactorySnapshotBuilder.MachineView> machineViews =
+        List<FactorySnapshotBuilder.MachineSnapshot> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
-        // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
-        Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
-                NodeStatusResolver.groupByNode(machineViews);
-        List<NodeView> nodes = new ArrayList<>(factory.config().nodes().size());
+        // 分组只由 NodeStatusBuilder 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
+        Map<java.util.UUID, List<FactorySnapshotBuilder.MachineSnapshot>> byNode =
+                NodeStatusBuilder.groupByNode(machineViews);
+        List<NodeSnapshot> nodes = new ArrayList<>(factory.config().nodes().size());
         boolean storageOnline = factory.storageOnline();
         for (Node node : factory.config().nodes().all()) {
-            List<FactorySnapshotBuilder.MachineView> views =
+            List<FactorySnapshotBuilder.MachineSnapshot> views =
                     byNode.getOrDefault(node.id(), List.of());
-            // 节点状态只由 NodeStatusResolver 一处聚合：探没过期看全体，在干什么按最需要管的那台。
-            NodeStatus status = NodeStatusResolver.resolve(node.ruleCount(), views);
-            List<MemberView> members = new ArrayList<>(node.machineCount());
+            // 节点状态只由 NodeStatusBuilder 一处聚合：探没过期看全体，在干什么按最需要管的那台。
+            NodeStatus status = NodeStatusBuilder.resolve(node.ruleCount(), views);
+            List<MemberSnapshot> members = new ArrayList<>(node.machineCount());
             for (Machine machine : node.machines()) {
-                FactorySnapshotBuilder.MachineView view = null;
-                for (FactorySnapshotBuilder.MachineView candidate : views) {
+                FactorySnapshotBuilder.MachineSnapshot view = null;
+                for (FactorySnapshotBuilder.MachineSnapshot candidate : views) {
                     if (candidate.machineId().equals(machine.id())) {
                         view = candidate;
                         break;
                     }
                 }
                 members.add(view == null
-                        ? new MemberView(machine.id(), machine.block(), null, MachineHealth.OFFLINE,
+                        ? new MemberSnapshot(machine.id(), machine.block(), null, MachineHealth.OFFLINE,
                                 false, false)
-                        : new MemberView(machine.id(), machine.block(), view.blockId(),
+                        : new MemberSnapshot(machine.id(), machine.block(), view.blockId(),
                                 view.health(), view.probed(), view.stale()));
             }
             boolean available = storageOnline && status.health() != NodeHealth.OFFLINE;
@@ -169,10 +171,10 @@ public final class FactoryNodeSnapshotBuilder {
             int pendingCount = queue == null ? 0 : queue.size();
             NodeDispatchOrder head = queue == null ? null : queue.first();
             long pendingOldestAt = head == null ? -1L : head.enqueuedAt();
-            nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
+            nodes.add(new NodeSnapshot(node.id(), node.name(), node.typeBlockId(), status,
                     node.ruleCount(), node.patternCount(), autoEnergyOnly, pendingCount,
                     pendingOldestAt,
-                    new ProviderView(available, node.provider().blocking(),
+                    new ProviderSnapshot(available, node.provider().blocking(),
                             node.provider().multiplier(), node.provider().dispatch()),
                     members));
         }

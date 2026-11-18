@@ -3,12 +3,13 @@ package io.github.crafteve.idlefactory.client.screen;
 import net.minecraft.resources.ResourceLocation;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.view.TotalState;
+import io.github.crafteve.idlefactory.view.NodeStatus;
 
 /**
  * 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
  *
- * <p>聚合已经在服务端 {@code NodeStatusResolver} 完成，这里只把服务端下发的 {@link NodeStatus}
+ * <p>聚合已经在服务端 {@code NodeStatusBuilder} 完成，这里只把服务端下发的 {@link NodeStatus}
  * 映射成展示档位；绘制、搜索字段和 tooltip 用同一份结果，不在客户端再判断一次状态。</p>
  *
  * @param text  状态文字
@@ -103,7 +104,7 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      * @param state 服务端总状态
      * @return 状态种类
      */
-    private static Kind kindOf(FactorySnapshotBuilder.TotalState state) {
+    private static Kind kindOf(TotalState state) {
         return switch (state) {
             case OFFLINE -> Kind.OFFLINE;
             case UNCONFIGURED -> Kind.UNCONFIGURED;

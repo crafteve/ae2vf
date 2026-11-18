@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
@@ -39,7 +39,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 服务端 → 客户端的机器表。
  *
- * <p>直接携带 {@link FactorySnapshotBuilder.MachineView}，不另建界面 DTO。机器视图带节点归属
+ * <p>直接携带 {@link FactorySnapshotBuilder.MachineSnapshot}，不另建界面 DTO。机器视图带节点归属
  * 字段（nodeId / nodeName / nodeIconBlockId / nodeMachineCount），v3 客户端按 {@code nodeId}
  * 分组；健康是 {@link MachineHealth}，并带 {@code probed} 与 {@code stale}。</p>
  *
@@ -51,7 +51,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline,
-        List<FactorySnapshotBuilder.MachineView> machines,
+        List<FactorySnapshotBuilder.MachineSnapshot> machines,
         List<NodeStatusEntry> nodeStatuses) implements CustomPacketPayload {
 
     /**
@@ -101,7 +101,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeBoolean(payload.hasFactory());
         buf.writeBoolean(payload.storageOnline());
         buf.writeVarInt(payload.machines().size());
-        for (FactorySnapshotBuilder.MachineView machine : payload.machines()) {
+        for (FactorySnapshotBuilder.MachineSnapshot machine : payload.machines()) {
             writeMachine(buf, machine);
         }
         buf.writeVarInt(payload.nodeStatuses().size());
@@ -117,7 +117,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         boolean storageOnline = buf.readBoolean();
         int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines()),
                 "machines");
-        List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>(count);
+        List<FactorySnapshotBuilder.MachineSnapshot> machines = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
@@ -131,7 +131,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeMachine(RegistryFriendlyByteBuf buf,
-            FactorySnapshotBuilder.MachineView machine) {
+            FactorySnapshotBuilder.MachineSnapshot machine) {
         buf.writeUUID(machine.nodeId());
         writeNullableString(buf, machine.nodeName());
         writeNullableResourceLocation(buf, machine.nodeIconBlockId());
@@ -161,7 +161,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         buf.writeByte(machine.outputReason().ordinal());
     }
 
-    private static FactorySnapshotBuilder.MachineView readMachine(RegistryFriendlyByteBuf buf) {
+    private static FactorySnapshotBuilder.MachineSnapshot readMachine(RegistryFriendlyByteBuf buf) {
         UUID nodeId = buf.readUUID();
         String nodeName = readNullableString(buf);
         ResourceLocation nodeIconBlockId = readNullableResourceLocation(buf);
@@ -190,7 +190,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         long sinceInputMoveTicks = buf.readVarLong();
         IoReason inputReason = readEnum(buf, IoReason.values(), "input reason");
         IoReason outputReason = readEnum(buf, IoReason.values(), "output reason");
-        return new FactorySnapshotBuilder.MachineView(nodeId, nodeName, nodeIconBlockId,
+        return new FactorySnapshotBuilder.MachineSnapshot(nodeId, nodeName, nodeIconBlockId,
                 nodeMachineCount, machineId, primaryBlock, health, probed, stale,
                 blockId, groupBlockId, beTypeId, ruleCount, inputs, outputs,
                 inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,

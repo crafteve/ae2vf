@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory;
+package io.github.crafteve.idlefactory.view;
 
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
@@ -8,7 +8,7 @@ import io.github.crafteve.idlefactory.observation.NodeHealth;
  * <p>这是节点状态在服务端与客户端的唯一表示。节点终端、被动 IO 终端、搜索、tooltip 与排序
  * 都只读这一份结论；谁都不许再自己拿"第一台"或"最后一台"成员拼一个状态。</p>
  *
- * <p>字段含义与聚合规则见 {@link NodeStatusResolver}：{@code probed} 要求全部成员探过，
+ * <p>字段含义与聚合规则见 {@link NodeStatusBuilder}：{@code probed} 要求全部成员探过，
  * {@code stale} 要求任一成员过期，{@code health} 按在线台数分档，{@code totalState} 按
  * "最需要管的那台"聚合。</p>
  *
@@ -22,5 +22,5 @@ import io.github.crafteve.idlefactory.observation.NodeHealth;
  * @param totalState 节点在干什么
  */
 public record NodeStatus(boolean probed, boolean stale, NodeHealth health,
-        FactorySnapshotBuilder.TotalState totalState) {
+        TotalState totalState) {
 }

@@ -1,7 +1,8 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.NodeStatus;
+import io.github.crafteve.idlefactory.view.TotalState;
+import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 import io.netty.handler.codec.DecoderException;
@@ -42,8 +43,8 @@ public final class NodeStatusCodec {
         boolean probed = buf.readBoolean();
         boolean stale = buf.readBoolean();
         NodeHealth health = readEnum(buf, NodeHealth.values(), "node health");
-        FactorySnapshotBuilder.TotalState totalState =
-                readEnum(buf, FactorySnapshotBuilder.TotalState.values(), "total state");
+        TotalState totalState =
+                readEnum(buf, TotalState.values(), "total state");
         return new NodeStatus(probed, stale, health, totalState);
     }
 
