@@ -28,7 +28,7 @@ public final class ModCreativeTabs {
                         output.accept(ModItems.PASSIVE_IO_TERMINAL.get());
                         output.accept(ModItems.NODE_TERMINAL.get());
                         output.accept(ModItems.MACHINE_BINDING_WAND.get());
-                        output.accept(ModItems.STORAGE_BINDING_WAND.get());
+                        output.accept(ModItems.ME_BINDING_WAND.get());
                     })
                     .build());
 

@@ -6,22 +6,25 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.storage.StorageMode;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 
 /**
  * 工厂档案的存档容器。
  *
- * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库地址与节点（含机器、
+ * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库锚点与节点（含机器、
  * IO 规则与 provider）。运行时数据（仓库在线、诊断、健康）一律不写。</p>
  *
  * <p>存档挂在主世界的 {@code DataStorage} 上，每个存档一份。</p>
@@ -32,8 +35,10 @@ public final class FactoryStore extends SavedData {
     private static final String TAG_FACTORIES = "Factories";
     private static final String TAG_ID = "Id";
     private static final String TAG_OWNER = "Owner";
-    private static final String TAG_ANCHOR = "Anchor";
-    private static final String TAG_STORAGE_MODE = "StorageMode";
+    /** 仓库锚点维度；缺这条表示未绑定。 */
+    private static final String TAG_ANCHOR_DIM = "AnchorDim";
+    /** 仓库锚点坐标（{@link BlockPos#asLong()}）。 */
+    private static final String TAG_ANCHOR_POS = "AnchorPos";
     private static final String TAG_NODES = "Nodes";
     private static final String TAG_NEXT_SEQ = "NextSeq";
 
@@ -92,10 +97,11 @@ public final class FactoryStore extends SavedData {
             CompoundTag entry = new CompoundTag();
             entry.putUUID(TAG_ID, record.id());
             entry.putUUID(TAG_OWNER, record.owner());
-            if (record.anchor() != null) {
-                entry.put(TAG_ANCHOR, record.anchor().save());
+            BlockKey anchor = record.anchor();
+            if (anchor != null) {
+                entry.putString(TAG_ANCHOR_DIM, anchor.dimension().location().toString());
+                entry.putLong(TAG_ANCHOR_POS, anchor.pos().asLong());
             }
-            entry.putString(TAG_STORAGE_MODE, record.storageMode().name());
             if (!record.nodes().isEmpty()) {
                 ListTag nodes = new ListTag();
                 for (Node node : record.nodes()) {
@@ -119,10 +125,7 @@ public final class FactoryStore extends SavedData {
             if (!entry.hasUUID(TAG_ID) || !entry.hasUUID(TAG_OWNER)) {
                 continue;
             }
-            StorageAnchor anchor = entry.contains(TAG_ANCHOR, Tag.TAG_COMPOUND)
-                    ? StorageAnchor.load(entry.getCompound(TAG_ANCHOR))
-                    : null;
-            StorageMode storageMode = readMode(entry, anchor);
+            BlockKey anchor = readAnchor(entry);
             List<Node> nodes = new ArrayList<>();
             ListTag nodeList = entry.getList(TAG_NODES, Tag.TAG_COMPOUND);
             for (int j = 0; j < nodeList.size(); j++) {
@@ -132,7 +135,7 @@ public final class FactoryStore extends SavedData {
                 }
             }
             loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    storageMode, nodes));
+                    nodes));
         }
         store.records = loaded;
         store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
@@ -140,37 +143,37 @@ public final class FactoryStore extends SavedData {
     }
 
     /**
-     * 读仓库模式；旧档没有字段时按地址类型推断。
+     * 读仓库锚点。
      *
-     * @param entry  工厂记录
-     * @param anchor 已读出的地址，可为空
-     * @return 仓库模式
+     * <p>缺维度键或维度名非法都按「未绑定」处理：锚点是可选配置，读不出来不该拖累整个工厂。</p>
+     *
+     * @param entry 工厂记录标签
+     * @return 锚点；未绑定或字段非法时为 {@code null}
      */
-    private static StorageMode readMode(CompoundTag entry, @Nullable StorageAnchor anchor) {
-        String raw = entry.getString(TAG_STORAGE_MODE);
-        if (!raw.isEmpty()) {
-            try {
-                return StorageMode.valueOf(raw);
-            } catch (IllegalArgumentException ignored) {
-                // 未知值按地址类型推断
-            }
+    @Nullable
+    private static BlockKey readAnchor(CompoundTag entry) {
+        if (!entry.contains(TAG_ANCHOR_DIM) || !entry.contains(TAG_ANCHOR_POS)) {
+            return null;
         }
-        return anchor instanceof ContainerAnchor ? StorageMode.CONTAINER : StorageMode.ME;
+        ResourceLocation id = ResourceLocation.tryParse(entry.getString(TAG_ANCHOR_DIM));
+        if (id == null) {
+            return null;
+        }
+        return BlockKey.of(ResourceKey.create(Registries.DIMENSION, id),
+                BlockPos.of(entry.getLong(TAG_ANCHOR_POS)));
     }
 
     /**
-     * 一条存档记录：工厂身份、仓库地址与节点表。
+     * 一条存档记录：工厂身份、仓库锚点与节点表。
      *
      * <p>节点自己带机器、IO 规则与 provider；{@code NextSeq} 仍是存档根级字段，
      * 不属于任何工厂记录。</p>
      *
-     * @param id          工厂 id
-     * @param owner       拥有者玩家 uuid
-     * @param anchor      仓库地址；未绑定为 {@code null}
-     * @param storageMode 仓库接入模式（ME / 容器）
-     * @param nodes       节点表（含机器、IO 规则与 provider）
+     * @param id     工厂 id
+     * @param owner  拥有者玩家 uuid
+     * @param anchor 仓库锚点方块；未绑定为 {@code null}
+     * @param nodes  节点表（含机器、IO 规则与 provider）
      */
-    public record FactoryRecord(UUID id, UUID owner, @Nullable StorageAnchor anchor,
-            StorageMode storageMode, List<Node> nodes) {
+    public record FactoryRecord(UUID id, UUID owner, @Nullable BlockKey anchor, List<Node> nodes) {
     }
 }

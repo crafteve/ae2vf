@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 
 import com.mojang.logging.LogUtils;
 
-import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.registry.ModCreativeTabs;
 import io.github.crafteve.idlefactory.registry.ModItems;
@@ -32,7 +32,7 @@ public class IdleFactory {
 
         modEventBus.addListener(this::commonSetup);
         // 工厂上限与观测调优统一走 COMMON 配置；旧的模板 Config 已删除
-        modContainer.registerConfig(ModConfig.Type.COMMON, FactoryLimitsConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON, IdleFactoryConfig.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

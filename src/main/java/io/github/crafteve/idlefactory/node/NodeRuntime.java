@@ -19,7 +19,6 @@ import io.github.crafteve.idlefactory.io.FacePick;
 import io.github.crafteve.idlefactory.io.PortExecutor;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.storage.EmptyStorage;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.GridHelper;
@@ -176,9 +175,8 @@ public final class NodeRuntime
     void detachReturning() {
         try {
             // 队列属于节点：拆节点时把剩余量全部退回网络，退不回按 D21 记日志丢弃。
-            MEStorage network = this.networkStorage();
             DispatchQueue.RefundReport report = this.node.provider().pending().refundAll(
-                    network == null ? EmptyStorage.INSTANCE : network, this.gameTime());
+                    this.networkStorage(), this.gameTime());
             this.logThrottled(this.gameTime(), "拆节点，队列 " + report.orders() + " 单已尽力退回网络");
         } catch (RuntimeException e) {
             this.logThrottled(this.gameTime(), "拆节点时退回订单失败：" + e);

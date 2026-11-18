@@ -9,7 +9,6 @@ import java.util.Set;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.observation.BlockProbe;
 import io.github.crafteve.idlefactory.observation.Health;
-import io.github.crafteve.idlefactory.storage.ContainerCapabilityAdapter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -30,8 +29,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 public final class FactoryLinkFinder {
     /** 一次连锁最多返回多少台机器。 */
     public static final int MAX_MACHINES = 128;
-    /** 一次连锁最多返回多少个容器。 */
-    public static final int MAX_CONTAINERS = 16;
     /** 最多访问多少个方块，防止大面积同 id 方块拖垮服务端。 */
     private static final int MAX_VISITS = 4096;
     /** 连锁半径（格）。 */
@@ -50,17 +47,6 @@ public final class FactoryLinkFinder {
      */
     public static List<BlockPos> machines(ServerLevel level, BlockPos origin) {
         return find(level, origin, MAX_MACHINES, pos -> isMachine(level, pos));
-    }
-
-    /**
-     * 查找目标容器所在的同 id 连通群。
-     *
-     * @param level  服务端世界
-     * @param origin 目标容器
-     * @return 容器坐标；目标不是有效容器时为空
-     */
-    public static List<BlockPos> containers(ServerLevel level, BlockPos origin) {
-        return find(level, origin, MAX_CONTAINERS, pos -> ContainerCapabilityAdapter.isContainer(level, pos));
     }
 
     /**

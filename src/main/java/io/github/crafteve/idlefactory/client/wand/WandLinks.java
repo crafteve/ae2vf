@@ -8,7 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
@@ -25,8 +24,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>只读缓存，不参与业务判断；登录 / 换维度 / 打开终端时主动请求一次，之后靠推送更新。</p>
  */
 public final class WandLinks {
-    private static StorageMode mode = StorageMode.ME;
-    private static List<FactoryLinksS2C.Link> storage = List.of();
     private static List<BlockKey> machineBlocks = List.of();
     private static Map<BlockKey, Owner> owners = Map.of();
     private static Map<UUID, BlockKey> machineBlocksById = Map.of();
@@ -64,8 +61,6 @@ public final class WandLinks {
                 nextBlocks.add(machine.block());
             }
         }
-        mode = payload.mode();
-        storage = payload.storage();
         owners = Map.copyOf(nextOwners);
         machineBlocksById = Map.copyOf(nextMachineBlocks);
         nodes = Map.copyOf(nextNodes);
@@ -74,22 +69,10 @@ public final class WandLinks {
 
     /** 清空缓存；登录 / 登出 / 换维度时调。 */
     public static void clear() {
-        mode = StorageMode.ME;
-        storage = List.of();
         machineBlocks = List.of();
         owners = Map.of();
         machineBlocksById = Map.of();
         nodes = Map.of();
-    }
-
-    /** 当前仓库模式。 */
-    public static StorageMode mode() {
-        return mode;
-    }
-
-    /** 仓库坐标（ME 一个 / 容器多个）。 */
-    public static List<FactoryLinksS2C.Link> storage() {
-        return storage;
     }
 
     /** 全部已绑定机器方块，按节点与成员顺序摊平。 */

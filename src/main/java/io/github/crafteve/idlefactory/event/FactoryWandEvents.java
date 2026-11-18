@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.event;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
+import io.github.crafteve.idlefactory.item.MeBindingWandItem;
 
 import net.minecraft.world.InteractionHand;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,7 +30,7 @@ public final class FactoryWandEvents {
         if (event.getHand() != InteractionHand.MAIN_HAND) {
             return;
         }
-        if (event.getEntity().getMainHandItem().getItem() instanceof StorageBindingWandItem) {
+        if (event.getEntity().getMainHandItem().getItem() instanceof MeBindingWandItem) {
             event.setCanceled(true);
         }
     }

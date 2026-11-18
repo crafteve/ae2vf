@@ -22,7 +22,6 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
-import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -59,7 +58,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 public final class WandLinkRenderer {
     /** 顶点缓冲初始大小。 */
     private static final int BUFFER_SIZE = 256;
-    /** 加法混合用的透明度；四种颜色共用。 */
+    /** 加法混合用的透明度；三种颜色共用。 */
     private static final int ALPHA = 100;
 
     @SuppressWarnings("deprecation")
@@ -107,18 +106,10 @@ public final class WandLinkRenderer {
         if (minecraft.player == null || minecraft.level == null || minecraft.screen != null) {
             return;
         }
-        boolean machineWand = minecraft.player.getMainHandItem().getItem()
-                instanceof MachineBindingWandItem;
-        boolean storageWand = minecraft.player.getMainHandItem().getItem()
-                instanceof StorageBindingWandItem;
-        if (!machineWand && !storageWand) {
+        if (!(minecraft.player.getMainHandItem().getItem() instanceof MachineBindingWandItem)) {
             return;
         }
         ResourceKey<Level> dimension = minecraft.level.dimension();
-        if (storageWand) {
-            draw(Kind.STORAGE, collectLinks(WandLinks.storage(), dimension), event);
-            return;
-        }
         boolean editing = WandSession.isEditing();
         java.util.UUID editingNode = editing ? WandSession.draft().nodeId() : null;
         LongOpenHashSet machineBlocks = new LongOpenHashSet();
@@ -259,24 +250,6 @@ public final class WandLinkRenderer {
     }
 
     /**
-     * 收集当前维度里的仓库坐标。
-     *
-     * @param links     仓库坐标
-     * @param dimension 当前维度
-     * @return 坐标集合
-     */
-    private static LongOpenHashSet collectLinks(List<FactoryLinksS2C.Link> links,
-            ResourceKey<Level> dimension) {
-        LongOpenHashSet positions = new LongOpenHashSet(Math.max(16, links.size()));
-        for (FactoryLinksS2C.Link link : links) {
-            if (link.dimension().equals(dimension)) {
-                positions.add(link.pos().asLong());
-            }
-        }
-        return positions;
-    }
-
-    /**
      * 把坐标集合编译成一个静态 VBO。
      *
      * @param positions 坐标集合
@@ -375,16 +348,14 @@ public final class WandLinkRenderer {
     private record VBOEntry(LongOpenHashSet positions, BlockPos origin, VertexBuffer vbo) {
     }
 
-    /** 四种世界框颜色。 */
+    /** 三种世界框颜色。 */
     private enum Kind {
         /** 已绑定机器。 */
         MACHINE(0xFF33FF73),
         /** 草稿待加入。 */
         DRAFT_ADDED(0xFFFFCC33),
         /** 校验冲突或待删除。 */
-        DRAFT_CONFLICT(0xFFFF4D4D),
-        /** 仓库地址。 */
-        STORAGE(0xFF40A6FF);
+        DRAFT_CONFLICT(0xFFFF4D4D);
 
         private final int color;
 

@@ -7,25 +7,43 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
+
 import io.github.crafteve.idlefactory.io.IoReason;
+
 import io.github.crafteve.idlefactory.io.IoAnalyzer;
+
 import io.github.crafteve.idlefactory.io.IoForm;
+
 import io.github.crafteve.idlefactory.io.IoSide;
+
 import io.github.crafteve.idlefactory.io.PassivePlanner;
+
 import io.github.crafteve.idlefactory.io.IoKey;
+
 import io.github.crafteve.idlefactory.location.BlockKey;
+
 import io.github.crafteve.idlefactory.machine.Machine;
+
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
+
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
+
 import io.github.crafteve.idlefactory.observation.Observation;
+
 import io.github.crafteve.idlefactory.observation.ObservationService;
+
 import io.github.crafteve.idlefactory.observation.BlockFacts;
+
 import io.github.crafteve.idlefactory.observation.MachineHealth;
+
 import io.github.crafteve.idlefactory.observation.WorkState;
-import io.github.crafteve.idlefactory.storage.StorageAnchor;
+
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -64,8 +82,9 @@ public final class FactorySnapshotBuilder {
      * @return 摘要文本
      */
     public static String describe(Factory factory) {
-        StorageAnchor anchor = factory.config().storageAnchor();
-        String anchorText = anchor == null ? "unbound" : anchor.describe();
+        BlockKey anchor = factory.config().storageAnchor();
+        String anchorText = anchor == null ? "unbound"
+                : anchor.dimension().location() + " " + anchor.pos().toShortString();
         return "工厂 " + factory.id()
                 + " | owner=" + factory.config().owner()
                 + " | storage=" + (factory.live().storageOnline() ? "online" : "offline")
@@ -270,7 +289,7 @@ public final class FactorySnapshotBuilder {
             @Nullable IoForm form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
-        long staleTicks = FactoryLimitsConfig.staleHealthTicks();
+        long staleTicks = IdleFactoryConfig.staleHealthTicks();
         for (Node node : factory.config().nodes().all()) {
             NodeIoGroup io = node.io();
             List<ResourceSpec> inputs = io.inputs();

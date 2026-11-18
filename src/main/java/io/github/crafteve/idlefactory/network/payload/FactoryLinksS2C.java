@@ -4,50 +4,39 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
+
 import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
+
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.storage.StorageMode;
+
 import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.network.payload.wand.WandDraftCodec;
 
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
+
 import io.netty.handler.codec.DecoderException;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 服务端 → 客户端：当前仓库模式与「节点 / 机器 / 方块」三层链接快照。
+ * 服务端 → 客户端：「节点 / 机器」两层链接快照。
  *
  * <p>客户端只用它画世界框与判断草稿三态，不拿它做业务判断。快照是整体替换：没有 revision、
  * 不合并，单线程生成加 TCP 有序已经保证不会乱序。节点里包含全部成员机器（失联的也在），
  * 因为渲染与「属于本节点」的判断都要用到它们。</p>
  *
- * @param mode    当前仓库模式
- * @param storage 仓库坐标（ME 一个、容器最多 {@link ContainerAnchor#MAX_CONTAINERS} 个）
- * @param nodes   全部节点
+ * @param nodes 全部节点
  */
-public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLink> nodes)
-        implements CustomPacketPayload {
-    /** 仓库坐标上限，与容器上限一致。 */
-    public static final int MAX_STORAGE = 16;
-
+public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:factory_links}。 */
     public static final Type<FactoryLinksS2C> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
@@ -58,7 +47,6 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
             StreamCodec.of(FactoryLinksS2C::write, FactoryLinksS2C::read);
 
     public FactoryLinksS2C {
-        storage = List.copyOf(storage);
         nodes = List.copyOf(nodes);
     }
 
@@ -74,15 +62,6 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
      * @return 同步包
      */
     public static FactoryLinksS2C of(Factory factory) {
-        List<Link> storage = new ArrayList<>();
-        StorageAnchor anchor = factory.config().storageAnchor();
-        if (anchor instanceof MeAnchor me) {
-            storage.add(new Link(me.dimension(), me.pos()));
-        } else if (anchor instanceof ContainerAnchor containers) {
-            for (ContainerRef ref : containers.containers()) {
-                storage.add(new Link(ref.dimension(), ref.pos()));
-            }
-        }
         List<NodeLink> nodes = new ArrayList<>();
         for (Node node : factory.config().nodes().all()) {
             List<MachineLink> machines = new ArrayList<>(node.machineCount());
@@ -91,12 +70,12 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
             }
             nodes.add(new NodeLink(node.id(), node.typeBlockId(), machines));
         }
-        return new FactoryLinksS2C(factory.config().storageMode(), storage, nodes);
+        return new FactoryLinksS2C(nodes);
     }
 
-    /** 空状态：没有工厂或还没绑定。 */
+    /** 空状态：没有工厂或还没有节点。 */
     public static FactoryLinksS2C empty() {
-        return new FactoryLinksS2C(StorageMode.ME, List.of(), List.of());
+        return new FactoryLinksS2C(List.of());
     }
 
     /**
@@ -110,11 +89,9 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
     }
 
     private static void write(RegistryFriendlyByteBuf buf, FactoryLinksS2C payload) {
-        buf.writeEnum(payload.mode());
-        writeLinks(buf, payload.storage(), MAX_STORAGE);
-        int nodeLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes());
-        int machinePerNodeLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode());
-        int totalLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxTotalMachines());
+        int nodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
         int nodeCount = Math.min(payload.nodes().size(), nodeLimit);
         buf.writeVarInt(nodeCount);
         int writtenMachines = 0;
@@ -135,11 +112,9 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
     }
 
     private static FactoryLinksS2C read(RegistryFriendlyByteBuf buf) {
-        StorageMode mode = buf.readEnum(StorageMode.class);
-        List<Link> storage = readLinks(buf, MAX_STORAGE);
-        int nodeLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes());
-        int machinePerNodeLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode());
-        int totalLimit = ModNetwork.wireLimit(FactoryLimitsConfig.maxTotalMachines());
+        int nodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
         int nodeCount = readCount(buf, nodeLimit, "节点");
         List<NodeLink> nodes = new ArrayList<>(nodeCount);
         int readMachines = 0;
@@ -158,7 +133,7 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
             readMachines += machineCount;
             nodes.add(new NodeLink(nodeId, typeBlockId, machines));
         }
-        return new FactoryLinksS2C(mode, storage, nodes);
+        return new FactoryLinksS2C(nodes);
     }
 
     private static int readCount(RegistryFriendlyByteBuf buf, int limit, String what) {
@@ -167,36 +142,6 @@ public record FactoryLinksS2C(StorageMode mode, List<Link> storage, List<NodeLin
             throw new DecoderException(what + "数量越界：" + count);
         }
         return count;
-    }
-
-    private static void writeLinks(RegistryFriendlyByteBuf buf, List<Link> links, int max) {
-        int count = Math.min(links.size(), max);
-        buf.writeVarInt(count);
-        for (int i = 0; i < count; i++) {
-            Link link = links.get(i);
-            buf.writeResourceLocation(link.dimension().location());
-            buf.writeBlockPos(link.pos());
-        }
-    }
-
-    private static List<Link> readLinks(RegistryFriendlyByteBuf buf, int max) {
-        int count = readCount(buf, max, "仓库坐标");
-        List<Link> links = new ArrayList<>(count);
-        for (int i = 0; i < count; i++) {
-            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION,
-                    buf.readResourceLocation());
-            links.add(new Link(dimension, buf.readBlockPos()));
-        }
-        return links;
-    }
-
-    /**
-     * 一个仓库坐标。
-     *
-     * @param dimension 维度
-     * @param pos       方块坐标
-     */
-    public record Link(ResourceKey<Level> dimension, BlockPos pos) {
     }
 
     /**

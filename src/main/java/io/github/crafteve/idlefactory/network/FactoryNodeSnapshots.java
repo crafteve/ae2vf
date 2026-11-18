@@ -6,7 +6,6 @@ import java.util.Optional;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -45,7 +44,6 @@ public final class FactoryNodeSnapshots {
         List<FactoryNodeSnapshotBuilder.NodeView> nodes = FactoryNodeSnapshotBuilder.nodes(
                 owner, runtime.observations(), runtime.formFor(owner), runtime.nodeManager(), now);
         PacketDistributor.sendToPlayer(player, new FactoryNodeTableS2C(
-                containerId, true, owner.config().storageMode() == StorageMode.ME,
-                owner.live().storageOnline(), nodes));
+                containerId, true, owner.live().storageOnline(), nodes));
     }
 }

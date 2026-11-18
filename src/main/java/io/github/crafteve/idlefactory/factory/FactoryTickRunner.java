@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeManager;
 import io.github.crafteve.idlefactory.node.NodeRuntime;
 import io.github.crafteve.idlefactory.observation.ObservationService;
-import io.github.crafteve.idlefactory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
 import net.minecraft.server.MinecraftServer;
 
@@ -46,7 +46,7 @@ final class FactoryTickRunner {
     private final IoRunner nodeIoRunner;
     private final NodeManager nodeManager;
     private final ObservationService observations;
-    private final StorageResolver storageResolver;
+    private final MeStorageResolver storageResolver;
     private final FactoryObservationRunner observationRunner;
     private final FactoryNodeRunner nodeRunner;
     private final MachineStateLibrary machineStates;
@@ -66,7 +66,7 @@ final class FactoryTickRunner {
      * @param formBuilder       表单生成器
      */
     FactoryTickRunner(MinecraftServer server, FactoryManager manager, IoRunner nodeIoRunner,
-            NodeManager nodeManager, ObservationService observations, StorageResolver storageResolver,
+            NodeManager nodeManager, ObservationService observations, MeStorageResolver storageResolver,
             FactoryObservationRunner observationRunner, FactoryNodeRunner nodeRunner,
             MachineStateLibrary machineStates, IoFormBuilder formBuilder) {
         this.server = server;

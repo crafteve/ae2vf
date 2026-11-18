@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
@@ -22,7 +21,7 @@ import net.minecraft.server.level.ServerPlayer;
  * 打开终端时由 {@link #ensureFactory} 静默完成，并顺手推一次链接快照。</p>
  *
  * <p>它只做装配与转发，业务实现分别在 {@link WandService}（绑定杖判定与写库）、
- * {@link MachineLinkService}（按 id 删除）、{@link StorageLinkService}（仓库 toggle 与模式切换）。
+ * {@link MachineLinkService}（按 id 删除）、{@link StorageLinkService}（仓库 toggle）。
  * 绑定杖回执直接复用 {@code factory.wand} 的公共 record，不引入网络层的类型。</p>
  */
 public final class FactoryService {
@@ -75,7 +74,7 @@ public final class FactoryService {
         }
         UUID id = nextFactoryId(manager, runtime, player.getUUID());
         Factory factory = new Factory(id,
-                new FactoryConfig(player.getUUID(), StorageMode.ME, null));
+                new FactoryConfig(player.getUUID(), null));
         if (!manager.add(factory)) {
             IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
             return;
@@ -183,33 +182,18 @@ public final class FactoryService {
     }
 
     /**
-     * 切换 ME / 容器模式；有链接时拒绝。
-     *
-     * @param player 发起请求的玩家
-     * @return 成功为 {@code 1}
-     */
-    public static int switchStorageMode(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageLinks(runtime).switchStorageMode(player);
-    }
-
-    /**
-     * 仓库 toggle：ME 或容器按当前模式处理；容器连锁按整组 toggle。
+     * 仓库 toggle：绑到 ME 锚点，或对着同一个方块再点一次解绑。
      *
      * @param player 发起请求的玩家
      * @param pos    目标方块
-     * @param chain  是否连锁
      * @return 变更数量
      */
-    public static int toggleStorage(ServerPlayer player, BlockPos pos, boolean chain) {
+    public static int toggleStorage(ServerPlayer player, BlockPos pos) {
         FactoryRuntime runtime = FactoryRuntime.get();
         if (runtime == null) {
             return notStarted(player);
         }
-        return storageLinks(runtime).toggleStorage(player, pos, chain);
+        return storageLinks(runtime).toggleStorage(player, pos);
     }
 
     /**

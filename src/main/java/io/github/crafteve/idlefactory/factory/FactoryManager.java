@@ -39,8 +39,7 @@ public final class FactoryManager {
         this.byId.clear();
         this.byOwner.clear();
         for (FactoryRecord record : records) {
-            FactoryConfig config = new FactoryConfig(record.owner(), record.storageMode(),
-                    record.anchor());
+            FactoryConfig config = new FactoryConfig(record.owner(), record.anchor());
             Factory factory = new Factory(record.id(), config);
             for (Node node : record.nodes()) {
                 NodeLibrary.Result added = factory.restoreNode(node);
@@ -94,8 +93,7 @@ public final class FactoryManager {
     public List<FactoryRecord> toRecords() {
         return this.byId.values().stream()
                 .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
-                        factory.config().storageAnchor(), factory.config().storageMode(),
-                        factory.config().nodes().all()))
+                        factory.config().storageAnchor(), factory.config().nodes().all()))
                 .toList();
     }
 

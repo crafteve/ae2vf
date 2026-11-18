@@ -21,7 +21,6 @@ import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.observation.ObservationService;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
-import io.github.crafteve.idlefactory.storage.StorageMode;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -138,7 +137,6 @@ public final class FactoryNodeSnapshotBuilder {
         Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
                 NodeStatusResolver.groupByNode(machineViews);
         List<NodeView> nodes = new ArrayList<>(factory.config().nodes().size());
-        boolean meStorage = factory.config().storageMode() == StorageMode.ME;
         boolean storageOnline = factory.live().storageOnline();
         for (Node node : factory.config().nodes().all()) {
             List<FactorySnapshotBuilder.MachineView> views =
@@ -160,7 +158,7 @@ public final class FactoryNodeSnapshotBuilder {
                         : new MemberView(machine.id(), machine.block(), view.blockId(),
                                 view.health(), view.probed(), view.stale()));
             }
-            boolean available = meStorage && storageOnline && status.health() != NodeHealth.OFFLINE;
+            boolean available = storageOnline && status.health() != NodeHealth.OFFLINE;
             NodeRuntime runtime = nodeManager == null ? null : nodeManager.node(node.id());
             // 规则里只有自动补的 FE 输入规则：这种节点删除不需要二次确认。
             // 样板不算玩家配置——删节点时样板会退回玩家背包，不会丢。

@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
@@ -59,7 +59,7 @@ public final class WandDraftCodec {
      * @return 加与删各自的数量上限
      */
     public static int draftLimit() {
-        return ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode());
+        return ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
     }
 
     /**

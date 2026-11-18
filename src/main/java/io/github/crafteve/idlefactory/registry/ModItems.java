@@ -4,7 +4,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
 import io.github.crafteve.idlefactory.item.FactoryPassiveIoTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
-import io.github.crafteve.idlefactory.item.StorageBindingWandItem;
+import io.github.crafteve.idlefactory.item.MeBindingWandItem;
 
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.Item;
@@ -36,10 +36,10 @@ public final class ModItems {
             ITEMS.register("machine_binding_wand",
                     () -> new MachineBindingWandItem(unstackable()));
 
-    /** 存储绑定杖。 */
-    public static final DeferredHolder<Item, StorageBindingWandItem> STORAGE_BINDING_WAND =
-            ITEMS.register("storage_binding_wand",
-                    () -> new StorageBindingWandItem(unstackable()));
+    /** ME 绑定杖。 */
+    public static final DeferredHolder<Item, MeBindingWandItem> ME_BINDING_WAND =
+            ITEMS.register("me_binding_wand",
+                    () -> new MeBindingWandItem(unstackable()));
 
     /**
      * 全部物品共用的属性：不可堆叠，且不设置耐久。

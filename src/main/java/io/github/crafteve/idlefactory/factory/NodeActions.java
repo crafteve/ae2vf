@@ -6,16 +6,27 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.io.IoSide;
+
 import io.github.crafteve.idlefactory.machine.MatchMode;
+
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
+
 import io.github.crafteve.idlefactory.io.BlockingMode;
+
 import io.github.crafteve.idlefactory.io.DispatchMode;
+
 import io.github.crafteve.idlefactory.node.Multiplier;
+
 import io.github.crafteve.idlefactory.node.MultiplierMode;
+
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
+
 import io.github.crafteve.idlefactory.node.NodeLibrary;
+
 import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 import appeng.api.stacks.AEKey;
@@ -171,7 +182,7 @@ public final class NodeActions {
         if (runtime == null) {
             return Result.err("Idle Factory 尚未启动（服务端未就绪）");
         }
-        int maxLength = FactoryLimitsConfig.maxNameLength();
+        int maxLength = IdleFactoryConfig.maxNameLength();
         String next = raw == null ? "" : raw.trim();
         if (next.length() > maxLength) {
             return Result.err("名字最多 " + maxLength + " 个字符");
@@ -218,7 +229,7 @@ public final class NodeActions {
         }
         NodeIoGroup io = ioFound.get();
         List<ResourceSpec> rules = rules(io, side);
-        int maxRules = FactoryLimitsConfig.maxRulesPerSide();
+        int maxRules = IdleFactoryConfig.maxRulesPerSide();
         if (rules.size() >= maxRules) {
             return Result.err(sideName(side) + "已达上限 " + maxRules + " 条");
         }
@@ -296,7 +307,7 @@ public final class NodeActions {
             return Result.err(sideName(from) + "里没有 " + key.getDisplayName().getString());
         }
         List<ResourceSpec> target = rules(io, to);
-        int maxRules = FactoryLimitsConfig.maxRulesPerSide();
+        int maxRules = IdleFactoryConfig.maxRulesPerSide();
         if (target.size() >= maxRules) {
             return Result.err(sideName(to) + "已达上限 " + maxRules + " 条");
         }

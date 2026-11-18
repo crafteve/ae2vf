@@ -26,7 +26,6 @@ final class FactoryNodeModel {
     private final FactoryGuiTheme theme;
     private List<FactoryNodeSnapshotBuilder.NodeView> nodes = List.of();
     private boolean hasFactory;
-    private boolean meStorage;
     private boolean storageOnline;
     private FactorySearchQuery query = FactorySearchQuery.EMPTY;
     /** 当前排序上下文：档位、方向与玩家位置。 */
@@ -80,7 +79,6 @@ final class FactoryNodeModel {
      */
     void accept(FactoryNodeTableS2C payload) {
         this.hasFactory = payload.hasFactory();
-        this.meStorage = payload.meStorage();
         this.storageOnline = payload.storageOnline();
         this.nodes = payload.nodes();
         rebuild();
@@ -131,11 +129,6 @@ final class FactoryNodeModel {
     /** 服务端是否已经有工厂。 */
     boolean hasFactory() {
         return this.hasFactory;
-    }
-
-    /** 仓库是否是 ME 模式。 */
-    boolean meStorage() {
-        return this.meStorage;
     }
 
     /** 仓库是否在线。 */

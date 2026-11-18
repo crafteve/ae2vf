@@ -86,9 +86,9 @@ final class FactoryNodeProbe {
      * @param screen 屏幕
      */
     static void logTable(FactoryNodeScreen screen) {
-        IdleFactory.LOGGER.info("[ui-probe] node table rows={} hasFactory={} meStorage={}",
+        IdleFactory.LOGGER.info("[ui-probe] node table rows={} hasFactory={} storageOnline={}",
                 screen.model().rows().size(), screen.model().hasFactory(),
-                screen.model().meStorage());
+                screen.model().storageOnline());
         for (int i = 0; i < screen.model().rows().size(); i++) {
             NodeRow row = screen.model().rows().get(i);
             IdleFactory.LOGGER.info("[ui-probe] node[{}] {} status={} members={} rules={} "

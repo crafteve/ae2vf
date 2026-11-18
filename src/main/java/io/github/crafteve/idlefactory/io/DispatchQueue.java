@@ -153,11 +153,11 @@ public final class DispatchQueue {
      * <p>供删节点与以后的手动「清空队列」按钮用。退回的是每行剩余量（含半份里没写进去的
      * 部分），已经进机器的部分不退。</p>
      *
-     * @param network 仓库
+     * @param network 仓库；离线时为 {@code null}，整条队列按丢弃处理
      * @param now     当前游戏时间
      * @return 退回报告
      */
-    public RefundReport refundAll(MEStorage network, long now) {
+    public RefundReport refundAll(@Nullable MEStorage network, long now) {
         int orderCount = this.orders.size();
         int lineCount = 0;
         long lost = 0L;
@@ -186,7 +186,11 @@ public final class DispatchQueue {
     /**
      * 一次退回；网络不收时返回 0，不抛异常。
      */
-    private long refund(MEStorage network, AEKey key, long amount) {
+    private long refund(@Nullable MEStorage network, AEKey key, long amount) {
+        if (network == null) {
+            // 仓库离线：没有可退回的目标，按丢弃记账，由调用方汇总记日志
+            return 0L;
+        }
         try {
             return network.insert(key, amount, appeng.api.config.Actionable.MODULATE,
                     AeKeySupport.SOURCE);

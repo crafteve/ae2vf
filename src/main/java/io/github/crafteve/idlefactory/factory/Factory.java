@@ -4,11 +4,10 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.storage.StorageMode;
-import io.github.crafteve.idlefactory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
 /**
  * 一个工厂实例：id + 配置 + 运行时。
@@ -19,7 +18,7 @@ import io.github.crafteve.idlefactory.storage.StorageResolver;
 public final class Factory {
     /** 工厂唯一 id。 */
     private final UUID id;
-    /** 写档部分：拥有者、仓库地址与模式、节点库。 */
+    /** 写档部分：拥有者、仓库锚点、节点库。 */
     private final FactoryConfig config;
     /** 运行时部分：解析出的仓库、在线标记、诊断计数。 */
     private final FactoryLive live = new FactoryLive();
@@ -49,23 +48,14 @@ public final class Factory {
     }
 
     /**
-     * 绑定仓库地址并立即解析一次。
+     * 绑定仓库锚点并立即解析一次。
      *
-     * @param anchor   新地址；{@code null} 表示解绑
+     * @param anchor   新锚点；{@code null} 表示解绑
      * @param resolver 仓库解析器；{@code null} 表示运行时未就绪
      */
-    public void bindStorage(@Nullable StorageAnchor anchor, @Nullable StorageResolver resolver) {
+    public void bindStorage(@Nullable BlockKey anchor, @Nullable MeStorageResolver resolver) {
         this.config.setStorageAnchor(anchor);
-        this.live.refresh(this.config.storageAnchor(), resolver);
-    }
-
-    /**
-     * 改仓库接入模式。调用方负责保证当前地址为空。
-     *
-     * @param mode 新模式
-     */
-    void setStorageMode(StorageMode mode) {
-        this.config.setStorageMode(mode);
+        this.live.refresh(anchor, resolver);
     }
 
     /**
@@ -79,12 +69,12 @@ public final class Factory {
     }
 
     /**
-     * 重新解析仓库地址。定时刷新与手动刷新都走这里。
+     * 重新解析仓库锚点。定时刷新与手动刷新都走这里。
      *
      * @param resolver 仓库解析器
      * @return 在线状态是否变化
      */
-    public boolean refreshStorage(@Nullable StorageResolver resolver) {
+    public boolean refreshStorage(@Nullable MeStorageResolver resolver) {
         return this.live.refresh(this.config.storageAnchor(), resolver);
     }
 }

@@ -1,29 +1,54 @@
 package io.github.crafteve.idlefactory.network;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandCommitC2S;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandCommitS2C;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandToggleC2S;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandToggleS2C;
 
 import net.neoforged.bus.api.IEventBus;
@@ -40,13 +65,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "36";
+    public static final String PROTOCOL_VERSION = "37";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
      *
      * <p>它不是玩法上限：解码时用 {@code min(有效配置值, HARD_WIRE_ENTRIES)}，防止恶意
-     * 超大包把服务端内存打爆。玩法上限在 {@code FactoryLimitsConfig}。</p>
+     * 超大包把服务端内存打爆。玩法上限在 {@code IdleFactoryConfig}。</p>
      */
     public static final int HARD_WIRE_ENTRIES = 32768;
 

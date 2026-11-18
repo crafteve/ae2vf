@@ -4,7 +4,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 
 /**
@@ -96,15 +98,15 @@ final class NodeLibraryService {
     private static NodeLibrary.Result checkLimits(Factory factory, Node node) {
         var nodes = factory.config().nodes();
         boolean replacing = nodes.byId(node.id()).isPresent();
-        if (!replacing && nodes.size() + 1 > FactoryLimitsConfig.maxNodes()) {
+        if (!replacing && nodes.size() + 1 > IdleFactoryConfig.maxNodes()) {
             return NodeLibrary.Result.FULL;
         }
-        if (node.machineCount() > FactoryLimitsConfig.maxMachinesPerNode()) {
+        if (node.machineCount() > IdleFactoryConfig.maxMachinesPerNode()) {
             return NodeLibrary.Result.FULL;
         }
         Node old = nodes.byId(node.id()).orElse(null);
         int machineDelta = node.machineCount() - (old == null ? 0 : old.machineCount());
-        if (nodes.totalMachineCount() + machineDelta > FactoryLimitsConfig.maxTotalMachines()) {
+        if (nodes.totalMachineCount() + machineDelta > IdleFactoryConfig.maxTotalMachines()) {
             return NodeLibrary.Result.FULL;
         }
         return null;

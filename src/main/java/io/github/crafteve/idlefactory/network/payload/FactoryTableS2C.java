@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientFactoryTableHandler;
-import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.io.IoReason;
@@ -116,13 +116,13 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxTotalMachines()),
+        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines()),
                 "machines");
         List<FactorySnapshotBuilder.MachineView> machines = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             machines.add(readMachine(buf));
         }
-        int statusCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes()),
+        int statusCount = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxNodes()),
                 "node statuses");
         List<NodeStatusEntry> nodeStatuses = new ArrayList<>(statusCount);
         for (int i = 0; i < statusCount; i++) {
@@ -210,7 +210,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<IoReason> readReasons(RegistryFriendlyByteBuf buf, int expected) {
-        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxRulesPerSide()),
+        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxRulesPerSide()),
                 "rule reasons");
         List<IoReason> reasons = new ArrayList<>(expected);
         for (int i = 0; i < count; i++) {
@@ -231,7 +231,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<Long> readRates(RegistryFriendlyByteBuf buf, int expected) {
-        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxRulesPerSide()),
+        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxRulesPerSide()),
                 "rule rates");
         List<Long> rates = new ArrayList<>(expected);
         for (int i = 0; i < count; i++) {
@@ -259,7 +259,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static List<ResourceSpec> readRules(RegistryFriendlyByteBuf buf) {
-        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxRulesPerSide()), "rules");
+        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxRulesPerSide()), "rules");
         List<ResourceSpec> rules = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             AEKey key = ResourceKeyCodec.read(buf);

@@ -3,7 +3,7 @@
   "item.idlefactory.passive_io_terminal": "Passive IO Management Terminal",
   "item.idlefactory.node_terminal": "Node Management Terminal",
   "item.idlefactory.machine_binding_wand": "Machine Binding Wand",
-  "item.idlefactory.storage_binding_wand": "Storage Binding Wand",
+  "item.idlefactory.me_binding_wand": "ME Binding Wand",
   "jei.idlefactory.fe.info.1": "FE (Forge Energy)",
   "jei.idlefactory.fe.info.2": "Energy transferred between storage and machines.",
   "jei.idlefactory.fe.info.3": "FE in AE2 storage is provided by Applied Flux; without it, FE only uses block containers.",

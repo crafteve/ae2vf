@@ -17,26 +17,47 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
+
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
+
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+
 import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+
 import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
+
 import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
+
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
+
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
+
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
+
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+
 import io.github.crafteve.idlefactory.client.wand.WandLinks;
+
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
+
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
+
 import io.github.crafteve.idlefactory.menu.FactorySortMode;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -521,7 +542,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
                 FactoryGuiTheme.current(), Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
         this.renameBox.setValue(node.view().name() == null ? "" : node.view().name());
-        this.renameBox.setMaxLength(io.github.crafteve.idlefactory.factory.FactoryLimitsConfig.maxNameLength());
+        this.renameBox.setMaxLength(io.github.crafteve.idlefactory.config.IdleFactoryConfig.maxNameLength());
         this.renameBox.setFocused(true);
         // 搜索框让出焦点，避免两个输入框的焦点框同时亮着。
         if (this.searchBox != null) {

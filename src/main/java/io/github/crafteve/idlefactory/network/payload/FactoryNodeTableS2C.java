@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientNodeTableHandler;
-import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.io.BlockingMode;
@@ -38,12 +38,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param containerId   菜单容器 id
  * @param hasFactory    玩家是否已有工厂
- * @param meStorage     仓库是否是 ME 模式
  * @param storageOnline 仓库是否在线
  * @param nodes         节点视图
  */
-public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean meStorage,
-        boolean storageOnline, List<FactoryNodeSnapshotBuilder.NodeView> nodes)
+public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean storageOnline,
+        List<FactoryNodeSnapshotBuilder.NodeView> nodes)
         implements CustomPacketPayload {
 
     /** 包类型：{@code idlefactory:node_table}。 */
@@ -60,7 +59,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
 
     /** 没有工厂时的空表。 */
     public static FactoryNodeTableS2C empty(int containerId) {
-        return new FactoryNodeTableS2C(containerId, false, false, false, List.of());
+        return new FactoryNodeTableS2C(containerId, false, false, List.of());
     }
 
     @Override
@@ -81,7 +80,6 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
     private static void write(RegistryFriendlyByteBuf buf, FactoryNodeTableS2C payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeBoolean(payload.hasFactory());
-        buf.writeBoolean(payload.meStorage());
         buf.writeBoolean(payload.storageOnline());
         buf.writeVarInt(payload.nodes().size());
         for (FactoryNodeSnapshotBuilder.NodeView node : payload.nodes()) {
@@ -92,14 +90,13 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
     private static FactoryNodeTableS2C read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
-        boolean meStorage = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int count = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxNodes()), "nodes");
+        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
         List<FactoryNodeSnapshotBuilder.NodeView> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
         }
-        return new FactoryNodeTableS2C(containerId, hasFactory, meStorage, storageOnline, nodes);
+        return new FactoryNodeTableS2C(containerId, hasFactory, storageOnline, nodes);
     }
 
     private static void writeNode(RegistryFriendlyByteBuf buf,
@@ -142,7 +139,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean m
         Multiplier multiplier = new Multiplier(readEnum(buf, MultiplierMode.values(), "multiplier mode"),
                 buf.readVarInt());
         DispatchMode dispatch = readEnum(buf, DispatchMode.values(), "dispatch");
-        int memberCount = readCount(buf, ModNetwork.wireLimit(FactoryLimitsConfig.maxMachinesPerNode()),
+        int memberCount = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode()),
                 "members");
         List<FactoryNodeSnapshotBuilder.MemberView> members = new ArrayList<>(memberCount);
         for (int i = 0; i < memberCount; i++) {

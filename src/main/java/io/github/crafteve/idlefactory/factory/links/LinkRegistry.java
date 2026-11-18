@@ -14,10 +14,6 @@ import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.storage.StorageAnchor;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -71,13 +67,9 @@ public final class LinkRegistry {
                     put(factory.id(), LinkRole.MACHINE, block.dimension(), block.pos());
                 }
             }
-            StorageAnchor anchor = factory.config().storageAnchor();
-            if (anchor instanceof MeAnchor me) {
-                put(factory.id(), LinkRole.STORAGE, me.dimension(), me.pos());
-            } else if (anchor instanceof ContainerAnchor containers) {
-                for (ContainerRef ref : containers.containers()) {
-                    put(factory.id(), LinkRole.STORAGE, ref.dimension(), ref.pos());
-                }
+            BlockKey anchor = factory.config().storageAnchor();
+            if (anchor != null) {
+                put(factory.id(), LinkRole.STORAGE, anchor.dimension(), anchor.pos());
             }
         }
     }

@@ -7,18 +7,26 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.io.IoRunner;
+
 import io.github.crafteve.idlefactory.location.BlockKey;
+
 import io.github.crafteve.idlefactory.machine.Machine;
+
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+
 import io.github.crafteve.idlefactory.node.NodeManager;
+
 import io.github.crafteve.idlefactory.node.NodeTypeResolver;
+
 import io.github.crafteve.idlefactory.observation.ObservationService;
+
 import io.github.crafteve.idlefactory.observation.Health;
+
 import io.github.crafteve.idlefactory.observation.NodeHealth;
-import io.github.crafteve.idlefactory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.storage.ContainerRef;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -109,14 +117,6 @@ final class FactoryObservationRunner {
                     }
                 }
             }
-            // 仓库容器和机器共用同一张方块级观测
-            if (factory.config().storageAnchor() instanceof ContainerAnchor anchor) {
-                for (ContainerRef container : anchor.containers()) {
-                    if (this.seen.add(container.blockKey())) {
-                        this.restKeys.add(container.blockKey());
-                    }
-                }
-            }
         }
         this.orderedKeys.addAll(this.dirtyKeys);
         this.orderedKeys.addAll(this.onlineKeys);
@@ -126,7 +126,7 @@ final class FactoryObservationRunner {
     /** 解析每个节点的健康与类型迁移。 */
     private void resolveNodes() {
         long now = this.observations.currentTick();
-        long staleTicks = FactoryLimitsConfig.staleHealthTicks();
+        long staleTicks = IdleFactoryConfig.staleHealthTicks();
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 Node current = node;

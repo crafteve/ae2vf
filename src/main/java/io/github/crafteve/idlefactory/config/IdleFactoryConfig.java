@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory;
+package io.github.crafteve.idlefactory.config;
 
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
@@ -17,7 +17,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * {@link #observationBlockBudgetPerTick} 与 {@link #staleHealthTicks} 是调优项，
  * 不是玩法上限，默认值非 -1。</p>
  */
-public final class FactoryLimitsConfig {
+public final class IdleFactoryConfig {
     /** 节点数硬上限。 */
     public static final int HARD_MAX_NODES = NodeLibrary.HARD_MAX_NODES;
     /** 单节点机器数硬上限。 */
@@ -77,7 +77,7 @@ public final class FactoryLimitsConfig {
     /** COMMON 配置规格；由 {@code IdleFactory} 注册。 */
     public static final ModConfigSpec SPEC = BUILDER.build();
 
-    private FactoryLimitsConfig() {
+    private IdleFactoryConfig() {
         // 纯配置容器，禁止实例化
     }
 

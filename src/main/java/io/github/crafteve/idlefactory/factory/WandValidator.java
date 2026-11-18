@@ -9,13 +9,21 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
+
 import io.github.crafteve.idlefactory.location.BlockKey;
+
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
+
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
+
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
+
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -175,14 +183,14 @@ final class WandValidator {
         }
         int baseMachines = base == null ? 0 : base.machineCount();
         int finalMachines = baseMachines - draft.removed().size() + draft.added().size();
-        if (base == null && factory.config().nodes().size() + 1 > FactoryLimitsConfig.maxNodes()) {
+        if (base == null && factory.config().nodes().size() + 1 > IdleFactoryConfig.maxNodes()) {
             issues.add(WandIssue.global(WandFailure.LIMIT_NODES));
         }
-        if (finalMachines > FactoryLimitsConfig.maxMachinesPerNode()) {
+        if (finalMachines > IdleFactoryConfig.maxMachinesPerNode()) {
             issues.add(WandIssue.global(WandFailure.LIMIT_MACHINES));
         }
         if (factory.config().nodes().totalMachineCount() - baseMachines + finalMachines
-                > FactoryLimitsConfig.maxTotalMachines()) {
+                > IdleFactoryConfig.maxTotalMachines()) {
             issues.add(WandIssue.global(WandFailure.LIMIT_MACHINES));
         }
         if (base != null && finalMachines == 0) {

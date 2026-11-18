@@ -6,18 +6,25 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
+
 import io.github.crafteve.idlefactory.io.IoForm;
+
 import io.github.crafteve.idlefactory.io.IoRunner;
+
 import io.github.crafteve.idlefactory.io.PortExecutor;
+
 import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
+
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
+
 import io.github.crafteve.idlefactory.node.NodeManager;
+
 import io.github.crafteve.idlefactory.observation.ObservationService;
-import io.github.crafteve.idlefactory.storage.ContainerStorageResolver;
-import io.github.crafteve.idlefactory.storage.DispatchingStorageResolver;
-import io.github.crafteve.idlefactory.storage.StorageResolver;
-import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
+
+import io.github.crafteve.idlefactory.storage.MeStorageResolver;
+
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
 import net.minecraft.server.MinecraftServer;
@@ -81,7 +88,7 @@ public final class FactoryRuntime {
     private ObservationService observations;
     /** 仓库解析器：启动时创建，供工厂定时刷新与指令即时刷新共用。 */
     @Nullable
-    private StorageResolver storageResolver;
+    private MeStorageResolver storageResolver;
     /** 每个玩家已经接受过的最大草稿提交序号；成功提交才推进，下线即清。 */
     private final Map<UUID, Long> lastAcceptedSeq = new HashMap<>();
 
@@ -155,7 +162,7 @@ public final class FactoryRuntime {
 
     /** 仓库解析器；启动完成后非 null。 */
     @Nullable
-    public StorageResolver storageResolver() {
+    public MeStorageResolver storageResolver() {
         return this.storageResolver;
     }
 
@@ -290,12 +297,9 @@ public final class FactoryRuntime {
 
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
-        // 观测先于仓库解析：容器仓库要借观测做面窄化与可用性判断
         this.observations = new ObservationService(this.server,
-                FactoryLimitsConfig::observationBlockBudgetPerTick);
-        this.storageResolver = new DispatchingStorageResolver(
-                new Ae2StorageResolver(this.server),
-                new ContainerStorageResolver(this.server, this.observations));
+                IdleFactoryConfig::observationBlockBudgetPerTick);
+        this.storageResolver = new MeStorageResolver(this.server);
         this.manager.loadFrom(this.store.records());
         this.links.rebuild(this.manager);
         for (Factory factory : this.manager.all()) {

@@ -106,7 +106,7 @@ final class FactoryNodeTooltip {
         List<Component> lines = new ArrayList<>(3);
         lines.add(Component.literal(label).withStyle(ChatFormatting.BOLD));
         if (!node.view().provider().available()) {
-            lines.add(Component.literal("不可用：非 ME / 仓库离线 / 失联")
+            lines.add(Component.literal("不可用：仓库离线 / 节点失联")
                     .withStyle(ChatFormatting.GRAY));
             return lines;
         }

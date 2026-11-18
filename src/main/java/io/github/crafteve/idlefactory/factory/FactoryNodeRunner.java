@@ -8,14 +8,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
+
 import io.github.crafteve.idlefactory.node.Node;
+
 import io.github.crafteve.idlefactory.node.NodeManager;
+
 import io.github.crafteve.idlefactory.observation.ObservationService;
+
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+
 import io.github.crafteve.idlefactory.observation.NodeHealth;
-import io.github.crafteve.idlefactory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.storage.StorageMode;
+
+import io.github.crafteve.idlefactory.location.BlockKey;
+
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import appeng.api.networking.IGridNode;
@@ -26,7 +33,7 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * 虚拟节点的每 tick 推进：对账（该建的建、该拆的拆）与节点 tick。
  *
- * <p>对账只在运行时这一侧拼期望集合：节点层不认识工厂，也不需要知道仓库模式。锚点方块不在、
+ * <p>对账只在运行时这一侧拼期望集合：节点层不认识工厂，只拿锚点节点。锚点方块不在、
  * 区块没加载或没有 ME 节点时，这家工厂不贡献任何期望节点，已有节点会被拆掉；锚点回来后
  * 再按预算重建。</p>
  *
@@ -79,16 +86,14 @@ final class FactoryNodeRunner {
     }
 
     /**
-     * 虚拟节点对账：把「ME 模式 + 锚点可解析」的工厂机器拼成期望集合。
+     * 虚拟节点对账：把「锚点可解析」的工厂机器拼成期望集合。
      */
     private void reconcile() {
         List<NodeManager.Spec> specs = new ArrayList<>();
         Map<UUID, Set<UUID>> onlineMachines = new HashMap<>();
         for (Factory factory : this.manager.all()) {
-            if (factory.config().storageMode() != StorageMode.ME) {
-                continue;
-            }
-            if (!(factory.config().storageAnchor() instanceof MeAnchor anchor)) {
+            BlockKey anchor = factory.config().storageAnchor();
+            if (anchor == null) {
                 continue;
             }
             ServerLevel level = this.server.getLevel(anchor.dimension());
@@ -100,7 +105,7 @@ final class FactoryNodeRunner {
                 continue;
             }
             long now = this.observations.currentTick();
-            long staleTicks = FactoryLimitsConfig.staleHealthTicks();
+            long staleTicks = IdleFactoryConfig.staleHealthTicks();
             for (Node node : factory.config().nodes().all()) {
                 // 健康只由 NodeHealthResolver 一处推导：这里不再自己逐方块判 PRESENT。
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(node,

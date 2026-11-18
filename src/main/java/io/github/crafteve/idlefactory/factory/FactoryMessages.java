@@ -1,6 +1,5 @@
 package io.github.crafteve.idlefactory.factory;
 
-import io.github.crafteve.idlefactory.storage.StorageMode;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -149,16 +148,6 @@ public final class FactoryMessages {
      */
     public static String patternSuffix(int returned) {
         return returned > 0 ? "，退回 " + returned + " 块样板" : "";
-    }
-
-    /**
-     * 仓库模式的中文名。
-     *
-     * @param mode 模式
-     * @return “ME”或“容器”
-     */
-    public static String modeLabel(StorageMode mode) {
-        return mode == StorageMode.ME ? "ME" : "容器";
     }
 
     /**

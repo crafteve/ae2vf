@@ -3,7 +3,7 @@
   "item.idlefactory.passive_io_terminal": "被动 IO 管理终端",
   "item.idlefactory.node_terminal": "节点管理终端",
   "item.idlefactory.machine_binding_wand": "机器绑定杖",
-  "item.idlefactory.storage_binding_wand": "存储绑定杖",
+  "item.idlefactory.me_binding_wand": "ME 绑定杖",
   "jei.idlefactory.fe.info.1": "FE（Forge Energy）",
   "jei.idlefactory.fe.info.2": "仓库与机器之间搬运的能量单位。",
   "jei.idlefactory.fe.info.3": "AE2 仓库的 FE 由 Applied Flux 提供；未安装时 FE 走方块容器。",
