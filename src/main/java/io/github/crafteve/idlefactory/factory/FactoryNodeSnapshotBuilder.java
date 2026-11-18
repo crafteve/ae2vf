@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
+import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
@@ -130,7 +130,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @return 节点视图
      */
     public static List<NodeView> nodes(Factory factory, @Nullable ObservationReader observations,
-            @Nullable IoForm form, @Nullable LiveNodeLibrary nodeManager, long now) {
+            @Nullable IoForm form, @Nullable LiveNodeApply nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
         // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。

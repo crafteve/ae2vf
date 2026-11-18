@@ -25,6 +25,8 @@ import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
+import io.github.crafteve.idlefactory.runtime.LiveNodeRunner;
 import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.observation.Health;
@@ -62,7 +64,8 @@ final class FactoryRunner implements ObservationChangeListener {
     private final ObservationRunner observationRunner;
     private final ObservationReader observations;
     private final IoRunner nodeIoRunner;
-    private final LiveNodeLibrary nodeManager;
+    private final LiveNodeApply nodeApply;
+    private final LiveNodeRunner nodeRunner;
     private final MachineStateLibrary machineStates;
     private final IoFormBuilder formBuilder;
     private final MeStorageResolver storageResolver;
@@ -77,7 +80,8 @@ final class FactoryRunner implements ObservationChangeListener {
      * @param observationRunner 观测调度者
      * @param observations      观测只读视图
      * @param nodeIoRunner      执行编排
-     * @param nodeManager       虚拟节点管理器
+     * @param nodeApply         虚拟节点建拆
+     * @param nodeRunner        节点对账与推进
      * @param machineStates     机器状态集合
      * @param formBuilder       表单生成器
      * @param storageResolver   仓库解析器
@@ -85,7 +89,8 @@ final class FactoryRunner implements ObservationChangeListener {
      */
     FactoryRunner(MinecraftServer server, FactoryManager manager,
             ObservationRunner observationRunner, ObservationReader observations,
-            IoRunner nodeIoRunner, LiveNodeLibrary nodeManager, MachineStateLibrary machineStates,
+            IoRunner nodeIoRunner, LiveNodeApply nodeApply, LiveNodeRunner nodeRunner,
+            MachineStateLibrary machineStates,
             IoFormBuilder formBuilder, MeStorageResolver storageResolver,
             FactoryNoticeHandler notices) {
         this.server = server;
@@ -93,7 +98,8 @@ final class FactoryRunner implements ObservationChangeListener {
         this.observationRunner = observationRunner;
         this.observations = observations;
         this.nodeIoRunner = nodeIoRunner;
-        this.nodeManager = nodeManager;
+        this.nodeApply = nodeApply;
+        this.nodeRunner = nodeRunner;
         this.machineStates = machineStates;
         this.formBuilder = formBuilder;
         this.storageResolver = storageResolver;
@@ -110,7 +116,7 @@ final class FactoryRunner implements ObservationChangeListener {
         this.resolveNodes();
 
         this.reconcileNodes();
-        this.nodeManager.tick();
+        this.nodeRunner.tick();
 
         if (this.tickCounter % STORAGE_REFRESH_INTERVAL == 0) {
             for (Factory factory : this.manager.all()) {
@@ -177,7 +183,7 @@ final class FactoryRunner implements ObservationChangeListener {
                 }
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,
                         this.observations, now, staleTicks);
-                this.nodeManager.setAvailable(current.id(),
+                this.nodeApply.setAvailable(current.id(),
                         snapshot.health() != NodeHealth.OFFLINE);
             }
         }
@@ -186,7 +192,7 @@ final class FactoryRunner implements ObservationChangeListener {
     /** 虚拟节点对账：到点或收到请求才做。 */
     private void reconcileNodes() {
         if ((this.tickCounter - 1) % NODE_RECONCILE_INTERVAL != 0
-                && !this.nodeManager.isReconcileRequested()) {
+                && !this.nodeApply.isReconcileRequested()) {
             return;
         }
         try {
@@ -221,7 +227,7 @@ final class FactoryRunner implements ObservationChangeListener {
                     onlineMachines.put(node.id(), online);
                 }
             }
-            this.nodeManager.reconcile(specs, onlineMachines);
+            this.nodeRunner.reconcile(specs, onlineMachines);
         } catch (RuntimeException e) {
             // 对账炸了不能让整个服务器 tick 跟着炸；下一轮对账会把状态补齐
             IdleFactory.LOGGER.warn("Idle Factory: 虚拟节点对账失败：{}", e.toString());
@@ -237,7 +243,7 @@ final class FactoryRunner implements ObservationChangeListener {
     private List<DispatchState> dispatchStates(Factory factory) {
         List<DispatchState> states = new ArrayList<>(factory.config().nodes().size());
         for (Node node : factory.config().nodes().all()) {
-            LiveNode runtime = this.nodeManager.node(node.id());
+            LiveNode runtime = this.nodeApply.node(node.id());
             if (runtime != null) {
                 states.add(runtime.dispatchState());
             }

@@ -1,21 +1,17 @@
 package io.github.crafteve.idlefactory.runtime;
 
-import java.util.ArrayDeque;
-import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.io.PortExecutor;
 
 import appeng.api.networking.IGridNode;
 
@@ -23,49 +19,34 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * 全部虚拟节点节点的对账表：该有的建出来，不该有的拆掉，其余每 tick 推一次。
+ * 活节点的索引：节点 id → 运行时节点。
  *
- * <p>键是节点 id：一个节点一个 AE2 节点 / PatternContainer，成员机器只是节点里的方块集合。
- * 它不认识 {@code Factory}，只吃运行时拼好的 {@link Spec}：这样节点层不反向依赖工厂层。
- * 建节点分帧（每 tick 上限 {@link #MAX_CREATES_PER_TICK}）。</p>
+ * <p>只存、只查、只 tick；建与拆在 {@link LiveNodeApply}，对账判定在 {@link LiveNodeRunner}。
+ * 它不认识 {@code Factory}，只吃 {@link Spec}，节点层不反向依赖工厂层。</p>
  */
 public final class LiveNodeLibrary {
-    /** 每 tick 最多建几个节点。 */
-    public static final int MAX_CREATES_PER_TICK = 128;
-
     private final MinecraftServer server;
-    /** 工厂共享的端口缓存；所有节点共用同一份，避免每个节点一套机器存储缓存。 */
-    private final PortExecutor ports;
-    /** 存档数据变化回调。 */
+    /** 存档数据变化回调：节点 tick 改动了运行时数据时触发。 */
     private final Runnable dataChanged;
     /** 节点告警出口。 */
     private final Consumer<Notice> notice;
     private final Map<UUID, LiveNode> nodes = new LinkedHashMap<>();
-    /** 待建节点；每次对账整体替换。 */
-    private final ArrayDeque<Spec> createQueue = new ArrayDeque<>();
     /** 工厂侧要求提前对账的标记。 */
     private boolean reconcileRequested;
-    /** 本轮到账的逐机器在线集合，建节点时用。 */
-    private final Map<UUID, Set<UUID>> onlineByNode = new HashMap<>();
 
     /**
      * @param server      服务端实例
-     * @param ports       工厂共享的端口缓存
      * @param dataChanged 存档数据变化回调
      * @param notice      节点告警出口
      */
-    public LiveNodeLibrary(MinecraftServer server, PortExecutor ports, Runnable dataChanged,
-            Consumer<Notice> notice) {
+    public LiveNodeLibrary(MinecraftServer server, Runnable dataChanged, Consumer<Notice> notice) {
         this.server = server;
-        this.ports = ports;
         this.dataChanged = dataChanged;
         this.notice = notice;
     }
 
     /**
      * 建节点需要的外部输入。
-     *
-     * <p>由运行时按「工厂是 ME 模式、锚点节点能解析出来」筛好后交进来，节点层不自己找锚点。</p>
      *
      * @param factoryId   所属工厂 id
      * @param node        节点记录
@@ -97,6 +78,11 @@ public final class LiveNodeLibrary {
         return this.reconcileRequested;
     }
 
+    /** 清掉对账请求。 */
+    void clearReconcileRequest() {
+        this.reconcileRequested = false;
+    }
+
     /** 当前节点数。 */
     public int size() {
         return this.nodes.size();
@@ -113,68 +99,47 @@ public final class LiveNodeLibrary {
         return this.nodes.get(nodeId);
     }
 
-    /**
-     * 对账：拆掉不该有的，排上该建的。
-     *
-     * <p>锚点节点实例变了、结构版本变了就整个重建——旧节点还挂在旧网格上，没法就地迁移。</p>
-     *
-     * @param specs          期望存在的节点
-     * @param onlineMachines 节点 id → 在线机器 id 集合
-     */
-    public void reconcile(List<Spec> specs, Map<UUID, Set<UUID>> onlineMachines) {
-        this.reconcileRequested = false;
-        this.onlineByNode.clear();
-        this.onlineByNode.putAll(onlineMachines);
-        Map<UUID, Spec> wanted = new LinkedHashMap<>();
-        for (Spec spec : specs) {
-            wanted.put(spec.node().id(), spec);
-        }
-
-        Iterator<Map.Entry<UUID, LiveNode>> iterator = this.nodes.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<UUID, LiveNode> entry = iterator.next();
-            Spec spec = wanted.get(entry.getKey());
-            if (spec == null || !entry.getValue().matches(spec)) {
-                try {
-                    entry.getValue().detach();
-                } catch (RuntimeException e) {
-                    entry.getValue().logThrottled(this.server.overworld().getGameTime(),
-                            "拆节点异常：" + e);
-                }
-                iterator.remove();
-            }
-        }
-
-        this.createQueue.clear();
-        for (Spec spec : wanted.values()) {
-            if (!this.nodes.containsKey(spec.node().id())) {
-                this.createQueue.add(spec);
-            }
-        }
-        for (Spec spec : wanted.values()) {
-            LiveNode node = this.nodes.get(spec.node().id());
-            if (node != null) {
-                try {
-                    // 名字 / 规则等非结构变化不重建节点，但要刷新到运行时。
-                    node.updateNode(spec.node());
-                    node.setAvailable(spec.available());
-                    node.setOnlineMachines(this.onlineByNode.getOrDefault(spec.node().id(),
-                            Set.of()));
-                } catch (RuntimeException e) {
-                    node.logThrottled(this.server.overworld().getGameTime(),
-                            "更新节点异常：" + e);
-                }
-            }
-        }
+    /** 是否已有该节点的运行时。 */
+    boolean contains(UUID nodeId) {
+        return this.nodes.containsKey(nodeId);
     }
 
-    /** 每 tick 推一次：先补建节点，再让每个节点收口自己的脏数据（投递与回收在执行层）。 */
-    public void tick() {
-        long now = this.server.overworld().getGameTime();
-        this.createQueued(now);
+    /** 全部节点的只读快照。 */
+    Collection<LiveNode> all() {
+        return List.copyOf(this.nodes.values());
+    }
 
+    /** 登记一个刚建好的节点。 */
+    void add(LiveNode node) {
+        this.nodes.put(node.node().id(), node);
+    }
+
+    /**
+     * 摘掉一个节点，不拆。
+     *
+     * @param nodeId 节点 id
+     * @return 被摘掉的节点；不存在时为 {@code null}
+     */
+    @Nullable
+    LiveNode removeRaw(UUID nodeId) {
+        return this.nodes.remove(nodeId);
+    }
+
+    /** 停机：摘掉全部节点并返回，由调用方统一 shutdown。 */
+    List<LiveNode> drain() {
+        List<LiveNode> remaining = new ArrayList<>(this.nodes.values());
+        this.nodes.clear();
+        return remaining;
+    }
+
+    /**
+     * 每 tick 让所有节点收口一次：投递与回收在执行层，这里只推进节点自身。
+     */
+    public void tickNodes() {
+        long now = this.server.overworld().getGameTime();
         boolean changed = false;
-        for (LiveNode node : this.nodes.values()) {
+        for (Iterator<LiveNode> it = this.nodes.values().iterator(); it.hasNext();) {
+            LiveNode node = it.next();
             try {
                 changed |= node.tick();
             } catch (RuntimeException e) {
@@ -188,62 +153,6 @@ public final class LiveNodeLibrary {
     }
 
     /**
-     * 拆掉一个节点的运行时，并把待投递队列还回网络；节点删除走这里。
-     *
-     * @param nodeId 节点 id
-     */
-    public void removeNode(UUID nodeId) {
-        LiveNode node = this.nodes.remove(nodeId);
-        if (node != null) {
-            try {
-                node.detachReturning();
-            } catch (RuntimeException e) {
-                node.logThrottled(this.server.overworld().getGameTime(), "拆节点异常：" + e);
-            }
-        }
-    }
-
-    /**
-     * 作废一个节点的样板缓存：下一 tick 重新解码并按当前倍率重新广告。
-     *
-     * <p>倍率变化必须走这里。只让 CPU 重读（{@code requestPatternUpdate}）读到的是旧缓存，
-     * 放大后的样板是在重建时才生成的。</p>
-     *
-     * @param nodeId 节点 id
-     */
-    public void markPatternsDirty(UUID nodeId) {
-        LiveNode node = this.nodes.get(nodeId);
-        if (node != null) {
-            node.markPatternsDirty();
-        }
-    }
-
-    /**
-     * 改名后刷新样板终端分组名。
-     *
-     * @param nodeId 节点 id
-     */
-    public void refreshName(UUID nodeId) {
-        LiveNode node = this.nodes.get(nodeId);
-        if (node != null) {
-            node.refreshName();
-        }
-    }
-
-    /**
-     * 更新一个节点的可用性；节点内机器出现 / 消失时由观测迁移驱动。
-     *
-     * @param nodeId    节点 id
-     * @param available 现在是否可用
-     */
-    public void setAvailable(UUID nodeId, boolean available) {
-        LiveNode node = this.nodes.get(nodeId);
-        if (node != null) {
-            node.setAvailable(available);
-        }
-    }
-
-    /**
      * 发一条节点告警给运行时。
      *
      * @param factoryId 工厂 id
@@ -252,55 +161,5 @@ public final class LiveNodeLibrary {
      */
     void report(UUID factoryId, UUID nodeId, String message) {
         this.notice.accept(new Notice(factoryId, nodeId, message));
-    }
-
-    /** 停机：拆掉全部节点，不碰存档数据。 */
-    public void destroyAll() {
-        this.createQueue.clear();
-        List<LiveNode> remaining = new ArrayList<>(this.nodes.values());
-        this.nodes.clear();
-        for (LiveNode node : remaining) {
-            try {
-                node.shutdown();
-            } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 停机拆节点失败 [{}]：{}",
-                        node.node().id(), e.toString());
-            }
-        }
-    }
-
-    /**
-     * 按预算建队列里的节点。
-     *
-     * @param now 当前游戏时间，告警节流用
-     */
-    private void createQueued(long now) {
-        int budget = MAX_CREATES_PER_TICK;
-        while (budget > 0 && !this.createQueue.isEmpty()) {
-            budget--;
-            Spec spec = this.createQueue.poll();
-            if (this.nodes.containsKey(spec.node().id())) {
-                continue;
-            }
-            LiveNode node;
-            try {
-                node = new LiveNode(this.server, spec.factoryId(), spec.node(),
-                        spec.anchor(), spec.anchorLevel(), spec.available(), this.ports, this.notice);
-            } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",
-                        spec.node().id(), e.toString());
-                continue;
-            }
-            node.setOnlineMachines(this.onlineByNode.getOrDefault(spec.node().id(), Set.of()));
-            try {
-                if (!node.attach(spec.anchor())) {
-                    continue;
-                }
-            } catch (RuntimeException e) {
-                node.logThrottled(now, "建节点异常：" + e);
-                continue;
-            }
-            this.nodes.put(spec.node().id(), node);
-        }
     }
 }

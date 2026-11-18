@@ -19,7 +19,9 @@ import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 
+import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
 import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
+import io.github.crafteve.idlefactory.runtime.LiveNodeRunner;
 
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.observation.ObservationRunner;
@@ -81,7 +83,9 @@ public final class FactoryLifecycle {
     /** 每 tick 的 IO 表单生成器。 */
     private final IoFormBuilder formBuilder = new IoFormBuilder();
     /** 虚拟机器节点：对账、分帧创建、每 tick 推进。 */
-    private final LiveNodeLibrary nodeManager;
+    private final LiveNodeLibrary nodeLibrary;
+    private final LiveNodeApply nodeApply;
+    private final LiveNodeRunner nodeRunner;
     /** 每 tick 编排器；启动完成（load）后非 null。 */
     @Nullable
     private FactoryRunner runner;
@@ -103,7 +107,9 @@ public final class FactoryLifecycle {
         this.server = server;
         this.ports = new PortExecutor(server);
         this.nodeIoRunner = new IoRunner(this.ports);
-        this.nodeManager = new LiveNodeLibrary(server, this.ports, this::markDirty, this::logNodeNotice);
+        this.nodeLibrary = new LiveNodeLibrary(server, this::markDirty, this::logNodeNotice);
+        this.nodeApply = new LiveNodeApply(server, this.ports, this.nodeLibrary);
+        this.nodeRunner = new LiveNodeRunner(this.nodeApply, this.nodeLibrary);
     }
 
     /**
@@ -127,7 +133,7 @@ public final class FactoryLifecycle {
             return;
         }
         runtime.save();
-        runtime.nodeManager.destroyAll();
+        runtime.nodeApply.destroyAll();
     }
 
     /** 服务器停止时调一次，把档案写回存档并丢掉内存状态。 */
@@ -218,8 +224,8 @@ public final class FactoryLifecycle {
     }
 
     /** 虚拟机器节点管理器。 */
-    public LiveNodeLibrary nodeManager() {
-        return this.nodeManager;
+    public LiveNodeApply nodeManager() {
+        return this.nodeApply;
     }
 
     /** 服务端实例。 */
@@ -250,7 +256,7 @@ public final class FactoryLifecycle {
         }
         this.occupancy.rebuild(this.occupancyEntries());
         // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
-        this.nodeManager.requestReconcile();
+        this.nodeApply.requestReconcile();
     }
 
     /**
@@ -361,7 +367,7 @@ public final class FactoryLifecycle {
             factory.refreshStorage(this.storageResolver);
         }
         this.runner = new FactoryRunner(this.server, this.manager, this.observationRunner,
-                this.observationReader, this.nodeIoRunner, this.nodeManager, this.machineStates,
+                this.observationReader, this.nodeIoRunner, this.nodeApply, this.nodeRunner, this.machineStates,
                 this.formBuilder, this.storageResolver, this.notices);
         this.observationRunner.register(this.runner);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
