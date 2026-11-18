@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
 
-import io.github.crafteve.idlefactory.factory.links.LinkRole;
+import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
@@ -51,6 +51,7 @@ import net.minecraft.server.level.ServerPlayer;
  */
 final class WandService {
     private final FactoryManager manager;
+    private final BlockOccupancyTable occupancy;
     @Nullable
     private final ObservationReader observations;
     private final NodeLibraryService nodeLibrary;
@@ -65,14 +66,15 @@ final class WandService {
      * @param machineLinks 节点拓扑变更出口
      * @param server       服务端
      */
-    WandService(FactoryManager manager, @Nullable ObservationReader observations,
-            NodeLibraryService nodeLibrary, MachineLinkService machineLinks,
-            MinecraftServer server) {
+    WandService(FactoryManager manager, BlockOccupancyTable occupancy,
+            @Nullable ObservationReader observations, NodeLibraryService nodeLibrary,
+            MachineLinkService machineLinks, MinecraftServer server) {
         this.manager = manager;
+        this.occupancy = occupancy;
         this.observations = observations;
         this.nodeLibrary = nodeLibrary;
         this.machineLinks = machineLinks;
-        this.validator = new WandValidator(manager, server);
+        this.validator = new WandValidator(occupancy, server);
         this.server = server;
     }
 
@@ -130,8 +132,8 @@ final class WandService {
             return new FactoryService.ChainResult(List.of(), WandFailure.NONE);
         }
         // BFS 的半径与数量上限按筛选前计算；这里只按占用表分流，过滤后不补位、不重扫。
-        LinkGate.Filter filter = LinkGate.of(this.manager).filter(factory.id(), LinkRole.MACHINE,
-                level.dimension(), found);
+        BlockOccupancyTable.Filter filter = this.occupancy.filter(factory.id(),
+                BlockOccupancyTable.Role.MACHINE, level.dimension(), found);
         List<BlockKey> blocks = new ArrayList<>(filter.open().size());
         for (BlockPos pos : filter.open()) {
             blocks.add(BlockKey.of(level.dimension(), pos));
@@ -327,8 +329,8 @@ final class WandService {
         if (!FactoryLinkFinder.isMachine(level, block.pos())) {
             return WandCommitOutcome.failure(WandFailure.NOT_A_MACHINE);
         }
-        if (LinkGate.of(this.manager).check(block, factory.id(), LinkRole.MACHINE).kind()
-                != LinkGate.ClaimCheck.Kind.FREE) {
+        if (this.occupancy.check(block, factory.id(), BlockOccupancyTable.Role.MACHINE).kind()
+                != BlockOccupancyTable.ClaimCheck.Kind.FREE) {
             return WandCommitOutcome.failure(WandFailure.BLOCK_CLAIMED);
         }
         ResourceLocation typeId = BuiltInRegistries.BLOCK.getKey(level.getBlockState(block.pos()).getBlock());

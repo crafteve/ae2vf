@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
-import io.github.crafteve.idlefactory.factory.links.LinkRole;
+import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
 
@@ -44,15 +44,15 @@ import net.minecraft.server.level.ServerPlayer;
  * 的草稿级问题表示面板根本不该打开。</p>
  */
 final class WandValidator {
-    private final FactoryManager manager;
+    private final BlockOccupancyTable occupancy;
     private final MinecraftServer server;
 
     /**
      * @param manager 工厂档案柜，用于本次操作的占用快照
      * @param server  服务端，用于按维度取世界
      */
-    WandValidator(FactoryManager manager, MinecraftServer server) {
-        this.manager = manager;
+    WandValidator(BlockOccupancyTable occupancy, MinecraftServer server) {
+        this.occupancy = occupancy;
         this.server = server;
     }
 
@@ -165,7 +165,7 @@ final class WandValidator {
         if (!issues.isEmpty()) {
             return;
         }
-        LinkGate gate = LinkGate.of(this.manager);
+        BlockOccupancyTable gate = this.occupancy;
         ResourceLocation typeId = base == null ? null : base.typeBlockId();
         for (BlockKey block : draft.added()) {
             ResourceLocation blockId = checkBlock(factory, gate, block, issues);
@@ -215,7 +215,7 @@ final class WandValidator {
      * @return 方块 id；失败时为 {@code null}，问题已经写进列表
      */
     @Nullable
-    private ResourceLocation checkBlock(Factory factory, LinkGate gate, BlockKey block,
+    private ResourceLocation checkBlock(Factory factory, BlockOccupancyTable gate, BlockKey block,
             List<WandIssue> issues) {
         ServerLevel level = this.server.getLevel(block.dimension());
         if (level == null || !level.isLoaded(block.pos())) {
@@ -234,8 +234,8 @@ final class WandValidator {
             issues.add(WandIssue.at(block, WandFailure.BLOCK_CLAIMED));
             return null;
         }
-        if (gate.check(block, factory.id(), LinkRole.MACHINE).kind()
-                != LinkGate.ClaimCheck.Kind.FREE) {
+        if (gate.check(block, factory.id(), BlockOccupancyTable.Role.MACHINE).kind()
+                != BlockOccupancyTable.ClaimCheck.Kind.FREE) {
             issues.add(WandIssue.at(block, WandFailure.BLOCK_CLAIMED));
             return null;
         }

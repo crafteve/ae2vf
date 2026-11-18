@@ -5,6 +5,7 @@ import appeng.api.implementations.menuobjects.ItemMenuHost;
 import appeng.api.util.IConfigManager;
 import appeng.menu.locator.ItemMenuHostLocator;
 
+import io.github.crafteve.idlefactory.command.CommandController;
 import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
 
@@ -36,7 +37,7 @@ public final class FactoryNodeHost extends ItemMenuHost<FactoryNodeTerminalItem>
             ItemMenuHostLocator locator) {
         super(item, player, locator);
         if (player instanceof ServerPlayer serverPlayer) {
-            FactoryService.ensureFactory(serverPlayer);
+            CommandController.ensureFactory(serverPlayer);
         }
         this.configManager = IConfigManager.builder(this::getItemStack)
                 .registerSetting(FactoryTerminalSetting.SORT_MODE, FactorySortMode.NAME)

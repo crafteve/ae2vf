@@ -1,10 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
@@ -52,51 +50,6 @@ public final class FactoryService {
         public OpenResult {
             issues = List.copyOf(issues);
         }
-    }
-
-    /**
-     * 保证玩家有工厂：没有就静默创建，已有就不动。
-     *
-     * <p>终端菜单打开前调它。创建用的是与旧生命周期服务相同的确定性 id 规则
-     * （owner + 自增序号），只是不再有「创建成功」的聊天回执。新建工厂要推一次链接快照，
-     * 否则绑定杖要等到下一次结构变更才看得到它。</p>
-     *
-     * @param player 玩家
-     */
-    public static void ensureFactory(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return;
-        }
-        FactoryManager manager = runtime.manager();
-        if (manager.byOwner(player.getUUID()).isPresent()) {
-            return;
-        }
-        UUID id = nextFactoryId(manager, runtime, player.getUUID());
-        Factory factory = new Factory(id,
-                new FactoryConfig(player.getUUID(), null));
-        if (!manager.add(factory)) {
-            IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
-            return;
-        }
-        runtime.markDirtyLinks(factory);
-    }
-
-    /**
-     * 生成一个不与现有工厂冲突的确定性 id。
-     *
-     * @param manager 工厂档案柜
-     * @param runtime 运行时（取自增序号）
-     * @param owner   拥有者
-     * @return 新 id
-     */
-    private static UUID nextFactoryId(FactoryManager manager, FactoryRuntime runtime, UUID owner) {
-        UUID id;
-        do {
-            long seq = runtime.takeNextSeq();
-            id = UUID.nameUUIDFromBytes((owner + ":" + seq).getBytes(StandardCharsets.UTF_8));
-        } while (manager.byId(id).isPresent());
-        return id;
     }
 
     /**
@@ -182,21 +135,6 @@ public final class FactoryService {
     }
 
     /**
-     * 仓库 toggle：绑到 ME 锚点，或对着同一个方块再点一次解绑。
-     *
-     * @param player 发起请求的玩家
-     * @param pos    目标方块
-     * @return 变更数量
-     */
-    public static int toggleStorage(ServerPlayer player, BlockPos pos) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return notStarted(player);
-        }
-        return storageLinks(runtime).toggleStorage(player, pos);
-    }
-
-    /**
      * 服务端未就绪时的统一回执。
      *
      * @param player 玩家
@@ -235,18 +173,8 @@ public final class FactoryService {
      * @return 服务实例
      */
     private static WandService wandService(FactoryRuntime runtime) {
-        return new WandService(runtime.manager(), runtime.observations(),
+        return new WandService(runtime.manager(), runtime.occupancy(), runtime.observations(),
                 machineLibrary(runtime), machineLinks(runtime), runtime.server());
     }
 
-    /**
-     * 装配仓库接线服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static StorageLinkService storageLinks(FactoryRuntime runtime) {
-        return new StorageLinkService(runtime.manager(), runtime::markDirtyLinks,
-                runtime.storageResolver());
-    }
 }

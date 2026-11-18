@@ -26,8 +26,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryWandActionC2S;
-
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
@@ -126,9 +124,7 @@ public final class ModNetwork {
         registrar.playToClient(FactoryTerminalSortS2C.TYPE,
                 FactoryTerminalSortS2C.STREAM_CODEC, FactoryTerminalSortS2C::handle);
 
-        // 绑定杖：仓库动作 + 三层链接快照
-        registrar.playToServer(FactoryWandActionC2S.TYPE, FactoryWandActionC2S.STREAM_CODEC,
-                FactoryWandActionC2S::handle);
+        // 绑定杖：链接快照（仓库绑定已并入统一写命令）
         registrar.playToServer(FactoryLinksRequestC2S.TYPE, FactoryLinksRequestC2S.STREAM_CODEC,
                 FactoryLinksRequestC2S::handle);
         registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,

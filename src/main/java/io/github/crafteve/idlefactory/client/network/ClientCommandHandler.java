@@ -19,6 +19,16 @@ public final class ClientCommandHandler {
      * @param payload 负载
      */
     public static void handle(FactoryCommandS2C payload) {
+        if (payload.containerId() < 0) {
+            // 世界命令：没有终端，回执投到动作栏。
+            Minecraft minecraft = Minecraft.getInstance();
+            if (minecraft.player != null) {
+                minecraft.player.displayClientMessage(
+                        net.minecraft.network.chat.Component.literal(
+                                ClientCommandText.hud(payload.result())), true);
+            }
+            return;
+        }
         if (Minecraft.getInstance().screen instanceof FactoryFeedbackSink sink
                 && sink.containerId() == payload.containerId()) {
             sink.acceptCommandResult(payload.result());

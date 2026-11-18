@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.io.PortExecutor;
 
 import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 
-import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
+import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 
 import io.github.crafteve.idlefactory.node.NodeManager;
 
@@ -68,13 +68,13 @@ public final class FactoryRuntime {
      */
     private final PortExecutor ports;
     /**
-     * 全服占用索引：统一 id → 认领。
+     * 全服方块占用表：一个位置同一时刻只归一家工厂、一种角色。
      *
-     * <p>它只是真相的索引，不是真相本身——真相永远在各工厂的记录里，索引只负责让门禁
-     * 查得快。每次档案变化就全量重建一次（O(总数)，只发生在配置变更时），所以它和档案
-     * 不可能打架：要么一起新，要么一起旧。</p>
+     * <p>它只是真相的索引，不是真相本身——真相永远在各工厂的配置里，索引只负责让门禁查得
+     * 快。每次配置变化就全量重建一次（O(总数)，只发生在配置变更时），所以它和配置不可能
+     * 打架：要么一起新，要么一起旧。</p>
      */
-    private final LinkRegistry links = new LinkRegistry();
+    private final BlockOccupancyTable occupancy = new BlockOccupancyTable();
     /** 失联/恢复通知的聚合与节流。 */
     private final FactoryNoticeHandler notices = new FactoryNoticeHandler();
     /** 全服机器状态（世界的镜像，不写档）。 */
@@ -189,8 +189,8 @@ public final class FactoryRuntime {
      * <p>门禁查它，对账读它；写它的只有 {@link #markDirty} 和 {@link #load}，都是全量重建，
      * 所以调用方永远不用担心“改了档案忘改索引”。</p>
      */
-    public LinkRegistry links() {
-        return this.links;
+    public BlockOccupancyTable occupancy() {
+        return this.occupancy;
     }
 
     /** IO 编排器。 */
@@ -237,7 +237,7 @@ public final class FactoryRuntime {
      */
     public void markDirty() {
         save();
-        this.links.rebuild(this.manager);
+        this.occupancy.rebuild(this.occupancyEntries());
         // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
         this.nodeManager.requestReconcile();
     }
@@ -318,6 +318,31 @@ public final class FactoryRuntime {
         }
     }
 
+    /**
+     * 从当前配置拼一份全量占用快照。
+     *
+     * <p>机器与仓库锚点都算占用：同一位置不能同时是两家工厂的机器或仓库。</p>
+     *
+     * @return 占用条目
+     */
+    private java.util.List<BlockOccupancyTable.Entry> occupancyEntries() {
+        java.util.List<BlockOccupancyTable.Entry> entries = new java.util.ArrayList<>();
+        for (Factory factory : this.manager.all()) {
+            for (var node : factory.config().nodes().all()) {
+                for (var machine : node.machines()) {
+                    entries.add(new BlockOccupancyTable.Entry(factory.id(),
+                            BlockOccupancyTable.Role.MACHINE, machine.block()));
+                }
+            }
+            var anchor = factory.config().storageAnchor();
+            if (anchor != null) {
+                entries.add(new BlockOccupancyTable.Entry(factory.id(),
+                        BlockOccupancyTable.Role.STORAGE, anchor));
+            }
+        }
+        return entries;
+    }
+
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
         this.observationRunner = new ObservationRunner(this.server,
@@ -330,7 +355,7 @@ public final class FactoryRuntime {
         NeoForge.EVENT_BUS.register(this.worldEventListener);
         this.storageResolver = new MeStorageResolver(this.server);
         this.manager.loadFrom(this.store.records());
-        this.links.rebuild(this.manager);
+        this.occupancy.rebuild(this.occupancyEntries());
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage(this.storageResolver);
         }

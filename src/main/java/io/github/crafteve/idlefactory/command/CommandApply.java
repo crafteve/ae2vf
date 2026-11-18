@@ -5,11 +5,14 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
+import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.io.IoSide;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.node.Multiplier;
@@ -21,6 +24,7 @@ import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import appeng.api.stacks.AEKey;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.material.Fluids;
 
 /**
@@ -56,6 +60,7 @@ public final class CommandApply {
             case PROVIDER_DISPATCH -> setDispatch(factory, command.nodeId(), command.body());
             case NODE_RENAME -> rename(factory, command.nodeId(), command.body());
             case NODE_DELETE -> deleteNode(factory, command.nodeId());
+            case SET_ANCHOR -> toggleAnchor(context, command);
             default -> CommandResult.of(CommandReason.INTERNAL);
         };
     }
@@ -265,6 +270,50 @@ public final class CommandApply {
         runtime.markDirty();
         runtime.nodeManager().refreshName(nodeId);
         return CommandResult.node(CommandReason.OK, nodeId);
+    }
+
+    /**
+     * 仓库锚点 toggle：没绑过就绑到目标方块，已绑同一个方块就解绑。
+     *
+     * <p>占用先查表：同一位置不能同时是两家工厂的仓库，也不能是自己的机器。绑定成功后立即
+     * 解析一次仓库，并推链接快照。</p>
+     *
+     * @param context 上下文
+     * @param command 命令
+     * @return 回执
+     */
+    private static CommandResult toggleAnchor(CommandContext context, FactoryCommand command) {
+        Factory factory = context.factory();
+        BlockKey target = command.target();
+        if (target == null || context.player() == null) {
+            return CommandResult.of(CommandReason.TARGET_UNLOADED);
+        }
+        BlockOccupancyTable.ClaimCheck claim = context.runtime().occupancy()
+                .check(target, factory.id(), BlockOccupancyTable.Role.STORAGE);
+        if (claim.blocked()) {
+            return CommandResult.block(claim.kind() == BlockOccupancyTable.ClaimCheck.Kind.SELF_OTHER
+                    ? CommandReason.OCCUPIED_SELF_ROLE : CommandReason.OCCUPIED_OTHER,
+                    target, List.of());
+        }
+        BlockKey anchor = factory.config().storageAnchor();
+        if (target.equals(anchor)) {
+            factory.bindStorage(null, context.runtime().storageResolver());
+            context.runtime().markDirtyLinks(factory);
+            return CommandResult.block(CommandReason.OK, target, List.of());
+        }
+        if (anchor != null) {
+            return CommandResult.block(CommandReason.OTHER_BOUND, target, List.of());
+        }
+        ServerLevel level = context.player().serverLevel();
+        if (!level.isLoaded(target.pos())) {
+            return CommandResult.block(CommandReason.TARGET_UNLOADED, target, List.of());
+        }
+        if (Ae2Binder.nodeAt(level, target.pos()) == null) {
+            return CommandResult.block(CommandReason.NOT_ME_BLOCK, target, List.of());
+        }
+        factory.bindStorage(target, context.runtime().storageResolver());
+        context.runtime().markDirtyLinks(factory);
+        return CommandResult.block(CommandReason.OK, target, List.of());
     }
 
     private static CommandResult deleteNode(Factory factory, java.util.UUID nodeId) {
