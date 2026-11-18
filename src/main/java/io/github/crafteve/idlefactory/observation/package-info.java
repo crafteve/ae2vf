@@ -15,7 +15,7 @@
  * 原子观测的消费者。</p>
  *
  * <p><b>唯一读世界的地方</b>是 {@link io.github.crafteve.idlefactory.observation.BlockProbe}。
- * 执行层（{@code IoExecutor} / {@code ContainerStorage}）仍可直接取 handler 来搬运，但不得据此
+ * 执行层（{@code IoExecutor} / {@code PortExecutor}）仍可直接取面存储来搬运，但不得据此
  * 改写观测状态。</p>
  */
 package io.github.crafteve.idlefactory.observation;

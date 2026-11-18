@@ -21,7 +21,7 @@ import net.minecraft.server.level.ServerLevel;
  * 没处放，而不是抛异常。</p>
  *
  * <p>解析结果不缓存：工厂每 20 tick 调一次、锚点变更时立即调一次，缓存放在
- * {@code FactoryLive}，本类保持无状态。</p>
+ * {@code Factory} 的缓存字段，本类保持无状态。</p>
  */
 public final class MeStorageResolver {
     /** 服务端实例，用来按维度取 level。 */

@@ -16,7 +16,7 @@ import appeng.api.storage.MEStorage;
  * 一个工厂实例：id + 配置 + 运行时。
  *
  * <p>它是服务端对象，不感知终端是否存在。配置在 {@link FactoryConfig}，写档；运行时在
- * {@link FactoryLive}，可随时从配置重建。</p>
+ * 仓库缓存与执行账房直接挂在工厂上，可随时从配置重建。</p>
  */
 public final class Factory {
     /** 工厂唯一 id。 */

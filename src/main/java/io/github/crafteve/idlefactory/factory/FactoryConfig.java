@@ -12,7 +12,7 @@ import io.github.crafteve.idlefactory.node.NodeLibraryView;
  * 工厂的配置部分：需要写进存档、重启后必须原样恢复的内容。
  *
  * <p>只描述「玩家配置了什么」：拥有者、仓库地址、节点库。仓库解析结果、在线标记与诊断计数
- * 都在 {@link FactoryLive}，不写档。</p>
+ * 都在 {@link Factory}，不写档。</p>
  *
  * <p>节点库就是工厂的全部节点：节点 → 机器 → 方块三层，IO 与 provider 都按节点跑。</p>
  *
