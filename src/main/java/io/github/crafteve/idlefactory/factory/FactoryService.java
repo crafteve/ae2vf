@@ -5,8 +5,8 @@ import java.util.List;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;

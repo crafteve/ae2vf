@@ -10,8 +10,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;

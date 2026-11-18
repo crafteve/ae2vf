@@ -5,7 +5,7 @@ import java.util.List;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;

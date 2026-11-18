@@ -12,7 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 /**
  * {@link AEKey} 与 AE2 {@link AEKey} 的互转。

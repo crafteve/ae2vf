@@ -121,7 +121,7 @@ final class FactoryNodeRender {
                         ? 0xFFFFFFFF : this.theme.textPrimary());
 
         var multiplier = row.view().provider().multiplier();
-        boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.factory.node.MultiplierMode.OFF;
+        boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 1), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 multiplierActive ? this.theme.statusRun() : this.theme.bevelLight(),
@@ -131,7 +131,7 @@ final class FactoryNodeRender {
                 multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
 
         boolean roundRobin = row.view().provider().dispatch()
-                == io.github.crafteve.idlefactory.factory.io.DispatchMode.ROUND_ROBIN;
+                == io.github.crafteve.idlefactory.io.DispatchMode.ROUND_ROBIN;
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
@@ -164,7 +164,7 @@ final class FactoryNodeRender {
 
     /** 倍率键帽文字：关 / ×N / 智。 */
     private static String multiplierLabel(
-            io.github.crafteve.idlefactory.factory.node.Multiplier multiplier) {
+            io.github.crafteve.idlefactory.node.Multiplier multiplier) {
         return switch (multiplier.mode()) {
             case OFF -> "倍";
             case FIXED -> multiplier.factor() >= 8 ? "8" : Integer.toString(multiplier.factor());

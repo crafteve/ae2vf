@@ -7,18 +7,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import io.github.crafteve.idlefactory.factory.io.IoRunner;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
-import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.node.NodeTypeResolver;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.Health;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.io.IoRunner;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.node.NodeTypeResolver;
+import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.Health;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+import io.github.crafteve.idlefactory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.storage.ContainerRef;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -135,7 +135,7 @@ final class FactoryObservationRunner {
                 if (migration.isPresent()) {
                     Node migrated = current.withTypeBlockId(migration.get());
                     if (factory.config().library().replace(migrated)
-                            == io.github.crafteve.idlefactory.factory.node.NodeLibrary.Result.REPLACED) {
+                            == io.github.crafteve.idlefactory.node.NodeLibrary.Result.REPLACED) {
                         current = migrated;
                         this.publish.accept(factory);
                     }

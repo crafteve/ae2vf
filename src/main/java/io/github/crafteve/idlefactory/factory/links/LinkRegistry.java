@@ -10,14 +10,14 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.storage.MeAnchor;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;

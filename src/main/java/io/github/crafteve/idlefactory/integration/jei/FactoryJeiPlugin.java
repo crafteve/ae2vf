@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;

@@ -9,13 +9,13 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.node.NodeHealthResolver;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+import io.github.crafteve.idlefactory.storage.MeAnchor;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import appeng.api.networking.IGridNode;

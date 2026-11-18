@@ -6,14 +6,14 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.factory.storage.ContainerCapabilityAdapter;
-import io.github.crafteve.idlefactory.factory.storage.ContainerRef;
-import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.storage.ContainerCapabilityAdapter;
+import io.github.crafteve.idlefactory.storage.ContainerRef;
+import io.github.crafteve.idlefactory.storage.MeAnchor;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.storage.StorageMode;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 
 import net.minecraft.core.BlockPos;

@@ -6,17 +6,17 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.machine.MatchMode;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.io.BlockingMode;
-import io.github.crafteve.idlefactory.factory.io.DispatchMode;
-import io.github.crafteve.idlefactory.factory.node.Multiplier;
-import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.io.IoSide;
+import io.github.crafteve.idlefactory.machine.MatchMode;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.io.BlockingMode;
+import io.github.crafteve.idlefactory.io.DispatchMode;
+import io.github.crafteve.idlefactory.node.Multiplier;
+import io.github.crafteve.idlefactory.node.MultiplierMode;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 import appeng.api.stacks.AEKey;
 

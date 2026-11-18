@@ -4,8 +4,8 @@ import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.Node;
 
 import net.minecraft.server.level.ServerPlayer;
 

@@ -6,7 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 /**

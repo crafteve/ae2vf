@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;

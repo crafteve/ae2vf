@@ -6,7 +6,7 @@ import java.util.Optional;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
 import net.minecraft.server.level.ServerPlayer;

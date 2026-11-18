@@ -6,16 +6,16 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.io.DispatchState;
-import io.github.crafteve.idlefactory.factory.io.IoRunner;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.io.IoForm;
+import io.github.crafteve.idlefactory.io.DispatchState;
+import io.github.crafteve.idlefactory.io.IoRunner;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.node.NodeRuntime;
+import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 
 import net.minecraft.server.MinecraftServer;
 

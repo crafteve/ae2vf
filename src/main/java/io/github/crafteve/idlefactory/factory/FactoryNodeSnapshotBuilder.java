@@ -6,22 +6,22 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.DispatchOrder;
-import io.github.crafteve.idlefactory.factory.io.DispatchQueue;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.node.Multiplier;
-import io.github.crafteve.idlefactory.factory.io.DispatchMode;
-import io.github.crafteve.idlefactory.factory.io.BlockingMode;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.node.NodeRuntime;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.io.DispatchOrder;
+import io.github.crafteve.idlefactory.io.DispatchQueue;
+import io.github.crafteve.idlefactory.io.IoForm;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.Multiplier;
+import io.github.crafteve.idlefactory.io.DispatchMode;
+import io.github.crafteve.idlefactory.io.BlockingMode;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.node.NodeRuntime;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.MachineHealth;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;

@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;

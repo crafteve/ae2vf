@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.client.wand;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
 import net.minecraft.client.Minecraft;

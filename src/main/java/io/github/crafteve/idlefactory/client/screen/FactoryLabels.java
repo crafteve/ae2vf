@@ -4,10 +4,10 @@ import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.IoReason;
+import io.github.crafteve.idlefactory.io.IoReason;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -17,7 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 

@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;

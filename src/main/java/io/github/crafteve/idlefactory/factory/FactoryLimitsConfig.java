@@ -1,8 +1,8 @@
 package io.github.crafteve.idlefactory.factory;
 
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeIoGroup;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 

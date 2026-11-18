@@ -4,8 +4,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
 
 /**
  * 节点库的写入口：一次操作一次落盘。

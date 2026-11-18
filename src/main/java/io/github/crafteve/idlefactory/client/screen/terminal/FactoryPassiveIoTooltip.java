@@ -11,10 +11,10 @@ import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
-import io.github.crafteve.idlefactory.factory.io.IoReason;
-import io.github.crafteve.idlefactory.factory.machine.MatchMode;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.io.IoReason;
+import io.github.crafteve.idlefactory.machine.MatchMode;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;

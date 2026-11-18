@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 /**
  * 面表缓存：位置 → 面表。

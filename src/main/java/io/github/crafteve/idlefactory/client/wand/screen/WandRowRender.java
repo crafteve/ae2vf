@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.client.wand.screen;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
 import io.github.crafteve.idlefactory.client.wand.WandMessages;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;

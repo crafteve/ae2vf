@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.client.renderer.Rect2i;

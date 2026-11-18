@@ -7,9 +7,9 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.NodeActions;
-import io.github.crafteve.idlefactory.factory.io.BlockingMode;
-import io.github.crafteve.idlefactory.factory.io.DispatchMode;
-import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
+import io.github.crafteve.idlefactory.io.BlockingMode;
+import io.github.crafteve.idlefactory.io.DispatchMode;
+import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.FactoryNodeSnapshots;
 

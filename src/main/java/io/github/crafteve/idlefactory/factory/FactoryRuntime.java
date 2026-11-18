@@ -7,16 +7,16 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.io.IoRunner;
-import io.github.crafteve.idlefactory.factory.io.PortExecutor;
-import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
+import io.github.crafteve.idlefactory.io.IoForm;
+import io.github.crafteve.idlefactory.io.IoRunner;
+import io.github.crafteve.idlefactory.io.PortExecutor;
+import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
-import io.github.crafteve.idlefactory.factory.node.NodeManager;
-import io.github.crafteve.idlefactory.factory.observation.ObservationService;
-import io.github.crafteve.idlefactory.factory.storage.ContainerStorageResolver;
-import io.github.crafteve.idlefactory.factory.storage.DispatchingStorageResolver;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.storage.ContainerStorageResolver;
+import io.github.crafteve.idlefactory.storage.DispatchingStorageResolver;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2StorageResolver;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 

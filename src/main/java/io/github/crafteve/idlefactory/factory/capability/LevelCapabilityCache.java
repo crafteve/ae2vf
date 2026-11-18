@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

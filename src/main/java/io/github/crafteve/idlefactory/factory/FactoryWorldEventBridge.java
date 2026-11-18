@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;

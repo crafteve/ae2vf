@@ -17,10 +17,10 @@ import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
 import io.github.crafteve.idlefactory.factory.NodeStatusResolver;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.io.IoReason;
-import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+import io.github.crafteve.idlefactory.io.IoReason;
+import io.github.crafteve.idlefactory.io.IoSide;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import net.minecraft.resources.ResourceLocation;

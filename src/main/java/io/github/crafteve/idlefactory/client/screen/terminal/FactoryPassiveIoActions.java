@@ -6,10 +6,10 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.io.IoSide;
-import io.github.crafteve.idlefactory.factory.machine.MatchMode;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.io.IoSide;
+import io.github.crafteve.idlefactory.machine.MatchMode;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 
 import net.minecraft.core.Direction;

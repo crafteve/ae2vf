@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;

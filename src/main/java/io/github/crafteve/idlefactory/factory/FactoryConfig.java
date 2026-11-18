@@ -4,11 +4,11 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.factory.node.NodeLibraryView;
-import io.github.crafteve.idlefactory.factory.storage.ContainerAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.node.NodeLibraryView;
+import io.github.crafteve.idlefactory.storage.ContainerAnchor;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 
 /**
  * 工厂的配置部分：需要写进存档、重启后必须原样恢复的内容。

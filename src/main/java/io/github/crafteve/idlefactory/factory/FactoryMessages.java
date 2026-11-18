@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.factory;
 
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
+import io.github.crafteve.idlefactory.storage.StorageMode;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;

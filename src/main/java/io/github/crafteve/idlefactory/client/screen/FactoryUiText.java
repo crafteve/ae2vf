@@ -2,14 +2,14 @@ package io.github.crafteve.idlefactory.client.screen;
 
 
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.fml.ModList;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 
 /**
  * 界面专用的文本与资源形态辅助。

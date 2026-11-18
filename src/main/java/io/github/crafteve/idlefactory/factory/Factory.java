@@ -4,11 +4,11 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageMode;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.storage.StorageMode;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 
 /**
  * 一个工厂实例：id + 配置 + 运行时。

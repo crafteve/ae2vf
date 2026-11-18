@@ -2,10 +2,10 @@ package io.github.crafteve.idlefactory.integration.ae2;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.storage.MeAnchor;
+import io.github.crafteve.idlefactory.storage.MeAnchor;
 import appeng.api.storage.MEStorage;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;

@@ -7,7 +7,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.factory.NodeActions;
-import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.network.FactoryNodeSnapshots;
 

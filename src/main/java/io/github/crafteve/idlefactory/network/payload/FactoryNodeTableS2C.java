@@ -10,15 +10,15 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientNodeTableHandler;
 import io.github.crafteve.idlefactory.factory.FactoryLimitsConfig;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.io.BlockingMode;
-import io.github.crafteve.idlefactory.factory.io.DispatchMode;
-import io.github.crafteve.idlefactory.factory.node.Multiplier;
-import io.github.crafteve.idlefactory.factory.node.MultiplierMode;
-import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.io.BlockingMode;
+import io.github.crafteve.idlefactory.io.DispatchMode;
+import io.github.crafteve.idlefactory.node.Multiplier;
+import io.github.crafteve.idlefactory.node.MultiplierMode;
+import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.network.ModNetwork;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
-import io.github.crafteve.idlefactory.factory.probe.MachineHealth;
+import io.github.crafteve.idlefactory.observation.MachineHealth;
 
 import io.netty.handler.codec.DecoderException;
 

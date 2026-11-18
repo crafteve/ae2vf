@@ -19,10 +19,10 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.io.IoReason;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
-import io.github.crafteve.idlefactory.factory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.io.IoReason;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+import io.github.crafteve.idlefactory.storage.AeKeySupport;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.client.gui.Font;
@@ -505,17 +505,17 @@ final class FactoryPassiveIoRender {
 
     private static String modeLabel(ResourceSpec spec) {
         // 非物品固定精确，chip 仍然写「精」但灰显禁用，保持和物品规则同一套外形。
-        return spec.mode() == io.github.crafteve.idlefactory.factory.machine.MatchMode.EXACT
+        return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? "精" : "模";
     }
 
     private int modeColor(ResourceSpec spec) {
-        return spec.mode() == io.github.crafteve.idlefactory.factory.machine.MatchMode.EXACT
+        return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? this.theme.io().modeExact() : this.theme.io().modeFuzzy();
     }
 
     private int modeTextColor(ResourceSpec spec) {
-        return spec.mode() == io.github.crafteve.idlefactory.factory.machine.MatchMode.EXACT
+        return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? this.theme.io().modeExactText() : this.theme.io().modeFuzzyText();
     }
 }

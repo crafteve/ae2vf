@@ -2,11 +2,11 @@ package io.github.crafteve.idlefactory.factory;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.io.IoAnalyzer;
-import io.github.crafteve.idlefactory.factory.storage.EmptyStorage;
+import io.github.crafteve.idlefactory.io.IoAnalyzer;
+import io.github.crafteve.idlefactory.storage.EmptyStorage;
 import appeng.api.storage.MEStorage;
-import io.github.crafteve.idlefactory.factory.storage.StorageAnchor;
-import io.github.crafteve.idlefactory.factory.storage.StorageResolver;
+import io.github.crafteve.idlefactory.storage.StorageAnchor;
+import io.github.crafteve.idlefactory.storage.StorageResolver;
 
 /**
  * 工厂的运行时部分：可以随时从 {@link FactoryConfig} 重建，不写存档。

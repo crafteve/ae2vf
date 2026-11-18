@@ -8,7 +8,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineView;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.TotalState;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 /**
  * 节点状态的唯一聚合实现：成员机器事实 → {@link NodeStatus}。

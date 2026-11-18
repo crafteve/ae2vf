@@ -6,12 +6,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.io.IoForm;
-import io.github.crafteve.idlefactory.factory.machine.Machine;
-import io.github.crafteve.idlefactory.factory.machine.MachineStateLibrary;
-import io.github.crafteve.idlefactory.factory.machine.MachineStatus;
-import io.github.crafteve.idlefactory.factory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.factory.node.Node;
+import io.github.crafteve.idlefactory.io.IoForm;
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
+import io.github.crafteve.idlefactory.machine.MachineStatus;
+import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.node.Node;
 
 /**
  * 生成每 tick 的 IO 表单：世界事实（机器状态）+ 配置事实（节点的机器与规则）→ 工作清单。

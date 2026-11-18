@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.NodeStatus;
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 import io.netty.handler.codec.DecoderException;
 

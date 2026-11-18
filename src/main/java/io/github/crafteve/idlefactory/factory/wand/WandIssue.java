@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.factory.wand;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 /**
  * 一条校验问题：可以挂在某个方块上，也可以是整份草稿的问题。

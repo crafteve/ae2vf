@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.factory;
 
-import io.github.crafteve.idlefactory.factory.probe.NodeHealth;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 /**
  * 一个节点的体检汇总结论：由全部成员机器的事实聚合而来，与成员登记顺序无关。

@@ -6,10 +6,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.probe.BlockProbe;
-import io.github.crafteve.idlefactory.factory.probe.Health;
-import io.github.crafteve.idlefactory.factory.storage.ContainerCapabilityAdapter;
+import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.observation.BlockProbe;
+import io.github.crafteve.idlefactory.observation.Health;
+import io.github.crafteve.idlefactory.storage.ContainerCapabilityAdapter;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

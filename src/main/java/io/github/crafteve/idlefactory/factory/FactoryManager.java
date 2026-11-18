@@ -11,8 +11,8 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
-import io.github.crafteve.idlefactory.factory.node.Node;
-import io.github.crafteve.idlefactory.factory.node.NodeLibrary;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeLibrary;
 
 /**
  * 工厂档案柜：内存里的索引。

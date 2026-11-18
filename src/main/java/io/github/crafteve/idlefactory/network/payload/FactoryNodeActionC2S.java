@@ -32,7 +32,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record FactoryNodeActionC2S(int containerId, UUID nodeId) implements CustomPacketPayload {
 
-    /** 包类型：{@code idlefactory:factory_node_action}。 */
+    /** 包类型：{@code idlefactory.node_action}。 */
     public static final Type<FactoryNodeActionC2S> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
                     "factory_node_action"));

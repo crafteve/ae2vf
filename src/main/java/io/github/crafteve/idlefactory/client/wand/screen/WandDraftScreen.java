@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.client.wand.WandLinks;
 import io.github.crafteve.idlefactory.client.wand.WandMessages;
 import io.github.crafteve.idlefactory.client.wand.WandPrecheck;
 import io.github.crafteve.idlefactory.client.wand.WandSession;
-import io.github.crafteve.idlefactory.factory.location.BlockKey;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
