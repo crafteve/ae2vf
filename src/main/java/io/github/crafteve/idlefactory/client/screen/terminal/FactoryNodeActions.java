@@ -7,9 +7,11 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.No
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
+import io.github.crafteve.idlefactory.command.CommandKind;
+import io.github.crafteve.idlefactory.command.CommandSource;
+import io.github.crafteve.idlefactory.command.FactoryCommand;
+import io.github.crafteve.idlefactory.io.BlockingMode;
+import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -35,8 +37,8 @@ final class FactoryNodeActions {
      * @param on          目标开关
      */
     static void setBlocking(int containerId, NodeRow node, boolean on) {
-        PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
-                FactoryNodeProviderC2S.ProviderSetting.BLOCKING, on ? 1 : 0, 0));
+        send(containerId, node.nodeId(), CommandKind.PROVIDER_BLOCKING,
+                new FactoryCommand.Blocking(on ? BlockingMode.ON : BlockingMode.OFF));
     }
 
     /**
@@ -47,7 +49,8 @@ final class FactoryNodeActions {
      * @param name        新名字；空串表示恢复方块名
      */
     static void rename(int containerId, NodeRow node, String name) {
-        PacketDistributor.sendToServer(new FactoryNodeRenameC2S(containerId, node.nodeId(), name));
+        send(containerId, node.nodeId(), CommandKind.NODE_RENAME,
+                new FactoryCommand.Rename(name));
     }
 
     /**
@@ -57,7 +60,7 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void delete(int containerId, NodeRow node) {
-        PacketDistributor.sendToServer(new FactoryNodeActionC2S(containerId, node.nodeId()));
+        send(containerId, node.nodeId(), CommandKind.NODE_DELETE, new FactoryCommand.Empty());
     }
 
     /**
@@ -144,8 +147,8 @@ final class FactoryNodeActions {
             mode = MultiplierMode.OFF;
             factor = 1;
         }
-        PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
-                FactoryNodeProviderC2S.ProviderSetting.MULTIPLIER, mode.ordinal(), factor));
+        send(containerId, node.nodeId(), CommandKind.PROVIDER_MULTIPLIER,
+                new FactoryCommand.Multiplier(mode, factor));
     }
 
     /**
@@ -157,8 +160,22 @@ final class FactoryNodeActions {
     static void toggleDispatch(int containerId, NodeRow node) {
         DispatchMode next = node.view().provider().dispatch() == DispatchMode.ROUND_ROBIN
                 ? DispatchMode.SEQUENTIAL : DispatchMode.ROUND_ROBIN;
-        PacketDistributor.sendToServer(new FactoryNodeProviderC2S(containerId, node.nodeId(),
-                FactoryNodeProviderC2S.ProviderSetting.DISPATCH, next.ordinal(), 1));
+        send(containerId, node.nodeId(), CommandKind.PROVIDER_DISPATCH,
+                new FactoryCommand.Dispatch(next));
+    }
+
+    /**
+     * 发一条带节点身份的玩家命令。
+     *
+     * @param containerId 菜单容器 id
+     * @param nodeId      节点 id
+     * @param kind        命令种类
+     * @param body        命令数据
+     */
+    private static void send(int containerId, java.util.UUID nodeId, CommandKind kind,
+            FactoryCommand.Body body) {
+        PacketDistributor.sendToServer(new FactoryCommandC2S(new FactoryCommand(containerId, kind,
+                CommandSource.PLAYER, nodeId, null, 0L, body)));
     }
 
     private static void message(String text) {

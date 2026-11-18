@@ -52,7 +52,8 @@ import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 
 import io.github.crafteve.idlefactory.menu.FactorySortMode;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
+import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.command.CommandResult;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
 
@@ -368,12 +369,13 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     /**
      * 反馈：失败走动作栏，成功由快照体现。
      *
-     * @param payload 反馈
+     * @param result 回执
      */
     @Override
-    public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
-        if (!payload.ok() && this.minecraft != null && this.minecraft.player != null) {
-            this.minecraft.player.displayClientMessage(Component.literal(payload.message()), true);
+    public void acceptCommandResult(CommandResult result) {
+        if (!result.ok() && this.minecraft != null && this.minecraft.player != null) {
+            this.minecraft.player.displayClientMessage(
+                    Component.literal(CommandMessages.text(result)), true);
         }
     }
 

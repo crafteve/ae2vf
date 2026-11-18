@@ -69,6 +69,16 @@ public final class Factory {
     }
 
     /**
+     * 替换节点库里的一个节点（改名等原地改写）。
+     *
+     * @param node 新节点
+     * @return 节点库的写入结果
+     */
+    public NodeLibrary.Result replaceNode(Node node) {
+        return this.config.library().replace(node);
+    }
+
+    /**
      * 重新解析仓库锚点。定时刷新与手动刷新都走这里。
      *
      * @param resolver 仓库解析器

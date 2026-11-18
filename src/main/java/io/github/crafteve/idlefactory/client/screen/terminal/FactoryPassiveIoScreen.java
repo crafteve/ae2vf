@@ -33,7 +33,7 @@ import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompa
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 import io.github.crafteve.idlefactory.menu.FactorySortMode;
-import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
+import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
@@ -294,11 +294,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      * <p>终端里没有提示条：动作是否生效由随后到达的机器快照体现，失败时规则会原样留在表里。
      * 接口是两屏共用的，节点终端仍需要这条反馈，所以这里保留空实现而不是删方法。</p>
      *
-     * @param payload 反馈
+     * @param result 回执
      */
     @Override
-    public void acceptEditFeedback(FactoryEditFeedbackS2C payload) {
-        // 不展示、不记状态。
+    public void acceptCommandResult(CommandResult result) {
+        // 不展示、不记状态：是否生效由随后到达的机器快照体现。
     }
 
     /**

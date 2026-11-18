@@ -3,17 +3,12 @@ package io.github.crafteve.idlefactory.network;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryEditFeedbackS2C;
-
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeActionC2S;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeProviderC2S;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeRenameC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
+import io.github.crafteve.idlefactory.network.payload.FactoryCommandS2C;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
 
@@ -22,8 +17,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
 
@@ -65,7 +58,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "38";
+    public static final String PROTOCOL_VERSION = "39";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -115,11 +108,11 @@ public final class ModNetwork {
         registrar.playToClient(FactoryTableS2C.TYPE, FactoryTableS2C.STREAM_CODEC,
                 FactoryTableS2C::handle);
 
-        // P1：IO 编辑
-        registrar.playToServer(FactoryRuleActionC2S.TYPE, FactoryRuleActionC2S.STREAM_CODEC,
-                FactoryRuleActionC2S::handle);
-        registrar.playToClient(FactoryEditFeedbackS2C.TYPE, FactoryEditFeedbackS2C.STREAM_CODEC,
-                FactoryEditFeedbackS2C::handle);
+        // 写命令：节点、规则、provider 与应用内一切屏幕写操作都走这一对包
+        registrar.playToServer(FactoryCommandC2S.TYPE, FactoryCommandC2S.STREAM_CODEC,
+                FactoryCommandC2S::handle);
+        registrar.playToClient(FactoryCommandS2C.TYPE, FactoryCommandS2C.STREAM_CODEC,
+                FactoryCommandS2C::handle);
 
         // 被动 IO：列表 / 卡片视图写物品组件，服务端确认后回同步
         registrar.playToServer(FactoryPassiveIoViewC2S.TYPE,
@@ -141,17 +134,11 @@ public final class ModNetwork {
         registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
                 FactoryLinksS2C::handle);
 
-        // 节点管理终端：节点表请求 / 回包 / provider 设置 / 改名
+        // 节点管理终端：节点表请求 / 回包
         registrar.playToServer(FactoryNodeTableRequestC2S.TYPE,
                 FactoryNodeTableRequestC2S.STREAM_CODEC, FactoryNodeTableRequestC2S::handle);
         registrar.playToClient(FactoryNodeTableS2C.TYPE, FactoryNodeTableS2C.STREAM_CODEC,
                 FactoryNodeTableS2C::handle);
-        registrar.playToServer(FactoryNodeProviderC2S.TYPE,
-                FactoryNodeProviderC2S.STREAM_CODEC, FactoryNodeProviderC2S::handle);
-        registrar.playToServer(FactoryNodeRenameC2S.TYPE,
-                FactoryNodeRenameC2S.STREAM_CODEC, FactoryNodeRenameC2S::handle);
-        registrar.playToServer(FactoryNodeActionC2S.TYPE,
-                FactoryNodeActionC2S.STREAM_CODEC, FactoryNodeActionC2S::handle);
 
         // 机器绑定杖：1:1 toggle、连锁、草稿预校验与提交
         registrar.playToServer(WandToggleC2S.TYPE, WandToggleC2S.STREAM_CODEC,

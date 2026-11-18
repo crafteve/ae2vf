@@ -10,7 +10,10 @@ import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
-import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
+import io.github.crafteve.idlefactory.command.CommandKind;
+import io.github.crafteve.idlefactory.command.CommandSource;
+import io.github.crafteve.idlefactory.command.FactoryCommand;
+import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 
 import net.minecraft.core.Direction;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -45,9 +48,8 @@ final class FactoryPassiveIoActions {
             FactoryPassiveIoModel.RuleRow rule) {
         IoSide target = rule.side() == IoSide.INPUT ? IoSide.OUTPUT : IoSide.INPUT;
         probe("flip", block, rule, "-> " + target);
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.MOVE, block.nodeId(), rule.side(),
-                rule.spec().key(), rule.spec().face(), rule.spec().mode(), target));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_MOVE, rule.side(),
+                rule.spec().key(), rule.spec().face(), rule.spec().mode(), target);
     }
 
     /**
@@ -62,9 +64,8 @@ final class FactoryPassiveIoActions {
             FactoryPassiveIoModel.RuleRow rule, boolean backwards) {
         Direction next = backwards ? previousFace(rule.spec().face()) : nextFace(rule.spec().face());
         probe("face", block, rule, String.valueOf(next));
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.UPDATE, block.nodeId(), rule.side(),
-                rule.spec().key(), next, rule.spec().mode()));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
+                rule.spec().key(), next, rule.spec().mode(), null);
     }
 
     /**
@@ -82,9 +83,8 @@ final class FactoryPassiveIoActions {
         MatchMode next = rule.spec().mode() == MatchMode.EXACT
                 ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
         probe("mode", block, rule, next.name());
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.UPDATE, block.nodeId(), rule.side(),
-                rule.spec().key(), rule.spec().face(), next));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
+                rule.spec().key(), rule.spec().face(), next, null);
     }
 
     /**
@@ -97,9 +97,8 @@ final class FactoryPassiveIoActions {
     static void delete(int containerId, FactoryPassiveIoModel.BlockView block,
             FactoryPassiveIoModel.RuleRow rule) {
         probe("delete", block, rule, "");
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.REMOVE, block.nodeId(), rule.side(),
-                rule.spec().key(), rule.spec().face(), rule.spec().mode()));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_REMOVE, rule.side(),
+                rule.spec().key(), rule.spec().face(), rule.spec().mode(), null);
     }
 
     /**
@@ -119,9 +118,8 @@ final class FactoryPassiveIoActions {
         }
         IdleFactory.LOGGER.info("[ui-probe] add-energy block={} node={} key={}",
                 block.name(), block.nodeId(), key.getId());
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.ADD, block.nodeId(), IoSide.INPUT, key, null,
-                MatchMode.EXACT));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_ADD, IoSide.INPUT, key, null,
+                MatchMode.EXACT, null);
     }
 
     /**
@@ -135,9 +133,8 @@ final class FactoryPassiveIoActions {
         MatchMode mode = new ResourceSpec(key, null, 0L).mode();
         IdleFactory.LOGGER.info("[ui-probe] add block={} machine={} key={} mode={}",
                 block.name(), block.machineId(), key.getId(), mode);
-        PacketDistributor.sendToServer(new FactoryRuleActionC2S(containerId,
-                FactoryRuleActionC2S.Action.ADD, block.nodeId(), IoSide.INPUT, key, null,
-                mode));
+        sendRule(containerId, block.nodeId(), CommandKind.RULE_ADD, IoSide.INPUT, key, null,
+                mode, null);
     }
 
     /**
@@ -176,6 +173,26 @@ final class FactoryPassiveIoActions {
             }
         }
         return null;
+    }
+
+    /**
+     * 发一条规则命令。
+     *
+     * @param containerId 菜单容器 id
+     * @param nodeId      节点 id
+     * @param kind        命令种类
+     * @param side        当前侧
+     * @param key         资源
+     * @param face        面；{@code null} 表示不限
+     * @param mode        匹配模式
+     * @param targetSide  换方向的目标侧；其它动作为 {@code null}
+     */
+    private static void sendRule(int containerId, java.util.UUID nodeId, CommandKind kind,
+            IoSide side, AEKey key, @Nullable Direction face, MatchMode mode,
+            @Nullable IoSide targetSide) {
+        PacketDistributor.sendToServer(new FactoryCommandC2S(new FactoryCommand(containerId, kind,
+                CommandSource.PLAYER, nodeId, null, 0L,
+                new FactoryCommand.Rule(side, key, face, mode, targetSide))));
     }
 
     private static void probe(String action, FactoryPassiveIoModel.BlockView block,
