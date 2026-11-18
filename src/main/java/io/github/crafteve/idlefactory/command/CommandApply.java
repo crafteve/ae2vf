@@ -298,8 +298,8 @@ public final class CommandApply {
         }
         BlockKey anchor = factory.config().storageAnchor();
         if (target.equals(anchor)) {
+            // 落盘与推快照由 CommandController 统一做，这里只改内存。
             factory.bindStorage(null, context.runtime().storageResolver());
-            context.runtime().markDirtyLinks(factory);
             return CommandResult.block(CommandReason.OK, target, List.of());
         }
         if (anchor != null) {
@@ -313,7 +313,6 @@ public final class CommandApply {
             return CommandResult.block(CommandReason.NOT_ME_BLOCK, target, List.of());
         }
         factory.bindStorage(target, context.runtime().storageResolver());
-        context.runtime().markDirtyLinks(factory);
         return CommandResult.block(CommandReason.OK, target, List.of());
     }
 
