@@ -1,7 +1,12 @@
 package io.github.crafteve.idlefactory.factory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -24,34 +29,58 @@ import net.minecraft.world.level.saveddata.SavedData;
 /**
  * 工厂档案的存档容器。
  *
- * <p>它只负责 NBT 读写，不做业务判断。存档只保存配置：工厂身份、仓库锚点与节点（含机器、
- * IO 规则与 provider）。运行时数据（仓库在线、诊断、健康）一律不写。</p>
+ * <p>只负责 NBT 读写与两条落盘路径：配置行 {@link #put} 与运行时 {@link #flushRuntime}。
+ * 两条路径都从当时活的工厂整体重建条目；{@link #put} 会把工厂记进「本 tick 已写」，
+ * 同一工厂同一 tick 最多写一次。停服走 {@link #flushAll}。</p>
  *
- * <p>存档挂在主世界的 {@code DataStorage} 上，每个存档一份。</p>
+ * <p>工厂 id 由拥有者派生（{@link #idOf}），不写进存档；存档只记 Owner、锚点与节点。</p>
  */
 public final class FactoryStore extends SavedData {
     /** 存档文件名（{@code data/idlefactory_factories.dat}）。 */
     private static final String DATA_NAME = "idlefactory_factories";
     private static final String TAG_FACTORIES = "Factories";
-    private static final String TAG_ID = "Id";
     private static final String TAG_OWNER = "Owner";
     /** 仓库锚点维度；缺这条表示未绑定。 */
     private static final String TAG_ANCHOR_DIM = "AnchorDim";
     /** 仓库锚点坐标（{@link BlockPos#asLong()}）。 */
     private static final String TAG_ANCHOR_POS = "AnchorPos";
     private static final String TAG_NODES = "Nodes";
-    private static final String TAG_NEXT_SEQ = "NextSeq";
 
     private static final SavedData.Factory<FactoryStore> FACTORY =
             new SavedData.Factory<>(FactoryStore::new, FactoryStore::load);
 
-    /** 存档里的工厂记录。 */
-    private List<FactoryRecord> records = new ArrayList<>();
-    /** 已分配到的工厂序号；用于生成确定性 id。 */
-    private long nextSeq;
+    /** 工厂 id → 存档条目。 */
+    private final Map<UUID, Entry> entries = new LinkedHashMap<>();
+    /** 本 tick 已经由 {@link #put} 写过的工厂；{@link #flushRuntime} 跳过它们。 */
+    private final Set<UUID> writtenThisTick = new LinkedHashSet<>();
+    /** 等下一轮 flush 的工厂。 */
+    private final Set<UUID> runtimeDirty = new LinkedHashSet<>();
 
     private FactoryStore() {
         // SavedData 由工厂方法创建
+    }
+
+    /**
+     * 一个工厂的存档条目：拥有者、锚点与节点表。
+     *
+     * @param owner  拥有者玩家 uuid
+     * @param anchor 仓库锚点方块；未绑定为 {@code null}
+     * @param nodes  节点表
+     */
+    public record Entry(UUID owner, @Nullable BlockKey anchor, List<Node> nodes) {
+        public Entry {
+            nodes = List.copyOf(nodes);
+        }
+    }
+
+    /**
+     * 工厂 id 的派生规则：拥有者唯一确定 id。
+     *
+     * @param owner 拥有者玩家 uuid
+     * @return 工厂 id
+     */
+    public static UUID idOf(UUID owner) {
+        return UUID.nameUUIDFromBytes(("idlefactory:" + owner).getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -65,115 +94,142 @@ public final class FactoryStore extends SavedData {
         return overworld.getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
     }
 
-    /** 当前记录（只读）。 */
-    public List<FactoryRecord> records() {
-        return List.copyOf(this.records);
+    /** 存档里的全部条目（只读）。 */
+    public List<Entry> entries() {
+        return List.copyOf(this.entries.values());
     }
 
     /**
-     * 整份替换记录并标脏。
+     * 配置行落盘：整条重建并记进本 tick 已写。
      *
-     * @param newRecords 新记录
+     * @param factory 发生配置变化的工厂
      */
-    public void setRecords(List<FactoryRecord> newRecords) {
-        this.records = new ArrayList<>(newRecords);
+    public void put(io.github.crafteve.idlefactory.factory.Factory factory) {
+        this.entries.put(factory.id(), toEntry(factory));
+        this.writtenThisTick.add(factory.id());
         setDirty();
     }
 
     /**
-     * 取下一个工厂序号并自增。
+     * 标一个工厂的运行时数据待落盘。
      *
-     * @return 严格递增的序号
+     * @param factoryId 工厂 id
      */
-    public long takeNextSeq() {
+    public void markRuntimeDirty(UUID factoryId) {
+        this.runtimeDirty.add(factoryId);
+    }
+
+    /**
+     * 每 tick 落盘运行时数据：最多处理 {@code maxPerTick} 个，跳过本 tick 已由 {@link #put} 写过的。
+     *
+     * @param manager    工厂档案柜
+     * @param maxPerTick 本 tick 最多写几个
+     */
+    public void flushRuntime(FactoryManager manager, int maxPerTick) {
+        int budget = Math.max(1, maxPerTick);
+        int written = 0;
+        var iterator = this.runtimeDirty.iterator();
+        while (iterator.hasNext() && written < budget) {
+            UUID factoryId = iterator.next();
+            iterator.remove();
+            if (this.writtenThisTick.contains(factoryId)) {
+                continue;
+            }
+            manager.byId(factoryId).ifPresent(factory -> this.entries.put(factory.id(), toEntry(factory)));
+            written++;
+        }
+        if (written > 0) {
+            setDirty();
+        }
+    }
+
+    /**
+     * 停服落盘：从当前活的工厂整份重建，顺带清掉已删除工厂的条目。
+     *
+     * @param manager 工厂档案柜
+     */
+    public void flushAll(FactoryManager manager) {
+        this.entries.clear();
+        for (io.github.crafteve.idlefactory.factory.Factory factory : manager.all()) {
+            this.entries.put(factory.id(), toEntry(factory));
+        }
+        this.runtimeDirty.clear();
         setDirty();
-        return ++this.nextSeq;
+    }
+
+    /** 新一 tick：清掉「本 tick 已写」。 */
+    public void beginTick() {
+        this.writtenThisTick.clear();
+    }
+
+    private static Entry toEntry(io.github.crafteve.idlefactory.factory.Factory factory) {
+        return new Entry(factory.config().owner(), factory.config().storageAnchor(),
+                factory.config().nodes().all());
     }
 
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag list = new ListTag();
-        for (FactoryRecord record : this.records) {
-            CompoundTag entry = new CompoundTag();
-            entry.putUUID(TAG_ID, record.id());
-            entry.putUUID(TAG_OWNER, record.owner());
-            BlockKey anchor = record.anchor();
+        for (Entry entry : this.entries.values()) {
+            CompoundTag row = new CompoundTag();
+            row.putUUID(TAG_OWNER, entry.owner());
+            BlockKey anchor = entry.anchor();
             if (anchor != null) {
-                entry.putString(TAG_ANCHOR_DIM, anchor.dimension().location().toString());
-                entry.putLong(TAG_ANCHOR_POS, anchor.pos().asLong());
+                row.putString(TAG_ANCHOR_DIM, anchor.dimension().location().toString());
+                row.putLong(TAG_ANCHOR_POS, anchor.pos().asLong());
             }
-            if (!record.nodes().isEmpty()) {
+            if (!entry.nodes().isEmpty()) {
                 ListTag nodes = new ListTag();
-                for (Node node : record.nodes()) {
+                for (Node node : entry.nodes()) {
                     nodes.add(node.save(registries));
                 }
-                entry.put(TAG_NODES, nodes);
+                row.put(TAG_NODES, nodes);
             }
-            list.add(entry);
+            list.add(row);
         }
         tag.put(TAG_FACTORIES, list);
-        tag.putLong(TAG_NEXT_SEQ, this.nextSeq);
         return tag;
     }
 
     private static FactoryStore load(CompoundTag tag, HolderLookup.Provider registries) {
         FactoryStore store = new FactoryStore();
         ListTag list = tag.getList(TAG_FACTORIES, Tag.TAG_COMPOUND);
-        List<FactoryRecord> loaded = new ArrayList<>(list.size());
         for (int i = 0; i < list.size(); i++) {
-            CompoundTag entry = list.getCompound(i);
-            if (!entry.hasUUID(TAG_ID) || !entry.hasUUID(TAG_OWNER)) {
+            CompoundTag row = list.getCompound(i);
+            if (!row.hasUUID(TAG_OWNER)) {
                 continue;
             }
-            BlockKey anchor = readAnchor(entry);
+            UUID owner = row.getUUID(TAG_OWNER);
+            BlockKey anchor = readAnchor(row);
             List<Node> nodes = new ArrayList<>();
-            ListTag nodeList = entry.getList(TAG_NODES, Tag.TAG_COMPOUND);
+            ListTag nodeList = row.getList(TAG_NODES, Tag.TAG_COMPOUND);
             for (int j = 0; j < nodeList.size(); j++) {
                 Node node = Node.load(nodeList.getCompound(j), registries);
                 if (node != null) {
                     nodes.add(node);
                 }
             }
-            loaded.add(new FactoryRecord(entry.getUUID(TAG_ID), entry.getUUID(TAG_OWNER), anchor,
-                    nodes));
+            store.entries.put(idOf(owner), new Entry(owner, anchor, nodes));
         }
-        store.records = loaded;
-        store.nextSeq = tag.getLong(TAG_NEXT_SEQ);
         return store;
     }
 
     /**
      * 读仓库锚点。
      *
-     * <p>缺维度键或维度名非法都按「未绑定」处理：锚点是可选配置，读不出来不该拖累整个工厂。</p>
-     *
-     * @param entry 工厂记录标签
+     * @param row 工厂条目
      * @return 锚点；未绑定或字段非法时为 {@code null}
      */
     @Nullable
-    private static BlockKey readAnchor(CompoundTag entry) {
-        if (!entry.contains(TAG_ANCHOR_DIM) || !entry.contains(TAG_ANCHOR_POS)) {
+    private static BlockKey readAnchor(CompoundTag row) {
+        if (!row.contains(TAG_ANCHOR_DIM) || !row.contains(TAG_ANCHOR_POS)) {
             return null;
         }
-        ResourceLocation id = ResourceLocation.tryParse(entry.getString(TAG_ANCHOR_DIM));
+        ResourceLocation id = ResourceLocation.tryParse(row.getString(TAG_ANCHOR_DIM));
         if (id == null) {
             return null;
         }
         return BlockKey.of(ResourceKey.create(Registries.DIMENSION, id),
-                BlockPos.of(entry.getLong(TAG_ANCHOR_POS)));
-    }
-
-    /**
-     * 一条存档记录：工厂身份、仓库锚点与节点表。
-     *
-     * <p>节点自己带机器、IO 规则与 provider；{@code NextSeq} 仍是存档根级字段，
-     * 不属于任何工厂记录。</p>
-     *
-     * @param id     工厂 id
-     * @param owner  拥有者玩家 uuid
-     * @param anchor 仓库锚点方块；未绑定为 {@code null}
-     * @param nodes  节点表（含机器、IO 规则与 provider）
-     */
-    public record FactoryRecord(UUID id, UUID owner, @Nullable BlockKey anchor, List<Node> nodes) {
+                BlockPos.of(row.getLong(TAG_ANCHOR_POS)));
     }
 }

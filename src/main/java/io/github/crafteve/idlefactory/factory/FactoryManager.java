@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.FactoryStore.FactoryRecord;
+import io.github.crafteve.idlefactory.factory.FactoryStore.Entry;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 
@@ -35,24 +35,25 @@ public final class FactoryManager {
      *
      * @param records 存档里的工厂记录
      */
-    public void loadFrom(List<FactoryRecord> records) {
+    public void loadFrom(List<Entry> records) {
         this.byId.clear();
         this.byOwner.clear();
-        for (FactoryRecord record : records) {
+        for (Entry record : records) {
+            UUID id = FactoryStore.idOf(record.owner());
             FactoryConfig config = new FactoryConfig(record.owner(), record.anchor());
-            Factory factory = new Factory(record.id(), config);
+            Factory factory = new Factory(id, config);
             for (Node node : record.nodes()) {
                 NodeLibrary.Result added = factory.restoreNode(node);
                 if (added != NodeLibrary.Result.ADDED) {
                     IdleFactory.LOGGER.warn(
                             "Idle Factory: 载入工厂 {} 时节点 {} 未登记（{}），保留先登记的那个",
-                            record.id(), shortId(node), addResultText(added));
+                            id, shortId(node), addResultText(added));
                 }
             }
             if (!add(factory)) {
                 IdleFactory.LOGGER.warn(
                         "Idle Factory: 载入工厂 {}（拥有者 {}）失败：id 或拥有者与先登记的记录冲突，本条已忽略",
-                        record.id(), record.owner());
+                        id, record.owner());
             }
         }
     }
@@ -83,18 +84,6 @@ public final class FactoryManager {
      */
     private static String shortId(Node node) {
         return node.id().toString().substring(0, 8);
-    }
-
-    /**
-     * 导出成存档记录。停止时调一次。
-     *
-     * @return 当前所有工厂的记录
-     */
-    public List<FactoryRecord> toRecords() {
-        return this.byId.values().stream()
-                .map(factory -> new FactoryRecord(factory.id(), factory.config().owner(),
-                        factory.config().storageAnchor(), factory.config().nodes().all()))
-                .toList();
     }
 
     /**

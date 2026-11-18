@@ -236,7 +236,11 @@ public final class FactoryRuntime {
      * 的入口改调 {@link #markDirtyLinks(Factory)}。</p>
      */
     public void markDirty() {
-        save();
+        if (this.store != null) {
+            for (Factory factory : this.manager.all()) {
+                this.store.put(factory);
+            }
+        }
         this.occupancy.rebuild(this.occupancyEntries());
         // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
         this.nodeManager.requestReconcile();
@@ -300,21 +304,11 @@ public final class FactoryRuntime {
     }
 
     /**
-     * 取下一个工厂序号，用于生成确定性 id。
-     *
-     * @return 严格递增的序号；运行时未就绪时为 {@code 0}
-     */
-    public long takeNextSeq() {
-        return this.store == null ? 0L : this.store.takeNextSeq();
-    }
-
-    /**
-     * 把内存里的工厂导出到存档容器。停止时调一次；频繁调也没关系，{@code SavedData} 只在
-     * 存档时真正写盘。
+     * 把内存里的工厂整份导出到存档容器。停止时调一次。
      */
     public void save() {
         if (this.store != null) {
-            this.store.setRecords(this.manager.toRecords());
+            this.store.flushAll(this.manager);
         }
     }
 
@@ -354,7 +348,7 @@ public final class FactoryRuntime {
                 this.observationRunner.table());
         NeoForge.EVENT_BUS.register(this.worldEventListener);
         this.storageResolver = new MeStorageResolver(this.server);
-        this.manager.loadFrom(this.store.records());
+        this.manager.loadFrom(this.store.entries());
         this.occupancy.rebuild(this.occupancyEntries());
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage(this.storageResolver);
@@ -373,8 +367,15 @@ public final class FactoryRuntime {
 
     /** 每 tick 推进一次；实际编排在 {@link FactoryTickRunner}。 */
     public void tick() {
-        if (this.tickRunner != null) {
-            this.tickRunner.tick();
+        if (this.tickRunner == null) {
+            return;
+        }
+        if (this.store != null) {
+            this.store.beginTick();
+        }
+        this.tickRunner.tick();
+        if (this.store != null) {
+            this.store.flushRuntime(this.manager, 8);
         }
     }
 

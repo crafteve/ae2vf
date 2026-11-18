@@ -1,9 +1,6 @@
 package io.github.crafteve.idlefactory.command;
 
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-
-import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
@@ -82,7 +79,7 @@ public final class CommandController {
     /**
      * 保证玩家有一家工厂；已有就什么都不做。
      *
-     * <p>id 用「拥有者 + 自增序号」派生，确定且不与现有工厂冲突；建厂后推一次链接快照，
+     * <p>id 由拥有者派生（{@code FactoryStore.idOf}），确定且唯一；建厂后推一次链接快照，
      * 否则绑定杖要等到下一次结构变更才看得到它。</p>
      *
      * @param player 玩家
@@ -96,7 +93,7 @@ public final class CommandController {
         if (manager.byOwner(player.getUUID()).isPresent()) {
             return;
         }
-        UUID id = nextFactoryId(manager, runtime, player.getUUID());
+        UUID id = io.github.crafteve.idlefactory.factory.FactoryStore.idOf(player.getUUID());
         Factory factory = new Factory(id, new FactoryConfig(player.getUUID(), null));
         if (!manager.add(factory)) {
             IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
@@ -105,21 +102,4 @@ public final class CommandController {
         runtime.markDirtyLinks(factory);
     }
 
-    /**
-     * 生成一个不与现有工厂冲突的确定性 id。
-     *
-     * @param manager 工厂档案柜
-     * @param runtime 运行时（取自增序号）
-     * @param owner   拥有者
-     * @return 新 id
-     */
-    @Nullable
-    private static UUID nextFactoryId(FactoryManager manager, FactoryRuntime runtime, UUID owner) {
-        UUID id;
-        do {
-            long seq = runtime.takeNextSeq();
-            id = UUID.nameUUIDFromBytes((owner + ":" + seq).getBytes(StandardCharsets.UTF_8));
-        } while (manager.byId(id).isPresent());
-        return id;
-    }
 }
