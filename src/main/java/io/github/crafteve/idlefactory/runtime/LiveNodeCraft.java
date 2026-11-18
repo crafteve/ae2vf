@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.node;
+package io.github.crafteve.idlefactory.runtime;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -12,6 +12,9 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.io.CapacityPick;
+import io.github.crafteve.idlefactory.node.ProviderMode;
+import io.github.crafteve.idlefactory.node.MultiplierMode;
+import io.github.crafteve.idlefactory.node.NodeCraft;
 import io.github.crafteve.idlefactory.io.DispatchOrder;
 import io.github.crafteve.idlefactory.io.DispatchQueue;
 import io.github.crafteve.idlefactory.machine.Machine;
@@ -40,8 +43,8 @@ import net.minecraft.world.level.Level;
  * <p>样板解码结果、输入的 key 集合与产物 key 集合都缓存在这里，只在样板变化或机器上下线时
  * 重建；CPU 的合成规划直接读缓存，不会每 tick 解码样板。</p>
  */
-final class NodeCraftService implements ICraftingProvider {
-    private final NodeRuntime node;
+final class LiveNodeCraft implements ICraftingProvider {
+    private final LiveNode node;
     /** 当前能用的样板；机器方块不在时对外仍报空。 */
     private List<IPatternDetails> patterns = List.of();
     /** 所有样板输入的并集，已去掉组件（阻挡判定按这个比较）。 */
@@ -65,7 +68,7 @@ final class NodeCraftService implements ICraftingProvider {
     /**
      * @param node 所属机器节点
      */
-    NodeCraftService(NodeRuntime node) {
+    LiveNodeCraft(LiveNode node) {
         this.node = node;
     }
 
@@ -78,7 +81,7 @@ final class NodeCraftService implements ICraftingProvider {
 
     @Override
     public boolean pushPattern(IPatternDetails details, KeyCounter[] inputHolder) {
-        NodeProvider provider = this.node.node().provider();
+        NodeCraft provider = this.node.node().provider();
         if (this.isBusy() || !this.node.isAvailable() || !this.node.isNodeOnline()) {
             return false;
         }
@@ -140,7 +143,7 @@ final class NodeCraftService implements ICraftingProvider {
      * @return 份数，至少 1
      */
     private long factorOf(IPatternDetails details) {
-        return details instanceof ScaledPatternDetails scaled ? Math.max(1, scaled.factor()) : 1L;
+        return details instanceof LiveNodePatternDetails scaled ? Math.max(1, scaled.factor()) : 1L;
     }
 
     @Override
@@ -176,7 +179,7 @@ final class NodeCraftService implements ICraftingProvider {
      * <p>样板槽变化后调：AE2 的合成服务在节点注册时拍快照，不刷新的话 CPU 看到的永远是旧的。</p>
      */
     void rebuild() {
-        NodeProvider provider = this.node.node().provider();
+        NodeCraft provider = this.node.node().provider();
         Level level = this.node.decodeLevel();
         boolean modeChanged = this.smartCacheMode != provider.multiplier().mode();
         if (this.smartCacheRevision != this.node.node().topologyRevision() || modeChanged) {
@@ -200,7 +203,7 @@ final class NodeCraftService implements ICraftingProvider {
             }
             liveKeys.add(stack.copyWithCount(1));
             int factor = resolveFactor(provider, stack, details);
-            decoded.add(ScaledPatternDetails.scale(details, factor));
+            decoded.add(LiveNodePatternDetails.scale(details, factor));
             for (IPatternDetails.IInput input : details.getInputs()) {
                 for (GenericStack possible : input.getPossibleInputs()) {
                     inputs.add(possible.what().dropSecondary());
@@ -226,7 +229,7 @@ final class NodeCraftService implements ICraftingProvider {
      * @param details  原始样板
      * @return 倍数；智能探测失败回退 1
      */
-    private int resolveFactor(NodeProvider provider, ItemStack stack, IPatternDetails details) {
+    private int resolveFactor(NodeCraft provider, ItemStack stack, IPatternDetails details) {
         return switch (provider.multiplier().mode()) {
             case OFF -> 1;
             case FIXED -> provider.multiplier().resolve(0);

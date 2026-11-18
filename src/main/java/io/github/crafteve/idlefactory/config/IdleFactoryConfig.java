@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.config;
 
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -26,7 +26,7 @@ public final class IdleFactoryConfig {
     /** 全工厂机器数硬上限。 */
     public static final int HARD_MAX_TOTAL_MACHINES = NodeLibrary.HARD_MAX_TOTAL_MACHINES;
     /** 每侧规则数硬上限。 */
-    public static final int HARD_MAX_RULES_PER_SIDE = NodeIoGroup.MAX_RULES_PER_SIDE;
+    public static final int HARD_MAX_RULES_PER_SIDE = NodeIo.MAX_RULES_PER_SIDE;
     /** 名字长度硬上限。 */
     public static final int HARD_MAX_NAME_LENGTH = Node.HARD_MAX_NAME_LENGTH;
     /** 健康过期阈值硬上限（tick）。 */

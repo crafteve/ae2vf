@@ -23,7 +23,7 @@ import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
@@ -204,8 +204,8 @@ public final class CommandWand {
         ResourceLocation typeId = BuiltInRegistries.BLOCK
                 .getKey(level.getBlockState(block.pos()).getBlock());
         Machine machine = Machine.of(block.dimension(), block.pos());
-        Node candidate = new Node(UUID.randomUUID(), null, typeId, new NodeIoGroup(),
-                new io.github.crafteve.idlefactory.node.NodeProvider(), List.of(machine), 0L);
+        Node candidate = new Node(UUID.randomUUID(), null, typeId, new NodeIo(),
+                new io.github.crafteve.idlefactory.node.NodeCraft(), List.of(machine), 0L);
         CommandTopology topology = new CommandTopology(this.runtime, this.runtime.nodeManager(),
                 this.runtime.nodeIoRunner(), this.runtime.server());
         CommandTopology.TopologyOutcome outcome = topology.apply(factory, null, candidate,
@@ -334,8 +334,8 @@ public final class CommandWand {
             machines.add(Machine.of(block.dimension(), block.pos()));
         }
         if (base == null) {
-            return new Node(UUID.randomUUID(), null, typeId, new NodeIoGroup(),
-                    new io.github.crafteve.idlefactory.node.NodeProvider(), machines, 0L);
+            return new Node(UUID.randomUUID(), null, typeId, new NodeIo(),
+                    new io.github.crafteve.idlefactory.node.NodeCraft(), machines, 0L);
         }
         Node candidate = base;
         for (UUID machineId : draft.removed()) {

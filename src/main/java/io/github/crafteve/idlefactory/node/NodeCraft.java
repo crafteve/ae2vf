@@ -33,7 +33,7 @@ import net.minecraft.world.item.ItemStack;
  * <p>队列是 {@link DispatchQueue}：内存写入口只有它，本类只负责把队列序列化成 NBT 再读回来。
  * 旧版 {@code Pending} 格式（一单绑一台机器、只投 0/1 份）不再兼容，读到即丢弃。</p>
  */
-public final class NodeProvider {
+public final class NodeCraft {
     /** 默认样板槽数。 */
     public static final int DEFAULT_CAPACITY = 9;
     /** 每次扩容增加的槽数。 */
@@ -82,7 +82,7 @@ public final class NodeProvider {
     private final DispatchQueue pending = new DispatchQueue();
 
     /** 新建空供应器：默认 9 槽、不阻挡、队列为空。 */
-    public NodeProvider() {
+    public NodeCraft() {
         fill(this.patterns, DEFAULT_CAPACITY);
     }
 
@@ -298,8 +298,8 @@ public final class NodeProvider {
      * @param registries 注册表访问
      * @return 供应器数据
      */
-    public static NodeProvider load(CompoundTag tag, HolderLookup.Provider registries) {
-        NodeProvider provider = new NodeProvider();
+    public static NodeCraft load(CompoundTag tag, HolderLookup.Provider registries) {
+        NodeCraft provider = new NodeCraft();
         provider.blocking = BlockingMode.read(tag.getString(TAG_BLOCKING));
         provider.mode = ProviderMode.read(tag.getString(TAG_MODE));
         provider.modePinned = tag.getBoolean(TAG_MODE_PINNED);

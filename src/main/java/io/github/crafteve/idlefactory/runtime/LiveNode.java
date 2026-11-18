@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.node;
+package io.github.crafteve.idlefactory.runtime;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -11,6 +11,8 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.node.NodeCraft;
+import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.io.CapacityPick;
 import io.github.crafteve.idlefactory.io.DispatchQueue;
@@ -46,11 +48,11 @@ import net.minecraft.world.level.Level;
  * {@link PatternContainer} 是为了让 AE2 样板访问终端按节点看到一个容器，实现
  * {@link IActionHost} 是为了派单时能给出「节点自己发起的操作」这个动作源。</p>
  *
- * <p>节点不写自己的 NBT：重启后由 {@link NodeManager} 按节点记录和锚点重建。节点内的机器
+ * <p>节点不写自己的 NBT：重启后由 {@link LiveNodeLibrary} 按节点记录和锚点重建。节点内的机器
  * 掉线时节点保留，只是不再广告样板。</p>
  */
-public final class NodeRuntime
-        implements IGridNodeListener<NodeRuntime>, PatternContainer, IActionHost {
+public final class LiveNode
+        implements IGridNodeListener<LiveNode>, PatternContainer, IActionHost {
     /** 同一条节点告警的最短间隔（tick）：避免一个坏节点刷屏。 */
     private static final long WARN_INTERVAL = 100L;
 
@@ -58,10 +60,10 @@ public final class NodeRuntime
     private final UUID factoryId;
     private final IGridNode anchor;
     private final ServerLevel anchorLevel;
-    private final Consumer<NodeManager.Notice> notice;
-    private final NodeCraftService craft;
-    private final NodePatternInventory patternInventory;
-    private final NodeTerminalGroup terminal;
+    private final Consumer<LiveNodeLibrary.Notice> notice;
+    private final LiveNodeCraft craft;
+    private final LiveNodePatternInventory patternInventory;
+    private final LiveNodePatternGroup terminal;
     private final IManagedGridNode managed;
     private final IActionSource actionSource;
 
@@ -93,9 +95,9 @@ public final class NodeRuntime
      * @param ports       工厂共享的端口缓存
      * @param notice      节点告警出口
      */
-    NodeRuntime(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
+    LiveNode(MinecraftServer server, UUID factoryId, Node node, IGridNode anchor,
             ServerLevel anchorLevel, boolean available, PortExecutor ports,
-            Consumer<NodeManager.Notice> notice) {
+            Consumer<LiveNodeLibrary.Notice> notice) {
         this.server = server;
         this.factoryId = factoryId;
         this.node = node;
@@ -109,9 +111,9 @@ public final class NodeRuntime
         // 建节点时节点上可能已经有样板（读档 / 从容器模式切回 ME），第一 tick 统一解码。
         this.patternsDirty = true;
 
-        this.craft = new NodeCraftService(this);
-        this.patternInventory = new NodePatternInventory(this);
-        this.terminal = new NodeTerminalGroup(server, node, available);
+        this.craft = new LiveNodeCraft(this);
+        this.patternInventory = new LiveNodePatternInventory(this);
+        this.terminal = new LiveNodePatternGroup(server, node, available);
 
         this.managed = GridHelper.createManagedNode(this, this)
                 .setInWorldNode(false)
@@ -152,7 +154,7 @@ public final class NodeRuntime
      * 收拾一个没有接上的节点。
      *
      * <p>清理本身也必须降级：{@code destroy} 再抛异常会盖掉原始失败原因，还会把异常甩给
-     * {@link NodeManager}，等于 attach 没兜住。</p>
+     * {@link LiveNodeLibrary}，等于 attach 没兜住。</p>
      */
     private void discard() {
         try {
@@ -367,7 +369,7 @@ public final class NodeRuntime
                 inputFaces.put(spec.key(), spec.face());
             }
         }
-        NodeProvider provider = this.node.provider();
+        NodeCraft provider = this.node.provider();
         Set<UUID> members = new java.util.HashSet<>(this.node.machines().size());
         for (Machine machine : this.node.machines()) {
             members.add(machine.id());
@@ -473,7 +475,7 @@ public final class NodeRuntime
      * @param message 短句
      */
     void report(String message) {
-        this.notice.accept(new NodeManager.Notice(this.factoryId, this.node.id(), message));
+        this.notice.accept(new LiveNodeLibrary.Notice(this.factoryId, this.node.id(), message));
     }
 
     /** 产物白名单：所有样板产物的 key 并集。 */
@@ -503,7 +505,7 @@ public final class NodeRuntime
      * @param spec 对账输入
      * @return 工厂、节点 id、锚点与结构版本都没变时为 {@code true}
      */
-    boolean matches(NodeManager.Spec spec) {
+    boolean matches(LiveNodeLibrary.Spec spec) {
         return this.factoryId.equals(spec.factoryId())
                 && this.node.id().equals(spec.node().id())
                 && this.node.topologyRevision() == spec.node().topologyRevision()
@@ -547,7 +549,7 @@ public final class NodeRuntime
     }
 
     @Override
-    public void onSaveChanges(NodeRuntime owner, IGridNode node) {
+    public void onSaveChanges(LiveNode owner, IGridNode node) {
         // 节点自己不带 NBT（重启按机器记录重建），这里没有要落的盘；存档走 dataChanged 汇总。
     }
 }

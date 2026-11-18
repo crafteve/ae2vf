@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.node;
+package io.github.crafteve.idlefactory.runtime;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -14,6 +14,7 @@ import java.util.function.Consumer;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.io.PortExecutor;
 
 import appeng.api.networking.IGridNode;
@@ -28,7 +29,7 @@ import net.minecraft.server.level.ServerLevel;
  * 它不认识 {@code Factory}，只吃运行时拼好的 {@link Spec}：这样节点层不反向依赖工厂层。
  * 建节点分帧（每 tick 上限 {@link #MAX_CREATES_PER_TICK}）。</p>
  */
-public final class NodeManager {
+public final class LiveNodeLibrary {
     /** 每 tick 最多建几个节点。 */
     public static final int MAX_CREATES_PER_TICK = 128;
 
@@ -39,7 +40,7 @@ public final class NodeManager {
     private final Runnable dataChanged;
     /** 节点告警出口。 */
     private final Consumer<Notice> notice;
-    private final Map<UUID, NodeRuntime> nodes = new LinkedHashMap<>();
+    private final Map<UUID, LiveNode> nodes = new LinkedHashMap<>();
     /** 待建节点；每次对账整体替换。 */
     private final ArrayDeque<Spec> createQueue = new ArrayDeque<>();
     /** 工厂侧要求提前对账的标记。 */
@@ -53,7 +54,7 @@ public final class NodeManager {
      * @param dataChanged 存档数据变化回调
      * @param notice      节点告警出口
      */
-    public NodeManager(MinecraftServer server, PortExecutor ports, Runnable dataChanged,
+    public LiveNodeLibrary(MinecraftServer server, PortExecutor ports, Runnable dataChanged,
             Consumer<Notice> notice) {
         this.server = server;
         this.ports = ports;
@@ -108,7 +109,7 @@ public final class NodeManager {
      * @return 节点；没建出来时为 {@code null}
      */
     @Nullable
-    public NodeRuntime node(UUID nodeId) {
+    public LiveNode node(UUID nodeId) {
         return this.nodes.get(nodeId);
     }
 
@@ -129,9 +130,9 @@ public final class NodeManager {
             wanted.put(spec.node().id(), spec);
         }
 
-        Iterator<Map.Entry<UUID, NodeRuntime>> iterator = this.nodes.entrySet().iterator();
+        Iterator<Map.Entry<UUID, LiveNode>> iterator = this.nodes.entrySet().iterator();
         while (iterator.hasNext()) {
-            Map.Entry<UUID, NodeRuntime> entry = iterator.next();
+            Map.Entry<UUID, LiveNode> entry = iterator.next();
             Spec spec = wanted.get(entry.getKey());
             if (spec == null || !entry.getValue().matches(spec)) {
                 try {
@@ -151,7 +152,7 @@ public final class NodeManager {
             }
         }
         for (Spec spec : wanted.values()) {
-            NodeRuntime node = this.nodes.get(spec.node().id());
+            LiveNode node = this.nodes.get(spec.node().id());
             if (node != null) {
                 try {
                     // 名字 / 规则等非结构变化不重建节点，但要刷新到运行时。
@@ -173,7 +174,7 @@ public final class NodeManager {
         this.createQueued(now);
 
         boolean changed = false;
-        for (NodeRuntime node : this.nodes.values()) {
+        for (LiveNode node : this.nodes.values()) {
             try {
                 changed |= node.tick();
             } catch (RuntimeException e) {
@@ -192,7 +193,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void removeNode(UUID nodeId) {
-        NodeRuntime node = this.nodes.remove(nodeId);
+        LiveNode node = this.nodes.remove(nodeId);
         if (node != null) {
             try {
                 node.detachReturning();
@@ -211,7 +212,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void markPatternsDirty(UUID nodeId) {
-        NodeRuntime node = this.nodes.get(nodeId);
+        LiveNode node = this.nodes.get(nodeId);
         if (node != null) {
             node.markPatternsDirty();
         }
@@ -223,7 +224,7 @@ public final class NodeManager {
      * @param nodeId 节点 id
      */
     public void refreshName(UUID nodeId) {
-        NodeRuntime node = this.nodes.get(nodeId);
+        LiveNode node = this.nodes.get(nodeId);
         if (node != null) {
             node.refreshName();
         }
@@ -236,7 +237,7 @@ public final class NodeManager {
      * @param available 现在是否可用
      */
     public void setAvailable(UUID nodeId, boolean available) {
-        NodeRuntime node = this.nodes.get(nodeId);
+        LiveNode node = this.nodes.get(nodeId);
         if (node != null) {
             node.setAvailable(available);
         }
@@ -256,9 +257,9 @@ public final class NodeManager {
     /** 停机：拆掉全部节点，不碰存档数据。 */
     public void destroyAll() {
         this.createQueue.clear();
-        List<NodeRuntime> remaining = new ArrayList<>(this.nodes.values());
+        List<LiveNode> remaining = new ArrayList<>(this.nodes.values());
         this.nodes.clear();
-        for (NodeRuntime node : remaining) {
+        for (LiveNode node : remaining) {
             try {
                 node.shutdown();
             } catch (RuntimeException e) {
@@ -281,9 +282,9 @@ public final class NodeManager {
             if (this.nodes.containsKey(spec.node().id())) {
                 continue;
             }
-            NodeRuntime node;
+            LiveNode node;
             try {
-                node = new NodeRuntime(this.server, spec.factoryId(), spec.node(),
+                node = new LiveNode(this.server, spec.factoryId(), spec.node(),
                         spec.anchor(), spec.anchorLevel(), spec.available(), this.ports, this.notice);
             } catch (RuntimeException e) {
                 IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",

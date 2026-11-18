@@ -16,7 +16,7 @@ import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -34,7 +34,7 @@ import net.minecraft.world.level.block.Block;
  */
 public final class CommandTopology {
     private final FactoryLifecycle runtime;
-    private final NodeManager nodeManager;
+    private final LiveNodeLibrary nodeManager;
     private final IoRunner nodeIoRunner;
     private final MinecraftServer server;
 
@@ -44,7 +44,7 @@ public final class CommandTopology {
      * @param nodeIoRunner 执行器
      * @param server       服务端
      */
-    public CommandTopology(FactoryLifecycle runtime, NodeManager nodeManager, IoRunner nodeIoRunner,
+    public CommandTopology(FactoryLifecycle runtime, LiveNodeLibrary nodeManager, IoRunner nodeIoRunner,
             MinecraftServer server) {
         this.runtime = runtime;
         this.nodeManager = nodeManager;

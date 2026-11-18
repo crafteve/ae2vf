@@ -31,7 +31,7 @@ import io.github.crafteve.idlefactory.node.Node;
 
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 
-import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeIo;
 
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 
@@ -287,7 +287,7 @@ public final class FactorySnapshotBuilder {
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = IdleFactoryConfig.staleHealthTicks();
         for (Node node : factory.config().nodes().all()) {
-            NodeIoGroup io = node.io();
+            NodeIo io = node.io();
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
             BlockFacts.Source facts = observations == null

@@ -1,25 +1,25 @@
-package io.github.crafteve.idlefactory.node;
+package io.github.crafteve.idlefactory.runtime;
 
 import appeng.api.inventories.InternalInventory;
 import appeng.core.definitions.AEItems;
 
 import net.minecraft.world.item.ItemStack;
-import io.github.crafteve.idlefactory.node.NodeProvider;
+import io.github.crafteve.idlefactory.node.NodeCraft;
 
 /**
  * 机器样板槽的 {@link InternalInventory} 视图：AE2 样板访问终端读写的就是这里。
  *
- * <p>数据本身在 {@link NodeProvider}（跟着机器记录落盘），本类只把容量、槽位与「只收处理
+ * <p>数据本身在 {@link NodeCraft}（跟着机器记录落盘），本类只把容量、槽位与「只收处理
  * 样板」的过滤规则翻译成 AE2 的库存接口。写入后由节点统一刷新解码缓存并提示存档，避免终端
  * 一次搬多格时反复解码。</p>
  */
-final class NodePatternInventory implements InternalInventory {
-    private final NodeRuntime node;
+final class LiveNodePatternInventory implements InternalInventory {
+    private final LiveNode node;
 
     /**
      * @param node 所属机器节点
      */
-    NodePatternInventory(NodeRuntime node) {
+    LiveNodePatternInventory(LiveNode node) {
         this.node = node;
     }
 
@@ -35,7 +35,7 @@ final class NodePatternInventory implements InternalInventory {
 
     @Override
     public void setItemDirect(int slot, ItemStack stack) {
-        NodeProvider provider = this.provider();
+        NodeCraft provider = this.provider();
         int capacityBefore = provider.capacity();
         provider.setPattern(slot, stack);
         // 第一张处理样板意味着这台机器开始参与主动合成；玩家手动切过模式后不再自动改。
@@ -56,7 +56,7 @@ final class NodePatternInventory implements InternalInventory {
     }
 
     /** 这台机器的供应器数据。 */
-    private NodeProvider provider() {
+    private NodeCraft provider() {
         return this.node.node().provider();
     }
 }

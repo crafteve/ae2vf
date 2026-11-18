@@ -63,6 +63,18 @@ public final class NodeLibrary implements NodeLibraryView {
      * @param node 节点
      * @return 加入结果；失败时索引不变
      */
+    /** 结构版本：任何增删改都 +1，运行层据此决定要不要重建。 */
+    private int revision;
+
+    /**
+     * 当前结构版本。
+     *
+     * @return 版本号
+     */
+    public int revision() {
+        return this.revision;
+    }
+
     public Result add(Node node) {
         if (this.byId.containsKey(node.id())) {
             return Result.DUPLICATE;
@@ -76,6 +88,7 @@ public final class NodeLibrary implements NodeLibraryView {
             return Result.FULL;
         }
         this.index(node);
+        this.revision++;
         return Result.ADDED;
     }
 
@@ -102,6 +115,7 @@ public final class NodeLibrary implements NodeLibraryView {
         }
         this.unindex(old);
         this.index(node);
+        this.revision++;
         return Result.REPLACED;
     }
 
@@ -117,6 +131,7 @@ public final class NodeLibrary implements NodeLibraryView {
             return Result.NOT_FOUND;
         }
         this.unindex(old);
+        this.revision++;
         return Result.REMOVED;
     }
 

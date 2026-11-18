@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
@@ -70,7 +70,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Rule rule)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<NodeIoGroup> ioFound = requireIo(factory, nodeId);
+        Optional<NodeIo> ioFound = requireIo(factory, nodeId);
         if (ioFound.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -78,7 +78,7 @@ public final class CommandApply {
         if (resourceError != null) {
             return CommandResult.node(resourceError, nodeId);
         }
-        NodeIoGroup io = ioFound.get();
+        NodeIo io = ioFound.get();
         List<ResourceSpec> rules = rules(io, rule.side());
         int maxRules = IdleFactoryConfig.maxRulesPerSide();
         if (rules.size() >= maxRules) {
@@ -101,11 +101,11 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Rule rule)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<NodeIoGroup> ioFound = requireIo(factory, nodeId);
+        Optional<NodeIo> ioFound = requireIo(factory, nodeId);
         if (ioFound.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
-        NodeIoGroup io = ioFound.get();
+        NodeIo io = ioFound.get();
         ResourceSpec current = find(rules(io, rule.side()), rule.key());
         if (current == null) {
             return CommandResult.node(CommandReason.RULE_MISSING, nodeId);
@@ -132,11 +132,11 @@ public final class CommandApply {
         if (from == to) {
             return CommandResult.node(CommandReason.SAME_SIDE, nodeId);
         }
-        Optional<NodeIoGroup> ioFound = requireIo(factory, nodeId);
+        Optional<NodeIo> ioFound = requireIo(factory, nodeId);
         if (ioFound.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
-        NodeIoGroup io = ioFound.get();
+        NodeIo io = ioFound.get();
         ResourceSpec current = find(rules(io, from), rule.key());
         if (current == null) {
             return CommandResult.node(CommandReason.RULE_MISSING, nodeId);
@@ -172,11 +172,11 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Rule rule)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<NodeIoGroup> ioFound = requireIo(factory, nodeId);
+        Optional<NodeIo> ioFound = requireIo(factory, nodeId);
         if (ioFound.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
-        NodeIoGroup io = ioFound.get();
+        NodeIo io = ioFound.get();
         boolean ok = rule.side() == IoSide.INPUT
                 ? io.removeInput(rule.key()) : io.removeOutput(rule.key());
         if (!ok) {
@@ -323,14 +323,14 @@ public final class CommandApply {
         return topology.deleteNode(context.factory(), nodeId, context.player());
     }
 
-    private static Optional<NodeIoGroup> requireIo(Factory factory, @Nullable java.util.UUID nodeId) {
+    private static Optional<NodeIo> requireIo(Factory factory, @Nullable java.util.UUID nodeId) {
         if (nodeId == null) {
             return Optional.empty();
         }
         return factory.config().nodes().byId(nodeId).map(Node::io);
     }
 
-    private static List<ResourceSpec> rules(NodeIoGroup io, IoSide side) {
+    private static List<ResourceSpec> rules(NodeIo io, IoSide side) {
         return side == IoSide.INPUT ? io.inputs() : io.outputs();
     }
 

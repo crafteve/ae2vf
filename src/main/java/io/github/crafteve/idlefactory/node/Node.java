@@ -19,8 +19,8 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 一个节点：随机 id + 名字 + 类型方块 id + 节点级 IO / provider + 成员机器。
  *
- * <p>节点是<b>浅不可变聚合</b>：字段全部 final，结构变更返回新实例；{@link NodeIoGroup} 与
- * {@link NodeProvider} 是可变的，由新旧实例共享，所以加一台机器不会复制规则和样板。</p>
+ * <p>节点是<b>浅不可变聚合</b>：字段全部 final，结构变更返回新实例；{@link NodeIo} 与
+ * {@link NodeCraft} 是可变的，由新旧实例共享，所以加一台机器不会复制规则和样板。</p>
  *
  * <p>结构变更（加 / 删 / 替换机器、换类型方块）会把 {@link #topologyRevision()} 加一，
  * 供运行时判断是否需要重建 AE2 节点；改名、改规则、改阻挡不是结构变更，不加版本。</p>
@@ -35,15 +35,16 @@ public final class Node {
     private static final String TAG_NAME = "Name";
     private static final String TAG_TYPE_BLOCK_ID = "TypeBlockId";
     private static final String TAG_IO = "Io";
-    private static final String TAG_PROVIDER = "Provider";
+    /** 样板 / 队列聚合；旧档写的是 {@code Provider}，读侧兼容。 */
+    private static final String TAG_CRAFT = "Craft";
     private static final String TAG_MACHINES = "Machines";
 
     private final UUID id;
     @Nullable
     private final String name;
     private final ResourceLocation typeBlockId;
-    private final NodeIoGroup io;
-    private final NodeProvider provider;
+    private final NodeIo io;
+    private final NodeCraft provider;
     private final List<Machine> machines;
     private final long topologyRevision;
 
@@ -56,8 +57,8 @@ public final class Node {
      * @param machines         成员机器，至少一台，顺序即加入顺序
      * @param topologyRevision 结构版本；新建节点从 0 开始
      */
-    public Node(UUID id, @Nullable String name, ResourceLocation typeBlockId, NodeIoGroup io,
-            NodeProvider provider, List<Machine> machines, long topologyRevision) {
+    public Node(UUID id, @Nullable String name, ResourceLocation typeBlockId, NodeIo io,
+            NodeCraft provider, List<Machine> machines, long topologyRevision) {
         if (typeBlockId == null) {
             throw new IllegalArgumentException("节点必须有类型方块 id");
         }
@@ -82,8 +83,8 @@ public final class Node {
      * @return 新节点
      */
     public static Node of(@Nullable String name, ResourceLocation typeId, BlockKey block) {
-        return new Node(UUID.randomUUID(), name, typeId, new NodeIoGroup(),
-                new NodeProvider(), List.of(new Machine(UUID.randomUUID(), block)), 0L);
+        return new Node(UUID.randomUUID(), name, typeId, new NodeIo(),
+                new NodeCraft(), List.of(new Machine(UUID.randomUUID(), block)), 0L);
     }
 
     /** 节点 id。 */
@@ -103,12 +104,12 @@ public final class Node {
     }
 
     /** 节点 IO 规则；结构变更时新旧节点共享同一个对象。 */
-    public NodeIoGroup io() {
+    public NodeIo io() {
         return this.io;
     }
 
     /** 节点样板供应器数据；结构变更时新旧节点共享同一个对象。 */
-    public NodeProvider provider() {
+    public NodeCraft provider() {
         return this.provider;
     }
 
@@ -253,7 +254,7 @@ public final class Node {
         }
         tag.putString(TAG_TYPE_BLOCK_ID, this.typeBlockId.toString());
         tag.put(TAG_IO, this.io.save(registries));
-        tag.put(TAG_PROVIDER, this.provider.save(registries));
+        tag.put(TAG_CRAFT, this.provider.save(registries));
         ListTag list = new ListTag();
         for (Machine machine : this.machines) {
             list.add(machine.save());
@@ -291,8 +292,11 @@ public final class Node {
         if (machines.isEmpty()) {
             return null;
         }
-        NodeIoGroup io = NodeIoGroup.load(tag.getCompound(TAG_IO), registries, tag.getUUID(TAG_ID));
-        NodeProvider provider = NodeProvider.load(tag.getCompound(TAG_PROVIDER), registries);
+        NodeIo io = NodeIo.load(tag.getCompound(TAG_IO), registries, tag.getUUID(TAG_ID));
+        // 旧档写的是 Provider；新档写 Craft，读侧两种都认。
+        CompoundTag craftTag = tag.contains(TAG_CRAFT) ? tag.getCompound(TAG_CRAFT)
+                : tag.getCompound("Provider");
+        NodeCraft provider = NodeCraft.load(craftTag, registries);
         String name = tag.contains(TAG_NAME) ? tag.getString(TAG_NAME) : null;
         return new Node(tag.getUUID(TAG_ID), name, typeId, io, provider, machines, 0L);
     }

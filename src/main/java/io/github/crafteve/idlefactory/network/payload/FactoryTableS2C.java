@@ -18,7 +18,7 @@ import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.node.NodeIoGroup;
+import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
 import io.github.crafteve.idlefactory.observation.WorkState;
 import io.github.crafteve.idlefactory.network.ModNetwork;
@@ -199,7 +199,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
 
     private static void writeReasons(RegistryFriendlyByteBuf buf,
             List<IoReason> reasons) {
-        int count = Math.min(reasons.size(), NodeIoGroup.MAX_RULES_PER_SIDE);
+        int count = Math.min(reasons.size(), NodeIo.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             buf.writeByte(reasons.get(i).ordinal());
@@ -220,7 +220,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeRates(RegistryFriendlyByteBuf buf, List<Long> rates) {
-        int count = Math.min(rates.size(), NodeIoGroup.MAX_RULES_PER_SIDE);
+        int count = Math.min(rates.size(), NodeIo.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             buf.writeVarLong(rates.get(i));
@@ -241,7 +241,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
     }
 
     private static void writeRules(RegistryFriendlyByteBuf buf, List<ResourceSpec> rules) {
-        int count = Math.min(rules.size(), NodeIoGroup.MAX_RULES_PER_SIDE);
+        int count = Math.min(rules.size(), NodeIo.MAX_RULES_PER_SIDE);
         buf.writeVarInt(count);
         for (int i = 0; i < count; i++) {
             ResourceSpec rule = rules.get(i);

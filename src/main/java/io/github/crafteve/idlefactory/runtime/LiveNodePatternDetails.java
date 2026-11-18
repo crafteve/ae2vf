@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.node;
+package io.github.crafteve.idlefactory.runtime;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,13 +28,13 @@ import net.minecraft.world.level.Level;
  * {@link #pushInputsToExternalInventory} 直接用接口默认实现原样推送。委托回原始样板会走它
  * 自己的「按槽位拆分」分支，那里用的是原始数量，会造成投入不放大、产出放大。</p>
  */
-public final class ScaledPatternDetails implements IPatternDetails {
+public final class LiveNodePatternDetails implements IPatternDetails {
     private final IPatternDetails delegate;
     private final int factor;
     private final IInput[] inputs;
     private final List<GenericStack> outputs;
 
-    private ScaledPatternDetails(IPatternDetails delegate, int factor, IInput[] inputs,
+    private LiveNodePatternDetails(IPatternDetails delegate, int factor, IInput[] inputs,
             List<GenericStack> outputs) {
         this.delegate = delegate;
         this.factor = factor;
@@ -52,10 +52,10 @@ public final class ScaledPatternDetails implements IPatternDetails {
      * @param factor   希望使用的倍数
      * @return 放大后的样板
      */
-    public static ScaledPatternDetails scale(IPatternDetails delegate, int factor) {
+    public static LiveNodePatternDetails scale(IPatternDetails delegate, int factor) {
         int safe = safeFactor(delegate, factor);
         if (safe <= 1) {
-            return new ScaledPatternDetails(delegate, 1, delegate.getInputs(),
+            return new LiveNodePatternDetails(delegate, 1, delegate.getInputs(),
                     delegate.getOutputs());
         }
         IPatternDetails.IInput[] originalInputs = delegate.getInputs();
@@ -69,7 +69,7 @@ public final class ScaledPatternDetails implements IPatternDetails {
             scaledOutputs.add(new GenericStack(output.what(),
                     Math.multiplyExact(output.amount(), (long) safe)));
         }
-        return new ScaledPatternDetails(delegate, safe, scaledInputs, List.copyOf(scaledOutputs));
+        return new LiveNodePatternDetails(delegate, safe, scaledInputs, List.copyOf(scaledOutputs));
     }
 
     /**

@@ -23,7 +23,7 @@ import net.minecraft.nbt.Tag;
  *
  * <p>同一个资源在同一侧只允许一条规则；输入和输出各自独立。</p>
  */
-public final class NodeIoGroup {
+public final class NodeIo {
     /**
      * 每侧规则数硬上限：输入与输出各自最多多少条。
      *
@@ -173,9 +173,9 @@ public final class NodeIoGroup {
      * @param ownerId    节点 id，只用于超限告警
      * @return IO 规则
      */
-    public static NodeIoGroup load(CompoundTag tag, HolderLookup.Provider registries,
+    public static NodeIo load(CompoundTag tag, HolderLookup.Provider registries,
             UUID ownerId) {
-        NodeIoGroup group = new NodeIoGroup();
+        NodeIo group = new NodeIo();
         readSpecs(tag.getList(TAG_INPUTS, Tag.TAG_COMPOUND), registries, group.inputs,
                 ownerId, "输入");
         readSpecs(tag.getList(TAG_OUTPUTS, Tag.TAG_COMPOUND), registries, group.outputs,

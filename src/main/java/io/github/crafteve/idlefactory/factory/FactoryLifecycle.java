@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 
-import io.github.crafteve.idlefactory.node.NodeManager;
+import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
 
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.observation.ObservationRunner;
@@ -81,7 +81,7 @@ public final class FactoryLifecycle {
     /** 每 tick 的 IO 表单生成器。 */
     private final IoFormBuilder formBuilder = new IoFormBuilder();
     /** 虚拟机器节点：对账、分帧创建、每 tick 推进。 */
-    private final NodeManager nodeManager;
+    private final LiveNodeLibrary nodeManager;
     /** 每 tick 编排器；启动完成（load）后非 null。 */
     @Nullable
     private FactoryRunner runner;
@@ -103,7 +103,7 @@ public final class FactoryLifecycle {
         this.server = server;
         this.ports = new PortExecutor(server);
         this.nodeIoRunner = new IoRunner(this.ports);
-        this.nodeManager = new NodeManager(server, this.ports, this::markDirty, this::logNodeNotice);
+        this.nodeManager = new LiveNodeLibrary(server, this.ports, this::markDirty, this::logNodeNotice);
     }
 
     /**
@@ -218,7 +218,7 @@ public final class FactoryLifecycle {
     }
 
     /** 虚拟机器节点管理器。 */
-    public NodeManager nodeManager() {
+    public LiveNodeLibrary nodeManager() {
         return this.nodeManager;
     }
 
@@ -389,7 +389,7 @@ public final class FactoryLifecycle {
      *
      * @param notice 节点告警
      */
-    private void logNodeNotice(NodeManager.Notice notice) {
+    private void logNodeNotice(LiveNodeLibrary.Notice notice) {
         Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
         if (factory == null) {
             IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",

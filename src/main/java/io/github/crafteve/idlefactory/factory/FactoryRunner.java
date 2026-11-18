@@ -21,8 +21,8 @@ import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
-import io.github.crafteve.idlefactory.node.NodeManager;
-import io.github.crafteve.idlefactory.node.NodeRuntime;
+import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
+import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.node.NodeTypeResolver;
 import io.github.crafteve.idlefactory.observation.Health;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
@@ -59,7 +59,7 @@ final class FactoryRunner implements ObservationChangeListener {
     private final ObservationRunner observationRunner;
     private final ObservationReader observations;
     private final IoRunner nodeIoRunner;
-    private final NodeManager nodeManager;
+    private final LiveNodeLibrary nodeManager;
     private final MachineStateLibrary machineStates;
     private final IoFormBuilder formBuilder;
     private final MeStorageResolver storageResolver;
@@ -85,7 +85,7 @@ final class FactoryRunner implements ObservationChangeListener {
      */
     FactoryRunner(MinecraftServer server, FactoryManager manager,
             ObservationRunner observationRunner, ObservationReader observations,
-            IoRunner nodeIoRunner, NodeManager nodeManager, MachineStateLibrary machineStates,
+            IoRunner nodeIoRunner, LiveNodeLibrary nodeManager, MachineStateLibrary machineStates,
             IoFormBuilder formBuilder, MeStorageResolver storageResolver,
             FactoryNoticeHandler notices, Consumer<Factory> publish) {
         this.server = server;
@@ -190,7 +190,7 @@ final class FactoryRunner implements ObservationChangeListener {
             return;
         }
         try {
-            List<NodeManager.Spec> specs = new ArrayList<>();
+            List<LiveNodeLibrary.Spec> specs = new ArrayList<>();
             Map<UUID, Set<UUID>> onlineMachines = new HashMap<>();
             for (Factory factory : this.manager.all()) {
                 BlockKey anchor = factory.config().storageAnchor();
@@ -211,7 +211,7 @@ final class FactoryRunner implements ObservationChangeListener {
                     NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(node,
                             this.observations, now, staleTicks);
                     boolean available = snapshot.health() != NodeHealth.OFFLINE;
-                    specs.add(new NodeManager.Spec(factory.id(), node, anchorNode, level, available));
+                    specs.add(new LiveNodeLibrary.Spec(factory.id(), node, anchorNode, level, available));
                     Set<UUID> online = new HashSet<>();
                     for (NodeHealthResolver.MachineState state : snapshot.machines()) {
                         if (state.health().isOnline()) {
@@ -237,7 +237,7 @@ final class FactoryRunner implements ObservationChangeListener {
     private List<DispatchState> dispatchStates(Factory factory) {
         List<DispatchState> states = new ArrayList<>(factory.config().nodes().size());
         for (Node node : factory.config().nodes().all()) {
-            NodeRuntime runtime = this.nodeManager.node(node.id());
+            LiveNode runtime = this.nodeManager.node(node.id());
             if (runtime != null) {
                 states.add(runtime.dispatchState());
             }

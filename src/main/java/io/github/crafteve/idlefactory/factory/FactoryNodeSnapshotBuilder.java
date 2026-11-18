@@ -15,8 +15,8 @@ import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.node.NodeManager;
-import io.github.crafteve.idlefactory.node.NodeRuntime;
+import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
+import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
@@ -130,7 +130,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @return 节点视图
      */
     public static List<NodeView> nodes(Factory factory, @Nullable ObservationReader observations,
-            @Nullable IoForm form, @Nullable NodeManager nodeManager, long now) {
+            @Nullable IoForm form, @Nullable LiveNodeLibrary nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
         // 分组只由 NodeStatusResolver 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
@@ -159,7 +159,7 @@ public final class FactoryNodeSnapshotBuilder {
                                 view.health(), view.probed(), view.stale()));
             }
             boolean available = storageOnline && status.health() != NodeHealth.OFFLINE;
-            NodeRuntime runtime = nodeManager == null ? null : nodeManager.node(node.id());
+            LiveNode runtime = nodeManager == null ? null : nodeManager.node(node.id());
             // 规则里只有自动补的 FE 输入规则：这种节点删除不需要二次确认。
             // 样板不算玩家配置——删节点时样板会退回玩家背包，不会丢。
             boolean autoEnergyOnly = node.io().outputs().isEmpty()

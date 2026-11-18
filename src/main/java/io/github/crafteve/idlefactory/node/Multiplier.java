@@ -11,7 +11,7 @@ import net.minecraft.nbt.CompoundTag;
  * 智能倍率的实际倍数在派单时按节点在线机器的容量算，失败就回退 ×1。</p>
  *
  * <p>这里不再夹一个「业务硬上限」：倍数只受 {@link #MIN_FACTOR} 与解码校验约束，真正的
- * 溢出保护在 {@link ScaledPatternDetails#scale} 里按样板数量现算。给倍数设一个固定的业务上限
+ * 溢出保护在 {@link LiveNodePatternDetails#scale} 里按样板数量现算。给倍数设一个固定的业务上限
  * 会把「很大的样板」整张丢掉，那不是保护，是功能缺失。</p>
  *
  * @param mode   倍率模式
