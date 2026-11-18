@@ -11,14 +11,15 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 ### 1.2 核心设定
 
 - 服务端权威：IO 全在服务端；GUI 只是监视器，只渲染 + 发意图；menu 是登录壳。
-- 工厂不是数据库：仓库在 AE2 网络或方块容器组；仓库离线 = 没料，不是断网。
+- 工厂不是数据库：仓库只支持 AE2 网络（`MEStorage`）；仓库离线 = 没料，不是断网。
 - 被动 IO：玩家给机器配输入输出规则，每 tick 搬运。主动合成：AE2 pattern / CPU 下单，已实现——节点带虚拟样板供应器，把样板广告给 CPU、接住派单推输入并回收产物；被动模式只做被动搬运，主动模式在被动搬运之外参与合成，写入第一张样板时自动转主动。
 - 基础概念：节点（1..N 台机器，带自己的 IO 规则）；**没有产线对象**，分组只是 UI 视图；失联是运行时状态，不写档。
 - **机器 = 一个方块**。多方块已删除：一台机器不再占多个方块，节点靠成员机器列表承担「1 台 / 多台」的区别。
 - 资源身份用 AE2 的 `AEKey`：物品带完整数据组件（`AEItemKey`），流体按注册名（`AEFluidKey`），不自己造平行的资源类型。
 - **资源类型的覆盖范围 = AE2 原生 + 已安装的 AE 生态附属，模组自己不新增任何资源类型**。FE 以 Applied Flux 为前提，化学品以 Applied Mekanistics 为前提；没装对应附属就没有那类资源，不写降级表示、不造平行 key。装了时它们的 key 都是 `AEKey`，走和物品 / 流体完全相同的规则。
 - IO 规则分精确 / 模糊：模糊忽略物品组件，旧规则默认按模糊读入。
-- 观测层是第二事实层：方块在不在、哪个面有什么能力、是否在干活。界面只读观测。
+- 观测层是第二事实层：方块在不在、是什么方块 / 方块实体、是否在干活；不存能力面。界面只读观测。
+- **写操作只有一条路**：节点 / 规则 / 绑定杖的写入全部走 `command` 包（世界命令用 `containerId = -1`），门禁、执行、落盘、回执各管一段；没有并行的 Service 写入口。
 - 无方块。入口只有两个终端物品右键：被动 IO 管理终端、节点管理终端；**没有聊天指令入口**（`/idf` 已整体删除）。
 
 ### 1.3 技术栈
@@ -43,14 +44,20 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 | 包 | 负责 | 不负责 |
 |---|---|---|
-| `observation` | 方块级观测、能力缓存、工作状态 | 配置、搬运 |
-| `machine` | 机器（一个方块）、`ResourceSpec` / `MatchMode` 规则类型 | 世界探测、搬运 |
-| `storage` | 仓库后端（AE2 / 容器，统一实现 `MEStorage`）、`AeKeySupport` 工具 | IO 事务 |
+| `observation` | 方块级观测表、观测调度、批量变化、工作状态 | 配置、搬运 |
+| `machine` | 机器（一个方块）、`ResourceSpec` / `MatchMode` 规则类型、`MachineHealth` 纯函数 | 世界探测、搬运 |
+| `storage` | 仓库解析（只解析 AE2 `MEStorage`） | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
-| `factory` | 工厂实例与编排（Runtime / Service / Store / Actions）、节点与机器 | 存储实现、搬运实现 |
+| `factory` | 工厂实例、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点 |
+| `runtime` | 活节点：`LiveNode` / `LiveNodeLibrary` / `LiveNodeApply` / `LiveNodeRunner` / `LiveNodeCraft` / 样板视图 | 配置、搬运 |
+| `node` | 节点配置数据：`Node` / `NodeIo` / `NodeIoRules` / `NodeCraft` / `NodeDispatchQueue` / `NodeDispatchOrder` / `NodeLibrary` / `NodeCodec` | 世界探测、搬运、存档根 |
+| `claim` | 方块占用表（机器 / 仓库锚点唯一性） | 世界探测 |
+| `command` | 唯一写入口：`FactoryCommand` 信封、`CommandController`、门禁、执行、拓扑、绑定杖、回执与原因 | 存储实现、界面 |
+| `view` | 只读快照与状态：`MachineSnapshot` / `NodeSnapshot` / `ProviderSnapshot` / `NodeStatus` / `TotalState` / `NodeStatusBuilder` | 持久化、世界探测 |
+| `config` / `resource` / `location` | 配置项；`AEKey` 适配；`BlockKey` | 业务逻辑 |
 | `event` / `registry` | 绑定杖世界事件；MenuType 注册 | 业务逻辑 |
 | `menu` | 菜单与玩家槽位 | 工厂数据 |
-| `network` | 协议与负载 | 业务判断 |
+| `network` | 协议、负载、`CommandPort`、`NoticeHandler`（失联提示） | 业务判断 |
 | `client` | 客户端入口、世界链接、绑定杖、按键 | 工厂界面细节 |
 | `client.screen` | 两个终端界面（`terminal` 子包）、共享渲染组件（主题 / 九宫格 / 文案 / 搜索 / 图标 / 排序） | 服务端状态 |
 | `integration` | AE2 / Applied Flux / JEI / jecharacters 适配 | 核心逻辑 |
@@ -66,7 +73,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 硬条款：
 
 1. 包名只用单数领域名词。禁止 `util`、`common`、`misc`、`helper`。
-2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`，能力分类 = `CapabilityKind`。
+2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`，占用 = `BlockOccupancyTable`。
 3. 依赖不得成环。跨包 import 不逐条登记，只守这一条；历史上的 `storage → network`、`factory → integration.ae2`、`network.payload → client.network`、`io → node` 只是既成事实，不再是需要维护的例外清单。
 4. 发包只从 `network`，服务端不得直接发负载（`player.openMenu` 之外的网络动作都走负载）。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
@@ -78,26 +85,28 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 ### 2.2 三层信息：配置 / 观测 / io
 
 - 配置（最高信息，写档）：节点的成员机器与 IO 规则、`factory` 的节点库与仓库地址。只描述搬什么，不执行。
-- 观测（第二信息，不写档）：`observation` 判断机器是否存活（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、哪个面有什么能力、当前是否在干活。界面与执行门禁都只读它，读路径不探世界。
+- 观测（第二信息，不写档）：`observation` 判断方块在不在（PRESENT / UNLOADED / MISSING / NO_DIMENSION）、是什么方块 / 方块实体、当前是否在干活。界面与执行门禁都只读它，读路径不探世界。
 - 执行（第三信息，瞬态）：`io` 判断机器此刻能不能收、能不能抽，跑 `IoRunner → ActivePlanner / PassivePlanner → IoExecutor → PortExecutor`；结果写进 `IoAnalyzer` 的账本与结论（不写档），不回写配置。
 
 各包职责：
 
-- `factory`：工厂实例与编排。`Factory` 持仓库插头与节点库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是界面与绑定杖的行政入口，`NodeActions` 管节点规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
+- `factory`：工厂实例与编排。`Factory` 持仓库缓存与节点库；`FactoryLifecycle` 管读档 / 装配 / 停服；`FactoryRunner` 每 tick 按固定顺序推进；`FactoryStore` 负责两条落盘路径（`put` / `flushRuntime`）；写操作全部在 `command` 包，工厂层不再有行政入口。
+- `command`：唯一写入口。`CommandController` 收 `FactoryCommand` 信封；`CommandGate` / `CommandWandGate` 校验身份与作用域；`CommandApply` / `CommandTopology` / `CommandWand` 只改内存；`CommandPort` 落盘、推快照、发回执。
 - `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 可以依赖 `node`，反向则成环**：配置数据归 `node`，活节点在运行层包，执行层只取数据、不持有运行对象。
 
-调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
+调用链（被动）：`ServerTick → IdleFactoryServer → FactoryLifecycle → FactoryRunner（观测 → 节点健康 → 锚点 → 活节点 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
 
-调用链（主动，旁路）：`AE2 CPU → NodeCraftService.pushPattern（校验 + 拆份 + 入队）→ 同一 tick 内 IoRunner → ActivePlanner（CapacityPick / FacePick）→ IoExecutor.fill → 机器`；产物由 `IoRunner` 调 `IoExecutor.sweep` 扫回网络。
+调用链（主动，旁路）：`AE2 CPU → LiveNodeCraft.pushPattern（校验 + 拆份 + 入队）→ 同一 tick 内 IoRunner → ActivePlanner（CapacityPick / FacePick）→ IoExecutor.fill → 机器`；产物由 `IoRunner` 调 `IoExecutor.sweep` 扫回网络。
 
 执行顺序固定：回收 → 主动 → 被动。
 
-失败原因沿链上抛（`io/IoReason`，9 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常、`FACE_CONFIG_INVALID` 玩家配的面没有这个能力（不兜底、不换面）。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没）由 `MachineStatus` 回答。
+失败原因沿链上抛（`io/IoReason`，9 值）：`RUN` 正常、`SLEEPING` 择时未跑、`NO_FACE` 探不到面、`BUDGET_OUT` 预算耗尽、`NO_MATERIAL` 没料、`FULL` 满了、`REJECTED` 有容量却不收、`ERROR` 异常、`FACE_CONFIG_INVALID` 玩家配的面没有这个能力（不兜底、不换面）。`REJECTED` 说明面不对，清掉经验面下一轮重探；`FULL` 是正常状态，保住面。原因只回答「一次搬运尝试为什么是这个结果」，世界态（在不在、加载没、类型对不对）由 `MachineHealth` 回答。
 
 ### 2.3 数据层
 
 - 不可变优先：`record` + `withXxx` 返回新实例。
-- 存档读写对称：`toTag` / `fromTag` 成对，键名常量化，缺字段走默认值兼容旧档。
+- 存档读写对称：工厂根在 `FactoryStore`，节点在 `NodeCodec`；键名常量化，缺字段走默认值兼容旧档；样板聚合键写 `Craft`，读侧兼容旧的 `Provider`。
+- 工厂 id 由拥有者派生（`FactoryStore.idOf`），存档不写 id、不写序号。
 - 对外返回不可变集合或防御性拷贝，不暴露内部可变表。
 - 上限、间隔、容量一律具名常量，并在解码侧校验。
 - 枚举分支用穷尽 `switch`，不留 `default` 掩盖新增值。
@@ -108,7 +117,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`event` 绑定杖世界事件 · `registry` MenuType · `menu` 两个终端菜单宿主与 36 个玩家槽位 · `network` 协议版本、负载、快照出口 · `client` 客户端入口/世界链接/绑定杖/按键 · `client.screen.terminal` 两个终端界面（节点管理、被动 IO 配置），共享渲染组件在 `client.screen` 根下，类名统一 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 只读快照与状态 · `command` 唯一写入口 · `event` 绑定杖世界事件 · `registry` MenuType · `menu` 两个终端菜单宿主与 36 个玩家槽位 · `network` 协议版本、负载、快照出口、失联提示 · `client` 客户端入口/世界链接/绑定杖/按键 · `client.screen.terminal` 两个终端界面（节点管理、被动 IO 配置），共享渲染组件在 `client.screen` 根下，类名统一 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -117,8 +126,8 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 目标体量：上百台机器、16 个容器。
 
 - 退避：规则级（不是机器级），按上一轮原因分档——`NO_MATERIAL` 5 tick、`FULL` 10 tick、`NO_FACE` 20 tick、`REJECTED` 20×连续拒收（封顶 100）、`ERROR` 20→100、`SLEEPING` 200 tick；一次都没试过的条目立刻跑。观测按状态退避。主动单另有 5 / 10 / 20 / 40 / 80（封顶 100）的卡单退避。
-- 预算：观测 64 次/tick（`FactoryLimitsConfig.DEFAULT_OBSERVATION_BUDGET`，硬上限 256），脏位置 64 次/tick，工作状态 16 次/tick。
-- 复探：PRESENT 100 tick，UNLOADED 40 tick，MISSING 100 → 1200 tick，工作状态 10 tick。
+- 预算：观测三条通道各默认 128 次/tick（`IdleFactoryConfig.observationHealthBudgetPerTick` / `observationWorkBudgetPerTick` / `observationEventBudgetPerTick`，下限 1，**不设硬上限**）。
+- 复探：健康通道 120 tick（MISSING 逐渐退到 1200），工作状态 5 / 40 / 120 → 1200 tick；读档首 tick 对账一次，之后每 1200 tick。
 - IO：固定每 tick 一轮（原本可由 `/idf diag io` 调整，指令删除后固定）。
 - 上限：节点 4096、单节点机器 256、全厂机器 8192、规则每侧 16、仓库快照 1024。
 - 读路径不探世界：展示与界面只读观测缓存。
@@ -258,13 +267,13 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `FactoryRuntime.java` · `FactoryTickRunner.java` · `FactoryService.java` · `Node.java` · `NodeRuntime.java` · `NodeLibrary.java` · `NodeIoGroup.java` · `Machine.java` · `NodeActions.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchOrder.java` · `DispatchQueue.java` · `DispatchState.java` · `MachineState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeySupport.java` · `AppFluxKeys.java` · `ObservationService.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryManager.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `NodeStatus.java` · `NodeStatusBuilder.java` · `TotalState.java` · `NoticeHandler.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
 1. 存档写盘在 `ServerStoppingEvent`，`ServerStoppedEvent` 太晚。
-2. `markDirty()` 必须走 `save()`；`FactoryStore` 只写自己的 `records`。
-3. 能力监听器必须强引用（NeoForge 存 WeakReference）；监听器里只标脏，不查世界；负结果要缓存。
+2. 落盘两条路：配置变化走 `FactoryStore.put(factory)`（记「本 tick 已写」），运行时数据走 `flushRuntime`（跳过本 tick 已写的），停服走 `flushAll`；不要绕开 `FactoryStore` 直接改存档。
+3. 观测变化监听器（`ObservationChangeListener`）要强引用；监听器里只标脏 / 丢缓存，不查世界。`PortExecutor` 取端口前用观测事实校验（在、已探、方块实体类型没变）。
 4. `NO_SPACE` 与 `REJECTED` 不能混：前者是满，后者是面不对。
 5. `UNLOADED` 不进失联通知，只在节点健康里体现。
 6. 物品规则默认无向（GUI 不提供面；旧档与常规规则 `face == null`），但执行时不再自己试无向 handler：机器侧统一走 AE2 `MEStorage`，面由 `FacePick` 决定（配置面 → 经验面 → 逐面探），`PortExecutor` 按面取存储。规则里显式配了 `face` 的优先用配置面，配置面无效记 `FACE_CONFIG_INVALID`，不自动换面。物品规则不写路由表（模糊变体可能落在不同面）；流体 / FE 一直按面。
@@ -277,7 +286,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 浮层的绘制顺序写在终端屏幕的 `draw` 里，浮层必须排在物品与数量之后；被数量盖住基本都是顺序写错。
 15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
-16. 机器失联只进 `FactoryLive.machineMissing`，不写档；只有显式删除机器才删规则。
+16. 失联是运行时状态，不写档；`NoticeHandler` 按工厂聚合、10 秒节流发 actionbar，`UNLOADED` 不通知。只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
 18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `FactoryResourceIconRender`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
@@ -285,10 +294,11 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
     - **机械的类型替换用 bash 批量替换 + 编译器收敛**，不要逐文件人工 read→edit（40 个文件约 80 次工具往返）。批量替换的安全做法见 4.3。
 20. `FactorySortMode` 的声明顺序同时是档位按钮的循环顺序、物品组件与线协议的 ordinal：只许末尾追加、不许重排，否则旧终端里的排序档位会错位。
-21. **条目离开表单即释放账本与结论**（这是 2026-11-12 确认的预期行为，不是 bug）：机器短暂 UNLOADED（玩家跨区块）再回来，会从零开始——`faceHint` 丢、`idleTicks` 清零、退避重置，表现为「回来第一轮全速重探面」。只有需要给宽限期时才改，别当缺陷修。
+21. **账本与经验面按「配置引用的机器集合」保留**（2026-11-18 修订）：机器 UNLOADED 时仍保留 `faceHint` / 退避 / 端口缓存，只有机器离开配置才释放；保留集合统一在 `IoRunner` 收口（`IoAnalyzer` / `PortExecutor` / `PassivePlanner`）。观测恢复时 `wake`，不要当成新机器从零重探。
 
 ### 6.3 文档偏差
 
+- 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
 - 2026-11-11 修正 §1.2：原文写「主动合成未实现」，与代码不符（`NodeCraftService`、
   `ProviderMode.ACTIVE` 等早已实现）。
