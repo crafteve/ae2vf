@@ -13,6 +13,9 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
+import io.github.crafteve.idlefactory.command.CommandApply;
+import io.github.crafteve.idlefactory.command.CommandTopology;
+import io.github.crafteve.idlefactory.command.FactoryCommand;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
@@ -45,7 +48,7 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>它是网络负载与节点库之间唯一的一层业务：负载只把线协议 record 换成草稿，这里做判定与
  * 写库，回执再交回负载。所有方法都跑在服务端主线程，不建线程、不建锁。</p>
  *
- * <p>写库统一走 {@link MachineLinkService#applyTopologyChange}，所以「先全量校验、再一次写
+ * <p>写库统一走 {@link CommandTopology#apply}，所以「先全量校验、再一次写
  * 索引」只有一套：校验不通过时它返回 {@code deleted=false}，节点库与虚拟节点都不动。新增
  * 机器的观测刷新留在这里——终端没有新增机器的入口。</p>
  */
@@ -54,8 +57,7 @@ final class WandService {
     private final BlockOccupancyTable occupancy;
     @Nullable
     private final ObservationReader observations;
-    private final NodeLibraryService nodeLibrary;
-    private final MachineLinkService machineLinks;
+    private final CommandTopology topology;
     private final WandValidator validator;
     private final MinecraftServer server;
 
@@ -67,13 +69,12 @@ final class WandService {
      * @param server       服务端
      */
     WandService(FactoryManager manager, BlockOccupancyTable occupancy,
-            @Nullable ObservationReader observations, NodeLibraryService nodeLibrary,
-            MachineLinkService machineLinks, MinecraftServer server) {
+            @Nullable ObservationReader observations, CommandTopology topology,
+            MinecraftServer server) {
         this.manager = manager;
         this.occupancy = occupancy;
         this.observations = observations;
-        this.nodeLibrary = nodeLibrary;
-        this.machineLinks = machineLinks;
+        this.topology = topology;
         this.validator = new WandValidator(occupancy, server);
         this.server = server;
     }
@@ -199,11 +200,9 @@ final class WandService {
         if (finalMachines > 0 && candidate == null) {
             return WandCommitOutcome.failure(WandFailure.INVALID_REQUEST);
         }
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        MachineLinkService.TopologyOutcome outcome = this.machineLinks.applyTopologyChange(factory,
-                base, candidate, draft.removed(), player, batch);
-        batch.close();
-        if (!outcome.deleted()) {
+        CommandTopology.TopologyOutcome outcome = this.topology.apply(factory, base, candidate,
+                draft.removed(), player);
+        if (!outcome.applied()) {
             IdleFactory.LOGGER.warn("Idle Factory: 绑定杖提交写库结果与预期不符：result={}, node={},"
                     + " added={}, removed={}", outcome.result(), draft.nodeId(),
                     draft.added().size(), draft.removed().size());
@@ -235,7 +234,7 @@ final class WandService {
      *
      * <p>规则归节点不归机器，所以一次接入只补一条；节点里已经有 FE 输入或输出规则时不补
      * （玩家手动删掉或翻成输出都应该被尊重）。没装 Applied Flux 时没有 FE 这类资源，静默跳过。
-     * 规则上限、重复校验交给 {@link NodeActions#addRule}，这里只决定「要不要尝试」。</p>
+     * 规则上限、重复校验交给 {@link CommandApply#addRule}，这里只决定「要不要尝试」。</p>
      *
      * @param factory 工厂
      * @param nodeId  落库后的节点 id
@@ -270,10 +269,10 @@ final class WandService {
         if (!hasEnergy) {
             return;
         }
-        NodeActions.Result result = NodeActions.addRule(factory, nodeId, IoSide.INPUT, energy,
-                null, MatchMode.EXACT);
+        var result = CommandApply.addRule(factory, nodeId, new FactoryCommand.Rule(IoSide.INPUT,
+                energy, null, MatchMode.EXACT, null));
         if (!result.ok()) {
-            IdleFactory.LOGGER.debug("Idle Factory: 自动补 FE 规则未写入：{}", result.message());
+            IdleFactory.LOGGER.debug("Idle Factory: 自动补 FE 规则未写入：{}", result.reason());
         }
     }
 
@@ -337,11 +336,9 @@ final class WandService {
         Machine machine = Machine.of(block.dimension(), block.pos());
         Node candidate = new Node(UUID.randomUUID(), null, typeId, new NodeIoGroup(),
                 new NodeProvider(), List.of(machine), 0L);
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        MachineLinkService.TopologyOutcome outcome = this.machineLinks.applyTopologyChange(factory,
-                null, candidate, Set.of(), player, batch);
-        batch.close();
-        if (!outcome.deleted()) {
+        CommandTopology.TopologyOutcome outcome = this.topology.apply(factory, null, candidate,
+                Set.of(), player);
+        if (!outcome.applied()) {
             return mapAddFailure(outcome.result(), block);
         }
         refresh(block);
@@ -380,11 +377,9 @@ final class WandService {
             return WandCommitOutcome.failure(WandFailure.DELETE_BLOCKED,
                     WandDeleteReason.HAS_PATTERNS, List.of(block), 1);
         }
-        NodeLibraryService.Batch batch = this.nodeLibrary.begin(factory);
-        MachineLinkService.TopologyOutcome outcome = this.machineLinks.applyTopologyChange(factory,
-                node, null, Set.of(machine.id()), player, batch);
-        batch.close();
-        if (!outcome.deleted()) {
+        CommandTopology.TopologyOutcome outcome = this.topology.apply(factory, node, null,
+                Set.of(machine.id()), player);
+        if (!outcome.applied()) {
             return WandCommitOutcome.failure(WandFailure.INVALID_REQUEST);
         }
         return WandCommitOutcome.success(node.id(), 0, 1);

@@ -10,7 +10,7 @@ import io.github.crafteve.idlefactory.machine.Machine;
 /**
  * 节点库的只读视图：工厂配置对外只暴露这一层。
  *
- * <p>写入口只有 {@code NodeLibraryService}（运行时）与读档时的 {@code Factory#restoreNode}；
+ * <p>写入口只有 {@code Factory#addNode / removeNode / replaceNode} 与读档时的 {@code Factory#restoreNode}；
  * 调用方拿不到 {@link NodeLibrary} 本身，也就不会出现「改了节点库忘记落盘」的漏法。</p>
  */
 public interface NodeLibraryView {

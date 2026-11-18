@@ -59,13 +59,13 @@ public final class CommandApply {
             case PROVIDER_MULTIPLIER -> setMultiplier(factory, command.nodeId(), command.body());
             case PROVIDER_DISPATCH -> setDispatch(factory, command.nodeId(), command.body());
             case NODE_RENAME -> rename(factory, command.nodeId(), command.body());
-            case NODE_DELETE -> deleteNode(factory, command.nodeId());
+            case NODE_DELETE -> deleteNode(context, command.nodeId());
             case SET_ANCHOR -> toggleAnchor(context, command);
             default -> CommandResult.of(CommandReason.INTERNAL);
         };
     }
 
-    private static CommandResult addRule(Factory factory, java.util.UUID nodeId,
+    public static CommandResult addRule(Factory factory, java.util.UUID nodeId,
             FactoryCommand.Body body) {
         if (!(body instanceof FactoryCommand.Rule rule)) {
             return CommandResult.of(CommandReason.INTERNAL);
@@ -316,13 +316,11 @@ public final class CommandApply {
         return CommandResult.block(CommandReason.OK, target, List.of());
     }
 
-    private static CommandResult deleteNode(Factory factory, java.util.UUID nodeId) {
-        // 删节点要退样板、清执行层缓存，统一交给既有的删除入口；它内部会落盘。
-        io.github.crafteve.idlefactory.factory.NodeActions.Result result =
-                io.github.crafteve.idlefactory.factory.FactoryService.deleteNodeById(factory,
-                        nodeId);
-        return CommandResult.node(result.ok() ? CommandReason.OK : CommandReason.NODE_MISSING,
-                nodeId);
+    private static CommandResult deleteNode(CommandContext context, java.util.UUID nodeId) {
+        FactoryRuntime runtime = context.runtime();
+        CommandTopology topology = new CommandTopology(runtime, runtime.nodeManager(),
+                runtime.nodeIoRunner(), runtime.server());
+        return topology.deleteNode(context.factory(), nodeId, context.player());
     }
 
     private static Optional<NodeIoGroup> requireIo(Factory factory, @Nullable java.util.UUID nodeId) {

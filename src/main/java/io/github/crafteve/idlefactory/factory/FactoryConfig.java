@@ -59,7 +59,7 @@ public final class FactoryConfig {
     /**
      * 节点库的只读视图。
      *
-     * <p>对外只暴露读方法：写入口是 {@code NodeLibraryService}（运行时）与
+     * <p>对外只暴露读方法：写入口是 {@code Factory#addNode / removeNode / replaceNode}（运行时）与
      * {@code Factory#restoreNode}（读档），调用方拿不到可变句柄。</p>
      *
      * @return 节点库视图

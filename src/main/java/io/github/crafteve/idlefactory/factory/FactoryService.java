@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.factory;
 import java.util.List;
 import java.util.UUID;
 
+import io.github.crafteve.idlefactory.command.CommandTopology;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
@@ -19,7 +20,7 @@ import net.minecraft.server.level.ServerPlayer;
  * 打开终端时由 {@link #ensureFactory} 静默完成，并顺手推一次链接快照。</p>
  *
  * <p>它只做装配与转发，业务实现分别在 {@link WandService}（绑定杖判定与写库）、
- * {@link MachineLinkService}（按 id 删除）、{@link StorageLinkService}（仓库 toggle）。
+ * {@code command.CommandTopology}（节点拓扑写入）与统一写命令（规则、仓库锚点）。
  * 绑定杖回执直接复用 {@code factory.wand} 的公共 record，不引入网络层的类型。</p>
  */
 public final class FactoryService {
@@ -50,21 +51,6 @@ public final class FactoryService {
         public OpenResult {
             issues = List.copyOf(issues);
         }
-    }
-
-    /**
-     * 按节点 id 删除整个节点；节点终端删除入口。
-     *
-     * @param factory 工厂
-     * @param nodeId  节点 id
-     * @return 动作结果
-     */
-    public static NodeActions.Result deleteNodeById(Factory factory, UUID nodeId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return NodeActions.Result.err("Idle Factory 尚未启动（服务端未就绪）");
-        }
-        return machineLinks(runtime).deleteNodeById(factory, nodeId);
     }
 
     /**
@@ -146,24 +132,14 @@ public final class FactoryService {
     }
 
     /**
-     * 装配机器库写入口。
+     * 装配节点拓扑写入口。
      *
      * @param runtime 运行时
      * @return 服务实例
      */
-    private static NodeLibraryService machineLibrary(FactoryRuntime runtime) {
-        return new NodeLibraryService(runtime::markDirtyLinks);
-    }
-
-    /**
-     * 装配机器接线服务。
-     *
-     * @param runtime 运行时
-     * @return 服务实例
-     */
-    private static MachineLinkService machineLinks(FactoryRuntime runtime) {
-        return new MachineLinkService(runtime.manager(), runtime.nodeManager(),
-                runtime.nodeIoRunner(), machineLibrary(runtime), runtime.server());
+    private static CommandTopology topology(FactoryRuntime runtime) {
+        return new CommandTopology(runtime, runtime.nodeManager(), runtime.nodeIoRunner(),
+                runtime.server());
     }
 
     /**
@@ -174,7 +150,7 @@ public final class FactoryService {
      */
     private static WandService wandService(FactoryRuntime runtime) {
         return new WandService(runtime.manager(), runtime.occupancy(), runtime.observations(),
-                machineLibrary(runtime), machineLinks(runtime), runtime.server());
+                topology(runtime), runtime.server());
     }
 
 }

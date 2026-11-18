@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.machine.Machine;
  * {@link #add}、{@link #replace}、{@link #remove}，三种方法都是「先全量校验，再一次性写索引」：
  * 任何一条失败都不改索引，调用方从返回的 {@link Result} 区分原因。</p>
  *
- * <p>这里只守结构不变量与硬上限；config 的软上限由 {@code NodeLibraryService} 在调用前判。
+ * <p>这里只守结构不变量与硬上限；config 的软上限由 {@code command.CommandTopology} 在调用前判。
  * 方块全局唯一：一个 {@link BlockKey} 只能属于一个节点的一台机器。</p>
  */
 public final class NodeLibrary implements NodeLibraryView {
