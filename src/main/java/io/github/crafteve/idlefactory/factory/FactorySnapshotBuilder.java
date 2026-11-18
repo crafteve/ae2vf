@@ -84,7 +84,7 @@ public final class FactorySnapshotBuilder {
                 : anchor.dimension().location() + " " + anchor.pos().toShortString();
         return "工厂 " + factory.id()
                 + " | owner=" + factory.config().owner()
-                + " | storage=" + (factory.live().storageOnline() ? "online" : "offline")
+                + " | storage=" + (factory.storageOnline() ? "online" : "offline")
                 + " | anchor=" + anchorText;
     }
 
@@ -303,7 +303,7 @@ public final class FactorySnapshotBuilder {
                 boolean probed = state != null && state.probed();
                 boolean stale = state != null && state.stale();
 
-                IoAnalyzer.Stats.MachineStats stats = factory.live().analyzer().stats().machineOrNull(machine.id());
+                IoAnalyzer.Stats.MachineStats stats = factory.analyzer().stats().machineOrNull(machine.id());
                 IoForm.Slot slot = form == null ? null : form.slotOrNull(machine.id());
                 List<Long> inputRates = new ArrayList<>(inputs.size());
                 for (ResourceSpec spec : inputs) {

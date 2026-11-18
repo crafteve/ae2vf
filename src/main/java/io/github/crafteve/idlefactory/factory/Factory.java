@@ -4,10 +4,13 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.io.IoAnalyzer;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.storage.MeStorageResolver;
+
+import appeng.api.storage.MEStorage;
 
 /**
  * 一个工厂实例：id + 配置 + 运行时。
@@ -20,8 +23,16 @@ public final class Factory {
     private final UUID id;
     /** 写档部分：拥有者、仓库锚点、节点库。 */
     private final FactoryConfig config;
-    /** 运行时部分：解析出的仓库、在线标记、诊断计数。 */
-    private final FactoryLive live = new FactoryLive();
+    /** 当前仓库；离线时为 {@code null}。 */
+    @Nullable
+    private MEStorage storage;
+    /** 上一次解析是否成功拿到仓库。 */
+    private boolean storageOnline;
+    /** 上一次解析的异常摘要；正常时为 {@code null}。 */
+    @Nullable
+    private String storageError;
+    /** 执行账房：账本、结论与搬运速率（每工厂一份）。 */
+    private final IoAnalyzer analyzer = new IoAnalyzer();
 
     /**
      * @param id     工厂 id
@@ -42,9 +53,26 @@ public final class Factory {
         return this.config;
     }
 
-    /** 运行时数据。 */
-    public FactoryLive live() {
-        return this.live;
+    /** 当前仓库；离线时为 {@code null}。 */
+    @Nullable
+    public MEStorage storage() {
+        return this.storage;
+    }
+
+    /** 仓库是否在线（上一次解析是否成功）。 */
+    public boolean storageOnline() {
+        return this.storageOnline;
+    }
+
+    /** 上一次解析的异常摘要；正常时为 {@code null}。 */
+    @Nullable
+    public String storageError() {
+        return this.storageError;
+    }
+
+    /** 执行账房。 */
+    public IoAnalyzer analyzer() {
+        return this.analyzer;
     }
 
     /**
@@ -55,7 +83,7 @@ public final class Factory {
      */
     public void bindStorage(@Nullable BlockKey anchor, @Nullable MeStorageResolver resolver) {
         this.config.setStorageAnchor(anchor);
-        this.live.refresh(anchor, resolver);
+        this.refresh(anchor, resolver);
     }
 
     /**
@@ -105,6 +133,41 @@ public final class Factory {
      * @return 在线状态是否变化
      */
     public boolean refreshStorage(@Nullable MeStorageResolver resolver) {
-        return this.live.refresh(this.config.storageAnchor(), resolver);
+        return this.refresh(this.config.storageAnchor(), resolver);
+    }
+
+    /**
+     * 重新解析仓库锚点。解析失败降级成离线，不抛异常。
+     *
+     * @param anchor   仓库锚点；{@code null} 表示未绑定
+     * @param resolver 仓库解析器；{@code null} 表示运行时尚未就绪
+     * @return 在线状态是否发生变化
+     */
+    boolean refresh(@Nullable BlockKey anchor, @Nullable MeStorageResolver resolver) {
+        boolean wasOnline = this.storageOnline;
+        if (anchor == null) {
+            this.storage = null;
+            this.storageOnline = false;
+            this.storageError = null;
+            return wasOnline;
+        }
+        if (resolver == null) {
+            this.storage = null;
+            this.storageOnline = false;
+            this.storageError = "仓库解析器未就绪";
+            return wasOnline;
+        }
+        MEStorage resolved;
+        try {
+            resolved = resolver.resolve(anchor);
+            this.storageError = null;
+        } catch (RuntimeException e) {
+            // 适配层炸了也不能把工厂带崩，降级成离线；异常留给诊断面板
+            resolved = null;
+            this.storageError = e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
+        this.storage = resolved;
+        this.storageOnline = resolved != null;
+        return wasOnline != this.storageOnline;
     }
 }

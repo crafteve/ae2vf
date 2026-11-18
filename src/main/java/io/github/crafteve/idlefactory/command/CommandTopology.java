@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.io.IoRunner;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
@@ -33,7 +33,7 @@ import net.minecraft.world.level.block.Block;
  * <p>本类不缓存任何状态，也不认识网络：回执由 {@link CommandApply} 映射成原因。</p>
  */
 public final class CommandTopology {
-    private final FactoryRuntime runtime;
+    private final FactoryLifecycle runtime;
     private final NodeManager nodeManager;
     private final IoRunner nodeIoRunner;
     private final MinecraftServer server;
@@ -44,7 +44,7 @@ public final class CommandTopology {
      * @param nodeIoRunner 执行器
      * @param server       服务端
      */
-    public CommandTopology(FactoryRuntime runtime, NodeManager nodeManager, IoRunner nodeIoRunner,
+    public CommandTopology(FactoryLifecycle runtime, NodeManager nodeManager, IoRunner nodeIoRunner,
             MinecraftServer server) {
         this.runtime = runtime;
         this.nodeManager = nodeManager;
@@ -100,7 +100,7 @@ public final class CommandTopology {
             // 先拆节点：机器已经不归工厂管了，不能再让 CPU 往里派单
             this.nodeManager.removeNode(base.id());
             for (Machine machine : base.machines()) {
-                factory.live().analyzer().forgetMachine(machine.id());
+                factory.analyzer().forgetMachine(machine.id());
                 this.nodeIoRunner.forget(machine.id());
             }
             int returned = returnPatterns(factory, base, receiver);
@@ -116,7 +116,7 @@ public final class CommandTopology {
         }
         // 成员变了：结构版本随之变化，对账会把节点整体重建，样板缓存也在那时重算。
         for (UUID machineId : removed) {
-            factory.live().analyzer().forgetMachine(machineId);
+            factory.analyzer().forgetMachine(machineId);
             this.nodeIoRunner.forget(machineId);
         }
         this.runtime.markDirtyLinks(factory);

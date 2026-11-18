@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.location.BlockKey;
@@ -45,13 +45,13 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>本类不持有跨命令状态；所有方法都跑在服务端主线程。</p>
  */
 public final class CommandWand {
-    private final FactoryRuntime runtime;
+    private final FactoryLifecycle runtime;
     private final CommandWandGate gate;
 
     /**
      * @param runtime 服务端运行时
      */
-    public CommandWand(FactoryRuntime runtime) {
+    public CommandWand(FactoryLifecycle runtime) {
         this.runtime = runtime;
         this.gate = new CommandWandGate(runtime.occupancy(), runtime.server());
     }

@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.network.payload.wand;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.command.CommandWand;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -48,7 +48,7 @@ public record WandChainC2S(BlockKey origin) implements CustomPacketPayload {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            FactoryRuntime runtime = FactoryRuntime.get();
+            FactoryLifecycle runtime = FactoryLifecycle.get();
             if (runtime == null) {
                 return;
             }

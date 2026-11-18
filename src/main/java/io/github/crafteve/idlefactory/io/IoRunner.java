@@ -73,13 +73,13 @@ public final class IoRunner {
      */
     public void run(Factory factory, IoForm form, List<DispatchState> dispatches,
             Set<UUID> liveMachines, long now) {
-        IoAnalyzer analyzer = factory.live().analyzer();
+        IoAnalyzer analyzer = factory.analyzer();
         try {
-            if (!factory.live().storageOnline()) {
+            if (!factory.storageOnline()) {
                 // 仓库离线就是没料：不跑搬运，但账房仍然要收口。
                 return;
             }
-            MEStorage network = factory.live().storage();
+            MEStorage network = factory.storage();
             this.trackNodes(factory.id(), dispatches, now);
             this.recover(factory, dispatches, network, analyzer, now);
             this.active(factory, dispatches, network, analyzer, now);

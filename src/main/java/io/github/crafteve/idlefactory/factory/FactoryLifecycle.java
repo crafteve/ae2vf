@@ -47,16 +47,15 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>它是工厂生命周期的唯一入口：服务器启动时读档案、服务器停止时写档案、每 tick 推进
  * 所有工厂。它不认识终端、玩家会话或 GUI——终端关掉、玩家下线，它照跑。</p>
  *
- * <p>本类只做装配与生命周期：tick 编排在 {@link FactoryTickRunner}，观测与迁移消费在
- * {@link FactoryObservationRunner}，失联通知在 {@link FactoryNoticeHandler}，虚拟节点
- * 对账在 {@link FactoryNodeRunner}。这里保留的 getter 是对外兼容入口，新代码应通过
- * 构造注入拿到需要的协作者。</p>
+ * <p>本类只做装配与生命周期：每 tick 编排在 {@link FactoryRunner}，失联通知在
+ * {@link FactoryNoticeHandler}。这里保留的 getter 是对外兼容入口，新代码应通过构造注入
+ * 拿到需要的协作者。</p>
  *
  * <p>观测必须先于 IO：IO 的门禁读的是观测结论，读路径不许自己探世界。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID)
-public final class FactoryRuntime {
-    private static FactoryRuntime instance;
+public final class FactoryLifecycle {
+    private static FactoryLifecycle instance;
 
     private final MinecraftServer server;
     private final FactoryManager manager = new FactoryManager();
@@ -85,7 +84,7 @@ public final class FactoryRuntime {
     private final NodeManager nodeManager;
     /** 每 tick 编排器；启动完成（load）后非 null。 */
     @Nullable
-    private FactoryTickRunner tickRunner;
+    private FactoryRunner runner;
     private FactoryStore store;
     @Nullable
     private ObservationRunner observationRunner;
@@ -100,7 +99,7 @@ public final class FactoryRuntime {
     /** 每个玩家已经接受过的最大草稿提交序号；成功提交才推进，下线即清。 */
     private final Map<UUID, Long> lastAcceptedSeq = new HashMap<>();
 
-    private FactoryRuntime(MinecraftServer server) {
+    private FactoryLifecycle(MinecraftServer server) {
         this.server = server;
         this.ports = new PortExecutor(server);
         this.nodeIoRunner = new IoRunner(this.ports);
@@ -116,19 +115,27 @@ public final class FactoryRuntime {
         if (instance != null) {
             return;
         }
-        FactoryRuntime runtime = new FactoryRuntime(server);
+        FactoryLifecycle runtime = new FactoryLifecycle(server);
         runtime.load();
         instance = runtime;
     }
 
-    /** 服务器停止时调一次，把档案写回存档并丢掉内存状态。 */
-    public static void stop() {
-        FactoryRuntime runtime = instance;
+    /** 世界保存之前调一次：整份落盘，再拆虚拟节点（拆节点不会再改数据）。 */
+    public static void stopAndSave() {
+        FactoryLifecycle runtime = instance;
         if (runtime == null) {
             return;
         }
         runtime.save();
         runtime.nodeManager.destroyAll();
+    }
+
+    /** 服务器停止时调一次，把档案写回存档并丢掉内存状态。 */
+    public static void stop() {
+        FactoryLifecycle runtime = instance;
+        if (runtime == null) {
+            return;
+        }
         runtime.nodeIoRunner.clear();
         runtime.ports.clear();
         runtime.machineStates.clear();
@@ -144,7 +151,7 @@ public final class FactoryRuntime {
         }
         runtime.observationRunner = null;
         runtime.observationReader = null;
-        runtime.tickRunner = null;
+        runtime.runner = null;
         runtime.notices.clear();
         runtime.lastAcceptedSeq.clear();
         instance = null;
@@ -152,7 +159,7 @@ public final class FactoryRuntime {
 
     /** @return 当前运行时；服务端未启动时为 {@code null} */
     @Nullable
-    public static FactoryRuntime get() {
+    public static FactoryLifecycle get() {
         return instance;
     }
 
@@ -353,27 +360,22 @@ public final class FactoryRuntime {
         for (Factory factory : this.manager.all()) {
             factory.refreshStorage(this.storageResolver);
         }
-        FactoryObservationRunner observationRunner = new FactoryObservationRunner(
-                this.server, this.manager, this.observationRunner, this.observationReader,
-                this.nodeIoRunner, this.nodeManager, this.notices, this::markDirtyLinks);
-        this.observationRunner.register(observationRunner);
-        FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
-                this.server, this.manager, this.observationReader, this.nodeManager);
-        this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
-                this.nodeManager, this.observationReader, this.storageResolver, observationRunner,
-                nodeRunner, this.machineStates, this.formBuilder);
+        this.runner = new FactoryRunner(this.server, this.manager, this.observationRunner,
+                this.observationReader, this.nodeIoRunner, this.nodeManager, this.machineStates,
+                this.formBuilder, this.storageResolver, this.notices, this::markDirtyLinks);
+        this.observationRunner.register(this.runner);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
 
-    /** 每 tick 推进一次；实际编排在 {@link FactoryTickRunner}。 */
+    /** 每 tick 推进一次；实际编排在 {@link FactoryRunner}。 */
     public void tick() {
-        if (this.tickRunner == null) {
+        if (this.runner == null) {
             return;
         }
         if (this.store != null) {
             this.store.beginTick();
         }
-        this.tickRunner.tick();
+        this.runner.tick();
         if (this.store != null) {
             this.store.flushRuntime(this.manager, 8);
         }
@@ -397,45 +399,8 @@ public final class FactoryRuntime {
         IdleFactory.LOGGER.debug("Idle Factory: 节点 {} 告警：{}", notice.nodeId(), notice.message());
     }
 
-    @SubscribeEvent
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        FactoryRuntime runtime = instance;
-        if (runtime != null) {
-            runtime.forgetCommitSeq(event.getEntity().getUUID());
-        }
-    }
 
-    @SubscribeEvent
-    public static void onServerStarted(ServerStartedEvent event) {
-        start(event.getServer());
-    }
 
-    /**
-     * 世界保存之前调一次。
-     *
-     * <p>这是<b>唯一可靠的写盘时机</b>：{@code MinecraftServer#stopServer} 会先
-     * {@code saveEverything()} 再发 {@link ServerStoppedEvent}，等后者再标脏就没人写盘了。</p>
-     */
-    @SubscribeEvent
-    public static void onServerStopping(ServerStoppingEvent event) {
-        FactoryRuntime runtime = instance;
-        if (runtime != null) {
-            runtime.save();
-            // 写盘之后再拆节点：拆节点不会再改数据，但可能碰到已经被拆掉的网络
-            runtime.nodeManager().destroyAll();
-        }
-    }
 
-    @SubscribeEvent
-    public static void onServerStopped(ServerStoppedEvent event) {
-        stop();
-    }
 
-    @SubscribeEvent
-    public static void onServerTick(ServerTickEvent.Post event) {
-        FactoryRuntime runtime = instance;
-        if (runtime != null) {
-            runtime.tick();
-        }
-    }
 }

@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -44,7 +44,7 @@ public record FactoryLinksRequestC2S() implements CustomPacketPayload {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            FactoryRuntime runtime = FactoryRuntime.get();
+            FactoryLifecycle runtime = FactoryLifecycle.get();
             if (runtime == null) {
                 PacketDistributor.sendToPlayer(player, FactoryLinksS2C.empty());
                 return;

@@ -5,7 +5,7 @@ import java.util.Optional;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -29,7 +29,7 @@ public final class FactoryNodeSnapshots {
      * @param containerId 菜单容器 id；过期界面自行忽略
      */
     public static void send(ServerPlayer player, int containerId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime == null) {
             PacketDistributor.sendToPlayer(player, FactoryNodeTableS2C.empty(containerId));
             return;
@@ -44,6 +44,6 @@ public final class FactoryNodeSnapshots {
         List<FactoryNodeSnapshotBuilder.NodeView> nodes = FactoryNodeSnapshotBuilder.nodes(
                 owner, runtime.observations(), runtime.formFor(owner), runtime.nodeManager(), now);
         PacketDistributor.sendToPlayer(player, new FactoryNodeTableS2C(
-                containerId, true, owner.live().storageOnline(), nodes));
+                containerId, true, owner.storageOnline(), nodes));
     }
 }

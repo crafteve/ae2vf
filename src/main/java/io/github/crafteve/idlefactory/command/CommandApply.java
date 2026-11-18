@@ -9,7 +9,7 @@ import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.location.BlockKey;
@@ -196,7 +196,7 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
         found.get().provider().setBlocking(blocking.mode());
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime != null) {
             runtime.markDirty();
         }
@@ -213,7 +213,7 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
         found.get().provider().setMultiplier(new Multiplier(multiplier.mode(), multiplier.factor()));
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime != null) {
             runtime.markDirty();
             runtime.nodeManager().markPatternsDirty(nodeId);
@@ -231,7 +231,7 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
         found.get().provider().setDispatch(dispatch.mode());
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime != null) {
             runtime.markDirty();
         }
@@ -247,7 +247,7 @@ public final class CommandApply {
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime == null) {
             return CommandResult.node(CommandReason.NOT_STARTED, nodeId);
         }
@@ -317,7 +317,7 @@ public final class CommandApply {
     }
 
     private static CommandResult deleteNode(CommandContext context, java.util.UUID nodeId) {
-        FactoryRuntime runtime = context.runtime();
+        FactoryLifecycle runtime = context.runtime();
         CommandTopology topology = new CommandTopology(runtime, runtime.nodeManager(),
                 runtime.nodeIoRunner(), runtime.server());
         return topology.deleteNode(context.factory(), nodeId, context.player());
@@ -366,7 +366,7 @@ public final class CommandApply {
      * @param nodeId  节点 id
      */
     private static void afterRuleChange(Factory factory, java.util.UUID nodeId) {
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime == null) {
             return;
         }

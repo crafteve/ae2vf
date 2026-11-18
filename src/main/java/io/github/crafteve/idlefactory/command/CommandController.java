@@ -6,7 +6,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
 import net.minecraft.server.level.ServerPlayer;
 
@@ -31,7 +31,7 @@ public final class CommandController {
      * @return 回执
      */
     public static CommandResult execute(ServerPlayer player, FactoryCommand command) {
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime == null) {
             return CommandResult.of(CommandReason.NOT_STARTED);
         }
@@ -85,7 +85,7 @@ public final class CommandController {
      * @param player 玩家
      */
     public static void ensureFactory(ServerPlayer player) {
-        FactoryRuntime runtime = FactoryRuntime.get();
+        FactoryLifecycle runtime = FactoryLifecycle.get();
         if (runtime == null) {
             return;
         }

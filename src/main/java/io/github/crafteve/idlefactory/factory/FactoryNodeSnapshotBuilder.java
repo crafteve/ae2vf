@@ -137,7 +137,7 @@ public final class FactoryNodeSnapshotBuilder {
         Map<java.util.UUID, List<FactorySnapshotBuilder.MachineView>> byNode =
                 NodeStatusResolver.groupByNode(machineViews);
         List<NodeView> nodes = new ArrayList<>(factory.config().nodes().size());
-        boolean storageOnline = factory.live().storageOnline();
+        boolean storageOnline = factory.storageOnline();
         for (Node node : factory.config().nodes().all()) {
             List<FactorySnapshotBuilder.MachineView> views =
                     byNode.getOrDefault(node.id(), List.of());

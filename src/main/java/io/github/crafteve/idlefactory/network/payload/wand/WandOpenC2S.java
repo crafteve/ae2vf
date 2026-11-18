@@ -5,7 +5,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.command.CommandWand;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import appeng.menu.MenuOpener;
@@ -55,7 +55,7 @@ public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            FactoryRuntime runtime = FactoryRuntime.get();
+            FactoryLifecycle runtime = FactoryLifecycle.get();
             if (runtime == null) {
                 return;
             }

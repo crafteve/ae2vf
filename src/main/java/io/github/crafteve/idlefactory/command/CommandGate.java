@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
@@ -36,7 +36,7 @@ public final class CommandGate {
      * @return 失败原因；通过时返回 {@code null}
      */
     @Nullable
-    public static CommandReason check(FactoryCommand command, FactoryRuntime runtime,
+    public static CommandReason check(FactoryCommand command, FactoryLifecycle runtime,
             @Nullable Factory factory, @Nullable ServerPlayer player) {
         if (command.source() == CommandSource.SYSTEM) {
             return command.kind().systemOnly() ? null : CommandReason.SESSION_MISMATCH;

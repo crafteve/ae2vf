@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.command;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryRuntime;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
 import net.minecraft.server.level.ServerPlayer;
 
@@ -18,5 +18,5 @@ import net.minecraft.server.level.ServerPlayer;
  * @param now         当前游戏时间（tick）
  */
 public record CommandContext(@Nullable ServerPlayer player, Factory factory,
-        FactoryRuntime runtime, int containerId, long requestSeq, long now) {
+        FactoryLifecycle runtime, int containerId, long requestSeq, long now) {
 }
