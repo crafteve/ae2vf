@@ -22,7 +22,6 @@ import io.github.crafteve.idlefactory.io.IoForm;
 import io.github.crafteve.idlefactory.io.IoRunner;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
@@ -66,7 +65,6 @@ final class FactoryRunner implements ObservationChangeListener {
     private final IoRunner nodeIoRunner;
     private final LiveNodeApply nodeApply;
     private final LiveNodeRunner nodeRunner;
-    private final MachineStateLibrary machineStates;
     private final IoFormBuilder formBuilder;
     private final MeStorageResolver storageResolver;
     private final FactoryNoticeHandler notices;
@@ -82,7 +80,6 @@ final class FactoryRunner implements ObservationChangeListener {
      * @param nodeIoRunner      执行编排
      * @param nodeApply         虚拟节点建拆
      * @param nodeRunner        节点对账与推进
-     * @param machineStates     机器状态集合
      * @param formBuilder       表单生成器
      * @param storageResolver   仓库解析器
      * @param notices           失联通知聚合
@@ -90,7 +87,7 @@ final class FactoryRunner implements ObservationChangeListener {
     FactoryRunner(MinecraftServer server, FactoryManager manager,
             ObservationRunner observationRunner, ObservationReader observations,
             IoRunner nodeIoRunner, LiveNodeApply nodeApply, LiveNodeRunner nodeRunner,
-            MachineStateLibrary machineStates,
+
             IoFormBuilder formBuilder, MeStorageResolver storageResolver,
             FactoryNoticeHandler notices) {
         this.server = server;
@@ -100,7 +97,6 @@ final class FactoryRunner implements ObservationChangeListener {
         this.nodeIoRunner = nodeIoRunner;
         this.nodeApply = nodeApply;
         this.nodeRunner = nodeRunner;
-        this.machineStates = machineStates;
         this.formBuilder = formBuilder;
         this.storageResolver = storageResolver;
         this.notices = notices;
@@ -124,20 +120,19 @@ final class FactoryRunner implements ObservationChangeListener {
             }
         }
 
-        this.machineStates.beginRefresh();
+        // 保留集合按「配置引用的机器」：含 UNLOADED，只有机器离开配置才释放账本 / 面经验 / 端口缓存。
+        Set<UUID> liveMachines = new HashSet<>();
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 for (Machine machine : node.machines()) {
-                    this.machineStates.observed(machine, this.observations);
+                    liveMachines.add(machine.id());
                 }
             }
         }
-        this.machineStates.endRefresh();
-        Set<UUID> liveMachines = this.machineStates.ids();
 
         // 执行段：回收 → 主动 → 被动由 IoRunner 统一编排；这里只负责收集输入与收口账房。
         for (Factory factory : this.manager.all()) {
-            IoForm form = this.formBuilder.build(factory, this.machineStates);
+            IoForm form = this.formBuilder.build(factory, this.observations);
             this.nodeIoRunner.run(factory, form, this.dispatchStates(factory), liveMachines, now);
             factory.analyzer().tick(now);
         }

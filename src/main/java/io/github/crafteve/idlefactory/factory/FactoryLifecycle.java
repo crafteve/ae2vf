@@ -15,7 +15,6 @@ import io.github.crafteve.idlefactory.io.IoRunner;
 
 import io.github.crafteve.idlefactory.io.PortExecutor;
 
-import io.github.crafteve.idlefactory.machine.MachineStateLibrary;
 
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 
@@ -79,7 +78,6 @@ public final class FactoryLifecycle {
     /** 失联/恢复通知的聚合与节流。 */
     private final FactoryNoticeHandler notices = new FactoryNoticeHandler();
     /** 全服机器状态（世界的镜像，不写档）。 */
-    private final MachineStateLibrary machineStates = new MachineStateLibrary();
     /** 每 tick 的 IO 表单生成器。 */
     private final IoFormBuilder formBuilder = new IoFormBuilder();
     /** 虚拟机器节点：对账、分帧创建、每 tick 推进。 */
@@ -144,7 +142,6 @@ public final class FactoryLifecycle {
         }
         runtime.nodeIoRunner.clear();
         runtime.ports.clear();
-        runtime.machineStates.clear();
         runtime.formBuilder.clear();
         runtime.storageResolver = null;
         if (runtime.worldEventListener != null) {
@@ -172,11 +169,6 @@ public final class FactoryLifecycle {
     /** 档案柜。 */
     public FactoryManager manager() {
         return this.manager;
-    }
-
-    /** 全服机器状态（世界的镜像，只读）。 */
-    public MachineStateLibrary machineStates() {
-        return this.machineStates;
     }
 
     /**
@@ -360,6 +352,8 @@ public final class FactoryLifecycle {
         this.worldEventListener = new WorldEventListener(this.observationRunner,
                 this.observationRunner.table());
         NeoForge.EVENT_BUS.register(this.worldEventListener);
+        this.ports.bindFacts(this.observationReader);
+        this.observationRunner.register(this.ports);
         this.storageResolver = new MeStorageResolver(this.server);
         this.manager.loadFrom(this.store.entries());
         this.occupancy.rebuild(this.occupancyEntries());
@@ -367,7 +361,7 @@ public final class FactoryLifecycle {
             factory.refreshStorage(this.storageResolver);
         }
         this.runner = new FactoryRunner(this.server, this.manager, this.observationRunner,
-                this.observationReader, this.nodeIoRunner, this.nodeApply, this.nodeRunner, this.machineStates,
+                this.observationReader, this.nodeIoRunner, this.nodeApply, this.nodeRunner,
                 this.formBuilder, this.storageResolver, this.notices);
         this.observationRunner.register(this.runner);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());

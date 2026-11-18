@@ -4,12 +4,17 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.observation.ObservationChange;
+import io.github.crafteve.idlefactory.observation.ObservationChangeListener;
+import io.github.crafteve.idlefactory.observation.BlockFacts;
 
 import appeng.api.AECapabilities;
 import appeng.api.behaviors.ExternalStorageStrategy;
@@ -42,7 +47,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  * <p>调用者只有 {@code FacePick} / {@code CapacityPick} / {@code IoExecutor}。Runner 只持有
  * 并转交，不直接调用。</p>
  */
-public final class PortExecutor {
+public final class PortExecutor implements ObservationChangeListener {
     /** 端口缓存条数栅栏：正常玩法摸不到，只防病态规模把内存撑爆。 */
     public static final int PORT_CACHE_FENCE = 16384;
     /** 外部存储包装用的空回调。 */
@@ -52,6 +57,13 @@ public final class PortExecutor {
     private static final Direction[] FACES = Direction.values();
 
     private final MinecraftServer server;
+    /** 方块观测事实；根装配在启动后注入，未就绪时不做观测保险。 */
+    @Nullable
+    private BlockFacts.Source facts;
+    /** 建缓存时看到的方块实体类型，用于发现「方块被换掉」。 */
+    private final Map<UUID, String> beTypes = new LinkedHashMap<>();
+    /** 方块 → 机器 id：观测变化按方块失效缓存时要反查。 */
+    private final Map<BlockKey, UUID> machineByBlock = new LinkedHashMap<>();
     /**
      * 端口缓存：机器 id → 六面存储（下标即 {@code get3DDataValue()}）。
      *
@@ -65,6 +77,15 @@ public final class PortExecutor {
      */
     public PortExecutor(MinecraftServer server) {
         this.server = server;
+    }
+
+    /**
+     * 注入观测事实来源；根装配在观测就绪后调一次。
+     *
+     * @param facts 方块观测事实
+     */
+    public void bindFacts(BlockFacts.Source facts) {
+        this.facts = facts;
     }
 
     /**
@@ -89,6 +110,11 @@ public final class PortExecutor {
      */
     @Nullable
     public MEStorage storage(Machine machine, Direction face, boolean rebuild) {
+        if (!this.valid(machine)) {
+            // 方块不见了 / 没加载 / 类型换了：缓存整台作废，交给调用方按「没有端口」处理。
+            this.invalidateMachine(machine);
+            return null;
+        }
         int index = face.get3DDataValue();
         if (rebuild) {
             // 探面时强制重来：先把这一面踢掉，下面按「没有缓存」重建一次。
@@ -127,6 +153,8 @@ public final class PortExecutor {
      */
     public void invalidateMachine(Machine machine) {
         this.ports.remove(machine.id());
+        this.beTypes.remove(machine.id());
+        this.machineByBlock.remove(machine.block());
     }
 
     /**
@@ -136,6 +164,8 @@ public final class PortExecutor {
      */
     public void drop(UUID machineId) {
         this.ports.remove(machineId);
+        this.beTypes.remove(machineId);
+        this.machineByBlock.values().removeIf(id -> id.equals(machineId));
     }
 
     /**
@@ -149,9 +179,60 @@ public final class PortExecutor {
         return level != null && level.isLoaded(machine.block().pos());
     }
 
+    /**
+     * 按配置机器集合保留：只有离开配置的机器才丢缓存。
+     *
+     * @param keep 当前配置引用的机器 id（含 UNLOADED）
+     */
+    public void retainMachines(Set<UUID> keep) {
+        this.ports.keySet().removeIf(id -> !keep.contains(id));
+        this.beTypes.keySet().removeIf(id -> !keep.contains(id));
+        this.machineByBlock.values().removeIf(id -> !keep.contains(id));
+    }
+
     /** 清空全部端口（服务器停止时）。 */
     public void clear() {
         this.ports.clear();
+        this.beTypes.clear();
+        this.machineByBlock.clear();
+    }
+
+    /**
+     * 观测变化：方块离开 PRESENT 时立刻丢掉它的端口缓存，不等下次取用。
+     *
+     * @param change 一批方块变化
+     */
+    @Override
+    public void onObservationChanged(ObservationChange change) {
+        for (ObservationChange.BlockChange blockChange : change.changes()) {
+            if (blockChange.to() == io.github.crafteve.idlefactory.observation.Health.PRESENT) {
+                continue;
+            }
+            UUID machineId = this.machineByBlock.remove(blockChange.key());
+            if (machineId != null) {
+                this.ports.remove(machineId);
+                this.beTypes.remove(machineId);
+            }
+        }
+    }
+
+    /**
+     * 取用前用观测事实校验：方块必须在、已探测、类型没被换掉。
+     *
+     * @param machine 机器
+     * @return 缓存仍然可用时为 {@code true}
+     */
+    private boolean valid(Machine machine) {
+        if (this.facts == null) {
+            return true;
+        }
+        BlockFacts observation = this.facts.at(machine.block());
+        if (!observation.probed() || !observation.present() || observation.blockId() == null) {
+            return false;
+        }
+        String cached = this.beTypes.get(machine.id());
+        return cached == null || observation.beTypeId() == null
+                || cached.equals(observation.beTypeId());
     }
 
     private void store(UUID machineId, int faceIndex, MEStorage storage) {
@@ -192,6 +273,10 @@ public final class PortExecutor {
             return null;
         }
         BlockEntity be = level.getBlockEntity(pos);
+        if (be != null) {
+            this.beTypes.put(machine.id(), be.getType().toString());
+            this.machineByBlock.put(machine.block(), machine.id());
+        }
         MEStorage nativeStorage = be != null
                 ? level.getCapability(AECapabilities.ME_STORAGE, pos, be.getBlockState(), be, face)
                 : level.getCapability(AECapabilities.ME_STORAGE, pos, face);

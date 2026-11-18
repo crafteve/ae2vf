@@ -87,6 +87,8 @@ public final class IoRunner {
             this.passive(factory, form, network, analyzer, now);
         } finally {
             analyzer.retainMachines(liveMachines);
+            this.ports.retainMachines(liveMachines);
+            this.passivePlanner.retainMachines(liveMachines);
             Set<UUID> nodeIds = dispatches.stream().map(DispatchState::nodeId)
                     .collect(java.util.stream.Collectors.toSet());
             analyzer.retainNodes(nodeIds);

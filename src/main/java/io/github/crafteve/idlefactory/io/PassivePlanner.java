@@ -76,6 +76,17 @@ public final class PassivePlanner {
         this.plans.remove(machineId);
     }
 
+    /**
+     * 按配置机器集合保留：只有离开配置的机器才释放游标、强制标记与执行清单。
+     *
+     * @param keep 当前配置引用的机器 id（含 UNLOADED）
+     */
+    public void retainMachines(Set<UUID> keep) {
+        this.cursors.keySet().removeIf(id -> !keep.contains(id));
+        this.forced.removeIf(id -> !keep.contains(id));
+        this.plans.keySet().removeIf(id -> !keep.contains(id));
+    }
+
     /** 清空全部排期状态（服务器停止时）。 */
     public void clear() {
         this.cursors.clear();
