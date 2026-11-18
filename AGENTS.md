@@ -67,13 +67,13 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 1. 包名只用单数领域名词。禁止 `util`、`common`、`misc`、`helper`。
 2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`，能力分类 = `CapabilityKind`。
-3. 依赖单向。现存例外只有 3 个：`storage → network`、`factory → integration.ae2`、`network.payload → client.network`。禁止新增跨层环。
+3. 依赖不得成环。跨包 import 不逐条登记，只守这一条；历史上的 `storage → network`、`factory → integration.ae2`、`network.payload → client.network`、`io → node` 只是既成事实，不再是需要维护的例外清单。
 4. 发包只从 `network`，服务端不得直接发负载（`player.openMenu` 之外的网络动作都走负载）。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
 6. 数据 record 只存 id、坐标、枚举；不持有 `Level`、`BlockEntity`、capability 等活对象。资源 key 一律用 AE2 的 `AEKey`，它本身是不可变值对象，不需要额外例外。
 7. 单文件超过约 400 行先给拆分方案，不边想边改。
 8. 新建包、新建文件、改数据层交互结构（record 字段 / NBT / 网络字段 / 跨包签名），计划里必须逐项列出：文件、职责、依赖方向、迁移顺序。等你确认后再动手。
-9. **类名 = 限定词 + 后缀。** 后缀只取上面两张表；限定词说明「谁的 / 哪个子领域的」，只有三种来源：层名（`Io`）、子领域（`Dispatch`）、主题或功能词（`Blocking`、`Multiplier`、`Provider`、`Active`、`Passive`、`Face`、`Capacity`、`Variant`、`Port`）。包的领域根类型（`Node`、`Machine`）可以裸名，其余一律要有可读限定词：`Analyzer` 不合格，`IoAnalyzer` 合格。状态三分不许串：`Health` 只答在不在，`Status` 只答能不能干活，`State` 只答此刻是什么。
+9. **类名 = 限定词 + 后缀。** 结构后缀只取上面两张表；功能名（`Command`、`Gate`、`Decoder`、`Codec`、`Source`、`Kind` 这类说明职责的词）不受后缀表约束，但必须说明它干什么。限定词说明「谁的 / 哪个子领域的」，只有三种来源：层名（`Io`）、子领域（`Dispatch`）、主题或功能词（`Blocking`、`Multiplier`、`Provider`、`Active`、`Passive`、`Face`、`Capacity`、`Variant`、`Port`）。包的领域根类型（`Node`、`Machine`）可以裸名，其余一律要有可读限定词：`Analyzer` 不合格，`IoAnalyzer` 合格。状态三分不许串：`Health` 只答在不在，`Status` 只答能不能干活，`State` 只答此刻是什么。
 
 ### 2.2 三层信息：配置 / 观测 / io
 
@@ -84,7 +84,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 各包职责：
 
 - `factory`：工厂实例与编排。`Factory` 持仓库插头与节点库；`FactoryRuntime` 每 tick 调观测 → 仓库 → IO；`FactoryService` 是界面与绑定杖的行政入口，`NodeActions` 管节点规则写操作；`FactorySnapshotBuilder` 把配置 + 观测整理成视图。
-- `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 不依赖 `node`**：节点只把 `DispatchState` 交下来，执行层不需要节点容器。
+- `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 可以依赖 `node`，反向则成环**：配置数据归 `node`，活节点在运行层包，执行层只取数据、不持有运行对象。
 
 调用链（被动）：`ServerTick → FactoryRuntime → FactoryTickRunner（观测 → 仓库 → 机器状态 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
 
