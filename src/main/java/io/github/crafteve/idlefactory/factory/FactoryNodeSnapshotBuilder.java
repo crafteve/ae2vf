@@ -7,6 +7,10 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.view.MemberSnapshot;
+import io.github.crafteve.idlefactory.view.ProviderSnapshot;
+import io.github.crafteve.idlefactory.view.NodeSnapshot;
+import io.github.crafteve.idlefactory.view.MachineSnapshot;
 import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.view.NodeStatusBuilder;
 import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
@@ -21,7 +25,7 @@ import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
-import io.github.crafteve.idlefactory.observation.MachineHealth;
+import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 import net.minecraft.core.BlockPos;
@@ -54,32 +58,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param provider         provider 组的状态
      * @param members          节点下的机器
      */
-    public record NodeSnapshot(java.util.UUID nodeId, @Nullable String name,
-            ResourceLocation typeBlockId, NodeStatus status, int ruleCount, int patternCount,
-            boolean autoEnergyOnly, int pendingCount, long pendingOldestAt, ProviderSnapshot provider,
-            List<MemberSnapshot> members) {
-
-        public NodeSnapshot {
-            members = List.copyOf(members);
-        }
-
-        /** 节点下的机器台数。 */
-        public int machineCount() {
-            return this.members.size();
-        }
-
-        /**
-         * 删除前要不要二次确认。
-         *
-         * <p>只有「接入时自动补的 FE 输入规则」不算玩家配置：这种节点点删除直接删，
-         * 规则反正会在下次接机器时再补回来。</p>
-         *
-         * @return 有样板、或有玩家自己配的规则
-         */
-        public boolean configured() {
-            return this.patternCount > 0 || (this.ruleCount > 0 && !this.autoEnergyOnly);
-        }
-    }
+    
 
     /**
      * provider 组的状态。
@@ -89,9 +68,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param multiplier  倍率
      * @param dispatch    派单模式
      */
-    public record ProviderSnapshot(boolean available, BlockingMode blocking, Multiplier multiplier,
-            DispatchMode dispatch) {
-    }
+    
 
     /**
      * 节点下的一台机器。
@@ -103,25 +80,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param probed    是否探测过
      * @param stale     健康是否过期
      */
-    public record MemberSnapshot(java.util.UUID machineId, BlockKey block,
-            @Nullable ResourceLocation blockId, MachineHealth health, boolean probed,
-            boolean stale) {
-
-        /** 机器方块。 */
-        public BlockKey primaryBlock() {
-            return this.block;
-        }
-
-        /** 方块坐标。 */
-        public BlockPos primaryPos() {
-            return this.block.pos();
-        }
-
-        /** 方块所在维度。 */
-        public ResourceLocation dimensionId() {
-            return this.block.dimension().location();
-        }
-    }
+    
 
     /**
      * 生成节点视图列表，顺序与节点库登记顺序一致。
@@ -133,22 +92,22 @@ public final class FactoryNodeSnapshotBuilder {
      */
     public static List<NodeSnapshot> nodes(Factory factory, @Nullable ObservationReader observations,
             @Nullable IoForm form, @Nullable LiveNodeApply nodeManager, long now) {
-        List<FactorySnapshotBuilder.MachineSnapshot> machineViews =
+        List<MachineSnapshot> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
         // 分组只由 NodeStatusBuilder 一处实现：机器表的节点状态与节点表的成员查找共用同一份分组。
-        Map<java.util.UUID, List<FactorySnapshotBuilder.MachineSnapshot>> byNode =
+        Map<java.util.UUID, List<MachineSnapshot>> byNode =
                 NodeStatusBuilder.groupByNode(machineViews);
         List<NodeSnapshot> nodes = new ArrayList<>(factory.config().nodes().size());
         boolean storageOnline = factory.storageOnline();
         for (Node node : factory.config().nodes().all()) {
-            List<FactorySnapshotBuilder.MachineSnapshot> views =
+            List<MachineSnapshot> views =
                     byNode.getOrDefault(node.id(), List.of());
             // 节点状态只由 NodeStatusBuilder 一处聚合：探没过期看全体，在干什么按最需要管的那台。
             NodeStatus status = NodeStatusBuilder.resolve(node.ruleCount(), views);
             List<MemberSnapshot> members = new ArrayList<>(node.machineCount());
             for (Machine machine : node.machines()) {
-                FactorySnapshotBuilder.MachineSnapshot view = null;
-                for (FactorySnapshotBuilder.MachineSnapshot candidate : views) {
+                MachineSnapshot view = null;
+                for (MachineSnapshot candidate : views) {
                     if (candidate.machineId().equals(machine.id())) {
                         view = candidate;
                         break;

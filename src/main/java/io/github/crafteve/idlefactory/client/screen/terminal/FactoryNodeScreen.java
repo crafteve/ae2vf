@@ -18,6 +18,7 @@ import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
+import io.github.crafteve.idlefactory.view.NodeSnapshot;
 import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
@@ -653,7 +654,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param view 节点视图
      * @return 说明文字
      */
-    private static String deleteDetail(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
+    private static String deleteDetail(NodeSnapshot view) {
         int rules = view.ruleCount();
         int patterns = view.patternCount();
         if (rules > 0 && patterns > 0) {

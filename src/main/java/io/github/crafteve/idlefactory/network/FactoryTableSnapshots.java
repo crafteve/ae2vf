@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.view.MachineSnapshot;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.view.NodeStatus;
@@ -48,7 +49,7 @@ public final class FactoryTableSnapshots {
         }
         Factory owner = factory.get();
         long now = player.serverLevel().getGameTime();
-        List<FactorySnapshotBuilder.MachineSnapshot> machines = FactorySnapshotBuilder.machines(
+        List<MachineSnapshot> machines = FactorySnapshotBuilder.machines(
                 owner, runtime.observations(), runtime.formFor(owner), now);
         // 节点状态只在这里算一次：被动 IO 终端直接读，不再拿第一台机器自己拼。
         List<FactoryTableS2C.NodeStatusEntry> nodeStatuses = new ArrayList<>();

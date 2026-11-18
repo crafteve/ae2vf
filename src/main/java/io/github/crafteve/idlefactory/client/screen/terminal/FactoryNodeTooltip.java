@@ -6,6 +6,8 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
+import io.github.crafteve.idlefactory.view.MemberSnapshot;
+import io.github.crafteve.idlefactory.view.NodeSnapshot;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
@@ -78,7 +80,7 @@ final class FactoryNodeTooltip {
                     + waitedText(node.view().pendingOldestAt())));
         }
         if (!node.members().isEmpty()) {
-            FactoryNodeSnapshotBuilder.MemberSnapshot first = node.members().get(0).member();
+            MemberSnapshot first = node.members().get(0).member();
             lines.add(line("位置", first.dimensionId() + " "
                     + first.primaryPos().toShortString()));
         }
@@ -121,7 +123,7 @@ final class FactoryNodeTooltip {
      * @param view 节点视图
      * @return 说明文字
      */
-    private static String configuredText(FactoryNodeSnapshotBuilder.NodeSnapshot view) {
+    private static String configuredText(NodeSnapshot view) {
         int rules = view.ruleCount();
         int patterns = view.patternCount();
         if (rules > 0 && patterns > 0) {
@@ -154,7 +156,7 @@ final class FactoryNodeTooltip {
             return List.of();
         }
         MemberRow member = node.members().get(index);
-        FactoryNodeSnapshotBuilder.MemberSnapshot view = member.member();
+        MemberSnapshot view = member.member();
         List<Component> lines = new ArrayList<>(4);
         lines.add(Component.literal(member.label()).withStyle(ChatFormatting.BOLD));
         lines.add(Component.literal(view.dimensionId() + " "
@@ -169,7 +171,7 @@ final class FactoryNodeTooltip {
         if (index < 0 || index >= node.members().size()) {
             return List.of();
         }
-        FactoryNodeSnapshotBuilder.MemberSnapshot view = node.members().get(index).member();
+        MemberSnapshot view = node.members().get(index).member();
         return List.of(
                 Component.literal("定位").withStyle(ChatFormatting.BOLD),
                 Component.literal(view.dimensionId() + " "

@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder.MachineSnapshot;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 /**

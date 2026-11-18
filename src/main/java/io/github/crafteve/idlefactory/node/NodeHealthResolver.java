@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.observation.BlockFacts;
-import io.github.crafteve.idlefactory.observation.MachineHealth;
+import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
 import net.minecraft.resources.ResourceLocation;

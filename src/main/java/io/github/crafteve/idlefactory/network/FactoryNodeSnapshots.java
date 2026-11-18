@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import io.github.crafteve.idlefactory.factory.Factory;
+import io.github.crafteve.idlefactory.view.NodeSnapshot;
 import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
@@ -41,7 +42,7 @@ public final class FactoryNodeSnapshots {
         }
         Factory owner = factory.get();
         long now = player.serverLevel().getGameTime();
-        List<FactoryNodeSnapshotBuilder.NodeSnapshot> nodes = FactoryNodeSnapshotBuilder.nodes(
+        List<NodeSnapshot> nodes = FactoryNodeSnapshotBuilder.nodes(
                 owner, runtime.observations(), runtime.formFor(owner), runtime.nodeManager(), now);
         PacketDistributor.sendToPlayer(player, new FactoryNodeTableS2C(
                 containerId, true, owner.storageOnline(), nodes));
