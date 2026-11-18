@@ -34,7 +34,6 @@ import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -55,7 +54,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>观测必须先于 IO：IO 的门禁读的是观测结论，读路径不许自己探世界。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryLifecycle {
     private static FactoryLifecycle instance;
 
