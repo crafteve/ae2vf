@@ -56,7 +56,35 @@ public enum CommandReason {
     /** 没有可执行的改动。 */
     NO_CHANGE,
     /** 内部错误。 */
-    INTERNAL;
+    INTERNAL,
+    /** 草稿是空的。 */
+    EMPTY_DRAFT,
+    /** 主手不是绑定杖。 */
+    NOT_HOLDING_WAND,
+    /** 草稿版本号已经过期。 */
+    STALE_REQUEST,
+    /** 节点里的机器类型不一致。 */
+    TYPE_MISMATCH,
+    /** 草稿里同一个方块出现两次。 */
+    DUPLICATE_BLOCK,
+    /** 方块已经被占用（自己的机器或别人的）。 */
+    BLOCK_CLAIMED,
+    /** 目标区块未加载。 */
+    BLOCK_UNLOADED,
+    /** 目标不是可接入的机器。 */
+    NOT_A_MACHINE,
+    /** 节点数达到上限。 */
+    LIMIT_NODES,
+    /** 机器数达到上限。 */
+    LIMIT_MACHINES,
+    /** 这台机器不能单独删除（节点里还有别的机器）。 */
+    MEMBER_NOT_REMOVABLE,
+    /** 删到 0 台时节点上还有规则。 */
+    DELETE_BLOCKED_RULES,
+    /** 删到 0 台时节点上还有样板。 */
+    DELETE_BLOCKED_PATTERNS,
+    /** 草稿结构非法。 */
+    INVALID_DRAFT;
 
     /** 是否是成功结果。 */
     public boolean ok() {

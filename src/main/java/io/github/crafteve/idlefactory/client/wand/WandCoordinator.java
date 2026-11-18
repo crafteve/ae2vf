@@ -4,7 +4,13 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.command.CommandKind;
+import io.github.crafteve.idlefactory.command.CommandResult;
+import io.github.crafteve.idlefactory.command.CommandSource;
+import io.github.crafteve.idlefactory.command.FactoryCommand;
 import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
@@ -16,8 +22,6 @@ import io.github.crafteve.idlefactory.network.payload.wand.WandCommitC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandCommitS2C;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
-import io.github.crafteve.idlefactory.network.payload.wand.WandToggleC2S;
-import io.github.crafteve.idlefactory.network.payload.wand.WandToggleS2C;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -77,7 +81,9 @@ public final class WandCoordinator {
      * @param block 目标方块
      */
     public static void toggle(BlockKey block) {
-        PacketDistributor.sendToServer(new WandToggleC2S(block.pos()));
+        PacketDistributor.sendToServer(new FactoryCommandC2S(new FactoryCommand(-1,
+                CommandKind.WAND_TOGGLE, CommandSource.PLAYER, null, block, 0L,
+                new FactoryCommand.Empty())));
     }
 
     /**
@@ -130,16 +136,16 @@ public final class WandCoordinator {
     /**
      * 1:1 回执：成功出绿字，失败出红字。
      *
-     * @param payload 回执
+     * @param result 回执
      */
-    public static void handleToggle(WandToggleS2C payload) {
-        WandCommitOutcome outcome = payload.outcome();
-        if (!outcome.ok()) {
-            WandHud.failure(WandMessages.failure(outcome.failure()));
+    public static void handleToggleResult(CommandResult result) {
+        if (!result.ok()) {
+            WandHud.failure(Component.literal(CommandMessages.text(result)));
             return;
         }
-        WandHud.success(outcome.addedMachines() > 0
-                ? WandMessages.toggleConnected() : WandMessages.toggleDisconnected());
+        boolean connected = result.block() != null && WandLinks.owner(result.block()).isPresent();
+        WandHud.success(connected ? WandMessages.toggleConnected()
+                : WandMessages.toggleDisconnected());
     }
 
     /**

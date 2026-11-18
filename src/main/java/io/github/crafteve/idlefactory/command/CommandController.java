@@ -47,6 +47,9 @@ public final class CommandController {
         if (denied != null) {
             return CommandResult.of(denied);
         }
+        if (command.kind() == CommandKind.WAND_TOGGLE) {
+            return new CommandWand(runtime).toggle(player, command.target());
+        }
         CommandContext context = new CommandContext(player, factory, runtime,
                 command.containerId(), command.requestSeq(),
                 player.serverLevel().getGameTime());

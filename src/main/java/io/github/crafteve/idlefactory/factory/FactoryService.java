@@ -54,21 +54,6 @@ public final class FactoryService {
     }
 
     /**
-     * 空闲态右键方块：1:1 连接或断开。
-     *
-     * @param player 发起请求的玩家
-     * @param pos    目标方块
-     * @return 回执
-     */
-    public static WandCommitOutcome toggleMachine(ServerPlayer player, BlockPos pos) {
-        FactoryRuntime runtime = FactoryRuntime.get();
-        if (runtime == null) {
-            return WandCommitOutcome.failure(WandFailure.INVALID_REQUEST);
-        }
-        return wandService(runtime).toggle(player, pos);
-    }
-
-    /**
      * 编辑态 Ctrl + 右键：查找同 id 机器群。
      *
      * @param player 发起请求的玩家

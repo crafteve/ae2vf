@@ -38,10 +38,6 @@ import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
 
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
 
-import io.github.crafteve.idlefactory.network.payload.wand.WandToggleC2S;
-
-import io.github.crafteve.idlefactory.network.payload.wand.WandToggleS2C;
-
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -137,10 +133,6 @@ public final class ModNetwork {
                 FactoryNodeTableS2C::handle);
 
         // 机器绑定杖：1:1 toggle、连锁、草稿预校验与提交
-        registrar.playToServer(WandToggleC2S.TYPE, WandToggleC2S.STREAM_CODEC,
-                WandToggleC2S::handle);
-        registrar.playToClient(WandToggleS2C.TYPE, WandToggleS2C.STREAM_CODEC,
-                WandToggleS2C::handle);
         registrar.playToServer(WandChainC2S.TYPE, WandChainC2S.STREAM_CODEC, WandChainC2S::handle);
         registrar.playToClient(WandChainS2C.TYPE, WandChainS2C.STREAM_CODEC, WandChainS2C::handle);
         registrar.playToServer(WandOpenC2S.TYPE, WandOpenC2S.STREAM_CODEC, WandOpenC2S::handle);

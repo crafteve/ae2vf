@@ -47,6 +47,20 @@ public final class CommandMessages {
             case TARGET_NOT_MACHINE -> "目标不是可接入的机器";
             case NO_CHANGE -> "没有可执行的改动";
             case INTERNAL -> "内部错误";
+            case EMPTY_DRAFT -> "草稿是空的";
+            case NOT_HOLDING_WAND -> "主手要拿绑定杖";
+            case STALE_REQUEST -> "这次提交已过期";
+            case TYPE_MISMATCH -> "节点里的机器类型不一致";
+            case DUPLICATE_BLOCK -> "同一个方块在草稿里出现了两次";
+            case BLOCK_CLAIMED -> "方块已经被占用";
+            case BLOCK_UNLOADED -> "目标区块未加载";
+            case NOT_A_MACHINE -> "目标不是可接入的机器";
+            case LIMIT_NODES -> "节点数已达上限";
+            case LIMIT_MACHINES -> "机器数已达上限";
+            case MEMBER_NOT_REMOVABLE -> "节点里还有别的机器，不能单独拆这一台";
+            case DELETE_BLOCKED_RULES -> "节点上还有规则，先清空规则";
+            case DELETE_BLOCKED_PATTERNS -> "节点上还有样板，先退回样板";
+            case INVALID_DRAFT -> "草稿结构非法";
         };
     }
 
