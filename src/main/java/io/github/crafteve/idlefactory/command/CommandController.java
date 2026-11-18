@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.command;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
@@ -8,6 +9,13 @@ import io.github.crafteve.idlefactory.factory.FactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
+import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.observation.BlockFacts;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
+
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -54,6 +62,71 @@ public final class CommandController {
         CommandContext context = new CommandContext(player, factory, runtime,
                 command.containerId(), command.requestSeq(),
                 player.serverLevel().getGameTime());
+        CommandResult result = CommandApply.apply(context, command);
+        if (result.ok() && changesStructure(command.kind())) {
+            runtime.markDirtyLinks(factory);
+        }
+        return result;
+    }
+
+    /**
+     * 节点类型的「全离线自动迁移」判定：纯函数，只回答「要不要换类型」。
+     *
+     * <p>节点所有机器都离线、都探测过且不过期、类型方块都 PRESENT 且是同一个新 id、
+     * 且不等于当前类型时才迁移。部分换、换得不一样、空气、未加载、过期都不迁移。</p>
+     *
+     * @param node             节点
+     * @param facts            方块观测事实来源
+     * @param now              当前游戏时间
+     * @param staleHealthTicks 过期阈值（tick）
+     * @return 新类型方块 id；不满足迁移条件时为空
+     */
+    public static Optional<ResourceLocation> migrationTarget(Node node, BlockFacts.Source facts,
+            long now, long staleHealthTicks) {
+        NodeHealthResolver.Snapshot snapshot =
+                NodeHealthResolver.resolve(node, facts, now, staleHealthTicks);
+        if (snapshot.health() != NodeHealth.OFFLINE) {
+            return Optional.empty();
+        }
+        ResourceLocation candidate = null;
+        for (Machine machine : node.machines()) {
+            BlockFacts observation = facts.at(machine.block());
+            if (!observation.probed()
+                    || observation.isStale(now, staleHealthTicks)
+                    || !observation.present() || observation.blockId() == null) {
+                return Optional.empty();
+            }
+            if (candidate == null) {
+                candidate = observation.blockId();
+            } else if (!candidate.equals(observation.blockId())) {
+                // 各机器的类型方块换成了不同 id：不是一次统一的替换，不认。
+                return Optional.empty();
+            }
+        }
+        if (candidate == null || candidate.equals(node.typeBlockId())) {
+            return Optional.empty();
+        }
+        return Optional.of(candidate);
+    }
+
+    /**
+     * 执行一条服务端命令：没有玩家会话，门禁只查作用域与归属。
+     *
+     * @param factory 目标工厂
+     * @param command 命令；source 必须是 SYSTEM
+     * @return 回执
+     */
+    public static CommandResult executeSystem(Factory factory, FactoryCommand command) {
+        FactoryLifecycle runtime = FactoryLifecycle.get();
+        if (runtime == null) {
+            return CommandResult.of(CommandReason.NOT_STARTED);
+        }
+        CommandReason denied = CommandGate.check(command, runtime, factory, null);
+        if (denied != null) {
+            return CommandResult.of(denied);
+        }
+        CommandContext context = new CommandContext(null, factory, runtime, -1,
+                command.requestSeq(), runtime.server().overworld().getGameTime());
         CommandResult result = CommandApply.apply(context, command);
         if (result.ok() && changesStructure(command.kind())) {
             runtime.markDirtyLinks(factory);

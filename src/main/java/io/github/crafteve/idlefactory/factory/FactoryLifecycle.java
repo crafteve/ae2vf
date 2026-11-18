@@ -362,7 +362,7 @@ public final class FactoryLifecycle {
         }
         this.runner = new FactoryRunner(this.server, this.manager, this.observationRunner,
                 this.observationReader, this.nodeIoRunner, this.nodeManager, this.machineStates,
-                this.formBuilder, this.storageResolver, this.notices, this::markDirtyLinks);
+                this.formBuilder, this.storageResolver, this.notices);
         this.observationRunner.register(this.runner);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }

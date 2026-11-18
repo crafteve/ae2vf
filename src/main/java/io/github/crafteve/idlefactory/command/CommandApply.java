@@ -59,6 +59,7 @@ public final class CommandApply {
             case PROVIDER_MULTIPLIER -> setMultiplier(factory, command.nodeId(), command.body());
             case PROVIDER_DISPATCH -> setDispatch(factory, command.nodeId(), command.body());
             case NODE_RENAME -> rename(factory, command.nodeId(), command.body());
+            case NODE_TYPE_MIGRATE -> migrate(factory, command.nodeId(), command.body());
             case NODE_DELETE -> deleteNode(context, command.nodeId());
             case SET_ANCHOR -> toggleAnchor(context, command);
             default -> CommandResult.of(CommandReason.INTERNAL);
@@ -314,6 +315,37 @@ public final class CommandApply {
         factory.bindStorage(target, context.runtime().storageResolver());
         context.runtime().markDirtyLinks(factory);
         return CommandResult.block(CommandReason.OK, target, List.of());
+    }
+
+    /**
+     * 节点类型迁移：把节点的类型方块换成探测到的新方块。
+     *
+     * <p>失败原样返回，调用方下一轮会再试；迁移只改类型，不动机器与规则。</p>
+     *
+     * @param factory 工厂
+     * @param nodeId  节点 id
+     * @param body    命令数据
+     * @return 回执
+     */
+    private static CommandResult migrate(Factory factory, java.util.UUID nodeId,
+            FactoryCommand.Body body) {
+        if (!(body instanceof FactoryCommand.Migrate migrate)) {
+            return CommandResult.of(CommandReason.INTERNAL);
+        }
+        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        if (found.isEmpty()) {
+            return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
+        }
+        NodeLibrary.Result result = factory.replaceNode(
+                found.get().withTypeBlockId(migrate.typeBlockId()));
+        if (result != NodeLibrary.Result.REPLACED) {
+            return CommandResult.node(CommandReason.INTERNAL, nodeId);
+        }
+        FactoryLifecycle runtime = FactoryLifecycle.get();
+        if (runtime != null) {
+            runtime.markDirty();
+        }
+        return CommandResult.node(CommandReason.OK, nodeId);
     }
 
     private static CommandResult deleteNode(CommandContext context, java.util.UUID nodeId) {

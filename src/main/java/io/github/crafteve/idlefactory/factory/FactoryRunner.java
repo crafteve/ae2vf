@@ -8,9 +8,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.command.CommandController;
+import io.github.crafteve.idlefactory.command.CommandKind;
+import io.github.crafteve.idlefactory.command.CommandResult;
+import io.github.crafteve.idlefactory.command.CommandSource;
+import io.github.crafteve.idlefactory.command.FactoryCommand;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.io.DispatchState;
@@ -23,7 +27,6 @@ import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 import io.github.crafteve.idlefactory.runtime.LiveNodeLibrary;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
-import io.github.crafteve.idlefactory.node.NodeTypeResolver;
 import io.github.crafteve.idlefactory.observation.Health;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.observation.ObservationChange;
@@ -64,8 +67,6 @@ final class FactoryRunner implements ObservationChangeListener {
     private final IoFormBuilder formBuilder;
     private final MeStorageResolver storageResolver;
     private final FactoryNoticeHandler notices;
-    /** 结构变化出口：类型迁移后落盘并推链接快照。 */
-    private final Consumer<Factory> publish;
     /** 每 tick 复用的被引用集合。 */
     private final Set<BlockKey> referenced = new HashSet<>();
     private int tickCounter;
@@ -81,13 +82,12 @@ final class FactoryRunner implements ObservationChangeListener {
      * @param formBuilder       表单生成器
      * @param storageResolver   仓库解析器
      * @param notices           失联通知聚合
-     * @param publish           结构变化出口
      */
     FactoryRunner(MinecraftServer server, FactoryManager manager,
             ObservationRunner observationRunner, ObservationReader observations,
             IoRunner nodeIoRunner, LiveNodeLibrary nodeManager, MachineStateLibrary machineStates,
             IoFormBuilder formBuilder, MeStorageResolver storageResolver,
-            FactoryNoticeHandler notices, Consumer<Factory> publish) {
+            FactoryNoticeHandler notices) {
         this.server = server;
         this.manager = manager;
         this.observationRunner = observationRunner;
@@ -98,7 +98,6 @@ final class FactoryRunner implements ObservationChangeListener {
         this.formBuilder = formBuilder;
         this.storageResolver = storageResolver;
         this.notices = notices;
-        this.publish = publish;
     }
 
     /** 推进一 tick。 */
@@ -165,14 +164,15 @@ final class FactoryRunner implements ObservationChangeListener {
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.config().nodes().all()) {
                 Node current = node;
-                Optional<ResourceLocation> migration = NodeTypeResolver.migrationTarget(current,
+                Optional<ResourceLocation> migration = CommandController.migrationTarget(current,
                         this.observations, now, staleTicks);
                 if (migration.isPresent()) {
-                    Node migrated = current.withTypeBlockId(migration.get());
-                    if (factory.config().library().replace(migrated)
-                            == io.github.crafteve.idlefactory.node.NodeLibrary.Result.REPLACED) {
-                        current = migrated;
-                        this.publish.accept(factory);
+                    CommandResult result = CommandController.executeSystem(factory,
+                            new FactoryCommand(-1, CommandKind.NODE_TYPE_MIGRATE,
+                                    CommandSource.SYSTEM, current.id(), null, 0L,
+                                    new FactoryCommand.Migrate(migration.get())));
+                    if (result.ok()) {
+                        current = factory.config().nodes().byId(current.id()).orElse(current);
                     }
                 }
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,
