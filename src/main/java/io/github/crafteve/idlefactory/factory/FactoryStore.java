@@ -13,6 +13,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;
+import io.github.crafteve.idlefactory.node.NodeCodec;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -181,7 +182,7 @@ public final class FactoryStore extends SavedData {
             if (!entry.nodes().isEmpty()) {
                 ListTag nodes = new ListTag();
                 for (Node node : entry.nodes()) {
-                    nodes.add(node.save(registries));
+                    nodes.add(NodeCodec.save(node, registries));
                 }
                 row.put(TAG_NODES, nodes);
             }
@@ -204,7 +205,7 @@ public final class FactoryStore extends SavedData {
             List<Node> nodes = new ArrayList<>();
             ListTag nodeList = row.getList(TAG_NODES, Tag.TAG_COMPOUND);
             for (int j = 0; j < nodeList.size(); j++) {
-                Node node = Node.load(nodeList.getCompound(j), registries);
+                Node node = NodeCodec.load(nodeList.getCompound(j), registries);
                 if (node != null) {
                     nodes.add(node);
                 }

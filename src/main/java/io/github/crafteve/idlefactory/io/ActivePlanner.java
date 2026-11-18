@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
@@ -134,7 +135,7 @@ public final class ActivePlanner {
         Plan plan = new Plan();
         // 一台机器每 tick 最多读一次库存：多个订单共用这一份结果。
         Map<UUID, Map<AEKey, Long>> inventories = new HashMap<>();
-        for (DispatchOrder order : state.queue().head(DISPATCH_SCAN_LIMIT)) {
+        for (NodeDispatchOrder order : state.queue().head(DISPATCH_SCAN_LIMIT)) {
             if (now < order.retryAt()) {
                 continue;
             }
@@ -154,13 +155,13 @@ public final class ActivePlanner {
     /**
      * 补齐半份：逐台机器算还差多少，产出补齐任务；机器被删就把没写进去的量退回网络。
      */
-    private void planBatches(Plan plan, DispatchState state, DispatchOrder order, IoAnalyzer analyzer,
+    private void planBatches(Plan plan, DispatchState state, NodeDispatchOrder order, IoAnalyzer analyzer,
             Map<UUID, Map<AEKey, Long>> inventories, long now) {
         int fillsBefore = plan.fills.size();
         int refundsBefore = plan.refunds.size();
-        for (Map.Entry<UUID, DispatchOrder.OpenBatch> entry : order.openBatches().entrySet()) {
+        for (Map.Entry<UUID, NodeDispatchOrder.OpenBatch> entry : order.openBatches().entrySet()) {
             UUID machineId = entry.getKey();
-            DispatchOrder.OpenBatch batch = entry.getValue();
+            NodeDispatchOrder.OpenBatch batch = entry.getValue();
             Machine machine = findOnline(state, machineId);
             if (machine == null) {
                 if (!state.memberMachines().contains(machineId)) {
@@ -200,7 +201,7 @@ public final class ActivePlanner {
     /**
      * 分配新份数。
      */
-    private void planPortions(Plan plan, DispatchState state, DispatchOrder order, IoAnalyzer analyzer,
+    private void planPortions(Plan plan, DispatchState state, NodeDispatchOrder order, IoAnalyzer analyzer,
             Map<UUID, Map<AEKey, Long>> inventories, long now) {
         long remaining = order.remainingPortions();
         if (remaining <= 0L) {
@@ -243,7 +244,7 @@ public final class ActivePlanner {
         if (placed > 0L) {
             this.stalls.remove(order.id());
             // 重新读一遍：轮询模式可能刚写过 nextMachineId，不能拿旧快照盖回去。
-            DispatchOrder latest = findOrder(state, order.id());
+            NodeDispatchOrder latest = findOrder(state, order.id());
             if (latest != null) {
                 state.queue().update(latest.withRetryAt(0L));
             }
@@ -257,7 +258,7 @@ public final class ActivePlanner {
      *
      * @return 这一轮排出去的份数
      */
-    private long allocateSequential(Plan plan, DispatchOrder order, List<Candidate> candidates,
+    private long allocateSequential(Plan plan, NodeDispatchOrder order, List<Candidate> candidates,
             long remaining) {
         long left = remaining;
         for (Candidate candidate : candidates) {
@@ -284,7 +285,7 @@ public final class ActivePlanner {
      *
      * @return 这一轮排出去的份数
      */
-    private long allocateRoundRobin(Plan plan, DispatchOrder order, List<Candidate> candidates,
+    private long allocateRoundRobin(Plan plan, NodeDispatchOrder order, List<Candidate> candidates,
             long remaining, DispatchState state) {
         List<Candidate> ordered = rotate(candidates, order.nextMachineId());
         long left = remaining;
@@ -365,9 +366,9 @@ public final class ActivePlanner {
     /**
      * 把一条订单的 n 份摊成「一台机器的一批行」。
      */
-    private FillRequest fill(DispatchOrder order, Candidate candidate, long count) {
+    private FillRequest fill(NodeDispatchOrder order, Candidate candidate, long count) {
         List<FillLine> lines = new ArrayList<>(order.perPortion().size());
-        for (DispatchOrder.Line line : order.perPortion()) {
+        for (NodeDispatchOrder.Line line : order.perPortion()) {
             lines.add(new FillLine(line.key(), candidate.faces.get(line.key()),
                     line.amount() * count));
         }
@@ -388,7 +389,7 @@ public final class ActivePlanner {
      */
     public void applyFill(DispatchState state, FillRequest fill, Map<AEKey, IoResult> results,
             IoAnalyzer analyzer, long now) {
-        DispatchOrder order = findOrder(state, fill.orderId);
+        NodeDispatchOrder order = findOrder(state, fill.orderId);
         if (order == null) {
             return;
         }
@@ -424,14 +425,14 @@ public final class ActivePlanner {
     /**
      * 新份数的回写：算完整份数，余量记成半份。
      */
-    private void applyPortions(DispatchState state, DispatchOrder order, FillRequest fill, long[] moved,
+    private void applyPortions(DispatchState state, NodeDispatchOrder order, FillRequest fill, long[] moved,
             boolean anyError) {
         long complete = fill.portions;
         for (int index = 0; index < order.perPortion().size(); index++) {
             complete = Math.min(complete, moved[index] / order.perPortion().get(index).amount());
         }
         long done = order.donePortions() + complete;
-        DispatchOrder next = order.withDone(done);
+        NodeDispatchOrder next = order.withDone(done);
         // 提交少于请求：把不足一份的那部分记成这台机器的半份，下一 tick 只补这一台。
         long[] missing = new long[order.perPortion().size()];
         boolean partial = false;
@@ -455,9 +456,9 @@ public final class ActivePlanner {
     /**
      * 半份补齐的回写：全补齐才算一份，否则更新还差多少。
      */
-    private void applyTopUp(DispatchState state, DispatchOrder order, FillRequest fill, long[] moved,
+    private void applyTopUp(DispatchState state, NodeDispatchOrder order, FillRequest fill, long[] moved,
             boolean anyError, IoAnalyzer analyzer, long now) {
-        DispatchOrder.OpenBatch batch = order.openBatches().get(fill.machineId);
+        NodeDispatchOrder.OpenBatch batch = order.openBatches().get(fill.machineId);
         if (batch == null) {
             return;
         }
@@ -469,7 +470,7 @@ public final class ActivePlanner {
                 complete = false;
             }
         }
-        DispatchOrder next = complete
+        NodeDispatchOrder next = complete
                 ? order.completeBatch(fill.machineId)
                 : order.withOpenBatch(fill.machineId, missing);
         state.queue().update(next);
@@ -486,11 +487,11 @@ public final class ActivePlanner {
      */
     public void applyRefund(DispatchState state, RefundRequest refund, Map<AEKey, Long> refunded,
             IoAnalyzer analyzer, long now) {
-        DispatchOrder order = findOrder(state, refund.orderId);
+        NodeDispatchOrder order = findOrder(state, refund.orderId);
         if (order == null) {
             return;
         }
-        DispatchOrder.OpenBatch batch = order.openBatches().get(refund.machineId);
+        NodeDispatchOrder.OpenBatch batch = order.openBatches().get(refund.machineId);
         if (batch == null) {
             return;
         }
@@ -507,7 +508,7 @@ public final class ActivePlanner {
             state.queue().update(order.completeBatch(refund.machineId));
             return;
         }
-        DispatchOrder next = order.withOpenBatch(refund.machineId, missing);
+        NodeDispatchOrder next = order.withOpenBatch(refund.machineId, missing);
         if (!order.orphan()) {
             next = next.asOrphan(now);
         }
@@ -523,7 +524,7 @@ public final class ActivePlanner {
     /**
      * 孤儿订单：网络恢复后把剩余量退回并出队；超时就丢弃。
      */
-    private void planOrphan(Plan plan, DispatchState state, DispatchOrder order, long now) {
+    private void planOrphan(Plan plan, DispatchState state, NodeDispatchOrder order, long now) {
         plan.orphans.add(new RefundRequest(order.id(), null, order, null));
     }
 
@@ -533,10 +534,10 @@ public final class ActivePlanner {
      * @return 每行都有面时返回映射；有一行拿不到面时返回 {@code null}
      */
     @Nullable
-    private Map<AEKey, Direction> resolveFaces(Machine machine, DispatchOrder order,
+    private Map<AEKey, Direction> resolveFaces(Machine machine, NodeDispatchOrder order,
             DispatchState state, IoAnalyzer analyzer, long now) {
         Map<AEKey, Direction> faces = new LinkedHashMap<>();
-        for (DispatchOrder.Line line : order.perPortion()) {
+        for (NodeDispatchOrder.Line line : order.perPortion()) {
             Direction hint = analyzer.machineFaceHint(machine, line.key(), now);
             FacePick.Result pick = this.facePick.pick(machine, line.key(), IoSide.INPUT,
                     state.inputFace(line.key()), hint);
@@ -599,7 +600,7 @@ public final class ActivePlanner {
     /**
      * 记一次卡单并按阶梯退避。
      */
-    private void stall(DispatchState state, DispatchOrder order, long now) {
+    private void stall(DispatchState state, NodeDispatchOrder order, long now) {
         int count = this.stalls.merge(order.id(), 1, Integer::sum);
         int step = Math.min(count - 1, STALL_DELAYS.length - 1);
         long delay = Math.min(STALL_DELAYS[step], STALL_CAP);
@@ -607,8 +608,8 @@ public final class ActivePlanner {
     }
 
     @Nullable
-    private static DispatchOrder findOrder(DispatchState state, UUID orderId) {
-        for (DispatchOrder order : state.queue().all()) {
+    private static NodeDispatchOrder findOrder(DispatchState state, UUID orderId) {
+        for (NodeDispatchOrder order : state.queue().all()) {
             if (order.id().equals(orderId)) {
                 return order;
             }
@@ -634,9 +635,9 @@ public final class ActivePlanner {
     /**
      * 订单的「每份用量」映射，给容量查询用。
      */
-    private static Map<AEKey, Long> perPortion(DispatchOrder order) {
+    private static Map<AEKey, Long> perPortion(NodeDispatchOrder order) {
         Map<AEKey, Long> map = new LinkedHashMap<>();
-        for (DispatchOrder.Line line : order.perPortion()) {
+        for (NodeDispatchOrder.Line line : order.perPortion()) {
             map.put(line.key(), line.amount());
         }
         return map;
@@ -728,8 +729,8 @@ public final class ActivePlanner {
      * @param order     订单快照
      * @param batch     半份；整单退回时为 {@code null}
      */
-    public record RefundRequest(UUID orderId, @Nullable UUID machineId, DispatchOrder order,
-            @Nullable DispatchOrder.OpenBatch batch) {
+    public record RefundRequest(UUID orderId, @Nullable UUID machineId, NodeDispatchOrder order,
+            @Nullable NodeDispatchOrder.OpenBatch batch) {
     }
 
     /**

@@ -5,7 +5,7 @@
  * {@code IoRunner} 是唯一入口，按 回收 → 主动 → 被动 依次跑：</p>
  * <ul>
  *   <li>回收：{@code ActivePlanner} 定节奏，{@code IoExecutor.sweep} 逐面抽产物；</li>
- *   <li>主动：{@code ActivePlanner} 把 {@code DispatchOrder} 分到多台机器，产出 {@code FillRequest}；</li>
+ *   <li>主动：{@code ActivePlanner} 把 {@code NodeDispatchOrder} 分到多台机器，产出 {@code FillRequest}；</li>
  *   <li>被动：{@code PassivePlanner} 择时并产出逐条 {@link io.github.crafteve.idlefactory.io.IoJob}。</li>
  * </ul>
  *

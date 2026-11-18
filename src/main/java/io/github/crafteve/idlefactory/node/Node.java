@@ -31,13 +31,6 @@ public final class Node {
     /** 节点名字长度硬上限；配置只能调低。 */
     public static final int HARD_MAX_NAME_LENGTH = 32767;
 
-    private static final String TAG_ID = "Id";
-    private static final String TAG_NAME = "Name";
-    private static final String TAG_TYPE_BLOCK_ID = "TypeBlockId";
-    private static final String TAG_IO = "Io";
-    /** 样板 / 队列聚合；旧档写的是 {@code Provider}，读侧兼容。 */
-    private static final String TAG_CRAFT = "Craft";
-    private static final String TAG_MACHINES = "Machines";
 
     private final UUID id;
     @Nullable
@@ -240,64 +233,5 @@ public final class Node {
                 this.topologyRevision + 1L);
     }
 
-    /**
-     * 序列化成 NBT：身份 + 类型 + IO + provider + 机器表。
-     *
-     * @param registries 注册表访问，物品组件编码需要
-     * @return 新标签
-     */
-    public CompoundTag save(HolderLookup.Provider registries) {
-        CompoundTag tag = new CompoundTag();
-        tag.putUUID(TAG_ID, this.id);
-        if (this.name != null) {
-            tag.putString(TAG_NAME, this.name);
-        }
-        tag.putString(TAG_TYPE_BLOCK_ID, this.typeBlockId.toString());
-        tag.put(TAG_IO, this.io.save(registries));
-        tag.put(TAG_CRAFT, this.provider.save(registries));
-        ListTag list = new ListTag();
-        for (Machine machine : this.machines) {
-            list.add(machine.save());
-        }
-        tag.put(TAG_MACHINES, list);
-        return tag;
-    }
 
-    /**
-     * 从 NBT 读回来；缺 id / 类型方块 / 机器时丢弃。
-     *
-     * <p>坏机器逐个丢弃，读完一台不剩才丢弃整份节点。</p>
-     *
-     * @param tag        存档标签
-     * @param registries 注册表访问，物品组件解码需要
-     * @return 节点；无法恢复时为 {@code null}
-     */
-    @Nullable
-    public static Node load(CompoundTag tag, HolderLookup.Provider registries) {
-        if (!tag.hasUUID(TAG_ID)) {
-            return null;
-        }
-        ResourceLocation typeId = ResourceLocation.tryParse(tag.getString(TAG_TYPE_BLOCK_ID));
-        if (typeId == null) {
-            return null;
-        }
-        ListTag machineList = tag.getList(TAG_MACHINES, Tag.TAG_COMPOUND);
-        List<Machine> machines = new ArrayList<>(machineList.size());
-        for (int i = 0; i < machineList.size(); i++) {
-            Machine machine = Machine.load(machineList.getCompound(i));
-            if (machine != null) {
-                machines.add(machine);
-            }
-        }
-        if (machines.isEmpty()) {
-            return null;
-        }
-        NodeIo io = NodeIo.load(tag.getCompound(TAG_IO), registries, tag.getUUID(TAG_ID));
-        // 旧档写的是 Provider；新档写 Craft，读侧两种都认。
-        CompoundTag craftTag = tag.contains(TAG_CRAFT) ? tag.getCompound(TAG_CRAFT)
-                : tag.getCompound("Provider");
-        NodeCraft provider = NodeCraft.load(craftTag, registries);
-        String name = tag.contains(TAG_NAME) ? tag.getString(TAG_NAME) : null;
-        return new Node(tag.getUUID(TAG_ID), name, typeId, io, provider, machines, 0L);
-    }
 }

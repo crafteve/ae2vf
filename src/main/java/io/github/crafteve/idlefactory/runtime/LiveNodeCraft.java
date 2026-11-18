@@ -15,8 +15,8 @@ import io.github.crafteve.idlefactory.io.CapacityPick;
 import io.github.crafteve.idlefactory.node.ProviderMode;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.node.NodeCraft;
-import io.github.crafteve.idlefactory.io.DispatchOrder;
-import io.github.crafteve.idlefactory.io.DispatchQueue;
+import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
+import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.machine.Machine;
 
 import appeng.api.crafting.IPatternDetails;
@@ -115,16 +115,16 @@ final class LiveNodeCraft implements ICraftingProvider {
                 perPortion.putAll(needed);
                 portions = 1L;
             }
-            List<DispatchOrder.Line> lines = new ArrayList<>(perPortion.size());
+            List<NodeDispatchOrder.Line> lines = new ArrayList<>(perPortion.size());
             for (Map.Entry<AEKey, Long> entry : perPortion.entrySet()) {
                 if (entry.getValue() <= 0L) {
                     return false;
                 }
-                lines.add(new DispatchOrder.Line(entry.getKey(), entry.getValue()));
+                lines.add(new NodeDispatchOrder.Line(entry.getKey(), entry.getValue()));
             }
             long now = this.node.gameTime();
-            DispatchQueue queue = provider.pending();
-            if (!queue.enqueue(DispatchOrder.create(UUID.randomUUID(), lines, portions, now))) {
+            NodeDispatchQueue queue = provider.pending();
+            if (!queue.enqueue(NodeDispatchOrder.create(UUID.randomUUID(), lines, portions, now))) {
                 return false;
             }
         } catch (RuntimeException e) {

@@ -7,8 +7,8 @@ import java.util.Map;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.io.DispatchOrder;
-import io.github.crafteve.idlefactory.io.DispatchQueue;
+import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
+import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.io.IoForm;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.node.Multiplier;
@@ -165,9 +165,9 @@ public final class FactoryNodeSnapshotBuilder {
             boolean autoEnergyOnly = node.io().outputs().isEmpty()
                     && node.io().inputs().stream().allMatch(spec ->
                             AeKeyAdapter.isEnergy(spec.key()) && spec.face() == null);
-            DispatchQueue queue = runtime == null ? null : runtime.pendingQueue();
+            NodeDispatchQueue queue = runtime == null ? null : runtime.pendingQueue();
             int pendingCount = queue == null ? 0 : queue.size();
-            DispatchOrder head = queue == null ? null : queue.first();
+            NodeDispatchOrder head = queue == null ? null : queue.first();
             long pendingOldestAt = head == null ? -1L : head.enqueuedAt();
             nodes.add(new NodeView(node.id(), node.name(), node.typeBlockId(), status,
                     node.ruleCount(), node.patternCount(), autoEnergyOnly, pendingCount,

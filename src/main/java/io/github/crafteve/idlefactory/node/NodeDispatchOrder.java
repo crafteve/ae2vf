@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.io;
+package io.github.crafteve.idlefactory.node;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,11 +32,11 @@ import appeng.api.stacks.AEKey;
  * @param enqueuedAt   入队时刻，给界面显示「等了多久」
  * @param orphanedAt   变成孤儿订单的时刻；{@code -1} 表示不是孤儿
  */
-public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long donePortions,
+public record NodeDispatchOrder(UUID id, List<Line> perPortion, long portions, long donePortions,
         Map<UUID, OpenBatch> openBatches, @Nullable UUID nextMachineId, long retryAt,
         long enqueuedAt, long orphanedAt) {
 
-    public DispatchOrder {
+    public NodeDispatchOrder {
         if (id == null || perPortion == null || portions <= 0L || donePortions < 0L) {
             throw new IllegalArgumentException("订单字段非法");
         }
@@ -56,8 +56,8 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param now        入队时刻
      * @return 新订单
      */
-    public static DispatchOrder create(UUID id, List<Line> perPortion, long portions, long now) {
-        return new DispatchOrder(id, perPortion, portions, 0L, Map.of(), null, 0L, now, -1L);
+    public static NodeDispatchOrder create(UUID id, List<Line> perPortion, long portions, long now) {
+        return new NodeDispatchOrder(id, perPortion, portions, 0L, Map.of(), null, 0L, now, -1L);
     }
 
     /**
@@ -129,8 +129,8 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param now 当前游戏时间
      * @return 新订单
      */
-    public DispatchOrder asOrphan(long now) {
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
+    public NodeDispatchOrder asOrphan(long now) {
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
                 this.openBatches, this.nextMachineId, this.retryAt, this.enqueuedAt, now);
     }
 
@@ -140,8 +140,8 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param at 到期 tick；{@code 0} 表示立刻可试
      * @return 新订单
      */
-    public DispatchOrder withRetryAt(long at) {
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
+    public NodeDispatchOrder withRetryAt(long at) {
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
                 this.openBatches, this.nextMachineId, at, this.enqueuedAt, this.orphanedAt);
     }
 
@@ -151,8 +151,8 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param machineId 下一轮从这台机器的下一台开始；{@code null} 表示从头
      * @return 新订单
      */
-    public DispatchOrder withNextMachine(@Nullable UUID machineId) {
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
+    public NodeDispatchOrder withNextMachine(@Nullable UUID machineId) {
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
                 this.openBatches, machineId, this.retryAt, this.enqueuedAt, this.orphanedAt);
     }
 
@@ -162,8 +162,8 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param done 新的已完成份数
      * @return 新订单
      */
-    public DispatchOrder withDone(long done) {
-        return new DispatchOrder(this.id, this.perPortion, this.portions, done,
+    public NodeDispatchOrder withDone(long done) {
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, done,
                 this.openBatches, this.nextMachineId, this.retryAt, this.enqueuedAt, -1L);
     }
 
@@ -174,10 +174,10 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param missing   每行还差多少
      * @return 新订单
      */
-    public DispatchOrder withOpenBatch(UUID machineId, long[] missing) {
+    public NodeDispatchOrder withOpenBatch(UUID machineId, long[] missing) {
         Map<UUID, OpenBatch> next = new LinkedHashMap<>(this.openBatches);
         next.put(machineId, new OpenBatch(missing));
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
                 next, this.nextMachineId, this.retryAt, this.enqueuedAt, this.orphanedAt);
     }
 
@@ -187,10 +187,10 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param machineId 机器 id
      * @return 新订单
      */
-    public DispatchOrder completeBatch(UUID machineId) {
+    public NodeDispatchOrder completeBatch(UUID machineId) {
         Map<UUID, OpenBatch> next = new LinkedHashMap<>(this.openBatches);
         next.remove(machineId);
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions + 1L,
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions + 1L,
                 next, this.nextMachineId, this.retryAt, this.enqueuedAt, -1L);
     }
 
@@ -200,10 +200,10 @@ public record DispatchOrder(UUID id, List<Line> perPortion, long portions, long 
      * @param machineId 机器 id
      * @return 新订单
      */
-    public DispatchOrder removeBatch(UUID machineId) {
+    public NodeDispatchOrder removeBatch(UUID machineId) {
         Map<UUID, OpenBatch> next = new LinkedHashMap<>(this.openBatches);
         next.remove(machineId);
-        return new DispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
+        return new NodeDispatchOrder(this.id, this.perPortion, this.portions, this.donePortions,
                 next, this.nextMachineId, this.retryAt, this.enqueuedAt, this.orphanedAt);
     }
 

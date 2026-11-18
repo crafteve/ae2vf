@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.io;
+package io.github.crafteve.idlefactory.node;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -7,25 +7,27 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
+import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 
 /**
- * 一个节点的待投递队列：多单排队，只认 {@link DispatchOrder}。
+ * 一个节点的待投递队列：多单排队，只认 {@link NodeDispatchOrder}。
  *
  * <p>它是内存与存档的<b>唯一写入口</b>：入队、取队首若干单、按 id 更新、出队都走这里。调用方
- * 拿到的订单是值对象，改完必须 {@link #update(DispatchOrder)} 才会生效——绕过这里直接改内部
+ * 拿到的订单是值对象，改完必须 {@link #update(NodeDispatchOrder)} 才会生效——绕过这里直接改内部
  * 列表会让进度与存档悄悄分叉。</p>
  *
  * <p>队列属于节点，不属于某台机器：删一台机器不影响订单；只有节点销毁或整单超时才退剩余量。</p>
  */
-public final class DispatchQueue {
+public final class NodeDispatchQueue {
     /** 队列单数硬顶，不可由 config 调整；满了这单不收（CPU 另找别家）。 */
     public static final int MAX_PENDING = 64;
 
-    private final List<DispatchOrder> orders = new ArrayList<>();
+    private final List<NodeDispatchOrder> orders = new ArrayList<>();
     /** 自上次收口以来有没有改过内容；节点据此决定要不要落盘。 */
     private boolean dirty;
 
@@ -35,7 +37,7 @@ public final class DispatchQueue {
      * @param order 订单
      * @return 是否入队；队列已满或订单已投完时返回 {@code false}
      */
-    public boolean enqueue(DispatchOrder order) {
+    public boolean enqueue(NodeDispatchOrder order) {
         if (order.finished() || this.orders.size() >= MAX_PENDING) {
             return false;
         }
@@ -50,7 +52,7 @@ public final class DispatchQueue {
      * @param limit 最多几单；{@code <= 0} 返回空表
      * @return 订单列表，顺序即队列顺序
      */
-    public List<DispatchOrder> head(int limit) {
+    public List<NodeDispatchOrder> head(int limit) {
         if (limit <= 0) {
             return List.of();
         }
@@ -64,7 +66,7 @@ public final class DispatchQueue {
      * @return 队首；队列空时为 {@code null}
      */
     @Nullable
-    public DispatchOrder first() {
+    public NodeDispatchOrder first() {
         return this.orders.isEmpty() ? null : this.orders.get(0);
     }
 
@@ -79,7 +81,7 @@ public final class DispatchQueue {
     }
 
     /** 全部订单的只读快照。 */
-    public List<DispatchOrder> all() {
+    public List<NodeDispatchOrder> all() {
         return List.copyOf(this.orders);
     }
 
@@ -101,7 +103,7 @@ public final class DispatchQueue {
      * @param order 新订单（id 不变）
      * @return 是否找到了原单
      */
-    public boolean update(DispatchOrder order) {
+    public boolean update(NodeDispatchOrder order) {
         for (int index = 0; index < this.orders.size(); index++) {
             if (this.orders.get(index).id().equals(order.id())) {
                 this.orders.set(index, order);
@@ -117,10 +119,10 @@ public final class DispatchQueue {
      *
      * @param loaded 读出来的订单；超过 {@link #MAX_PENDING} 的部分丢弃
      */
-    public void replaceAll(List<DispatchOrder> loaded) {
+    public void replaceAll(List<NodeDispatchOrder> loaded) {
         this.orders.clear();
         this.dirty = false;
-        for (DispatchOrder order : loaded) {
+        for (NodeDispatchOrder order : loaded) {
             if (this.orders.size() >= MAX_PENDING) {
                 break;
             }
@@ -161,7 +163,7 @@ public final class DispatchQueue {
         int orderCount = this.orders.size();
         int lineCount = 0;
         long lost = 0L;
-        for (DispatchOrder order : this.orders) {
+        for (NodeDispatchOrder order : this.orders) {
             long[] remaining = order.remainingAmounts();
             for (int index = 0; index < remaining.length; index++) {
                 long amount = remaining[index];

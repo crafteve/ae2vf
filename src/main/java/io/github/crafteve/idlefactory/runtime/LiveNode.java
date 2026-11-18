@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.node.NodeCraft;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.io.CapacityPick;
-import io.github.crafteve.idlefactory.io.DispatchQueue;
+import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.io.DispatchState;
 import io.github.crafteve.idlefactory.io.FacePick;
 import io.github.crafteve.idlefactory.io.PortExecutor;
@@ -177,7 +177,7 @@ public final class LiveNode
     void detachReturning() {
         try {
             // 队列属于节点：拆节点时把剩余量全部退回网络，退不回按 D21 记日志丢弃。
-            DispatchQueue.RefundReport report = this.node.provider().pending().refundAll(
+            NodeDispatchQueue.RefundReport report = this.node.provider().pending().refundAll(
                     this.networkStorage(), this.gameTime());
             this.logThrottled(this.gameTime(), "拆节点，队列 " + report.orders() + " 单已尽力退回网络");
         } catch (RuntimeException e) {
@@ -433,8 +433,8 @@ public final class LiveNode
         return this.anchorLevel;
     }
 
-    /** 待投递队列（只读用途：界面与快照读单数）；写入口在 {@link DispatchQueue}。 */
-    public DispatchQueue pendingQueue() {
+    /** 待投递队列（只读用途：界面与快照读单数）；写入口在 {@link NodeDispatchQueue}。 */
+    public NodeDispatchQueue pendingQueue() {
         return this.node.provider().pending();
     }
 

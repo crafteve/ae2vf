@@ -10,6 +10,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
+import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.machine.Machine;
 
@@ -183,7 +184,7 @@ public final class IoRunner {
             for (ActivePlanner.RefundRequest orphan : plan.orphans()) {
                 this.executeOrphan(state, orphan, network, analyzer, now);
             }
-            DispatchOrder first = state.queue().first();
+            NodeDispatchOrder first = state.queue().first();
             analyzer.nodeQueue(state.nodeId(), state.queue().size(),
                     first == null ? -1L : first.enqueuedAt());
         }
@@ -252,8 +253,8 @@ public final class IoRunner {
      */
     private void executeBatchRefund(DispatchState state, ActivePlanner.RefundRequest refund,
             MEStorage network, IoAnalyzer analyzer, ActivePlanner planner, long now) {
-        DispatchOrder order = refund.order();
-        DispatchOrder.OpenBatch batch = refund.batch();
+        NodeDispatchOrder order = refund.order();
+        NodeDispatchOrder.OpenBatch batch = refund.batch();
         if (batch == null) {
             return;
         }
@@ -277,7 +278,7 @@ public final class IoRunner {
      */
     private void executeOrphan(DispatchState state, ActivePlanner.RefundRequest orphan, MEStorage network,
             IoAnalyzer analyzer, long now) {
-        DispatchOrder order = orphan.order();
+        NodeDispatchOrder order = orphan.order();
         long[] remaining = order.remainingAmounts();
         long lost = 0L;
         for (int index = 0; index < remaining.length; index++) {

@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.machine.Machine;
+import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 
 import appeng.api.stacks.AEKey;
 
@@ -17,7 +18,7 @@ import net.minecraft.core.Direction;
  * 这一 tick 投递需要的输入：队列、在线机器、派单模式、阻挡开关、样板输入、产物白名单。
  *
  * <p>本类是纯粹的值对象：只带值，不带存储句柄——网络由 Runner 从工厂拿。队列是<b>活引用</b>
- * （只有 {@link DispatchQueue} 能改它），规划器用它的方法更新进度，而不是拿到一份副本算完再丢。</p>
+ * （只有 {@link NodeDispatchQueue} 能改它），规划器用它的方法更新进度，而不是拿到一份副本算完再丢。</p>
  *
  * <p>节点不认识执行层，执行层也不 import 节点：两边只交换这个记录。</p>
  *
@@ -31,7 +32,7 @@ import net.minecraft.core.Direction;
  * @param products       样板产物的并集（回收白名单）
  * @param inputFaces     样板输入的配置面：资源 → 面（玩家给输入规则配的面）
  */
-public record DispatchState(UUID nodeId, DispatchQueue queue, List<Machine> onlineMachines,
+public record DispatchState(UUID nodeId, NodeDispatchQueue queue, List<Machine> onlineMachines,
         DispatchMode dispatch, BlockingMode blocking, Set<AEKey> patternInputs,
         Set<AEKey> products, Map<AEKey, Direction> inputFaces, Set<UUID> memberMachines) {
 
@@ -50,7 +51,7 @@ public record DispatchState(UUID nodeId, DispatchQueue queue, List<Machine> onli
      * @param queue  队列
      * @return 空状态
      */
-    public static DispatchState empty(UUID nodeId, DispatchQueue queue) {
+    public static DispatchState empty(UUID nodeId, NodeDispatchQueue queue) {
         return new DispatchState(nodeId, queue, List.of(), DispatchMode.ROUND_ROBIN,
                 BlockingMode.OFF, Set.of(), Set.of(), Map.of(), Set.of());
     }
