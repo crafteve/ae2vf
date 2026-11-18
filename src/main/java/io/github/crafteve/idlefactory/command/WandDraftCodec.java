@@ -9,12 +9,6 @@ import java.util.function.Supplier;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
-import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
-import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
-import io.github.crafteve.idlefactory.factory.wand.WandLimits;
 import io.github.crafteve.idlefactory.network.ModNetwork;
 
 import io.netty.handler.codec.DecoderException;
@@ -25,29 +19,17 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.Level;
 
 /**
- * 绑定杖线协议的共用编解码：草稿、问题、回执、失败枚举与方块位置。
+ * 绑定杖草稿与方块位置的线协议编解码。
  *
- * <p>枚举一律 {@code writeByte} + 越界 {@link DecoderException}，不用 {@code readEnum}：
- * 客户端与服务端的枚举序号必须显式受控，新增值追加在末尾就还能读懂旧包。所有数量在解码侧
- * 先夹到上限再分配：草稿条目数是「有效单节点机器上限」与线协议硬上限的较小者，问题条数是
- * {@link WandLimits#MAX_ISSUES_WIRE}；越界直接拒绝整包，不截断。</p>
- *
- * <p>方块位置按「维度注册名 + 坐标 long」编码，与物品组件的方块编解码同构；草稿记录里的
- * 字段顺序与编码顺序一致。</p>
+ * <p>草稿条目上限取「单节点机器有效上限」与线协议硬上限的较小者；解码侧越界直接拒绝整包，
+ * 不截断——截断会让服务端按半份草稿写库。</p>
  */
 public final class WandDraftCodec {
     /** 草稿编解码。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, WandDraft> DRAFT =
             StreamCodec.of(WandDraftCodec::writeDraft, WandDraftCodec::readDraft);
-    /** 单条问题编解码。 */
-    public static final StreamCodec<RegistryFriendlyByteBuf, WandIssue> ISSUE =
-            StreamCodec.of(WandDraftCodec::writeIssue, WandDraftCodec::readIssue);
-    /** 回执编解码。 */
-    public static final StreamCodec<RegistryFriendlyByteBuf, WandCommitOutcome> OUTCOME =
-            StreamCodec.of(WandDraftCodec::writeOutcome, WandDraftCodec::readOutcome);
 
     private WandDraftCodec() {
         // 纯静态编解码
@@ -65,8 +47,8 @@ public final class WandDraftCodec {
     /**
      * 写一个方块位置。
      *
-     * @param buf  缓冲
-     * @param key  方块位置
+     * @param buf 缓冲
+     * @param key 方块位置
      */
     public static void writeBlockKey(RegistryFriendlyByteBuf buf, BlockKey key) {
         buf.writeResourceLocation(key.dimension().location());
@@ -116,46 +98,6 @@ public final class WandDraftCodec {
         return keys;
     }
 
-    /**
-     * 写失败枚举。
-     *
-     * @param buf     缓冲
-     * @param failure 失败原因
-     */
-    public static void writeFailure(RegistryFriendlyByteBuf buf, WandFailure failure) {
-        buf.writeByte(failure.ordinal());
-    }
-
-    /**
-     * 读失败枚举。
-     *
-     * @param buf 缓冲
-     * @return 失败原因
-     */
-    public static WandFailure readFailure(RegistryFriendlyByteBuf buf) {
-        return readOrdinal(buf, WandFailure.values(), "失败原因");
-    }
-
-    /**
-     * 写删除原因枚举。
-     *
-     * @param buf    缓冲
-     * @param reason 删除原因
-     */
-    public static void writeReason(RegistryFriendlyByteBuf buf, WandDeleteReason reason) {
-        buf.writeByte(reason.ordinal());
-    }
-
-    /**
-     * 读删除原因枚举。
-     *
-     * @param buf 缓冲
-     * @return 删除原因
-     */
-    public static WandDeleteReason readReason(RegistryFriendlyByteBuf buf) {
-        return readOrdinal(buf, WandDeleteReason.values(), "删除原因");
-    }
-
     private static void writeDraft(RegistryFriendlyByteBuf buf, WandDraft draft) {
         buf.writeBoolean(draft.nodeId() != null);
         if (draft.nodeId() != null) {
@@ -191,64 +133,12 @@ public final class WandDraftCodec {
         return decode("草稿", () -> new WandDraft(nodeId, added, removed, requestSeq));
     }
 
-    private static void writeIssue(RegistryFriendlyByteBuf buf, WandIssue issue) {
-        buf.writeBoolean(issue.block() != null);
-        if (issue.block() != null) {
-            writeBlockKey(buf, issue.block());
-        }
-        writeFailure(buf, issue.failure());
-        writeReason(buf, issue.reason());
-    }
-
-    private static WandIssue readIssue(RegistryFriendlyByteBuf buf) {
-        BlockKey block = buf.readBoolean() ? readBlockKey(buf) : null;
-        WandFailure failure = readFailure(buf);
-        WandDeleteReason reason = readReason(buf);
-        return decode("校验问题", () -> new WandIssue(block, failure, reason));
-    }
-
-    private static void writeOutcome(RegistryFriendlyByteBuf buf, WandCommitOutcome outcome) {
-        buf.writeBoolean(outcome.ok());
-        writeFailure(buf, outcome.failure());
-        writeReason(buf, outcome.reason());
-        buf.writeBoolean(outcome.nodeId() != null);
-        if (outcome.nodeId() != null) {
-            buf.writeUUID(outcome.nodeId());
-        }
-        buf.writeVarInt(outcome.addedMachines());
-        buf.writeVarInt(outcome.removedMachines());
-        writeBlockKeys(buf, outcome.rejected(), WandLimits.MAX_ISSUES_WIRE);
-        buf.writeVarInt(outcome.rejectedCount());
-    }
-
-    private static WandCommitOutcome readOutcome(RegistryFriendlyByteBuf buf) {
-        boolean ok = buf.readBoolean();
-        WandFailure failure = readFailure(buf);
-        WandDeleteReason reason = readReason(buf);
-        UUID nodeId = buf.readBoolean() ? buf.readUUID() : null;
-        int added = buf.readVarInt();
-        int removed = buf.readVarInt();
-        List<BlockKey> rejected = readBlockKeys(buf, WandLimits.MAX_ISSUES_WIRE);
-        int rejectedCount = buf.readVarInt();
-        return decode("回执", () -> new WandCommitOutcome(ok, failure, reason, nodeId, added,
-                removed, rejected, rejectedCount));
-    }
-
     private static int readCount(RegistryFriendlyByteBuf buf, int limit, String what) {
         int count = buf.readVarInt();
         if (count < 0 || count > limit) {
             throw new DecoderException(what + "数量越界：" + count);
         }
         return count;
-    }
-
-    private static <E extends Enum<E>> E readOrdinal(RegistryFriendlyByteBuf buf, E[] values,
-            String what) {
-        int ordinal = buf.readUnsignedByte();
-        if (ordinal >= values.length) {
-            throw new DecoderException(what + "序号越界：" + ordinal);
-        }
-        return values[ordinal];
     }
 
     private static <T> T decode(String what, Supplier<T> supplier) {

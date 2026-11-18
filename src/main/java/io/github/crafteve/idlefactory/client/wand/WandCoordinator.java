@@ -11,15 +11,10 @@ import io.github.crafteve.idlefactory.command.CommandSource;
 import io.github.crafteve.idlefactory.command.FactoryCommand;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
-import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
-import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+import net.minecraft.network.chat.Component;
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
-import io.github.crafteve.idlefactory.network.payload.wand.WandCommitC2S;
-import io.github.crafteve.idlefactory.network.payload.wand.WandCommitS2C;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
 
@@ -41,10 +36,12 @@ public final class WandCoordinator {
     private static long pendingSeq;
     /** 正在等待回执的容器 id；{@code -1} 表示没有在等。 */
     private static int pendingContainerId = -1;
+    /** 提交后等待回执的超时（毫秒）。 */
+    private static final long SUBMIT_TIMEOUT_MILLIS = 5000L;
     /** 提交超时的绝对毫秒时刻。 */
     private static long submitDeadlineMillis;
-    /** 最近一次预校验的问题；面板构造时读，关闭时清。 */
-    private static List<WandIssue> pendingIssues = List.of();
+    /** 最近一次预校验的冲突方块；面板构造时读，关闭时清。 */
+    private static List<BlockKey> pendingConflicts = List.of();
     /** 本次打开是否已经收到服务端预校验回执；收到后服务端结果就是唯一权威。 */
     private static boolean openResultReceived;
     /** 面板内的一行提示（超时 / 提交失败）；没有时为 {@code null}。 */
@@ -70,7 +67,7 @@ public final class WandCoordinator {
         pendingSeq = 0;
         pendingContainerId = -1;
         submitDeadlineMillis = 0L;
-        pendingIssues = List.of();
+        pendingConflicts = List.of();
         openResultReceived = false;
         panelStatus = null;
     }
@@ -101,10 +98,12 @@ public final class WandCoordinator {
             return;
         }
         if (WandSession.draft().isEmpty()) {
-            WandHud.failure(WandMessages.failure(WandFailure.EMPTY_DRAFT));
+            WandHud.failure(Component.literal(CommandMessages.text(new CommandResult(
+                    io.github.crafteve.idlefactory.command.CommandReason.EMPTY_DRAFT, null, null,
+                    List.of()))));
             return;
         }
-        pendingIssues = List.of();
+        pendingConflicts = List.of();
         openResultReceived = false;
         panelStatus = null;
         PacketDistributor.sendToServer(new WandOpenC2S(WandSession.draft()));
@@ -122,15 +121,19 @@ public final class WandCoordinator {
         }
         WandDraft draft = WandSession.renewRequestSeq();
         if (draft.isEmpty()) {
-            WandHud.failure(WandMessages.failure(WandFailure.EMPTY_DRAFT));
+            WandHud.failure(Component.literal(CommandMessages.text(
+                    new CommandResult(io.github.crafteve.idlefactory.command.CommandReason.EMPTY_DRAFT,
+                            null, null, List.of()))));
             return;
         }
         pendingSeq = draft.requestSeq();
         pendingContainerId = containerId;
         panelStatus = null;
-        submitDeadlineMillis = System.currentTimeMillis() + WandLimits.SUBMIT_TIMEOUT_MILLIS;
+        submitDeadlineMillis = System.currentTimeMillis() + SUBMIT_TIMEOUT_MILLIS;
         WandSession.beginSubmit();
-        PacketDistributor.sendToServer(new WandCommitC2S(containerId, draft));
+        PacketDistributor.sendToServer(new FactoryCommandC2S(new FactoryCommand(containerId,
+                CommandKind.WAND_COMMIT, CommandSource.PLAYER, null, null, draft.requestSeq(),
+                new FactoryCommand.Wand(draft))));
     }
 
     /**
@@ -153,12 +156,13 @@ public final class WandCoordinator {
      *
      * @param payload 回执
      */
-    public static void handleChain(WandChainS2C payload) {
-        if (payload.failure() != WandFailure.NONE) {
-            WandHud.failure(WandMessages.failure(payload.failure()));
+    public static void handleChain(io.github.crafteve.idlefactory.command.WandChainResult result) {
+        if (result.reason() != io.github.crafteve.idlefactory.command.CommandReason.OK) {
+            WandHud.failure(Component.literal(CommandMessages.text(
+                    new CommandResult(result.reason(), null, null, List.of()))));
             return;
         }
-        WandSession.applyChain(payload.machines());
+        WandSession.applyChain(result.blocks());
     }
 
     /**
@@ -166,33 +170,37 @@ public final class WandCoordinator {
      *
      * @param payload 回执
      */
-    public static void handleOpen(WandOpenS2C payload) {
-        if (payload.failure() != WandFailure.NONE) {
-            WandHud.failure(WandMessages.failure(payload.failure()));
+    public static void handleOpen(CommandResult result) {
+        if (result.reason() != io.github.crafteve.idlefactory.command.CommandReason.OK
+                && result.blocks().isEmpty()) {
+            WandHud.failure(Component.literal(CommandMessages.text(result)));
             return;
         }
-        pendingIssues = payload.issues();
+        pendingConflicts = result.blocks();
         openResultReceived = true;
     }
 
     /**
      * 提交回执：按容器 id 与版本号匹配，成功后清草稿并关面板。
      *
-     * @param payload 回执
+     * @param containerId 回执对应的容器 id
+     * @param requestSeq  回执对应的请求序号
+     * @param result      回执
      */
-    public static void handleCommit(WandCommitS2C payload) {
-        if (payload.containerId() != pendingContainerId || payload.requestSeq() != pendingSeq) {
+    public static void handleCommitResult(int containerId, long requestSeq, CommandResult result) {
+        if (containerId != pendingContainerId || requestSeq != pendingSeq) {
             return;
         }
         pendingContainerId = -1;
-        if (!payload.outcome().ok()) {
+        if (!result.ok()) {
             WandSession.submitFailed();
-            panelStatus = WandMessages.failure(payload.outcome().failure());
-            WandHud.failure(WandMessages.failure(payload.outcome().failure()));
+            Component text = Component.literal(CommandMessages.text(result));
+            panelStatus = text;
+            WandHud.failure(text);
             return;
         }
-        WandHud.success(WandMessages.saved(payload.outcome().addedMachines(),
-                payload.outcome().removedMachines()));
+        WandDraft draft = WandSession.draft();
+        WandHud.success(WandMessages.saved(draft.added().size(), draft.removed().size()));
         WandSession.submitSucceeded();
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player != null) {
@@ -221,8 +229,8 @@ public final class WandCoordinator {
     }
 
     /** 面板构造时读的预校验问题。 */
-    public static List<WandIssue> pendingIssues() {
-        return pendingIssues;
+    public static List<BlockKey> pendingConflicts() {
+        return pendingConflicts;
     }
 
     /** 本次打开是否已经收到服务端预校验回执；收到后不再退回客户端预检。 */
@@ -243,7 +251,7 @@ public final class WandCoordinator {
 
     /** 面板关闭时清掉预校验缓存，避免下一次打开读到旧问题。 */
     public static void clearPendingIssues() {
-        pendingIssues = List.of();
+        pendingConflicts = List.of();
         openResultReceived = false;
         panelStatus = null;
     }

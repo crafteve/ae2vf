@@ -26,9 +26,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param containerId 菜单容器 id
  * @param kind        命令种类
+ * @param requestSeq  请求序号；草稿提交用它对上回执，其它命令为 0
  * @param result      回执
  */
-public record FactoryCommandS2C(int containerId, CommandKind kind, CommandResult result)
+public record FactoryCommandS2C(int containerId, CommandKind kind, long requestSeq,
+        CommandResult result)
         implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:command_result}。 */
     public static final Type<FactoryCommandS2C> TYPE =
@@ -56,6 +58,7 @@ public record FactoryCommandS2C(int containerId, CommandKind kind, CommandResult
     private static void write(RegistryFriendlyByteBuf buf, FactoryCommandS2C payload) {
         buf.writeVarInt(payload.containerId());
         buf.writeByte(payload.kind().ordinal());
+        buf.writeVarLong(payload.requestSeq());
         CommandResult result = payload.result();
         buf.writeByte(result.reason().ordinal());
         buf.writeBoolean(result.nodeId() != null);
@@ -75,6 +78,7 @@ public record FactoryCommandS2C(int containerId, CommandKind kind, CommandResult
     private static FactoryCommandS2C read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
         CommandKind kind = readEnum(buf, CommandKind.values(), "command kind");
+        long requestSeq = buf.readVarLong();
         CommandReason reason = readEnum(buf, CommandReason.values(), "command reason");
         java.util.UUID nodeId = buf.readBoolean() ? buf.readUUID() : null;
         BlockKey block = buf.readBoolean() ? readBlock(buf) : null;
@@ -86,7 +90,7 @@ public record FactoryCommandS2C(int containerId, CommandKind kind, CommandResult
         for (int i = 0; i < count; i++) {
             blocks.add(readBlock(buf));
         }
-        return new FactoryCommandS2C(containerId, kind,
+        return new FactoryCommandS2C(containerId, kind, requestSeq,
                 new CommandResult(reason, nodeId, block, blocks));
     }
 

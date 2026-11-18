@@ -50,6 +50,10 @@ public final class CommandController {
         if (command.kind() == CommandKind.WAND_TOGGLE) {
             return new CommandWand(runtime).toggle(player, command.target());
         }
+        if (command.kind() == CommandKind.WAND_COMMIT
+                && command.body() instanceof FactoryCommand.Wand wand) {
+            return new CommandWand(runtime).commit(player, wand.draft());
+        }
         CommandContext context = new CommandContext(player, factory, runtime,
                 command.containerId(), command.requestSeq(),
                 player.serverLevel().getGameTime());

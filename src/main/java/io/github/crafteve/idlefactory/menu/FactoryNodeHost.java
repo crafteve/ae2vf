@@ -6,7 +6,6 @@ import appeng.api.util.IConfigManager;
 import appeng.menu.locator.ItemMenuHostLocator;
 
 import io.github.crafteve.idlefactory.command.CommandController;
-import io.github.crafteve.idlefactory.factory.FactoryService;
 import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
 
 import net.minecraft.server.level.ServerPlayer;

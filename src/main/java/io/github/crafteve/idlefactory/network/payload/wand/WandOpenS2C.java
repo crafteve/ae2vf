@@ -1,14 +1,10 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
-import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+import io.github.crafteve.idlefactory.command.CommandReason;
+import io.github.crafteve.idlefactory.command.CommandResult;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -19,18 +15,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 服务端 → 客户端：打开草稿面板前的预校验结果。
+ * 服务端 → 客户端：草稿预校验结果。
  *
- * <p>{@code issues} 只带前 {@link WandLimits#MAX_ISSUES_WIRE} 条，{@code issueCount} 是总数；
- * {@code failure} 只表示「面板不该打开」的草稿级原因（未持杖 / 无工厂 / 草稿为空等）。逐块问题
- * 不算 failure，由面板标红。</p>
+ * <p>{@code result.reason()} 是草稿级原因：{@code OK} 或逐方块问题时面板照样打开，只标红
+ * {@code result.blocks()}；只有草稿级失败（原因非 OK 且没有冲突方块）才不打开。</p>
  *
- * @param issues     预校验问题，线上截断
- * @param issueCount 问题总数
- * @param failure    不打开面板的原因；可以打开时为 {@link WandFailure#NONE}
+ * @param result 预校验结果
  */
-public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure failure)
-        implements CustomPacketPayload {
+public record WandOpenS2C(CommandResult result) implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:wand_open_result}。 */
     public static final Type<WandOpenS2C> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
@@ -38,35 +30,7 @@ public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure fa
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, WandOpenS2C> STREAM_CODEC =
-            StreamCodec.of(
-                    (buf, payload) -> {
-                        int count = Math.min(payload.issues().size(), WandLimits.MAX_ISSUES_WIRE);
-                        buf.writeVarInt(count);
-                        for (int i = 0; i < count; i++) {
-                            WandDraftCodec.ISSUE.encode(buf, payload.issues().get(i));
-                        }
-                        buf.writeVarInt(payload.issueCount());
-                        WandDraftCodec.writeFailure(buf, payload.failure());
-                    },
-                    buf -> {
-                        int count = buf.readVarInt();
-                        if (count < 0 || count > WandLimits.MAX_ISSUES_WIRE) {
-                            throw new DecoderException("预校验问题数量越界：" + count);
-                        }
-                        List<WandIssue> issues = new ArrayList<>(count);
-                        for (int i = 0; i < count; i++) {
-                            issues.add(WandDraftCodec.ISSUE.decode(buf));
-                        }
-                        return new WandOpenS2C(issues, buf.readVarInt(),
-                                WandDraftCodec.readFailure(buf));
-                    });
-
-    public WandOpenS2C {
-        issues = List.copyOf(issues);
-        if (issues.size() > WandLimits.MAX_ISSUES_WIRE || issueCount < issues.size()) {
-            throw new IllegalArgumentException("预校验问题条数不合法");
-        }
-    }
+            StreamCodec.of(WandOpenS2C::write, WandOpenS2C::read);
 
     @Override
     public Type<WandOpenS2C> type() {
@@ -74,12 +38,43 @@ public record WandOpenS2C(List<WandIssue> issues, int issueCount, WandFailure fa
     }
 
     /**
-     * 客户端处理：缓存问题，随后原版打开菜单事件会构造面板。
+     * 客户端处理：缓存冲突方块，随后原版打开菜单事件会构造面板。
      *
      * @param payload 回执
      * @param context 上下文
      */
     public static void handle(WandOpenS2C payload, IPayloadContext context) {
-        context.enqueueWork(() -> WandCoordinator.handleOpen(payload));
+        context.enqueueWork(() -> WandCoordinator.handleOpen(payload.result()));
+    }
+
+    private static void write(RegistryFriendlyByteBuf buf, WandOpenS2C payload) {
+        CommandResult result = payload.result();
+        buf.writeByte(result.reason().ordinal());
+        buf.writeVarInt(result.blocks().size());
+        for (BlockKey block : result.blocks()) {
+            buf.writeResourceLocation(block.dimension().location());
+            buf.writeLong(block.pos().asLong());
+        }
+    }
+
+    private static WandOpenS2C read(RegistryFriendlyByteBuf buf) {
+        int reasonOrdinal = buf.readUnsignedByte();
+        if (reasonOrdinal >= CommandReason.values().length) {
+            throw new DecoderException("invalid reason ordinal: " + reasonOrdinal);
+        }
+        CommandReason reason = CommandReason.values()[reasonOrdinal];
+        int count = buf.readVarInt();
+        if (count < 0 || count > 4096) {
+            throw new DecoderException("方块数量越界：" + count);
+        }
+        java.util.List<BlockKey> blocks = new java.util.ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            ResourceLocation dimension = buf.readResourceLocation();
+            blocks.add(BlockKey.of(
+                    net.minecraft.resources.ResourceKey.create(
+                            net.minecraft.core.registries.Registries.DIMENSION, dimension),
+                    net.minecraft.core.BlockPos.of(buf.readLong())));
+        }
+        return new WandOpenS2C(new CommandResult(reason, null, null, blocks));
     }
 }

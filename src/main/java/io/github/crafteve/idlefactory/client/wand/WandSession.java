@@ -11,8 +11,8 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
+import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
 import net.minecraft.client.Minecraft;
@@ -43,7 +43,7 @@ public final class WandSession {
 
     private static State state = State.IDLE;
     private static WandDraft draft = WandDraft.empty(0L);
-    private static List<WandIssue> issues = List.of();
+    private static List<BlockKey> conflicts = List.of();
     private static Set<BlockKey> conflictBlocks = Set.of();
     private static Set<BlockKey> removedBlocks = Set.of();
     /** 草稿所属玩家；换人就清空。 */
@@ -69,9 +69,9 @@ public final class WandSession {
         return draft;
     }
 
-    /** 最近一次客户端预检的问题，供面板与 HUD 使用。 */
-    public static List<WandIssue> issues() {
-        return issues;
+    /** 最近一次客户端预检的冲突方块，供面板与 HUD 使用。 */
+    public static List<BlockKey> conflicts() {
+        return conflicts;
     }
 
     /** 客户端预检判为冲突的方块，红框用。 */
@@ -106,12 +106,12 @@ public final class WandSession {
      */
     public static void startNew(Minecraft minecraft) {
         if (!holdingWand(minecraft)) {
-            WandHud.failure(WandMessages.failure(WandFailure.NOT_HOLDING_WAND));
+            refreshWandFailure(CommandReason.NOT_HOLDING_WAND);
             return;
         }
         draft = WandDraft.empty(WandCoordinator.nextSeq());
         state = State.EDITING;
-        issues = List.of();
+        conflicts = List.of();
         conflictBlocks = Set.of();
         removedBlocks = Set.of();
         WandHud.click();
@@ -125,11 +125,11 @@ public final class WandSession {
      */
     public static void startEdit(Minecraft minecraft, UUID nodeId) {
         if (!holdingWand(minecraft)) {
-            WandHud.failure(WandMessages.failure(WandFailure.NOT_HOLDING_WAND));
+            refreshWandFailure(CommandReason.NOT_HOLDING_WAND);
             return;
         }
         if (WandLinks.node(nodeId).isEmpty()) {
-            WandHud.failure(WandMessages.failure(WandFailure.NODE_NOT_FOUND));
+            refreshWandFailure(CommandReason.NODE_MISSING);
             return;
         }
         // 终端「+」进来时终端界面还开着；tick 的「打开别的界面就丢草稿」会在同一 tick
@@ -164,13 +164,17 @@ public final class WandSession {
                         : draft.withRemovedMachine(machineId));
                 return;
             }
-            WandHud.failure(WandMessages.failure(WandFailure.BLOCK_CLAIMED));
+            WandHud.failure(net.minecraft.network.chat.Component.literal(
+                    CommandMessages.text(new io.github.crafteve.idlefactory.command.CommandResult(
+                            CommandReason.BLOCK_CLAIMED, null, null, List.of()))));
             return;
         }
         ResourceLocation typeId = WandPrecheck.baseType(minecraft, draft);
-        WandIssue issue = WandPrecheck.checkBlock(minecraft, block, typeId, true);
-        if (issue != null) {
-            WandHud.failure(WandMessages.failure(issue.failure()));
+        CommandReason reason = WandPrecheck.checkBlock(minecraft, block, typeId, true);
+        if (reason != CommandReason.OK) {
+            WandHud.failure(net.minecraft.network.chat.Component.literal(
+                    CommandMessages.text(new io.github.crafteve.idlefactory.command.CommandResult(
+                            reason, null, null, List.of()))));
             return;
         }
         applyDraft(minecraft, draft.withAddedBlock(block));
@@ -245,7 +249,7 @@ public final class WandSession {
         WandCoordinator.abandonSubmission();
         state = State.IDLE;
         draft = WandDraft.empty(0L);
-        issues = List.of();
+        conflicts = List.of();
         conflictBlocks = Set.of();
         removedBlocks = Set.of();
         handSlot = -1;
@@ -308,6 +312,12 @@ public final class WandSession {
      * @param minecraft 客户端实例
      * @param next      新草稿
      */
+    private static void refreshWandFailure(CommandReason reason) {
+        WandHud.failure(net.minecraft.network.chat.Component.literal(CommandMessages.text(
+                new io.github.crafteve.idlefactory.command.CommandResult(reason, null, null,
+                        List.of()))));
+    }
+
     private static void applyDraft(Minecraft minecraft, WandDraft next) {
         draft = next.withRequestSeq(WandCoordinator.nextSeq());
         recheck(minecraft);
@@ -320,13 +330,7 @@ public final class WandSession {
      * @param minecraft 客户端实例
      */
     private static void recheck(Minecraft minecraft) {
-        issues = WandPrecheck.check(minecraft, draft);
-        Set<BlockKey> conflicts = new HashSet<>();
-        for (WandIssue issue : issues) {
-            if (issue.block() != null) {
-                conflicts.add(issue.block());
-            }
-        }
+        conflicts = WandPrecheck.check(minecraft, draft);
         conflictBlocks = Set.copyOf(conflicts);
         Set<BlockKey> removed = new HashSet<>();
         for (UUID machineId : draft.removed()) {

@@ -20,7 +20,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * 机器绑定杖：1:1 toggle 与草稿编辑的入口物品。
  *
  * <p>不可堆叠、无耐久。右键手势在客户端 {@code client.wand.WandGesture}，服务端判定在
- * {@code factory.WandService}。实现 {@link IMenuItem} 只是让 AE2 能按物品定位器还原草稿面板的
+ * {@code command.CommandWand}。实现 {@link IMenuItem} 只是让 AE2 能按物品定位器还原草稿面板的
  * 宿主，物品类仍不引用 {@code client.*}。</p>
  *
  * <p>唯一需要物品自己做的事：在 {@link #onItemUseFirst} 里替服务端挡掉方块的

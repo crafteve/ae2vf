@@ -19,6 +19,11 @@ public final class ClientCommandHandler {
      * @param payload 负载
      */
     public static void handle(FactoryCommandS2C payload) {
+        if (payload.kind() == io.github.crafteve.idlefactory.command.CommandKind.WAND_COMMIT) {
+            io.github.crafteve.idlefactory.client.wand.WandCoordinator.handleCommitResult(
+                    payload.containerId(), payload.requestSeq(), payload.result());
+            return;
+        }
         if (payload.kind() == io.github.crafteve.idlefactory.command.CommandKind.WAND_TOGGLE) {
             io.github.crafteve.idlefactory.client.wand.WandCoordinator
                     .handleToggleResult(payload.result());

@@ -21,7 +21,6 @@ import io.github.crafteve.idlefactory.client.wand.WandPrecheck;
 import io.github.crafteve.idlefactory.client.wand.WandSession;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -187,7 +186,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
     private boolean canConfirm() {
         return WandSession.state() == WandSession.State.EDITING
                 && !this.rows.isEmpty()
-                && issues().isEmpty();
+                && conflicts().isEmpty();
     }
 
     /** 行区可显示高度。 */
@@ -290,11 +289,11 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @param theme    主题
      */
     private void drawStatus(GuiGraphics graphics, FactoryGuiTheme theme) {
-        List<WandIssue> issues = issues();
+        List<io.github.crafteve.idlefactory.location.BlockKey> conflicts = conflicts();
         Component status;
         int color;
-        if (!issues.isEmpty()) {
-            status = WandMessages.panelIssues(issues.size());
+        if (!conflicts.isEmpty()) {
+            status = WandMessages.panelIssues(conflicts.size());
             color = theme.error();
         } else if (WandSession.state() == WandSession.State.SUBMITTING) {
             status = WandMessages.submitting();
@@ -329,11 +328,11 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      *
      * @return 问题列表
      */
-    private List<WandIssue> issues() {
+    private List<io.github.crafteve.idlefactory.location.BlockKey> conflicts() {
         if (WandCoordinator.openResultReceived()) {
-            return WandCoordinator.pendingIssues();
+            return WandCoordinator.pendingConflicts();
         }
-        return WandSession.issues();
+        return WandSession.conflicts();
     }
 
     /**
@@ -343,12 +342,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @return 冲突时为 {@code true}
      */
     private boolean isConflicted(BlockKey block) {
-        for (WandIssue issue : issues()) {
-            if (block.equals(issue.block())) {
-                return true;
-            }
-        }
-        return false;
+        return conflicts().contains(block);
     }
 
     /** 一行草稿：方块与是否待删除。 */

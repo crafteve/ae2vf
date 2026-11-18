@@ -2,8 +2,6 @@ package io.github.crafteve.idlefactory.client.wand;
 
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
@@ -14,54 +12,13 @@ import net.minecraft.world.level.block.Block;
  * 绑定杖的全部文案。
  *
  * <p>HUD 与面板只从这里取 {@link Component}，不在调用点拼字符串：失败原因按
- * {@link WandFailure} 查表，枚举新增时 {@code switch} 会编译失败，提醒补文案。</p>
+ * {@code CommandMessages} 查表，原因枚举新增时 {@code switch} 会编译失败，提醒补文案。</p>
  *
  * <p>不服务终端与仓库：那些仍走 {@code FactoryMessages}。</p>
  */
 public final class WandMessages {
     private WandMessages() {
         // 纯文案表
-    }
-
-    /**
-     * 失败原因。
-     *
-     * @param failure 失败原因
-     * @return 可显示文案
-     */
-    public static Component failure(WandFailure failure) {
-        return Component.translatable(switch (failure) {
-            case NONE -> "wand.failure.none";
-            case EMPTY_DRAFT -> "wand.failure.empty_draft";
-            case NOT_HOLDING_WAND -> "wand.failure.not_holding_wand";
-            case NO_FACTORY -> "wand.failure.no_factory";
-            case STALE_REQUEST -> "wand.failure.stale_request";
-            case INVALID_REQUEST -> "wand.failure.invalid_request";
-            case NODE_NOT_FOUND -> "wand.failure.node_not_found";
-            case TYPE_MISMATCH -> "wand.failure.type_mismatch";
-            case DUPLICATE_BLOCK -> "wand.failure.duplicate_block";
-            case BLOCK_CLAIMED -> "wand.failure.block_claimed";
-            case BLOCK_UNLOADED -> "wand.failure.block_unloaded";
-            case NOT_A_MACHINE -> "wand.failure.not_a_machine";
-            case LIMIT_NODES -> "wand.failure.limit_nodes";
-            case LIMIT_MACHINES -> "wand.failure.limit_machines";
-            case DELETE_BLOCKED -> "wand.failure.delete_blocked";
-            case MEMBER_NOT_REMOVABLE -> "wand.failure.member_not_removable";
-        });
-    }
-
-    /**
-     * 删除被拒绝时节点上还留着的配置。
-     *
-     * @param reason 残留配置
-     * @return 可显示文案
-     */
-    public static Component deleteReason(WandDeleteReason reason) {
-        return Component.translatable(switch (reason) {
-            case NONE -> "wand.delete.none";
-            case HAS_RULES -> "wand.delete.has_rules";
-            case HAS_PATTERNS -> "wand.delete.has_patterns";
-        });
     }
 
     /**

@@ -30,10 +30,6 @@ import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
 
-import io.github.crafteve.idlefactory.network.payload.wand.WandCommitC2S;
-
-import io.github.crafteve.idlefactory.network.payload.wand.WandCommitS2C;
-
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
 
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
@@ -137,10 +133,6 @@ public final class ModNetwork {
         registrar.playToClient(WandChainS2C.TYPE, WandChainS2C.STREAM_CODEC, WandChainS2C::handle);
         registrar.playToServer(WandOpenC2S.TYPE, WandOpenC2S.STREAM_CODEC, WandOpenC2S::handle);
         registrar.playToClient(WandOpenS2C.TYPE, WandOpenS2C.STREAM_CODEC, WandOpenS2C::handle);
-        registrar.playToServer(WandCommitC2S.TYPE, WandCommitC2S.STREAM_CODEC,
-                WandCommitC2S::handle);
-        registrar.playToClient(WandCommitS2C.TYPE, WandCommitS2C.STREAM_CODEC,
-                WandCommitS2C::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})", PROTOCOL_VERSION);
     }

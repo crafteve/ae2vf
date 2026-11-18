@@ -1,14 +1,11 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
-import java.util.List;
-
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.FactoryService;
+import io.github.crafteve.idlefactory.command.CommandResult;
+import io.github.crafteve.idlefactory.command.CommandWand;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
-import io.github.crafteve.idlefactory.factory.wand.WandLimits;
+import io.github.crafteve.idlefactory.factory.FactoryRuntime;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import appeng.menu.MenuOpener;
@@ -58,12 +55,15 @@ public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            FactoryService.OpenResult result = FactoryService.openDraft(player, payload.draft());
-            int wireCount = Math.min(result.issues().size(), WandLimits.MAX_ISSUES_WIRE);
-            List<WandIssue> issues = result.issues().subList(0, wireCount);
-            PacketDistributor.sendToPlayer(player,
-                    new WandOpenS2C(issues, result.issueCount(), result.failure()));
-            if (result.failure() != WandFailure.NONE) {
+            FactoryRuntime runtime = FactoryRuntime.get();
+            if (runtime == null) {
+                return;
+            }
+            CommandWand gate = new CommandWand(runtime);
+            var check = gate.open(player, payload.draft());
+            PacketDistributor.sendToPlayer(player, new WandOpenS2C(
+                    new CommandResult(check.reason(), null, null, check.conflicts())));
+            if (!check.openable()) {
                 return;
             }
             // 物品定位器走主手：面板与那把杖绑定，关掉再开仍是同一件物品

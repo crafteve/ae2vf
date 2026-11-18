@@ -5,20 +5,19 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.factory.wand.WandFailure;
-import io.github.crafteve.idlefactory.factory.wand.WandIssue;
+import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 客户端草稿预检：只做客户端做得到的事。
+ * 客户端草稿预检：打开面板前的本地兜底判断，只回答「哪些方块有问题」。
  *
- * <p>检查范围是「重复块、类型一致、快照三态、方块实体与区块加载」，不探测能力、不判上限——
- * 那些只有服务端知道。结果只用于即时红框与 HUD，面板以服务端预校验为准。</p>
+ * <p>服务端的预校验才是权威；这里的结论只用于面板打开瞬间与服务端回执到达之前的红行显示。
+ * 判断维度比服务端少：不查占用表、不查上限，只查本地能看见的方块事实。</p>
  */
 public final class WandPrecheck {
     private WandPrecheck() {
@@ -30,19 +29,15 @@ public final class WandPrecheck {
      *
      * @param minecraft 客户端实例
      * @param draft     草稿
-     * @return 问题列表；空表示客户端看不出问题
+     * @return 冲突方块；空表示客户端看不出问题
      */
-    public static List<WandIssue> check(Minecraft minecraft, WandDraft draft) {
-        List<WandIssue> issues = new ArrayList<>();
-        if (draft.nodeId() != null && WandLinks.node(draft.nodeId()).isEmpty()) {
-            issues.add(WandIssue.global(WandFailure.NODE_NOT_FOUND));
-            return issues;
-        }
+    public static List<BlockKey> check(Minecraft minecraft, WandDraft draft) {
+        List<BlockKey> conflicts = new ArrayList<>();
         ResourceLocation typeId = baseType(minecraft, draft);
         for (BlockKey block : draft.added()) {
-            WandIssue issue = checkBlock(minecraft, block, typeId, true);
-            if (issue != null) {
-                issues.add(issue);
+            CommandReason reason = checkBlock(minecraft, block, typeId, true);
+            if (reason != CommandReason.OK) {
+                conflicts.add(block);
                 continue;
             }
             ResourceLocation blockId = blockId(minecraft, block);
@@ -50,7 +45,7 @@ public final class WandPrecheck {
                 typeId = blockId;
             }
         }
-        return issues;
+        return conflicts;
     }
 
     /**
@@ -60,31 +55,30 @@ public final class WandPrecheck {
      * @param block     方块
      * @param typeId    草稿类型基准；新建草稿第一次加入时为空
      * @param checkType 是否顺便比对类型
-     * @return 问题；通过时为 {@code null}
+     * @return 通过时为 {@link CommandReason#OK}
      */
-    @Nullable
-    public static WandIssue checkBlock(Minecraft minecraft, BlockKey block,
+    public static CommandReason checkBlock(Minecraft minecraft, BlockKey block,
             @Nullable ResourceLocation typeId, boolean checkType) {
         if (minecraft.level == null) {
-            return WandIssue.at(block, WandFailure.BLOCK_UNLOADED);
+            return CommandReason.BLOCK_UNLOADED;
         }
         if (!minecraft.level.dimension().equals(block.dimension())
                 || !minecraft.level.isLoaded(block.pos())) {
-            return WandIssue.at(block, WandFailure.BLOCK_UNLOADED);
+            return CommandReason.BLOCK_UNLOADED;
         }
         if (minecraft.level.getBlockEntity(block.pos()) == null) {
-            return WandIssue.at(block, WandFailure.NOT_A_MACHINE);
+            return CommandReason.NOT_A_MACHINE;
         }
         if (WandLinks.owner(block).isPresent()) {
-            return WandIssue.at(block, WandFailure.BLOCK_CLAIMED);
+            return CommandReason.BLOCK_CLAIMED;
         }
         if (checkType && typeId != null) {
             ResourceLocation blockId = blockId(minecraft, block);
             if (blockId != null && !typeId.equals(blockId)) {
-                return WandIssue.at(block, WandFailure.TYPE_MISMATCH);
+                return CommandReason.TYPE_MISMATCH;
             }
         }
-        return null;
+        return CommandReason.OK;
     }
 
     /**

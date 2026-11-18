@@ -53,7 +53,8 @@ public record FactoryCommand(int containerId, CommandKind kind, CommandSource so
     /**
      * 命令数据：按种类取不同形状。
      */
-    public sealed interface Body permits Empty, Rename, Rule, Blocking, Multiplier, Dispatch, Migrate {
+    public sealed interface Body permits Empty, Rename, Rule, Blocking, Multiplier, Dispatch, Migrate,
+            Wand {
     }
 
     /** 没有额外数据的命令。 */
@@ -114,6 +115,14 @@ public record FactoryCommand(int containerId, CommandKind kind, CommandSource so
     public record Migrate(ResourceLocation typeBlockId) implements Body {
     }
 
+    /**
+     * 绑定杖草稿提交。
+     *
+     * @param draft 完整草稿
+     */
+    public record Wand(WandDraft draft) implements Body {
+    }
+
     private static void write(RegistryFriendlyByteBuf buf, FactoryCommand command) {
         buf.writeVarInt(command.containerId());
         buf.writeByte(command.kind().ordinal());
@@ -157,6 +166,7 @@ public record FactoryCommand(int containerId, CommandKind kind, CommandSource so
             }
             case Dispatch dispatch -> buf.writeByte(dispatch.mode().ordinal());
             case Migrate migrate -> buf.writeResourceLocation(migrate.typeBlockId());
+            case Wand wand -> WandDraftCodec.DRAFT.encode(buf, wand.draft());
         }
     }
 
@@ -197,7 +207,8 @@ public record FactoryCommand(int containerId, CommandKind kind, CommandSource so
                     readEnum(buf, MultiplierMode.values(), "multiplier mode"), buf.readVarInt());
             case PROVIDER_DISPATCH -> new Dispatch(readEnum(buf, DispatchMode.values(), "dispatch"));
             case NODE_TYPE_MIGRATE -> new Migrate(buf.readResourceLocation());
-            case WAND_TOGGLE, SET_ANCHOR, CLEAR_ANCHOR, WAND_COMMIT -> new Empty();
+            case WAND_COMMIT -> new Wand(WandDraftCodec.DRAFT.decode(buf));
+            case WAND_TOGGLE, SET_ANCHOR, CLEAR_ANCHOR -> new Empty();
         };
     }
 

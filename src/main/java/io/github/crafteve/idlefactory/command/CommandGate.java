@@ -74,7 +74,8 @@ public final class CommandGate {
             return false;
         }
         return player.containerMenu instanceof FactoryPassiveIoMenu
-                || player.containerMenu instanceof FactoryNodeMenu;
+                || player.containerMenu instanceof FactoryNodeMenu
+                || player.containerMenu instanceof io.github.crafteve.idlefactory.menu.wand.WandMenu;
     }
 
     /**

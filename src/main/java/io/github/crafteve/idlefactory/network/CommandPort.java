@@ -39,8 +39,8 @@ public final class CommandPort {
         CommandResult result = CommandController.execute(player, command);
         if (command.kind().needsReceipt()) {
             // 世界命令用 containerId = -1：客户端据此把回执投到 HUD 而不是终端。
-            PacketDistributor.sendToPlayer(player,
-                    new FactoryCommandS2C(command.containerId(), command.kind(), result));
+            PacketDistributor.sendToPlayer(player, new FactoryCommandS2C(command.containerId(),
+                    command.kind(), command.requestSeq(), result));
         }
         sendSnapshot(player, command);
     }

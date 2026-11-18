@@ -4,7 +4,6 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.factory.wand.WandLimits;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -45,6 +44,8 @@ public final class WandHud {
     private static final int BOTTOM_INSET = 58;
     /** 闪条与常驻条的间距。 */
     private static final int FLASH_GAP = 4;
+    /** HUD 闪条停留时间（tick）。 */
+    private static final int FLASH_TICKS = 60;
 
     @Nullable
     private static Component flashText;
@@ -127,7 +128,7 @@ public final class WandHud {
         flashText = text;
         flashColor = color;
         flashExpireTick = minecraft.level == null
-                ? 0L : minecraft.level.getGameTime() + WandLimits.FLASH_TICKS;
+                ? 0L : minecraft.level.getGameTime() + FLASH_TICKS;
     }
 
     /**
