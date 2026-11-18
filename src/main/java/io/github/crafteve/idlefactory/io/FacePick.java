@@ -2,9 +2,8 @@ package io.github.crafteve.idlefactory.io;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.config.Actionable;
 import appeng.api.stacks.AEKey;
@@ -128,11 +127,11 @@ public final class FacePick {
      * @return 能收下 / 抽得出时为 {@code true}
      */
     private boolean accepts(MEStorage storage, AEKey key, IoSide side) {
-        long probe = AeKeySupport.kind(key) == CapabilityKind.ENERGY ? ENERGY_PROBE : ITEM_PROBE;
+        long probe = AeKeyAdapter.isEnergy(key) ? ENERGY_PROBE : ITEM_PROBE;
         try {
             return side == IoSide.INPUT
-                    ? storage.insert(key, probe, Actionable.SIMULATE, AeKeySupport.SOURCE) > 0L
-                    : storage.extract(key, probe, Actionable.SIMULATE, AeKeySupport.SOURCE) > 0L;
+                    ? storage.insert(key, probe, Actionable.SIMULATE, AeKeyAdapter.SOURCE) > 0L
+                    : storage.extract(key, probe, Actionable.SIMULATE, AeKeyAdapter.SOURCE) > 0L;
         } catch (RuntimeException e) {
             // 第三方能力实现抛异常：这个面视为不可用，换下一个面；异常不能穿出选面。
             return false;

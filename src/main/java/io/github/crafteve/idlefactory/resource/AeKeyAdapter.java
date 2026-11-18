@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.storage;
+package io.github.crafteve.idlefactory.resource;
 
 import java.util.HashMap;
 import java.util.Locale;
@@ -22,7 +22,6 @@ import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 /**
  * {@link AEKey} 的通用辅助：构造、模糊匹配、显示名、日志摘要与图标栈。
@@ -36,8 +35,8 @@ import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
  * 构造侧的 {@link #item}/{@link #fluid}/{@link #energy} 让调用方不必各自写一遍
  * 「空栈怎么办、Flux 没装怎么办」。</p>
  */
-public final class AeKeySupport {
-    private AeKeySupport() {
+public final class AeKeyAdapter {
+    private AeKeyAdapter() {
         // 纯静态工具类
     }
 
@@ -136,22 +135,26 @@ public final class AeKeySupport {
     }
 
     /**
-     * 资源归属的能力大类，供界面分组、图标选择与速率单位使用。
+     * 是否是流体资源。
      *
-     * <p>资源身份本身由 {@link AEKey} 决定，这个分类只回答「它算哪一类」，不参与相等性。
-     * 复用观测层的 {@link CapabilityKind}，避免再维护一个平行的资源类型枚举。</p>
-     *
-     * @param key 资源 key
-     * @return 能力大类；未知类型按物品处理
+     * @param key 资源 key，可为 {@code null}
+     * @return 流体为 {@code true}
      */
-    public static CapabilityKind kind(@Nullable AEKey key) {
-        if (isEnergy(key)) {
-            return CapabilityKind.ENERGY;
-        }
-        if (key instanceof AEFluidKey) {
-            return CapabilityKind.FLUID;
-        }
-        return CapabilityKind.ITEM;
+    public static boolean isFluid(@Nullable AEKey key) {
+        return key instanceof AEFluidKey;
+    }
+
+    /**
+     * 是否是物品资源。
+     *
+     * <p>「不是 FE、也不是流体」都按物品处理：AE2 与已装生态的资源类型只有这几类，
+     * 未知类型按物品显示总比空白好。</p>
+     *
+     * @param key 资源 key，可为 {@code null}
+     * @return 物品为 {@code true}
+     */
+    public static boolean isItem(@Nullable AEKey key) {
+        return key != null && !isEnergy(key) && !isFluid(key);
     }
 
     /**

@@ -14,8 +14,7 @@ import appeng.api.stacks.GenericStack;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -104,7 +103,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
         if (target == null || runtime == null) {
             return Optional.empty();
         }
-        if (target.kind() == CapabilityKind.ENERGY) {
+        if (target.energy()) {
             return runtime.getIngredientManager()
                     .createClickableIngredient(FeIngredient.TYPE, FeIngredient.INSTANCE,
                             target.area(), false)
@@ -161,7 +160,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
         }
         if (ingredient instanceof FeIngredient) {
             // FE 是独立配料：拖它就是要一条 FE 规则；没装 Applied Flux 时没有 FE 这类资源。
-            return AeKeySupport.energy();
+            return AeKeyAdapter.energy();
         }
         return null;
     }

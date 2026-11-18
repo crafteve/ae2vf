@@ -14,7 +14,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * config 改小不会删已有数据，只阻止继续新增。</p>
  *
  * <p>硬上限不可关：它们同时是网络与存档解码的上限，用来防溢出与恶意包。
- * {@link #observationBlockBudgetPerTick} 与 {@link #staleHealthTicks} 是调优项，
+ * {@link #observationHealthBudgetPerTick}、{@link #observationWorkBudgetPerTick}、
+ * {@link #observationEventBudgetPerTick} 与 {@link #staleHealthTicks} 是调优项，
  * 不是玩法上限，默认值非 -1。</p>
  */
 public final class IdleFactoryConfig {
@@ -28,13 +29,11 @@ public final class IdleFactoryConfig {
     public static final int HARD_MAX_RULES_PER_SIDE = NodeIoGroup.MAX_RULES_PER_SIDE;
     /** 名字长度硬上限。 */
     public static final int HARD_MAX_NAME_LENGTH = Node.HARD_MAX_NAME_LENGTH;
-    /** 观测预算硬上限（每 tick 探测多少次）。 */
-    public static final int HARD_MAX_OBSERVATION_BUDGET = 256;
     /** 健康过期阈值硬上限（tick）。 */
     public static final int HARD_MAX_STALE_HEALTH_TICKS = 2400;
 
-    /** 观测预算默认值：每 tick 探测 64 个方块。 */
-    public static final int DEFAULT_OBSERVATION_BUDGET = 64;
+    /** 观测三条通道的默认预算：每 tick 各 128 次。预算不设硬上限，只保留下限 1。 */
+    public static final int DEFAULT_OBSERVATION_CHANNEL_BUDGET = 128;
     /** 健康过期默认阈值：1200 tick（约 60 秒）。 */
     public static final int DEFAULT_STALE_HEALTH_TICKS = 1200;
 
@@ -61,12 +60,24 @@ public final class IdleFactoryConfig {
             "节点名字长度上限；-1 表示用硬上限。 / Max node name length; -1 = hard cap.",
             HARD_MAX_NAME_LENGTH);
 
-    /** 每 tick 观测预算；调优项，热改下一 tick 生效。 */
-    public static final ModConfigSpec.IntValue OBSERVATION_BLOCK_BUDGET_PER_TICK = BUILDER
-            .comment("每 tick 最多探测多少方块；调优项，热改下一 tick 生效。 /",
-                    "Blocks probed per tick; tuning knob, applies on the next tick.")
-            .defineInRange("observationBlockBudgetPerTick", DEFAULT_OBSERVATION_BUDGET, 1,
-                    HARD_MAX_OBSERVATION_BUDGET);
+    /** 每 tick 健康探测预算；调优项，热改下一 tick 生效。 */
+    public static final ModConfigSpec.IntValue OBSERVATION_HEALTH_BUDGET_PER_TICK = BUILDER
+            .comment("每 tick 最多做多少次健康探测；调优项，热改下一 tick 生效，不设硬上限。 /",
+                    "Health probes per tick; tuning knob, applies on the next tick.")
+            .defineInRange("observationHealthBudgetPerTick",
+                    DEFAULT_OBSERVATION_CHANNEL_BUDGET, 1, Integer.MAX_VALUE);
+    /** 每 tick 工态探测预算；调优项，热改下一 tick 生效。 */
+    public static final ModConfigSpec.IntValue OBSERVATION_WORK_BUDGET_PER_TICK = BUILDER
+            .comment("每 tick 最多做多少次工作状态探测；调优项，不设硬上限。 /",
+                    "Work-state probes per tick; tuning knob.")
+            .defineInRange("observationWorkBudgetPerTick",
+                    DEFAULT_OBSERVATION_CHANNEL_BUDGET, 1, Integer.MAX_VALUE);
+    /** 每 tick 事件队列消化预算；调优项，热改下一 tick 生效。 */
+    public static final ModConfigSpec.IntValue OBSERVATION_EVENT_BUDGET_PER_TICK = BUILDER
+            .comment("每 tick 最多消化多少条事件标脏；调优项，不设硬上限。 /",
+                    "Dirty events drained per tick; tuning knob.")
+            .defineInRange("observationEventBudgetPerTick",
+                    DEFAULT_OBSERVATION_CHANNEL_BUDGET, 1, Integer.MAX_VALUE);
     /** 健康过期阈值；调优项，热改下一 tick 生效。 */
     public static final ModConfigSpec.IntValue STALE_HEALTH_TICKS = BUILDER
             .comment("方块健康超过多少 tick 未探测就算过期；调优项。 /",
@@ -133,9 +144,19 @@ public final class IdleFactoryConfig {
         return effective(MAX_NAME_LENGTH.get(), HARD_MAX_NAME_LENGTH);
     }
 
-    /** @return 当前观测预算 */
-    public static int observationBlockBudgetPerTick() {
-        return OBSERVATION_BLOCK_BUDGET_PER_TICK.get();
+    /** @return 当前健康探测预算 */
+    public static int observationHealthBudgetPerTick() {
+        return OBSERVATION_HEALTH_BUDGET_PER_TICK.get();
+    }
+
+    /** @return 当前工态探测预算 */
+    public static int observationWorkBudgetPerTick() {
+        return OBSERVATION_WORK_BUDGET_PER_TICK.get();
+    }
+
+    /** @return 当前事件消化预算 */
+    public static int observationEventBudgetPerTick() {
+        return OBSERVATION_EVENT_BUDGET_PER_TICK.get();
     }
 
     /** @return 当前健康过期阈值 */

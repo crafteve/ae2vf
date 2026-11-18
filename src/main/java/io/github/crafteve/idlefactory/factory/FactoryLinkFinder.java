@@ -67,7 +67,7 @@ public final class FactoryLinkFinder {
         MinecraftServer server = level.getServer();
         BlockProbe.Presence presence = BlockProbe.presence(server,
                 BlockKey.of(level.dimension(), pos));
-        return presence.health() == Health.PRESENT && !presence.kinds().isEmpty();
+        return presence.health() == Health.PRESENT && presence.machineCapable();
     }
 
     private static List<BlockPos> find(ServerLevel level, BlockPos origin, int max,

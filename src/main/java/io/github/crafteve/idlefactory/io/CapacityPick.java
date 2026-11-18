@@ -10,7 +10,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.Direction;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 /**
  * 容量查询：这一轮这台机器能完整收下几份。
@@ -137,7 +137,7 @@ public final class CapacityPick {
             long want = mid * amount;
             long accepted;
             try {
-                accepted = storage.insert(key, want, Actionable.SIMULATE, AeKeySupport.SOURCE);
+                accepted = storage.insert(key, want, Actionable.SIMULATE, AeKeyAdapter.SOURCE);
             } catch (RuntimeException e) {
                 // 第三方能力实现抛异常：这个面按「一份都收不下」处理，不把异常带出去。
                 return 0L;

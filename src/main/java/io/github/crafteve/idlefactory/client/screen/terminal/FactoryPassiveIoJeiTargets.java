@@ -13,8 +13,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.client.renderer.Rect2i;
@@ -43,11 +42,11 @@ public final class FactoryPassiveIoJeiTargets {
     /**
      * 一个 JEI 查询目标。
      *
-     * @param kind  资源类型
-     * @param stack 图标物品（流体用桶、FE 用红石）
-     * @param area  图标区域
+     * @param energy 是否 FE 目标（JEI 用独立配料，不能落到红石粉）
+     * @param stack  图标物品（流体用桶、FE 用红石）
+     * @param area   图标区域
      */
-    public record JeiTarget(CapabilityKind kind, ItemStack stack, Rect2i area) {
+    public record JeiTarget(boolean energy, ItemStack stack, Rect2i area) {
     }
 
     /**
@@ -100,11 +99,11 @@ public final class FactoryPassiveIoJeiTargets {
         if (hit.kind() == FactoryPassiveIoLayout.Kind.MACHINE) {
             ItemStack stack = FactoryLabels.blockStack(block.machine().blockId());
             return stack.isEmpty() ? null
-                    : new JeiTarget(CapabilityKind.ITEM, stack, machineIconArea(layout, hit, scroll));
+                    : new JeiTarget(false, stack, machineIconArea(layout, hit, scroll));
         }
         RuleRow rule = block.rules().get(hit.rule());
         AEKey key = rule.spec().key();
-        return new JeiTarget(AeKeySupport.kind(key), FactoryLabels.icon(key),
+        return new JeiTarget(AeKeyAdapter.isEnergy(key), FactoryLabels.icon(key),
                 ruleIconArea(layout, hit, scroll));
     }
 

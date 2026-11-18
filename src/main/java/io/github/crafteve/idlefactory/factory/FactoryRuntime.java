@@ -21,7 +21,9 @@ import io.github.crafteve.idlefactory.factory.links.LinkRegistry;
 
 import io.github.crafteve.idlefactory.node.NodeManager;
 
-import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.ObservationReader;
+import io.github.crafteve.idlefactory.observation.ObservationRunner;
+import io.github.crafteve.idlefactory.observation.WorldEventListener;
 
 import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
@@ -31,6 +33,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
@@ -85,7 +88,12 @@ public final class FactoryRuntime {
     private FactoryTickRunner tickRunner;
     private FactoryStore store;
     @Nullable
-    private ObservationService observations;
+    private ObservationRunner observationRunner;
+    @Nullable
+    private ObservationReader observationReader;
+    /** 世界事件标脏监听；阶段 2 临时由运行时注册，阶段 4 迁到根装配。 */
+    @Nullable
+    private WorldEventListener worldEventListener;
     /** 仓库解析器：启动时创建，供工厂定时刷新与指令即时刷新共用。 */
     @Nullable
     private MeStorageResolver storageResolver;
@@ -126,7 +134,16 @@ public final class FactoryRuntime {
         runtime.machineStates.clear();
         runtime.formBuilder.clear();
         runtime.storageResolver = null;
-        runtime.observations = null;
+        if (runtime.worldEventListener != null) {
+            NeoForge.EVENT_BUS.unregister(runtime.worldEventListener);
+            runtime.worldEventListener.clear();
+            runtime.worldEventListener = null;
+        }
+        if (runtime.observationRunner != null) {
+            runtime.observationRunner.shutdown();
+        }
+        runtime.observationRunner = null;
+        runtime.observationReader = null;
         runtime.tickRunner = null;
         runtime.notices.clear();
         runtime.lastAcceptedSeq.clear();
@@ -181,10 +198,16 @@ public final class FactoryRuntime {
         return this.nodeIoRunner;
     }
 
-    /** 观测服务；服务端未就绪时为 {@code null}。 */
+    /** 观测只读视图；服务端未就绪时为 {@code null}。 */
     @Nullable
-    public ObservationService observations() {
-        return this.observations;
+    public ObservationReader observations() {
+        return this.observationReader;
+    }
+
+    /** 观测调度者；服务端未就绪时为 {@code null}。 */
+    @Nullable
+    public ObservationRunner observationRunner() {
+        return this.observationRunner;
     }
 
     /** 虚拟机器节点管理器。 */
@@ -297,8 +320,14 @@ public final class FactoryRuntime {
 
     private void load() {
         this.store = FactoryStore.get(this.server.overworld());
-        this.observations = new ObservationService(this.server,
-                IdleFactoryConfig::observationBlockBudgetPerTick);
+        this.observationRunner = new ObservationRunner(this.server,
+                IdleFactoryConfig::observationHealthBudgetPerTick,
+                IdleFactoryConfig::observationWorkBudgetPerTick,
+                IdleFactoryConfig::observationEventBudgetPerTick);
+        this.observationReader = this.observationRunner.reader();
+        this.worldEventListener = new WorldEventListener(this.observationRunner,
+                this.observationRunner.table());
+        NeoForge.EVENT_BUS.register(this.worldEventListener);
         this.storageResolver = new MeStorageResolver(this.server);
         this.manager.loadFrom(this.store.records());
         this.links.rebuild(this.manager);
@@ -306,12 +335,13 @@ public final class FactoryRuntime {
             factory.refreshStorage(this.storageResolver);
         }
         FactoryObservationRunner observationRunner = new FactoryObservationRunner(
-                this.server, this.manager, this.observations, this.nodeIoRunner,
-                this.nodeManager, this.notices, this::markDirtyLinks);
+                this.server, this.manager, this.observationRunner, this.observationReader,
+                this.nodeIoRunner, this.nodeManager, this.notices, this::markDirtyLinks);
+        this.observationRunner.register(observationRunner);
         FactoryNodeRunner nodeRunner = new FactoryNodeRunner(
-                this.server, this.manager, this.observations, this.nodeManager);
+                this.server, this.manager, this.observationReader, this.nodeManager);
         this.tickRunner = new FactoryTickRunner(this.server, this.manager, this.nodeIoRunner,
-                this.nodeManager, this.observations, this.storageResolver, observationRunner,
+                this.nodeManager, this.observationReader, this.storageResolver, observationRunner,
                 nodeRunner, this.machineStates, this.formBuilder);
         IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }

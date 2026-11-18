@@ -18,11 +18,10 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 import net.minecraft.client.gui.Font;
@@ -233,7 +232,7 @@ final class FactoryPassiveIoRender {
         int contentRight = FactoryPassiveIoLayout.contentRight(viewport);
         // 状态灯占最右 3px；数量用原版物品数量修饰器，叠在图标右下角，和背包一致。
         int lampX = contentRight - 5;
-        boolean hasEnergy = AeKeySupport.energy() != null;
+        boolean hasEnergy = AeKeyAdapter.energy() != null;
         // FE 按钮占住状态灯左侧；名字可用宽度要把按钮让出来，不能压到按钮上。
         int nameRight = hasEnergy ? FactoryPassiveIoLayout.feButtonX(viewport) - 2 : lampX - 4;
         if (block.machineCount() > 1) {
@@ -396,11 +395,10 @@ final class FactoryPassiveIoRender {
      * @return 速率文案
      */
     private static String rateText(RuleRow rule) {
-        CapabilityKind kind = AeKeySupport.kind(rule.spec().key());
-        if (kind == CapabilityKind.ENERGY) {
+        if (AeKeyAdapter.isEnergy(rule.spec().key())) {
             return FactoryLabels.count(rule.rate()) + "/s";
         }
-        return FactoryLabels.rateText(rule.rate(), kind);
+        return FactoryLabels.rateText(rule.rate(), rule.spec().key());
     }
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,

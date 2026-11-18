@@ -6,7 +6,7 @@ import java.util.List;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
 /**
@@ -243,7 +243,7 @@ final class FactoryPassiveIoLayout {
                 }
                 // 没装 Applied Flux 时没有 FE 这类资源，按钮不画也不占命中。
                 int buttonY = feButtonY(box.top());
-                if (AeKeySupport.energy() != null
+                if (AeKeyAdapter.energy() != null
                         && localY >= buttonY && localY < buttonY + FE_BUTTON
                         && inside(localX, feButtonX(this.viewport), FE_BUTTON)) {
                     return new Hit(Kind.ENERGY, box.index(), -1);

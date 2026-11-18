@@ -7,9 +7,8 @@ import java.util.Set;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.config.Actionable;
 import appeng.api.stacks.AEKey;
@@ -91,7 +90,7 @@ public final class IoExecutor {
         }
         long accepted;
         try {
-            accepted = target.insert(key, amount, Actionable.SIMULATE, AeKeySupport.SOURCE);
+            accepted = target.insert(key, amount, Actionable.SIMULATE, AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             this.log("模拟写入目标异常", key, e);
             return new IoResult(0L, IoReason.ERROR);
@@ -102,7 +101,7 @@ public final class IoExecutor {
         long available;
         try {
             available = source.extract(key, Math.min(amount, accepted), Actionable.SIMULATE,
-                    AeKeySupport.SOURCE);
+                    AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             this.log("模拟从来源抽取异常", key, e);
             return new IoResult(0L, IoReason.ERROR);
@@ -113,7 +112,7 @@ public final class IoExecutor {
         long want = Math.min(available, accepted);
         long taken;
         try {
-            taken = source.extract(key, want, Actionable.MODULATE, AeKeySupport.SOURCE);
+            taken = source.extract(key, want, Actionable.MODULATE, AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             // 取没取出来是未知的：按「一点没取」处理，下一轮重试；宁可重复也不让料悬空。
             this.log("从来源抽取异常", key, e);
@@ -124,7 +123,7 @@ public final class IoExecutor {
         }
         long inserted;
         try {
-            inserted = target.insert(key, taken, Actionable.MODULATE, AeKeySupport.SOURCE);
+            inserted = target.insert(key, taken, Actionable.MODULATE, AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             // 写进去多少未知：把本次从源扣走的整笔退回去（可能重复），记 ERROR，不让单卡死。
             this.log("提交写入目标异常", key, e);
@@ -159,7 +158,7 @@ public final class IoExecutor {
             long inserted;
             try {
                 inserted = machine.insert(line.getKey(), amount, Actionable.MODULATE,
-                        AeKeySupport.SOURCE);
+                        AeKeyAdapter.SOURCE);
             } catch (RuntimeException e) {
                 // 这一行写进去多少未知：剩余量留队下一 tick 重试（可能重复，但单不卡死）。
                 this.log("补料写入机器异常", line.getKey(), e);
@@ -186,7 +185,7 @@ public final class IoExecutor {
         }
         long inserted;
         try {
-            inserted = network.insert(key, amount, Actionable.MODULATE, AeKeySupport.SOURCE);
+            inserted = network.insert(key, amount, Actionable.MODULATE, AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             this.log("退回仓库异常", key, e);
             inserted = 0L;
@@ -195,7 +194,7 @@ public final class IoExecutor {
         if (lost > 0L) {
             // 退回失败按 D21 记日志丢弃：不生成掉落物，也不把错误藏起来。
             IdleFactory.LOGGER.warn("Idle Factory: 退回仓库失败，{} × {} 已按丢弃处理",
-                    lost, AeKeySupport.displayName(key));
+                    lost, AeKeyAdapter.displayName(key));
         }
         return new IoResult(inserted, inserted > 0L ? IoReason.RUN : IoReason.FULL);
     }
@@ -220,7 +219,7 @@ public final class IoExecutor {
             }
             Map<AEKey, Long> available;
             try {
-                available = AeKeySupport.snapshot(storage);
+                available = AeKeyAdapter.snapshot(storage);
             } catch (RuntimeException e) {
                 // 某一面读不出来：只失效这一面，其它面继续扫。
                 this.log("读取机器面库存异常", null, e);
@@ -251,7 +250,7 @@ public final class IoExecutor {
      */
     private boolean otherFaceAccepts(IoJob job) {
         Machine machine = job.machine();
-        long probe = AeKeySupport.kind(job.key()) == CapabilityKind.ENERGY ? ENERGY_PROBE : ITEM_PROBE;
+        long probe = AeKeyAdapter.isEnergy(job.key()) ? ENERGY_PROBE : ITEM_PROBE;
         for (Direction face : FACES) {
             if (face == job.face()) {
                 continue;
@@ -262,8 +261,8 @@ public final class IoExecutor {
             }
             try {
                 long accepted = job.side() == IoSide.INPUT
-                        ? storage.insert(job.key(), probe, Actionable.SIMULATE, AeKeySupport.SOURCE)
-                        : storage.extract(job.key(), probe, Actionable.SIMULATE, AeKeySupport.SOURCE);
+                        ? storage.insert(job.key(), probe, Actionable.SIMULATE, AeKeyAdapter.SOURCE)
+                        : storage.extract(job.key(), probe, Actionable.SIMULATE, AeKeyAdapter.SOURCE);
                 if (accepted > 0L) {
                     return true;
                 }
@@ -282,6 +281,6 @@ public final class IoExecutor {
 
     private void log(String message, @Nullable AEKey key, RuntimeException cause) {
         IdleFactory.LOGGER.warn("Idle Factory: {}（{}）", message,
-                key == null ? "未知资源" : AeKeySupport.describe(key), cause);
+                key == null ? "未知资源" : AeKeyAdapter.describe(key), cause);
     }
 }

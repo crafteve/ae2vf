@@ -15,7 +15,7 @@ import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidStack;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 /**
  * 仓库格、规则图标共用的资源图标绘制。
@@ -44,19 +44,16 @@ public final class FactoryResourceIconRender {
      * @param y        左上角 y
      */
     public static void draw(GuiGraphics graphics, Font font, AEKey key, int x, int y) {
-        switch (AeKeySupport.kind(key)) {
-            case ITEM -> drawItem(graphics, font, key, x, y);
-            case FLUID -> {
-                if (!drawFluid(graphics, key, x, y)) {
-                    drawItem(graphics, font, key, x, y);
-                }
+        if (AeKeyAdapter.isEnergy(key)) {
+            if (!drawEnergy(graphics, x, y)) {
+                drawItem(graphics, font, key, x, y);
             }
-            case ENERGY -> {
-                if (!drawEnergy(graphics, x, y)) {
-                    drawItem(graphics, font, key, x, y);
-                }
+        } else if (AeKeyAdapter.isFluid(key)) {
+            if (!drawFluid(graphics, key, x, y)) {
+                drawItem(graphics, font, key, x, y);
             }
-            default -> drawItem(graphics, font, key, x, y);
+        } else {
+            drawItem(graphics, font, key, x, y);
         }
     }
 

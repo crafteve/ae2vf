@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoMod
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -91,7 +91,7 @@ final class FactoryPassiveIoTooltip {
         if (spec.key() instanceof AEItemKey) {
             lines.add(line("模式", spec.mode() == MatchMode.EXACT ? "精确" : "模糊"));
         }
-        lines.add(line("速率", FactoryLabels.rateText(row.rate(), AeKeySupport.kind(spec.key()))));
+        lines.add(line("速率", FactoryLabels.rateText(row.rate(), spec.key())));
         IoReason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
         if (reason != IoReason.RUN) {
             lines.add(line("原因", FactoryLabels.reason(reason, row.input())));

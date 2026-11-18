@@ -6,7 +6,6 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.io.IoReason;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -17,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 
@@ -66,17 +65,17 @@ public final class FactoryLabels {
      * @param key 资源
      * @return 图标；未知资源用屏障
      */
-    public static ItemStack icon(AEKey key) {
-        return switch (AeKeySupport.kind(key)) {
-            case ITEM -> AeKeySupport.toStack(key).isEmpty() ? new ItemStack(Items.BARRIER) : AeKeySupport.toStack(key);
-            case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.getId());
-                Item bucket = fluid.getBucket();
-                yield new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
-            }
-            case ENERGY -> new ItemStack(Items.REDSTONE);
-            default -> new ItemStack(Items.BARRIER);
-        };
+    public static ItemStack icon(@Nullable AEKey key) {
+        if (AeKeyAdapter.isEnergy(key)) {
+            return new ItemStack(Items.REDSTONE);
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            var fluid = BuiltInRegistries.FLUID.get(key.getId());
+            Item bucket = fluid.getBucket();
+            return new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
+        }
+        ItemStack stack = AeKeyAdapter.toStack(key);
+        return stack.isEmpty() ? new ItemStack(Items.BARRIER) : stack;
     }
 
     /**
@@ -86,7 +85,7 @@ public final class FactoryLabels {
      * @return 名称；查不到时退回注册名
      */
     public static String name(AEKey key) {
-        if (AeKeySupport.isEnergy(key)) {
+        if (AeKeyAdapter.isEnergy(key)) {
             return "FE";
         }
         if ((key instanceof AEFluidKey)) {
@@ -96,7 +95,7 @@ public final class FactoryLabels {
                     : new ItemStack(bucket).getHoverName().getString();
         }
         if ((key instanceof AEItemKey)) {
-            ItemStack stack = AeKeySupport.toStack(key);
+            ItemStack stack = AeKeyAdapter.toStack(key);
             return stack.isEmpty() ? key.getId().toString() : stack.getHoverName().getString();
         }
         return key.getId().toString();
@@ -129,15 +128,17 @@ public final class FactoryLabels {
      * 速率显示：物品 {@code 1.2k/s}、流体 {@code 1.5B/s}、FE {@code 28.1G FE/s}。
      *
      * @param rate 内部单位每秒（物品个 / 流体 mB / FE）
-     * @param kind 资源类型
+     * @param key  资源 key；类型决定单位
      * @return 带单位的一行
      */
-    public static String rateText(long rate, CapabilityKind kind) {
-        return switch (kind) {
-            case FLUID -> fluid(rate) + "/s";
-            case ENERGY -> count(rate) + " FE/s";
-            default -> count(rate) + "/s";
-        };
+    public static String rateText(long rate, @Nullable AEKey key) {
+        if (AeKeyAdapter.isEnergy(key)) {
+            return count(rate) + " FE/s";
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            return fluid(rate) + "/s";
+        }
+        return count(rate) + "/s";
     }
 
     /**
@@ -331,15 +332,15 @@ public final class FactoryLabels {
      * 「数量 + 单位」的速率片段，数值颜色跟随流量与原因。
      *
      * @param rate   速率值
-     * @param kind   资源类型
+     * @param key    资源 key；类型决定单位
      * @param reason 最近一次原因
      * @param theme  主题
      * @return 文本组件
      */
-    static Component rate(long rate, CapabilityKind kind, IoReason reason,
+    static Component rate(long rate, @Nullable AEKey key, IoReason reason,
             FactoryGuiTheme theme) {
         int color = rateColorTooltip(rate, reason, theme);
-        return coloredBold(rateText(rate, kind), color);
+        return coloredBold(rateText(rate, key), color);
     }
 
     /**

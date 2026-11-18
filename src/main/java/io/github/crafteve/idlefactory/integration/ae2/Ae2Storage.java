@@ -9,7 +9,6 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
 /**
@@ -51,14 +50,6 @@ public final class Ae2Storage implements MEStorage {
         long extracted = this.storage.extract(aeKey, amount,
                 simulate ? Actionable.SIMULATE : Actionable.MODULATE, SOURCE);
         return extracted;
-    }
-
-    public boolean supports(CapabilityKind kind) {
-        return switch (kind) {
-            case ITEM, FLUID -> true;
-            // 装了 Applied Flux 还不够，得等 FE key 真正接上才算支持
-            case ENERGY -> AppFluxKeys.feKey() != null;
-        };
     }
 
     public boolean isEmpty() {

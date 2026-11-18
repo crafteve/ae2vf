@@ -19,7 +19,6 @@ import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
 import io.github.crafteve.idlefactory.observation.WorkState;
 import io.github.crafteve.idlefactory.network.ModNetwork;
@@ -146,7 +145,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         writeNullableResourceLocation(buf, machine.blockId());
         writeNullableResourceLocation(buf, machine.groupBlockId());
         writeNullableResourceLocation(buf, machine.beTypeId());
-        buf.writeByte(kindMask(machine.presence()));
         buf.writeVarInt(machine.ruleCount());
         writeRules(buf, machine.inputs());
         writeRates(buf, machine.inputRates());
@@ -178,7 +176,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         ResourceLocation blockId = readNullableResourceLocation(buf);
         ResourceLocation groupBlockId = readNullableResourceLocation(buf);
         ResourceLocation beTypeId = readNullableResourceLocation(buf);
-        Set<CapabilityKind> presence = readKinds(buf.readUnsignedByte());
         int ruleCount = buf.readVarInt();
         List<ResourceSpec> inputs = readRules(buf);
         List<Long> inputRates = readRates(buf, inputs.size());
@@ -195,7 +192,7 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
         IoReason outputReason = readEnum(buf, IoReason.values(), "output reason");
         return new FactorySnapshotBuilder.MachineView(nodeId, nodeName, nodeIconBlockId,
                 nodeMachineCount, machineId, primaryBlock, health, probed, stale,
-                blockId, groupBlockId, beTypeId, presence, ruleCount, inputs, outputs,
+                blockId, groupBlockId, beTypeId, ruleCount, inputs, outputs,
                 inputRates, outputRates, sinceMoveTicks, blockedTicks, workState, inputFull,
                 sinceInputMoveTicks, inputReason, outputReason, inputReasons, outputReasons);
     }
@@ -272,24 +269,6 @@ public record FactoryTableS2C(int containerId, boolean hasFactory,
             rules.add(new ResourceSpec(key, face, amount, mode));
         }
         return rules;
-    }
-
-    private static int kindMask(Set<CapabilityKind> kinds) {
-        int mask = 0;
-        for (CapabilityKind kind : kinds) {
-            mask |= 1 << kind.ordinal();
-        }
-        return mask;
-    }
-
-    private static Set<CapabilityKind> readKinds(int mask) {
-        EnumSet<CapabilityKind> kinds = EnumSet.noneOf(CapabilityKind.class);
-        for (CapabilityKind kind : CapabilityKind.values()) {
-            if ((mask & (1 << kind.ordinal())) != 0) {
-                kinds.add(kind);
-            }
-        }
-        return kinds;
     }
 
     private static void writeNullableString(RegistryFriendlyByteBuf buf, @Nullable String value) {

@@ -9,7 +9,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.fml.ModList;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 /**
  * 界面专用的文本与资源形态辅助。
@@ -60,16 +60,15 @@ public final class FactoryUiText {
      * @return 物品栈；化学品等没有物品形态时为空
      */
     static ItemStack resourceStack(AEKey key) {
-        return switch (AeKeySupport.kind(key)) {
-            case ITEM -> AeKeySupport.toStack(key);
-            case FLUID -> {
-                var fluid = BuiltInRegistries.FLUID.get(key.getId());
-                Item bucket = fluid.getBucket();
-                yield bucket == Items.AIR ? new ItemStack(Items.BUCKET) : new ItemStack(bucket);
-            }
-            case ENERGY -> new ItemStack(Items.REDSTONE);
-            default -> ItemStack.EMPTY;
-        };
+        if (AeKeyAdapter.isEnergy(key)) {
+            return new ItemStack(Items.REDSTONE);
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            var fluid = BuiltInRegistries.FLUID.get(key.getId());
+            Item bucket = fluid.getBucket();
+            return bucket == Items.AIR ? new ItemStack(Items.BUCKET) : new ItemStack(bucket);
+        }
+        return AeKeyAdapter.toStack(key);
     }
 
     /**

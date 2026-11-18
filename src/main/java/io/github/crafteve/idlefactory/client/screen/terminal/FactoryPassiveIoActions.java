@@ -9,7 +9,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.network.payload.FactoryRuleActionC2S;
 
 import net.minecraft.core.Direction;
@@ -112,7 +112,7 @@ final class FactoryPassiveIoActions {
      * @param block       机器块
      */
     static void addEnergy(int containerId, FactoryPassiveIoModel.BlockView block) {
-        AEKey key = AeKeySupport.energy();
+        AEKey key = AeKeyAdapter.energy();
         if (key == null) {
             // 没装 Applied Flux：没有 FE 这类资源，按钮本来也不该出现。
             return;

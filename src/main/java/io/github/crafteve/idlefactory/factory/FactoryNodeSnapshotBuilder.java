@@ -17,8 +17,8 @@ import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeManager;
 import io.github.crafteve.idlefactory.node.NodeRuntime;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
-import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.observation.MachineHealth;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 
@@ -129,7 +129,7 @@ public final class FactoryNodeSnapshotBuilder {
      * @param now          当前服务端 tick
      * @return 节点视图
      */
-    public static List<NodeView> nodes(Factory factory, @Nullable ObservationService observations,
+    public static List<NodeView> nodes(Factory factory, @Nullable ObservationReader observations,
             @Nullable IoForm form, @Nullable NodeManager nodeManager, long now) {
         List<FactorySnapshotBuilder.MachineView> machineViews =
                 FactorySnapshotBuilder.machines(factory, observations, form, now);
@@ -164,7 +164,7 @@ public final class FactoryNodeSnapshotBuilder {
             // 样板不算玩家配置——删节点时样板会退回玩家背包，不会丢。
             boolean autoEnergyOnly = node.io().outputs().isEmpty()
                     && node.io().inputs().stream().allMatch(spec ->
-                            AeKeySupport.isEnergy(spec.key()) && spec.face() == null);
+                            AeKeyAdapter.isEnergy(spec.key()) && spec.face() == null);
             DispatchQueue queue = runtime == null ? null : runtime.pendingQueue();
             int pendingCount = queue == null ? 0 : queue.size();
             DispatchOrder head = queue == null ? null : queue.first();

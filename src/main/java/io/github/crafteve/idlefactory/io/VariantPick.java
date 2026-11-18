@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
@@ -113,7 +113,7 @@ public final class VariantPick {
     private List<AEKey> fromMachine(MEStorage machine, ResourceLocation itemId, int limit) {
         Map<AEKey, Long> snapshot;
         try {
-            snapshot = AeKeySupport.snapshot(machine);
+            snapshot = AeKeyAdapter.snapshot(machine);
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("IdleFactory: 扫描机器变体失败", e);
             return List.of();
@@ -141,7 +141,7 @@ public final class VariantPick {
         this.byItem.clear();
         Map<AEKey, Long> snapshot;
         try {
-            snapshot = AeKeySupport.snapshot(network);
+            snapshot = AeKeyAdapter.snapshot(network);
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("IdleFactory: 模糊变体索引构建失败", e);
             return;

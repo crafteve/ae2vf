@@ -8,7 +8,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
 
 import io.github.crafteve.idlefactory.io.IoReason;
 
@@ -34,9 +33,7 @@ import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
 
-import io.github.crafteve.idlefactory.observation.Observation;
-
-import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.ObservationReader;
 
 import io.github.crafteve.idlefactory.observation.BlockFacts;
 
@@ -56,7 +53,7 @@ import net.minecraft.world.level.Level;
  * <p>遍历顺序是节点 → 机器：一个节点下的每台机器摊平成一行，规则从节点读。视图带节点归属，
  * v3 机器表用 {@code nodeId} 归组、用 {@code nodeMachineCount} 画机器数。</p>
  *
- * <p><b>这里不许探世界</b>：所有状态都从 {@link ObservationService} 的缓存里读。</p>
+ * <p><b>这里不许探世界</b>：所有状态都从 {@link ObservationReader} 的缓存里读。</p>
  */
 public final class FactorySnapshotBuilder {
     /** 界面上的总状态，由 WS + IO 推导。 */
@@ -111,7 +108,6 @@ public final class FactorySnapshotBuilder {
      * @param blockId        观测到的方块 id；未知时 {@code null}
      * @param groupBlockId   分组用的方块 id：{@code blockId} 为空时回退到「最后一次看到的方块」
      * @param beTypeId       方块实体类型 id；没有方块实体时为 {@code null}
-     * @param presence       无向能力
      * @param ruleCount      节点配了几条规则
      * @param inputs         输入规则（界面明细用）
      * @param outputs        输出规则（界面明细用）
@@ -132,7 +128,7 @@ public final class FactorySnapshotBuilder {
             UUID machineId, BlockKey primaryBlock,
             MachineHealth health, boolean probed, boolean stale,
             @Nullable ResourceLocation blockId, @Nullable ResourceLocation groupBlockId,
-            @Nullable ResourceLocation beTypeId, Set<CapabilityKind> presence, int ruleCount,
+            @Nullable ResourceLocation beTypeId, int ruleCount,
             List<ResourceSpec> inputs, List<ResourceSpec> outputs,
             List<Long> inputRates, List<Long> outputRates,
             long sinceMoveTicks, long blockedTicks,
@@ -285,7 +281,7 @@ public final class FactorySnapshotBuilder {
      * @param now          当前服务端 tick
      * @return 视图列表
      */
-    public static List<MachineView> machines(Factory factory, @Nullable ObservationService observations,
+    public static List<MachineView> machines(Factory factory, @Nullable ObservationReader observations,
             @Nullable IoForm form, long now) {
         List<MachineView> views = new ArrayList<>(factory.config().nodes().totalMachineCount());
         long healthNow = observations == null ? 0L : observations.currentTick();
@@ -295,13 +291,13 @@ public final class FactorySnapshotBuilder {
             List<ResourceSpec> inputs = io.inputs();
             List<ResourceSpec> outputs = io.outputs();
             BlockFacts.Source facts = observations == null
-                    ? key -> Observation.UNKNOWN : observations;
+                    ? key -> BlockFacts.UNKNOWN : observations;
             NodeHealthResolver.Snapshot nodeHealth = NodeHealthResolver.resolve(node,
                     facts, healthNow, staleTicks);
             for (Machine machine : node.machines()) {
                 BlockKey typeBlock = machine.block();
-                Observation observation = observations == null
-                        ? Observation.UNKNOWN : observations.observe(typeBlock);
+                BlockFacts observation = observations == null
+                        ? BlockFacts.UNKNOWN : observations.at(typeBlock);
                 NodeHealthResolver.MachineState state = nodeHealth.machine(machine.id());
                 MachineHealth health = state == null ? MachineHealth.OFFLINE : state.health();
                 boolean probed = state != null && state.probed();
@@ -377,14 +373,17 @@ public final class FactorySnapshotBuilder {
 
                 // groupBlockId 在未加载时回退到 lastBlockId：分组只看「它本来是什么」。
                 ResourceLocation groupBlockId = observation.blockId() != null
-                        ? observation.blockId() : observation.lastBlockId();
+                        ? observation.blockId()
+                        : (observations == null ? null : observations.lastBlockId(typeBlock));
+                WorkState workState = observations == null
+                        ? WorkState.UNKNOWN : observations.workState(typeBlock);
                 views.add(new MachineView(node.id(), node.name(), node.typeBlockId(),
                         node.machineCount(), machine.id(), typeBlock,
                         health, probed, stale,
                         observation.blockId(), groupBlockId, observation.beTypeId(),
-                        observation.presence(), inputs.size() + outputs.size(),
+                        inputs.size() + outputs.size(),
                         inputs, outputs, inputRates, outputRates,
-                        sinceMove, blocked, observation.workState(), inputFull,
+                        sinceMove, blocked, workState, inputFull,
                         sinceInput, inputReason, outputReason,
                         inputReasons, outputReasons));
             }
@@ -418,7 +417,7 @@ public final class FactorySnapshotBuilder {
      * @return 视图列表
      */
     public static List<MachineView> machines(Factory factory,
-            @Nullable ObservationService observations) {
+            @Nullable ObservationReader observations) {
         return machines(factory, observations, null, 0L);
     }
 
@@ -429,7 +428,7 @@ public final class FactorySnapshotBuilder {
      * @param observations 观测服务；{@code null} 时全部算未探测
      * @return 汇总
      */
-    public static FactoryHealth health(Factory factory, @Nullable ObservationService observations) {
+    public static FactoryHealth health(Factory factory, @Nullable ObservationReader observations) {
         return health(factory, machines(factory, observations));
     }
 

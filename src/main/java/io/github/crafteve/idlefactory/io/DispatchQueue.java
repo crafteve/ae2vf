@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
@@ -193,10 +193,10 @@ public final class DispatchQueue {
         }
         try {
             return network.insert(key, amount, appeng.api.config.Actionable.MODULATE,
-                    AeKeySupport.SOURCE);
+                    AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
             IdleFactory.LOGGER.warn("Idle Factory: 退回队列材料异常（{}）：{}",
-                    AeKeySupport.describe(key), e.toString());
+                    AeKeyAdapter.describe(key), e.toString());
             return 0L;
         }
     }

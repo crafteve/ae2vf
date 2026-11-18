@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
@@ -583,7 +583,7 @@ public final class ActivePlanner {
             }
             Map<AEKey, Long> part;
             try {
-                part = AeKeySupport.snapshot(storage);
+                part = AeKeyAdapter.snapshot(storage);
             } catch (RuntimeException e) {
                 // 某一面读不出来：只失效这一面，阻挡判定按「没读到」处理。
                 this.ports.invalidate(machine, face);

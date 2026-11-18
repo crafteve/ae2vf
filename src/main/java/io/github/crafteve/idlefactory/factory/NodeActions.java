@@ -27,7 +27,7 @@ import io.github.crafteve.idlefactory.node.NodeIoGroup;
 
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import appeng.api.stacks.AEKey;
 
@@ -396,12 +396,14 @@ public final class NodeActions {
         if (key == null) {
             return "资源为空";
         }
-        return switch (AeKeySupport.kind(key)) {
-            case ITEM -> AeKeySupport.toStack(key).isEmpty() ? "未知物品：" + key.getId() : null;
-            case FLUID -> BuiltInRegistries.FLUID.get(key.getId()) == Fluids.EMPTY
+        if (AeKeyAdapter.isEnergy(key)) {
+            return AeKeyAdapter.energy().equals(key) ? null : "能量规则只能使用 idlefactory:fe";
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            return BuiltInRegistries.FLUID.get(key.getId()) == Fluids.EMPTY
                     ? "未知流体：" + key.getId() : null;
-            case ENERGY -> AeKeySupport.energy().equals(key) ? null : "能量规则只能使用 idlefactory:fe";
-        };
+        }
+        return AeKeyAdapter.toStack(key).isEmpty() ? "未知物品：" + key.getId() : null;
     }
 
     /**

@@ -9,10 +9,35 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 一个方块的只读观测事实。
  *
- * <p>这是观测层对外的唯一形状：健康解析器、机器状态只依赖本接口，不再每 tick 把观测投影成
- * 第二份记录对象。{@code Observation} 直接实现它，「事实只存一份」由此成立。</p>
+ * <p>这是观测层对外的唯一形状：健康解析器、机器状态、视图构建都只依赖本接口，不再每 tick
+ * 把观测投影成第二份记录对象。观测表的行进直接实现它，「事实只存一份」由此成立。</p>
  */
 public interface BlockFacts {
+    /** 没有登记过时的空事实：未探测、无方块 id。 */
+    BlockFacts UNKNOWN = new BlockFacts() {
+        @Override
+        public Health health() {
+            return Health.UNKNOWN;
+        }
+
+        @Override
+        public boolean isStale(long now, long staleHealthTicks) {
+            return false;
+        }
+
+        @Nullable
+        @Override
+        public ResourceLocation blockId() {
+            return null;
+        }
+
+        @Nullable
+        @Override
+        public ResourceLocation beTypeId() {
+            return null;
+        }
+    };
+
     /**
      * 方块级健康。
      *
@@ -54,6 +79,14 @@ public interface BlockFacts {
      */
     @Nullable
     ResourceLocation blockId();
+
+    /**
+     * 观测到的方块实体类型 id。
+     *
+     * @return 注册名；没有方块实体时为 {@code null}
+     */
+    @Nullable
+    ResourceLocation beTypeId();
 
     /**
      * 按位置取观测事实的来源。

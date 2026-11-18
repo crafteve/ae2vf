@@ -13,19 +13,17 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.factory.links.LinkRole;
-import io.github.crafteve.idlefactory.factory.capability.CapabilityKind;
-import io.github.crafteve.idlefactory.factory.capability.FaceTable;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeIoGroup;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
 import io.github.crafteve.idlefactory.node.NodeProvider;
-import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
 import io.github.crafteve.idlefactory.factory.wand.WandDraft;
@@ -54,7 +52,7 @@ import net.minecraft.server.level.ServerPlayer;
 final class WandService {
     private final FactoryManager manager;
     @Nullable
-    private final ObservationService observations;
+    private final ObservationReader observations;
     private final NodeLibraryService nodeLibrary;
     private final MachineLinkService machineLinks;
     private final WandValidator validator;
@@ -67,7 +65,7 @@ final class WandService {
      * @param machineLinks 节点拓扑变更出口
      * @param server       服务端
      */
-    WandService(FactoryManager manager, @Nullable ObservationService observations,
+    WandService(FactoryManager manager, @Nullable ObservationReader observations,
             NodeLibraryService nodeLibrary, MachineLinkService machineLinks,
             MinecraftServer server) {
         this.manager = manager;
@@ -227,7 +225,7 @@ final class WandService {
      * @return 是自动形状的 FE 输入规则
      */
     private static boolean isAutoEnergy(ResourceSpec spec) {
-        return AeKeySupport.isEnergy(spec.key()) && spec.face() == null;
+        return AeKeyAdapter.isEnergy(spec.key()) && spec.face() == null;
     }
 
     /**
@@ -242,7 +240,7 @@ final class WandService {
      * @param added   本次新接入的方块
      */
     private void autoAddEnergyRule(Factory factory, UUID nodeId, Collection<BlockKey> added) {
-        AEKey energy = AeKeySupport.energy();
+        AEKey energy = AeKeyAdapter.energy();
         if (energy == null || this.observations == null || added.isEmpty()) {
             return;
         }
@@ -262,9 +260,7 @@ final class WandService {
         }
         boolean hasEnergy = false;
         for (BlockKey block : added) {
-            FaceTable table = this.observations.ensureFaces(block);
-            if (!table.facesFor(CapabilityKind.ENERGY).isEmpty()
-                    || table.unsided().contains(CapabilityKind.ENERGY)) {
+            if (this.observations.energyCapable(block)) {
                 hasEnergy = true;
                 break;
             }

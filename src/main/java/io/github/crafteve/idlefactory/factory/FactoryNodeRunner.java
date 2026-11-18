@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.node.Node;
 
 import io.github.crafteve.idlefactory.node.NodeManager;
 
-import io.github.crafteve.idlefactory.observation.ObservationService;
+import io.github.crafteve.idlefactory.observation.ObservationReader;
 
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
 
@@ -46,7 +46,7 @@ final class FactoryNodeRunner {
 
     private final MinecraftServer server;
     private final FactoryManager manager;
-    private final ObservationService observations;
+    private final ObservationReader observations;
     private final NodeManager nodeManager;
 
     /**
@@ -56,7 +56,7 @@ final class FactoryNodeRunner {
      * @param nodeManager  虚拟节点管理器
      */
     FactoryNodeRunner(MinecraftServer server, FactoryManager manager,
-            ObservationService observations, NodeManager nodeManager) {
+            ObservationReader observations, NodeManager nodeManager) {
         this.server = server;
         this.manager = manager;
         this.observations = observations;

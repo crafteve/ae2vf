@@ -12,7 +12,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.fluids.FluidStack;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 /**
  * {@link AEKey} 与 AE2 {@link AEKey} 的互转。
@@ -32,15 +32,15 @@ public final class Ae2Keys {
      */
     @Nullable
     public static AEKey toAe(AEKey key) {
-        return switch (AeKeySupport.kind(key)) {
-            // 整栈往返：组件是 AEItemKey 身份的一部分，不能只传注册名。
-            case ITEM -> AEItemKey.of(AeKeySupport.toStack(key));
-            case FLUID -> {
-                Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
-                yield fluid == Fluids.EMPTY ? null : AEFluidKey.of(new FluidStack(fluid, 1));
-            }
-            case ENERGY -> AppFluxKeys.feKey();
-        };
+        if (AeKeyAdapter.isEnergy(key)) {
+            return AppFluxKeys.feKey();
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            Fluid fluid = BuiltInRegistries.FLUID.get(key.getId());
+            return fluid == Fluids.EMPTY ? null : AEFluidKey.of(new FluidStack(fluid, 1));
+        }
+        // 整栈往返：组件是 AEItemKey 身份的一部分，不能只传注册名。
+        return AEItemKey.of(AeKeyAdapter.toStack(key));
     }
 
     /**
@@ -52,13 +52,13 @@ public final class Ae2Keys {
     @Nullable
     public static AEKey toResource(AEKey key) {
         if (key instanceof AEItemKey itemKey) {
-            return AeKeySupport.item(itemKey.getReadOnlyStack());
+            return AeKeyAdapter.item(itemKey.getReadOnlyStack());
         }
         if (key instanceof AEFluidKey fluidKey) {
-            return AeKeySupport.fluid(BuiltInRegistries.FLUID.getKey(fluidKey.getFluid()));
+            return AeKeyAdapter.fluid(BuiltInRegistries.FLUID.getKey(fluidKey.getFluid()));
         }
         if (AppFluxKeys.isFe(key)) {
-            return AeKeySupport.energy();
+            return AeKeyAdapter.energy();
         }
         return null;
     }

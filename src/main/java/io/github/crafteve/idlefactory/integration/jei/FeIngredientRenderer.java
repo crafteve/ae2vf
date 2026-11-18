@@ -10,7 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.TooltipFlag;
-import io.github.crafteve.idlefactory.storage.AeKeySupport;
+import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 /**
  * FE 配料的 JEI 绘制。
@@ -30,7 +30,7 @@ final class FeIngredientRenderer implements IIngredientRenderer<FeIngredient> {
     @Override
     public void render(GuiGraphics graphics, FeIngredient ingredient) {
         FactoryResourceIconRender.draw(graphics, Minecraft.getInstance().font,
-                AeKeySupport.energy(), 0, 0);
+                AeKeyAdapter.energy(), 0, 0);
     }
 
     /**

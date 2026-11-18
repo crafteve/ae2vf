@@ -65,7 +65,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class ModNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "37";
+    public static final String PROTOCOL_VERSION = "38";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
