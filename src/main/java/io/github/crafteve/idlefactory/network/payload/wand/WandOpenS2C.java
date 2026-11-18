@@ -3,6 +3,7 @@ package io.github.crafteve.idlefactory.network.payload.wand;
 import java.util.ArrayList;
 import java.util.List;
 
+import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;

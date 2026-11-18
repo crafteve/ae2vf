@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.network.payload.wand;
+package io.github.crafteve.idlefactory.command;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -11,7 +11,7 @@ import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.factory.wand.WandLimits;

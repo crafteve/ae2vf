@@ -2,9 +2,10 @@ package io.github.crafteve.idlefactory.network.payload.wand;
 
 import java.util.List;
 
+import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.FactoryService;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.factory.wand.WandLimits;

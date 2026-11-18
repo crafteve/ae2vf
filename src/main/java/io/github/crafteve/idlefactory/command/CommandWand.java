@@ -16,7 +16,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
 import io.github.crafteve.idlefactory.factory.FactoryRefs;
 import io.github.crafteve.idlefactory.factory.FactoryRuntime;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;

@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;

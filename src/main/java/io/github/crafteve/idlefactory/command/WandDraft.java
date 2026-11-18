@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory.wand;
+package io.github.crafteve.idlefactory.command;
 
 import java.util.ArrayList;
 import java.util.HashSet;

@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 
 import io.github.crafteve.idlefactory.network.ModNetwork;
-import io.github.crafteve.idlefactory.network.payload.wand.WandDraftCodec;
+import io.github.crafteve.idlefactory.command.WandDraftCodec;
 
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeLibrary;

@@ -18,7 +18,7 @@ import io.github.crafteve.idlefactory.node.Node;
 
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
 
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 

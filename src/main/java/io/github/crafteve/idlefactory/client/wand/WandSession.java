@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;

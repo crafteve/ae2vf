@@ -29,7 +29,7 @@ import io.github.crafteve.idlefactory.node.NodeProvider;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.factory.wand.WandCommitOutcome;
 import io.github.crafteve.idlefactory.factory.wand.WandDeleteReason;
-import io.github.crafteve.idlefactory.factory.wand.WandDraft;
+import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.factory.wand.WandFailure;
 import io.github.crafteve.idlefactory.factory.wand.WandIssue;
 import io.github.crafteve.idlefactory.factory.wand.WandLimits;
