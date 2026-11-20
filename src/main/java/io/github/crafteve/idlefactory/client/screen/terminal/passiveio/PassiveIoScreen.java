@@ -181,7 +181,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         super.init();
         // base_terminal.json 带一条 ME 终端的「条目数」文本，本界面不用它，必须显式隐藏。
         this.setTextHidden("entriesShown", true);
-        this.render = new PassiveIoRender(this.font, FactoryGuiTheme.current());
+        this.render = new PassiveIoRender(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, Component.literal("搜索机器…"));

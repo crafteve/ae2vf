@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
+import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;
+
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
@@ -52,16 +54,37 @@ final class PassiveIoRender {
     private static final int TILE_NAME_W = PassiveIoLayout.TILE_W
             - PassiveIoLayout.TILE_NAME_X - 2;
 
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 键帽亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 面板底色（AE2 终端内部实色）。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 机器行深色带。 */
+    private static final int IO_MACHINE_ROW = 0xFFA9AAB8;
+    /** 输入方向 chip。 */
+    private static final int IO_DIR_IN = 0xFF2F6FB0;
+    /** 输出方向 chip。 */
+    private static final int IO_DIR_OUT = 0xFFB06A2F;
+    /** 模糊模式 chip 底。 */
+    private static final int IO_MODE_FUZZY = 0xFFC8B06A;
+    /** 模糊模式 chip 字。 */
+    private static final int IO_MODE_FUZZY_TEXT = 0xFF3A2C08;
+    /** 精确模式 chip 底。 */
+    private static final int IO_MODE_EXACT = 0xFF8FB4D8;
+    /** 精确模式 chip 字。 */
+    private static final int IO_MODE_EXACT_TEXT = 0xFF000000;
+
     private final Font font;
-    private final FactoryGuiTheme theme;
 
     /**
      * @param font  字体
      * @param theme 当前主题
      */
-    PassiveIoRender(Font font, FactoryGuiTheme theme) {
+    PassiveIoRender(Font font) {
         this.font = font;
-        this.theme = theme;
     }
 
     /**
@@ -218,7 +241,7 @@ final class PassiveIoRender {
         if (height <= 0) {
             return;
         }
-        graphics.fill(left, top + 1, right, top + 1 + height, this.theme.io().machineRow());
+        graphics.fill(left, top + 1, right, top + 1 + height, IO_MACHINE_ROW);
         StatusBar.draw(graphics, left, top + 1, height, block.status().color());
         int slotX = PassiveIoLayout.headerX(viewport);
         NineSliceRenderer.slot(graphics, slotX, top + 1, PassiveIoLayout.SLOT,
@@ -240,7 +263,7 @@ final class PassiveIoRender {
         }
         graphics.drawString(this.font,
                 ellipsize(block.name(), nameRight - nameX), nameX, top + 6,
-                this.theme.textPrimary(), false);
+                TEXT_PRIMARY, false);
         NineSliceRenderer.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
         if (hasEnergy) {
             drawEnergyButton(graphics, viewport, box, top, hover);
@@ -266,11 +289,11 @@ final class PassiveIoRender {
         boolean hovered = hover != null && hover.kind() == PassiveIoLayout.Kind.ENERGY
                 && hover.block() == box.index();
         KeycapButton.draw(graphics, x, y, PassiveIoLayout.FE_BUTTON,
-                PassiveIoLayout.FE_BUTTON, this.theme.bevelLight(), true, hovered);
+                PassiveIoLayout.FE_BUTTON, BEVEL_LIGHT, true, hovered);
         graphics.pose().pushPose();
         graphics.pose().translate(x + 2, y + 4, 0.0F);
         graphics.pose().scale(0.75F, 0.75F, 1.0F);
-        graphics.drawString(this.font, "FE", 0, 0, this.theme.textPrimary(), false);
+        graphics.drawString(this.font, "FE", 0, 0, TEXT_PRIMARY, false);
         graphics.pose().popPose();
     }
 
@@ -285,7 +308,7 @@ final class PassiveIoRender {
         int top = PassiveIoLayout.screenY(viewport, box.bodyTop(), scroll);
         int bottom = PassiveIoLayout.screenY(viewport, box.bottom(), scroll) - 1;
         if (bottom > top) {
-            graphics.fill(left, top, right, bottom, this.theme.panelBg());
+            graphics.fill(left, top, right, bottom, PANEL_BG);
         }
         for (int i = 0; i < block.rules().size(); i++) {
             drawRuleRow(graphics, viewport, box, block.rules().get(i), i, scroll, hover);
@@ -299,7 +322,7 @@ final class PassiveIoRender {
         if (index % 2 == 1) {
             graphics.fill(PassiveIoLayout.bodyX(viewport) + PassiveIoLayout.ROW_INSET,
                     y, PassiveIoLayout.bodyX(viewport) + viewport.width() - 2,
-                    y + PassiveIoLayout.ROW_H, this.theme.bevelLight());
+                    y + PassiveIoLayout.ROW_H, BEVEL_LIGHT);
         }
         int slotX = PassiveIoLayout.slotX(viewport);
         // 行不再套卡片，也不再画槽位底：图标直接落在机器卡片的浅色底上。
@@ -310,7 +333,7 @@ final class PassiveIoRender {
         int textY = y + (PassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.key()), chipX - 2 - nameX), nameX,
-                textY, this.theme.textPrimary(), false);
+                textY, TEXT_PRIMARY, false);
         drawChips(graphics, viewport, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
                 PassiveIoLayout.rateX(viewport) + PassiveIoLayout.RATE_W,
@@ -344,11 +367,11 @@ final class PassiveIoRender {
                 directionLabel(rule), directionColor(rule), 0xFFFFFFFF, true,
                 hoveredChip == 0);
         drawChip(graphics, PassiveIoLayout.chipX(viewport, 1), cy, faceLabel(rule),
-                this.theme.bevelLight(), this.theme.textPrimary(), true, hoveredChip == 1);
+                BEVEL_LIGHT, TEXT_PRIMARY, true, hoveredChip == 1);
         boolean item = rule.key() instanceof AEItemKey;
         drawChip(graphics, PassiveIoLayout.chipX(viewport, 2), cy, modeLabel(rule),
-                item ? modeColor(rule) : this.theme.bevelLight(),
-                item ? modeTextColor(rule) : this.theme.textDim(), item, hoveredChip == 2);
+                item ? modeColor(rule) : BEVEL_LIGHT,
+                item ? modeTextColor(rule) : TEXT_DIM, item, hoveredChip == 2);
     }
 
     /**
@@ -378,7 +401,7 @@ final class PassiveIoRender {
     private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,
             int maxWidth) {
         IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
-        int color = rule.rate() <= 0L ? this.theme.statusIdle()
+        int color = rule.rate() <= 0L ? StatusColor.IDLE
                 : FactoryLabels.rateColorUi(rule.rate(), reason);
         String clipped = ellipsize(rateText(rule), maxWidth);
         graphics.drawString(this.font, clipped, right - this.font.width(clipped), textY, color,
@@ -421,23 +444,23 @@ final class PassiveIoRender {
         int nameX = x + PassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.key()), TILE_NAME_W), nameX, y + 7,
-                this.theme.textPrimary(), false);
+                TEXT_PRIMARY, false);
         int chipY = y + PassiveIoLayout.TILE_CHIP_Y;
         int hoveredChip = chipIndex(hover, blockIndex, index);
         drawChip(graphics, slotX, chipY, directionLabel(rule), directionColor(rule), 0xFFFFFFFF,
                 true, hoveredChip == 0);
         drawChip(graphics, slotX + PassiveIoLayout.CHIP + PassiveIoLayout.GAP, chipY,
-                faceLabel(rule), this.theme.bevelLight(), this.theme.textPrimary(), true,
+                faceLabel(rule), BEVEL_LIGHT, TEXT_PRIMARY, true,
                 hoveredChip == 1);
         boolean item = rule.key() instanceof AEItemKey;
         drawChip(graphics, slotX + (PassiveIoLayout.CHIP + PassiveIoLayout.GAP) * 2,
                 chipY, modeLabel(rule),
-                item ? modeColor(rule) : this.theme.bevelLight(),
-                item ? modeTextColor(rule) : this.theme.textDim(), item, hoveredChip == 2);
+                item ? modeColor(rule) : BEVEL_LIGHT,
+                item ? modeTextColor(rule) : TEXT_DIM, item, hoveredChip == 2);
         String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + PassiveIoLayout.TILE_W - 2;
         IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
-        int color = rule.rate() <= 0L ? this.theme.statusIdle()
+        int color = rule.rate() <= 0L ? StatusColor.IDLE
                 : FactoryLabels.rateColorUi(rule.rate(), reason);
         // 速率和 chip 行同一中线：13px chip 的正文在 +2。
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 2, color,
@@ -466,7 +489,7 @@ final class PassiveIoRender {
 
     private void drawEmpty(GuiGraphics graphics, Viewport viewport, String text) {
         int x = viewport.x() + (viewport.width() - this.font.width(text)) / 2;
-        graphics.drawString(this.font, text, x, viewport.y() + 12, this.theme.textDim(), false);
+        graphics.drawString(this.font, text, x, viewport.y() + 12, TEXT_DIM, false);
     }
 
     /**
@@ -489,7 +512,7 @@ final class PassiveIoRender {
     }
 
     private int directionColor(RuleRow rule) {
-        return rule.input() ? this.theme.io().dirIn() : this.theme.io().dirOut();
+        return rule.input() ? IO_DIR_IN : IO_DIR_OUT;
     }
 
     private static String directionLabel(RuleRow rule) {
@@ -508,11 +531,11 @@ final class PassiveIoRender {
 
     private int modeColor(RuleRow spec) {
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
-                ? this.theme.io().modeExact() : this.theme.io().modeFuzzy();
+                ? IO_MODE_EXACT : IO_MODE_FUZZY;
     }
 
     private int modeTextColor(RuleRow spec) {
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
-                ? this.theme.io().modeExactText() : this.theme.io().modeFuzzyText();
+                ? IO_MODE_EXACT_TEXT : IO_MODE_FUZZY_TEXT;
     }
 }
