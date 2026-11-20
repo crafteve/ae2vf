@@ -194,7 +194,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         this.render = new PassiveIoRender(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, Component.literal("搜索机器…"));
+                SEARCH_W - 6, 10, Component.translatable("idlefactory.passive.search.hint"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
@@ -231,7 +231,8 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
             syncFromBar();
         }
         super.render(graphics, mouseX, mouseY, partialTick);
-        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos, "被动 IO");
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
+                tr("idlefactory.passive.title"));
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
         List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);
@@ -685,14 +686,25 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         }
     }
 
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
+    }
+
     private String emptyText() {
         if (!this.model.hasFactory()) {
-            return "工厂未就绪：重新打开一次终端";
+            return tr("idlefactory.passive.empty.no_factory");
         }
         if (this.model.filteredEmpty()) {
-            return "没有匹配的机器";
+            return tr("idlefactory.passive.empty.filtered");
         }
-        return "还没有机器 · 用机器绑定杖右键方块接入";
+        return tr("idlefactory.passive.empty.none");
     }
 
     private int totalRules() {

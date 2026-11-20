@@ -515,17 +515,28 @@ final class PassiveIoRender {
     }
 
     private static String directionLabel(RuleRow rule) {
-        return rule.input() ? "入" : "出";
+        return tr(rule.input() ? "idlefactory.passive.chip.input" : "idlefactory.passive.chip.output");
+    }
+
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
     }
 
     private static String faceLabel(RuleRow rule) {
-        return rule.face() == null ? "任" : FactoryLabels.face(rule.face());
+        return rule.face() == null ? tr("idlefactory.passive.chip.any_face") : FactoryLabels.face(rule.face());
     }
 
     private static String modeLabel(RuleRow spec) {
         // 非物品固定精确，chip 仍然写「精」但灰显禁用，保持和物品规则同一套外形。
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
-                ? "精" : "模";
+                ? tr("idlefactory.passive.chip.exact") : tr("idlefactory.passive.chip.fuzzy");
     }
 
     private int modeColor(RuleRow spec) {

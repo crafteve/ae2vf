@@ -48,8 +48,8 @@ final class PassiveIoTooltip {
             case MACHINE -> machine(block);
             case ENERGY -> energy();
             case ADD -> List.of(
-                    Component.literal("从 JEI 拖到这里新建行"),
-                    Component.literal("新规则默认作为输入").withStyle(ChatFormatting.GRAY));
+                    Component.translatable("idlefactory.passive.tooltip.add_row"),
+                    Component.translatable("idlefactory.passive.tooltip.add_row.default_input").withStyle(ChatFormatting.GRAY));
             default -> rule(block, block.rules().get(hit.rule()));
         };
     }
@@ -61,10 +61,10 @@ final class PassiveIoTooltip {
      */
     private static List<Component> energy() {
         return List.of(
-                Component.literal("FE 输入").withStyle(ChatFormatting.BOLD),
-                Component.literal("点一下：给这个节点加一条输入 FE 规则")
+                Component.translatable("idlefactory.passive.tooltip.fe_input").withStyle(ChatFormatting.BOLD),
+                Component.translatable("idlefactory.passive.tooltip.fe_input.hint")
                         .withStyle(ChatFormatting.GRAY),
-                Component.literal("加完可用规则上的「入」切成输出").withStyle(ChatFormatting.DARK_GRAY));
+                Component.translatable("idlefactory.passive.tooltip.fe_input.switch").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static List<Component> machine(BlockView block) {
@@ -74,9 +74,9 @@ final class PassiveIoTooltip {
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
         lines.add(Component.literal(block.machine().block().dimension().location()
                 + " " + block.machine().block().pos().toShortString()).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.literal("机器 " + block.machineCount() + " 台")
+        lines.add(Component.translatable("idlefactory.passive.tooltip.members", block.machineCount())
                 .withStyle(ChatFormatting.GRAY));
-        lines.add(Component.literal("规则 " + block.rules().size() + " 条")
+        lines.add(Component.translatable("idlefactory.passive.tooltip.rules", block.rules().size())
                 .withStyle(ChatFormatting.GRAY));
         return lines;
     }
@@ -84,19 +84,36 @@ final class PassiveIoTooltip {
     private static List<Component> rule(BlockView block, RuleRow row) {
         List<Component> lines = new ArrayList<>(6);
         lines.add(Component.literal(FactoryLabels.name(row.key())).withStyle(ChatFormatting.BOLD));
-        lines.add(line("方向", row.input() ? "输入" : "输出"));
-        lines.add(line("面", row.face() == null ? "任意" : FactoryLabels.face(row.face())));
+        lines.add(line(tr("idlefactory.passive.tooltip.direction"),
+                tr(row.input() ? "idlefactory.passive.side.input" : "idlefactory.passive.side.output")));
+        lines.add(line(tr("idlefactory.passive.tooltip.face"),
+                row.face() == null ? tr("idlefactory.passive.face.any") : FactoryLabels.face(row.face())));
         if (row.key() instanceof AEItemKey) {
-            lines.add(line("模式", row.mode() == MatchMode.EXACT ? "精确" : "模糊"));
+            lines.add(line(tr("idlefactory.passive.tooltip.mode"),
+                tr(row.mode() == MatchMode.EXACT
+                        ? "idlefactory.passive.mode.exact" : "idlefactory.passive.mode.fuzzy")));
         }
-        lines.add(line("速率", FactoryLabels.rateText(row.rate(), row.key())));
+        lines.add(line(tr("idlefactory.passive.tooltip.rate"),
+                FactoryLabels.rateText(row.rate(), row.key())));
         IoReason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
         if (reason != IoReason.RUN) {
-            lines.add(line("原因", FactoryLabels.reason(reason, row.input())));
+            lines.add(line(tr("idlefactory.passive.tooltip.reason"),
+                FactoryLabels.reason(reason, row.input())));
         }
-        lines.add(Component.literal("左键改方向 / 面 / 模式，右键删除")
+        lines.add(Component.translatable("idlefactory.passive.tooltip.hint")
                 .withStyle(ChatFormatting.DARK_GRAY));
         return lines;
+    }
+
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
     }
 
     private static Component line(String label, String value) {
