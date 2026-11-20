@@ -187,7 +187,6 @@
   "wand.hud.toggle.off": "已断开链接",
   "wand.hud.saved": "已保存：+%s 台 / -%s 台",
   "wand.hud.saved.none": "已保存",
-  "wand.hud.deleted": "已删除节点",
   "wand.hud.cancelled": "已取消草稿",
   "wand.hud.timeout": "服务端未响应，请重试",
   "wand.hud.waiting": "正在提交，请稍候",

@@ -286,7 +286,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 浮层的绘制顺序写在终端屏幕的 `draw` 里，浮层必须排在物品与数量之后；被数量盖住基本都是顺序写错。
 15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
-16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、10 秒节流发 actionbar，`UNLOADED` 不通知。只有显式删除机器才删规则。
+16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、10 秒节流发 `HudNoticeS2C`（模组 HUD 条，不是原版 actionbar），`UNLOADED` 不通知。只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
 18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `ResourceIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
@@ -298,7 +298,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
-- 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议 41），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键。
+- 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议发布前重置为 1，内部编号 41 / 42 只留在 ADR），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键；新增 `HudNoticeS2C` 把失联 / 恢复提示并入模组 HUD 条。
 - 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
 - 2026-11-11 修正 §1.2：原文写「主动合成未实现」，与代码不符（`NodeCraftService`、

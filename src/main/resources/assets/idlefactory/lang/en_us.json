@@ -187,7 +187,6 @@
   "wand.hud.toggle.off": "Link removed",
   "wand.hud.saved": "Saved: +%s / -%s machines",
   "wand.hud.saved.none": "Saved",
-  "wand.hud.deleted": "Node deleted",
   "wand.hud.cancelled": "Draft cancelled",
   "wand.hud.timeout": "The server did not respond, please retry",
   "wand.hud.waiting": "Submitting, please wait",

@@ -41,11 +41,12 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * 网络通道。
  *
  * <p>读侧只有一条通道：视图表（请求、全量页、差量）。另有写命令、被动 IO 视图偏好、排序偏好、
- * 绑定杖链接快照与三层绑定杖包。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
+ * 绑定杖链接快照与三层绑定杖包。改包结构时必须递增 {@link #PROTOCOL_VERSION}；
+ * 首个公开测试版从 1 开始编号，此前的内部编号（29–42）只留在 ADR 里。</p>
  */
 public final class IdleFactoryNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "42";
+    public static final String PROTOCOL_VERSION = "1";
 
     /**
      * 线协议固定的条目硬上限（每个包）。

@@ -988,7 +988,7 @@
 
 1. **读侧只有一张表**。服务端在 `FactoryRunner` 里把工厂状态聚合成 `ViewTable`（`ViewHeader` + 节点列表：`ViewNode` / `ViewNodeCore` / `ViewIoRule` / `ViewMachine`），客户端只做展示映射。`MachineSnapshot` / `NodeSnapshot` / `ProviderSnapshot` / `NodeStatus` / `NodeStatusBuilder` / `TotalState` 与协议 32 的「节点表 + 机器表」两张快照全部删除。
 2. **聚合口径不变**：原 `NodeStatusResolver` 的 any / all 规则原样搬进 `ViewTableBuilder`（未探测优先、过期其次、失联 / 缺机再次、最后看活动），`INPUT_BLOCKED` 的 200 tick 宽限常量保留。
-3. **两段式下发**：整表分页（`ViewTableS2C`，按 16 KiB 预算切页）与差量（`ViewTableDiffS2C`，`ViewIoRule.identity()` 做行身份、`machineId` 做机器身份）。`ViewPort` 是唯一出口，`PROTOCOL_VERSION` = 41。
+3. **两段式下发**：整表分页（`ViewTableS2C`，按 16 KiB 预算切页）与差量（`ViewTableDiffS2C`，`ViewIoRule.identity()` 做行身份、`machineId` 做机器身份）。`ViewPort` 是唯一出口；开发期内部编号到 42，首个公开测试版发布前**重置为 1**，旧编号只作历史记录。
 4. **客户端结构**：`client` 拆 `world`（世界高亮）/ `wand`（绑定杖输入与草稿）/ `network`（报文投递）/ `screen`；两个终端分到 `terminal.node` 与 `terminal.passiveio`，共用 `TerminalSource`（分页拼装与差量应用）、`TerminalModel`（搜索 / 排序 / 玩家上下文）、`TerminalChrome`（外壳与标题）。
 5. **命名**：客户端类去掉 `Factory` 前缀（`NodeScreen` / `PassiveIoModel` / `WandHud` …）；排序键与上下文进 `screen.sort`（`SortKey` / `SortContext`），搜索字段进 `screen.search.SearchFields`；`ResourceKeyCodec` → `AeKeyCodec`，`NoticeHandler` → `ObservationNoticeListener`，`ModNetwork` → `IdleFactoryNetwork`。
 6. **颜色与文案**：删除 `FactoryGuiTheme`，颜色归属组件（`paint/StatusColor` 集中四色）；界面文案走 `idlefactory.*` 语言键（中英各一份），代码里不再有中文字面量。
@@ -1002,13 +1002,13 @@
 
 **后果**：
 
-- 协议号 41；旧的两张表负载与客户端 Handler 已删，没有兼容层。
+- 协议号发布重置为 1（开发期到 42）；旧的两张表负载与客户端 Handler 已删，没有兼容层。
 - `AGENTS.md` §2.1 / §2.4 / §3.2 / §5.4 / §6.1–6.3 已同步；`docs/README.md` 与 `README.md` 的结构说明同步更新。
 - 偏差记录：多出 `ViewTableCodec` 一个编解码文件；`FactoryLifecycle.stop()` 额外调用 `ViewPort.clear()`；客户端 `TerminalFrame` 已并入 `TerminalChrome`，`PassiveIoScroll` 已删除（直连 AE2 `Scrollbar`）。
 
 **2026-11-20 追加：HUD 条与协议 42**
 
-- 新增 `HudNoticeS2C(text, Kind{SUCCESS,NEUTRAL,FAILURE})`，把失联 / 恢复这类没有界面的通知从原版动作栏改成模组 HUD 条；`PROTOCOL_VERSION` 升到 42。
+- 新增 `HudNoticeS2C(text, Kind{SUCCESS,NEUTRAL,FAILURE})`，把失联 / 恢复这类没有界面的通知从原版动作栏改成模组 HUD 条（内部编号 42，发布重置为 1）。
 - 客户端统一入口 `client/screen/hud/HUDRenderer`：深底、1px 边框、左侧状态点；`WandHud` 常驻草稿条复用 `drawBar`，绑杖 / ME 杖 / 定位 / 改名 / 失联共五类提示全部落到这里。
 - 约定：**服务端只发无色文本，颜色由 `Kind` 决定**；条内文本自带颜色会与状态点打架，`FactoryMessages` 因此删除。
 - `EnergyPick` 在接入时直接探 FE 能力，不再依赖观测 tick；`EnergyRuleRetry` 双保险已移除。
