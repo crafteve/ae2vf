@@ -24,7 +24,7 @@ import io.github.crafteve.idlefactory.observation.BlockFacts;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
 import io.github.crafteve.idlefactory.observation.WorkState;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
 import io.github.crafteve.idlefactory.view.ViewNode.Activity;

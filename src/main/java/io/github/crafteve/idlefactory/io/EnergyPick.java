@@ -4,7 +4,7 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 import appeng.api.behaviors.ExternalStorageStrategy;
 import appeng.api.config.Actionable;

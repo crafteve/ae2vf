@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.node.Node;
 
 import net.minecraft.core.registries.BuiltInRegistries;

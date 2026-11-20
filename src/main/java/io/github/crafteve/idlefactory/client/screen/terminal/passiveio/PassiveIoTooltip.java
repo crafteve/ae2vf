@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIo
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;

@@ -12,14 +12,14 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.io.IoSide;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 import appeng.api.stacks.AEKey;
 

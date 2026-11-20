@@ -9,7 +9,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandSource;
 import io.github.crafteve.idlefactory.command.FactoryCommand;

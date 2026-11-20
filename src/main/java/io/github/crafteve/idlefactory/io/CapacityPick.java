@@ -10,7 +10,7 @@ import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
 
 import net.minecraft.core.Direction;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 /**
  * 容量查询：这一轮这台机器能完整收下几份。

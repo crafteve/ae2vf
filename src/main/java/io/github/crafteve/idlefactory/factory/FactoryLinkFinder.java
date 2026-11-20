@@ -6,7 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.observation.BlockProbe;
 import io.github.crafteve.idlefactory.observation.Health;
 

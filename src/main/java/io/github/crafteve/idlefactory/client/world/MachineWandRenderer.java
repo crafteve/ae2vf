@@ -19,7 +19,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 机器绑定杖的世界高亮：已绑定绿、草稿待加入橙、冲突或待删除红。

@@ -4,7 +4,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.command.CommandWand;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;

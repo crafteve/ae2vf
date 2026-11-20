@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.client.wand.WandPrecheck;
 import io.github.crafteve.idlefactory.client.wand.WandDraftState;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.menu.wand.WandDraftMenu;
 
@@ -304,7 +304,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandDraftMenu> {
      * @param theme    主题
      */
     private void drawStatus(GuiGraphics graphics) {
-        List<io.github.crafteve.idlefactory.location.BlockKey> conflicts = conflicts();
+        List<io.github.crafteve.idlefactory.key.BlockKey> conflicts = conflicts();
         Component status;
         int color;
         if (!conflicts.isEmpty()) {
@@ -343,7 +343,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandDraftMenu> {
      *
      * @return 问题列表
      */
-    private List<io.github.crafteve.idlefactory.location.BlockKey> conflicts() {
+    private List<io.github.crafteve.idlefactory.key.BlockKey> conflicts() {
         if (WandSubmitter.openResultReceived()) {
             return WandSubmitter.pendingConflicts();
         }

@@ -6,7 +6,7 @@ import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.WandChainResult;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
 import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import io.netty.handler.codec.DecoderException;
 

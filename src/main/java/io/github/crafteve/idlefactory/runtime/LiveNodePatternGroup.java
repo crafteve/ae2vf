@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.node.NodeCraft;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.machine.Machine;

@@ -8,7 +8,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 绑定杖草稿：一次提交要落的完整改动。

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.location;
+package io.github.crafteve.idlefactory.key;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;

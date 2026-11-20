@@ -16,7 +16,7 @@ import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
 import net.minecraft.client.Minecraft;

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.resource;
+package io.github.crafteve.idlefactory.key;
 
 import java.util.HashMap;
 import java.util.Locale;

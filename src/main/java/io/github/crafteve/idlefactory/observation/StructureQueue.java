@@ -4,7 +4,7 @@ import java.util.LinkedHashSet;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 结构队列：等下一轮立刻复探的位置（事件标脏、新登记的位置）。

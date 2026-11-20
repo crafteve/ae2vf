@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.command;
 
 import java.util.List;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 绑定杖连锁查询的结果：可接入的方块列表 + 原因。

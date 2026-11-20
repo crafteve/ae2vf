@@ -12,7 +12,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.item.MeBindingWandItem;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 存储绑定杖的世界高亮：把仓库锚点画成蓝色六面半透明填充。

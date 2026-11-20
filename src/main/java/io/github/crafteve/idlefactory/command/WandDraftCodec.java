@@ -8,7 +8,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
 
 import io.netty.handler.codec.DecoderException;

@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.observation;
 import java.util.HashMap;
 import java.util.Map;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;

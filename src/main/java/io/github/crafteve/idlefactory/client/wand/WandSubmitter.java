@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.command.CommandSource;
 import io.github.crafteve.idlefactory.command.FactoryCommand;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import net.minecraft.network.chat.Component;

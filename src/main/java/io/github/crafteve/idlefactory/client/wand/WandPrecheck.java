@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.BuiltInRegistries;

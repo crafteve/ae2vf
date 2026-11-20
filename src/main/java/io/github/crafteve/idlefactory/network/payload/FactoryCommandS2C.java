@@ -8,7 +8,7 @@ import io.github.crafteve.idlefactory.client.network.ClientCommandHandler;
 import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.CommandResult;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import io.netty.handler.codec.DecoderException;
 

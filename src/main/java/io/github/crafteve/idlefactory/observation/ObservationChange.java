@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.observation;
 
 import java.util.List;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 一批观测变化：一次 tick 里所有健康结论发生变化的行。

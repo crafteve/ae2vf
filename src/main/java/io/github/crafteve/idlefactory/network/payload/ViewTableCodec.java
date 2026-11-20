@@ -11,7 +11,7 @@ import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.io.IoSide;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;

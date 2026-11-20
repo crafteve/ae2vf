@@ -14,7 +14,7 @@ import appeng.api.stacks.GenericStack;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoJeiIngredients;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
-import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
+import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;

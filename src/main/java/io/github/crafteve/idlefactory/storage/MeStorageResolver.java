@@ -4,7 +4,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.integration.ae2.Ae2Storage;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import appeng.api.networking.IGrid;
 import appeng.api.networking.IGridNode;

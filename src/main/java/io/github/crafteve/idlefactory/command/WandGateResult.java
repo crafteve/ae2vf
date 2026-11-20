@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.command;
 
 import java.util.List;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 绑定杖草稿的校验结果。

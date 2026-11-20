@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.IntSupplier;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;

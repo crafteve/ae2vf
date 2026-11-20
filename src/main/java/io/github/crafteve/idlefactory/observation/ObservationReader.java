@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.observation;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 
 /**
  * 观测表的只读视图：健康解析、类型迁移、视图片段构建都只从这里读。

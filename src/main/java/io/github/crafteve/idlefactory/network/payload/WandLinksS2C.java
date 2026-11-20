@@ -12,7 +12,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientWandLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
 
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;

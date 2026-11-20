@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.integration.ae2.Ae2Binder;
 import io.github.crafteve.idlefactory.io.DispatchState;
 import io.github.crafteve.idlefactory.io.IoForm;
 import io.github.crafteve.idlefactory.io.IoRunner;
-import io.github.crafteve.idlefactory.location.BlockKey;
+import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
