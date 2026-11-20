@@ -48,7 +48,28 @@ public final class TerminalChrome {
      */
     public static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos,
             String title) {
-        graphics.drawString(font, title, leftPos + 8, topPos + 5, TITLE_COLOR, false);
+        drawTitle(graphics, font, leftPos, topPos, title, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 画标题，超出可用宽度时省略，避免压到右侧搜索框。
+     *
+     * @param graphics 画布
+     * @param font     字体
+     * @param leftPos  面板左边缘
+     * @param topPos   面板上边缘
+     * @param title    标题
+     * @param maxWidth 允许占用的最大宽度
+     */
+    public static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos,
+            String title, int maxWidth) {
+        String shown = title;
+        if (font.width(shown) > maxWidth) {
+            String ellipsis = "…";
+            shown = font.plainSubstrByWidth(shown, Math.max(0, maxWidth - font.width(ellipsis)))
+                    + ellipsis;
+        }
+        graphics.drawString(font, shown, leftPos + 8, topPos + 5, TITLE_COLOR, false);
     }
 
     /**

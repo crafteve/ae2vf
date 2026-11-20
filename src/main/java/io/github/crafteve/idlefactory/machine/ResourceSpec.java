@@ -71,21 +71,17 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
     }
 
     /**
-     * 由物品是否带自定义组件推导默认匹配模式。
+     * 新规则的默认匹配模式：一律精确。
      *
-     * <p>和默认组件比较，相同就不算自定义——这样「普通铁锭」按模糊匹配、附魔改名的铁锭
-     * 按精确匹配，行为和旧版 {@code ResourceKey} 一致。</p>
+     * <p>模糊匹配必须由玩家在规则上显式切换；旧存档缺字段时仍按模糊读入，见
+     * {@code readMode}。</p>
      *
      * @param key 资源
      * @return 默认匹配模式
      */
     private static MatchMode defaultMode(AEKey key) {
-        if (!(key instanceof AEItemKey itemKey)) {
-            return MatchMode.EXACT;
-        }
-        ItemStack stack = itemKey.getReadOnlyStack();
-        boolean custom = !ItemStack.isSameItemSameComponents(stack, new ItemStack(stack.getItem()));
-        return custom ? MatchMode.EXACT : MatchMode.IGNORE_COMPONENTS;
+        // 新规则一律精确：模糊会跨组件匹配所有变体，必须由玩家显式切换。
+        return MatchMode.EXACT;
     }
 
     /** 给界面用的面名。 */

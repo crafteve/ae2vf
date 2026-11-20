@@ -158,6 +158,10 @@ public final class TerminalText {
             prefix++;
             text = String.format(Locale.ROOT, "%.1f", value);
         }
+        // 整数不留 ".0"：144k 比 144.0k 短，终端列宽紧张时少一次省略。
+        if (text.endsWith(".0")) {
+            text = text.substring(0, text.length() - 2);
+        }
         return text + (prefix < 0 ? "" : PREFIXES[prefix]) + unit;
     }
 

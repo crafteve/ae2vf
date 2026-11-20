@@ -7,7 +7,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoViewButton
 
 import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
 
-
 import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
 import java.util.List;
@@ -82,13 +81,12 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
     private static final int TEXT_DIM = 0xFF5F5F5F;
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
-    /** 内容区左右内边距。 */
     /** 机器表请求节拍。 */
     private static final int REQUEST_INTERVAL = 20;
     /** 顶栏搜索框的外框位置与尺寸。 */
-    private static final int SEARCH_X = 46;
+    /** 顶栏搜索框：右对齐，宽度固定。 */
     private static final int SEARCH_Y = 4;
-    private static final int SEARCH_W = 124;
+    private static final int SEARCH_W = 112;
     private static final int SEARCH_H = 13;
 
     /** 跨界面保留的搜索词；关闭界面再打开仍保留。 */
@@ -185,7 +183,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         this.setTextHidden("entriesShown", true);
         this.render = new PassiveIoRender(this.font);
         this.searchBox = new SearchEditBox(this.font,
-                this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
+                this.searchX() + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, Component.translatable("idlefactory.passive.search.hint"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
@@ -213,7 +211,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         Viewport frame = workAreaFrame();
         TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
                 frame.height());
-        TerminalChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
+        TerminalChrome.drawSearchField(graphics, this.searchX(),
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
 
@@ -224,7 +222,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         }
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
-                tr("idlefactory.passive.title"));
+                tr("idlefactory.passive.title"), this.searchX() - this.leftPos - 12);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
         List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);
@@ -755,4 +753,9 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
             this.scroll = Mth.clamp(value, 0, this.layout.maxScroll(this.layout.viewport().height()));
         }
     }
+    /** 搜索框左边缘：贴着右侧滚动条预留区，标题只占它左边的空间。 */
+    private int searchX() {
+        return this.leftPos + this.imageWidth - SEARCH_W - 22;
+    }
+
 }
