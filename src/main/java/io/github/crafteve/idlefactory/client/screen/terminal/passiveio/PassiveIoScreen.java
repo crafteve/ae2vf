@@ -184,7 +184,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         this.render = new PassiveIoRender(this.font, FactoryGuiTheme.current());
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索机器…"));
+                SEARCH_W - 6, 10, Component.literal("搜索机器…"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);

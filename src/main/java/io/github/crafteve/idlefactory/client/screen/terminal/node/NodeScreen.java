@@ -191,7 +191,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.confirmDialog = new FactoryConfirmDialog(this.font, FactoryGuiTheme.current());
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索节点…"));
+                SEARCH_W - 6, 10, Component.literal("搜索节点…"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
@@ -592,7 +592,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int x = NodeLayout.nameX(viewport);
         int width = Math.max(40, NodeLayout.nameWidth(viewport));
         this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
-                FactoryGuiTheme.current(), Component.literal("节点名"),
+                Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
         this.renameBox.setValue(node.view().core().name() == null ? ""
                 : node.view().core().name());

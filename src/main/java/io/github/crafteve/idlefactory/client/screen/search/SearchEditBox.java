@@ -1,8 +1,5 @@
 package io.github.crafteve.idlefactory.client.screen.search;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-
-
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -10,20 +7,23 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
 /**
- * 深色/浅色搜索框（跟随主题）。
+ * 终端里的输入框：搜索框与节点改名框共用。
  *
- * <p>复用原版 {@link EditBox} 的输入/选区/剪贴板逻辑，只是关掉原版边框、换成主题文字色，
+ * <p>复用原版 {@link EditBox} 的输入/选区/剪贴板逻辑，只是关掉原版边框、换成自己的文字色，
  * 并在绘制后覆盖一条强调色光标（1.21.1 的 EditBox 把光标颜色写死成浅灰，没有 setter）。</p>
  */
 public class SearchEditBox extends EditBox {
-    private final FactoryGuiTheme theme;
+    /** 光标与选中描边的强调色。 */
+    private static final int ACCENT = 0xFF33445C;
+    /** 不可编辑时的文字色。 */
+    private static final int UNEDITABLE_TEXT = 0xFFD8D9DF;
     /** 占位提示；聚焦或有内容时临时清掉，避免和输入文字叠在一起。 */
     private final Component hint;
     /** 提示文字颜色。 */
     private final int hintColor;
 
-    public SearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme, Component hint) {
-        this(font, x, y, width, height, theme, hint, 0xFFFFFFFF, 0xFFE6EEF8);
+    public SearchEditBox(Font font, int x, int y, int width, int height, Component hint) {
+        this(font, x, y, width, height, hint, 0xFFFFFFFF, 0xFFE6EEF8);
     }
 
     /**
@@ -32,22 +32,20 @@ public class SearchEditBox extends EditBox {
      * @param y         上边缘
      * @param width     宽
      * @param height    高
-     * @param theme     主题
      * @param hint      占位提示
      * @param textColor 输入文字颜色
      * @param hintColor 占位提示颜色
      */
-    public SearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme,
+    public SearchEditBox(Font font, int x, int y, int width, int height,
             Component hint, int textColor, int hintColor) {
         super(font, x, y, width, height, Component.empty());
-        this.theme = theme;
         this.hint = hint;
         this.hintColor = hintColor;
         setBordered(false);
         // AE2 的输入框底板是中等灰蓝，搜索框文字与提示都用亮色才看得清；
         // 节点改名贴在浅色节点行上，改用黑字，避免和底色糊在一起。
         setTextColor(textColor);
-        setTextColorUneditable(0xFFD8D9DF);
+        setTextColorUneditable(UNEDITABLE_TEXT);
         setTextShadow(false);
         // 原版 hint 颜色写死成灰色，自己画可控颜色的提示。
         setHint(Component.empty());
@@ -86,6 +84,6 @@ public class SearchEditBox extends EditBox {
         // 与原版无边框模式一致：文字从 getX() 开始，光标在文字宽度 - 1 处
         int caretX = getX() + font.width(value.substring(0, caret)) - 1;
         caretX = Math.max(getX() - 1, Math.min(caretX, getX() + getWidth() - 1));
-        guiGraphics.fill(caretX, getY(), caretX + 1, getY() + 9, this.theme.accent());
+        guiGraphics.fill(caretX, getY(), caretX + 1, getY() + 9, ACCENT);
     }
 }
