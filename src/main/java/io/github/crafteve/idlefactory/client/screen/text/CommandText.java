@@ -2,6 +2,8 @@ package io.github.crafteve.idlefactory.client.screen.text;
 
 
 import io.github.crafteve.idlefactory.command.CommandReason;
+
+import net.minecraft.network.chat.Component;
 import io.github.crafteve.idlefactory.command.CommandResult;
 
 /**
@@ -63,6 +65,18 @@ public final class CommandText {
             case DELETE_BLOCKED_PATTERNS -> tr("idlefactory.command.delete_blocked_patterns");
             case INVALID_DRAFT -> tr("idlefactory.command.invalid_draft");
         };
+    }
+
+    /**
+     * 世界命令的 HUD 文本：成功说锚点已更新，失败直接用原因文案。
+     *
+     * @param result 回执
+     * @return 文案
+     */
+    public static String hud(CommandResult result) {
+        return result.ok()
+                ? Component.translatable("idlefactory.command.anchor_updated").getString()
+                : text(result);
     }
 
     /**

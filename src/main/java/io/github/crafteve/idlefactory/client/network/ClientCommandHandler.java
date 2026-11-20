@@ -35,7 +35,7 @@ public final class ClientCommandHandler {
             // 世界命令（ME 绑定杖设锚点 / 解锚、绑定杖 toggle）：没有终端，回执走模组 HUD 条，
             // 不再塞原版动作栏，否则和绑定杖的条不是一套外观。
             var text = net.minecraft.network.chat.Component.literal(
-                    ClientCommandText.hud(payload.result()));
+                    io.github.crafteve.idlefactory.client.screen.text.CommandText.hud(payload.result()));
             if (payload.result().ok()) {
                 io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.success(text);
             } else {
