@@ -48,7 +48,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `machine` | 机器（一个方块）、`ResourceSpec` / `MatchMode` 规则类型、`MachineHealth` 纯函数 | 世界探测、搬运 |
 | `storage` | 仓库解析（只解析 AE2 `MEStorage`） | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
-| `factory` | 工厂实例与索引（`Factory` / `FactoryLibrary`）、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、短 id 解析（`FactoryResolver`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点、连锁查找 |
+| `factory` | 工厂实例与索引（`Factory` / `FactoryLibrary`）、装配（`FactoryLoader`）、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、短 id 解析（`FactoryResolver`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点、连锁查找、网络发包 |
 | `runtime` | 活节点：`LiveNode` / `LiveNodeLibrary` / `LiveNodeApply` / `LiveNodeRunner` / `LiveNodeCraft` / 样板视图 | 配置、搬运 |
 | `node` | 节点配置数据：`Node` / `NodeIo` / `NodeIoRules` / `NodeCraft` / `NodeDispatchQueue` / `NodeDispatchOrder` / `NodeLibrary` / `NodeCodec` | 世界探测、搬运、存档根 |
 | `claim` | 方块占用表（机器 / 仓库锚点唯一性） | 世界探测 |
@@ -91,7 +91,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 各包职责：
 
-- `factory`：工厂实例与编排。`Factory` 持仓库缓存与节点库；`FactoryLifecycle` 管读档 / 装配 / 停服；`FactoryRunner` 每 tick 按固定顺序推进；`FactoryStore` 负责两条落盘路径（`put` / `flushRuntime`）；写操作全部在 `command` 包，工厂层不再有行政入口。
+- `factory`：工厂实例与编排。`Factory` 持仓库缓存与节点库；`FactoryLoader` 管读档 / 装配，`FactoryLifecycle` 管启停与 tick 顺序；`FactoryRunner` 每 tick 按固定顺序推进；`FactoryStore` 负责两条落盘路径（`put` / `flushRuntime`）；写操作全部在 `command` 包，工厂层不再有行政入口。
 - `command`：唯一写入口。`CommandController` 收 `FactoryCommand` 信封；`CommandGate` / `CommandWandGate` 校验身份与作用域；`CommandApply` / `CommandTopology` / `CommandWand` 只改内存；`CommandPort` 落盘、推快照、发回执。
 - `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 可以依赖 `node`，反向则成环**：配置数据归 `node`，活节点在运行层包，执行层只取数据、不持有运行对象。
 

@@ -1063,3 +1063,22 @@
 **后果**：纯改名与搬文件，协议号不变（仍为 1），存档、物品组件、菜单注册顺序均不受影响。
 
 **ADR-046 追加（2026-11-20）**：命名再收敛一轮——`FactoryManager` → `FactoryLibrary`（`Manager` 读作「管理」，与「内存索引」不符；`Library` 是集合后缀）；`FactoryRefs` → `FactoryResolver`（`Resolver` = 解析）；连锁查找从 `factory` 移入 `command.CommandChain`（它只被绑定杖命令使用，BFS 找同 id 机器属于命令的职责）；`NetworkProtocol` 拆成 `NetworkVersion` 与 `NetworkLimit`。
+
+
+---
+
+## ADR-047 factory 包拆分
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. 装配从生命周期里拆出：新增 `FactoryLoader`（读档、建观测通道、绑端口、建运行器、重建占用表），返回 `Loaded` 记录；`FactoryLifecycle` 只持有协作者并转发 tick。
+2. 绑定杖链接推送移出工厂层：新增 `network.WandLinkPort`，工厂层不再直接发 `WandLinksS2C`（守住「发包只从 network」）。
+3. 草稿提交序号窗口移出工厂层：新增 `command.CommitSeqStore`（防重放，下线清空），生命周期只保留同名委托方法。
+4. `FactoryConfig` 并回 `Factory`：写档部分就是 `owner` / `storageAnchor` / `nodes` 三个字段，删掉只做包装的类；`factory.config().nodes()` 改为 `factory.nodes()`。
+5. 命名：`FactoryLibrary`（原 Manager，内存索引）、`FactoryResolver`（原 Refs，短 id 解析）、连锁查找迁入 `command.CommandChain`。
+
+**理由**：`FactoryLifecycle` 原来同时承担启停、读档装配、脏标记、存档、链接推送、防重放与节点日志，任何一处改动都要在一个 400 行文件里找位置；拆开后每类的修改理由只剩一个。
+
+**后果**：`FactoryLifecycle` 从 412 行降到 346 行（其余是服务 getter），无协议、存档、行为变化；存档键与节点编码格式不变。
