@@ -1,9 +1,12 @@
 package io.github.crafteve.idlefactory.client.screen.paint;
 
+import net.minecraft.network.chat.Component;
+
 /**
  * 状态的显示文字。
  *
- * <p>两个终端、搜索字段与 tooltip 都从这里取词，保证同一档位在任何地方写法一致。</p>
+ * <p>两个终端、搜索字段与 tooltip 都从这里取词，保证同一档位在任何地方写法一致；文案走
+ * {@code idlefactory.status.*} 语言键，中英各一份。</p>
  */
 public final class StatusText {
     private StatusText() {
@@ -17,18 +20,28 @@ public final class StatusText {
      * @return 文字
      */
     public static String of(StatusKind kind) {
+        return Component.translatable(key(kind)).getString();
+    }
+
+    /**
+     * 档位对应的语言键。
+     *
+     * @param kind 档位
+     * @return 语言键
+     */
+    public static String key(StatusKind kind) {
         return switch (kind) {
-            case OFFLINE -> "失联";
-            case PARTIAL -> "缺机";
-            case STALE -> "健康过期";
-            case UNPROBED -> "未探测";
-            case UNCONFIGURED -> "无规则";
-            case RUNNING -> "运行";
-            case INPUT_OK -> "可输入";
-            case WAITING_MATERIAL -> "仓库缺料";
-            case INPUT_BLOCKED -> "输入堵塞";
-            case IDLE -> "空闲";
-            case UNKNOWN -> "未知";
+            case OFFLINE -> "idlefactory.status.offline";
+            case PARTIAL -> "idlefactory.status.partial";
+            case STALE -> "idlefactory.status.stale";
+            case UNPROBED -> "idlefactory.status.unprobed";
+            case UNCONFIGURED -> "idlefactory.status.unconfigured";
+            case RUNNING -> "idlefactory.status.running";
+            case INPUT_OK -> "idlefactory.status.input_ok";
+            case WAITING_MATERIAL -> "idlefactory.status.waiting_material";
+            case INPUT_BLOCKED -> "idlefactory.status.input_blocked";
+            case IDLE -> "idlefactory.status.idle";
+            case UNKNOWN -> "idlefactory.status.unknown";
         };
     }
 }
