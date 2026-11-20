@@ -1,0 +1,945 @@
+package io.github.crafteve.ae2vf.client.screen.terminal.node;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.TerminalLayout;
+import io.github.crafteve.ae2vf.client.screen.terminal.PassiveIoHelpButton;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.TerminalChrome;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.TerminalSource;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
+
+import appeng.api.config.Settings;
+import appeng.api.config.SortDir;
+import appeng.client.gui.AEBaseScreen;
+import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.style.TerminalStyle;
+import appeng.client.gui.widgets.Scrollbar;
+import appeng.client.gui.widgets.SettingToggleButton;
+import appeng.core.AEConfig;
+
+import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+
+
+import io.github.crafteve.ae2vf.client.screen.FeedbackSink;
+
+import io.github.crafteve.ae2vf.client.screen.search.SearchEditBox;
+
+import io.github.crafteve.ae2vf.client.screen.search.SearchQuery;
+
+import io.github.crafteve.ae2vf.client.screen.sort.SortContext;
+
+import io.github.crafteve.ae2vf.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.ae2vf.client.screen.terminal.ExpandAllButton;
+
+import io.github.crafteve.ae2vf.client.screen.sort.SortModeButton;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.node.NodeLayout.Hit;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.node.NodeLayout.Viewport;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.node.NodeModel.MemberRow;
+
+import io.github.crafteve.ae2vf.client.screen.terminal.node.NodeModel.NodeRow;
+
+import io.github.crafteve.ae2vf.client.wand.WandLinkCache;
+
+import io.github.crafteve.ae2vf.integration.jecharacters.JecharactersCompat;
+
+import io.github.crafteve.ae2vf.menu.node.NodeTerminalMenu;
+
+import io.github.crafteve.ae2vf.menu.TerminalSortMode;
+
+import io.github.crafteve.ae2vf.client.screen.text.CommandText;
+import io.github.crafteve.ae2vf.command.CommandResult;
+
+import io.github.crafteve.ae2vf.client.screen.ViewTableSink;
+import io.github.crafteve.ae2vf.network.payload.ViewTableRequestC2S;
+import io.github.crafteve.ae2vf.view.ViewNode;
+import io.github.crafteve.ae2vf.view.ViewTable;
+import io.github.crafteve.ae2vf.view.ViewTableDiff;
+
+import io.github.crafteve.ae2vf.network.payload.FactoryTerminalSortC2S;
+
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.fml.loading.FMLLoader;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+/**
+ * 节点管理终端：AE2 终端边框 + 36 个玩家背包槽 + 自绘节点卡片列表。
+ *
+ * <p>壳与被动 IO 终端一致：每 {@link #REQUEST_INTERVAL} tick 拉一次节点表，内容区先于
+ * {@code super.mouseClicked} 处理点击。节点行复用 IO 的卡片、键帽与状态灯；展开后的机器行只在
+ * 行尾放定位。</p>
+ *
+ * <p>删除有规则或样板的节点会先弹确认浮层；没有配置的节点直接删除。阻挡 / 倍率 / 派单 /
+ * 编辑都直接发命令，点卡片空白与节点名区域切换展开（名字区域双击改名）。</p>
+ */
+public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
+        implements FeedbackSink, ViewTableSink {
+
+    /** 面板底色（AE2 终端内部实色）。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 键帽 / 边框亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 格子暗边。 */
+    private static final int SLOT_BORDER_DARK = 0xFF878FA5;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 最少内容行数。 */
+    private static final int MIN_ROWS = 3;
+    /** 节点表请求节拍。 */
+    private static final int REQUEST_INTERVAL = 20;
+    /** 顶栏搜索框：右对齐，宽度固定。 */
+    private static final int SEARCH_Y = 4;
+    private static final int SEARCH_W = 104;
+    private static final int SEARCH_H = 13;
+    /** 改名输入框高度。 */
+    private static final int RENAME_H = 10;
+    /** 跨界面保留的搜索词。 */
+    private static String rememberedQuery = "";
+    private int rows = MIN_ROWS;
+    private final NodeModel model;
+    /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
+    private final TerminalSource source;
+    /** 当前排序档位；初值来自物品组件，切换后回写。 */
+    private TerminalSortMode sortMode;
+    /** 当前排序方向；初值来自物品组件，切换后回写。 */
+    private SortDir sortDirection;
+    @Nullable
+    private NodeLayout layout;
+    @Nullable
+    private NodeRender render;
+    @Nullable
+    private Scrollbar bar;
+    private int scroll;
+    private int requestTicker;
+    @Nullable
+    private SearchEditBox searchBox;
+    /** 当前展开的节点。 */
+    /** 用户主动收起的节点；不在集合里就是展开（默认全部展开）。 */
+    private final Set<UUID> collapsed = new HashSet<>();
+    /** 点过「… N 台」的节点，展开全部成员。 */
+    private final Set<UUID> expandedAll = new HashSet<>();
+    /** 名字区域第一次点击的节点：等双击窗口过去还没第二次点击，才执行展开 / 收起。 */
+    @Nullable
+    private UUID pendingToggleNode;
+    /** 待切换的节点下标；{@code -1} 表示没有挂起的点击。 */
+    private int pendingToggleIndex = -1;
+    /** 挂起点击的到期时刻（毫秒）。 */
+    private long pendingToggleAt;
+    /** 双击判定窗口（毫秒）。 */
+    private static final long DOUBLE_CLICK_MS = 180L;
+    @Nullable
+    private ConfirmDialog confirmDialog;
+    /** 正在改名的节点；{@code null} 表示不在改名。 */
+    @Nullable
+    private UUID renamingNode;
+    @Nullable
+    private SearchEditBox renameBox;
+    private int lastLogSignature = -1;
+
+    /**
+     * @param menu      菜单
+     * @param inventory 玩家物品栏
+     * @param title     标题
+     * @param style     AE2 终端样式
+     */
+    public NodeScreen(NodeTerminalMenu menu, Inventory inventory, Component title,
+            ScreenStyle style) {
+        super(menu, inventory, title, style);
+        this.source = new TerminalSource(menu.containerId);
+        this.model = new NodeModel(this.source);
+        this.sortMode = menu.host().sortMode();
+        this.sortDirection = menu.host().sortDirection();
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
+        this.bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
+        this.addToLeftToolbar(new PassiveIoHelpButton(button -> {
+            // 指南页待接入。
+        }));
+        this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
+                AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
+        this.addToLeftToolbar(new SortModeButton(() -> this.sortMode,
+                reverse -> this.stepSortMode(reverse)));
+        this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
+                reverse -> this.toggleSortDirection()));
+        this.addToLeftToolbar(new ExpandAllButton(this::allExpanded, this::toggleAllExpanded));
+    }
+
+    @Override
+    protected void init() {
+        this.clearWidgets();
+        this.searchBox = null;
+        this.renameBox = null;
+        this.renamingNode = null;
+        TerminalStyle terminal = this.style.getTerminalStyle();
+        int margin = AEConfig.instance().getTerminalMargin();
+        int usable = Math.max(0, this.height - margin * 2);
+        int possibleRows = terminal.getPossibleRows(usable);
+        this.rows = Math.max(MIN_ROWS,
+                AEConfig.instance().getTerminalStyle().getRows(possibleRows));
+        this.imageWidth = terminal.getScreenWidth();
+        this.imageHeight = terminal.getScreenHeight(this.rows);
+        super.init();
+        this.setTextHidden("entriesShown", true);
+        this.render = new NodeRender(this.font);
+        this.confirmDialog = new ConfirmDialog(this.font);
+        this.searchBox = new SearchEditBox(this.font,
+                this.searchX() + 3, this.topPos + SEARCH_Y + 2,
+                SEARCH_W - 6, 10, Component.translatable("idlefactory.node.search.hint"));
+        this.searchBox.setValue(rememberedQuery);
+        this.searchBox.setResponder(this::applyQuery);
+        this.addRenderableWidget(this.searchBox);
+        this.applyQuery(rememberedQuery);
+        this.requestTable();
+        WandLinkCache.request();
+    }
+
+    @Override
+    public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
+            float partialTicks) {
+        super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
+        TerminalChrome.drawFrame(graphics, this.style.getTerminalStyle(), this.leftPos,
+                this.topPos, this.rows);
+        int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
+        graphics.fill(this.leftPos + 2, this.topPos + header,
+                this.leftPos + this.imageWidth - 21,
+                this.topPos + header + this.rows * rowHeight(),
+                PANEL_BG);
+        Viewport frame = workAreaFrame();
+        TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
+                frame.height());
+        TerminalChrome.drawSearchField(graphics, this.searchX(),
+                this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 每帧冲刷挂起的名字点击：延迟只受窗口本身约束，不再叠加 tick 的 50ms 粒度。
+        flushPendingClick();
+        syncFromBar();
+        super.render(graphics, mouseX, mouseY, partialTick);
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
+                tr("idlefactory.node.title"), this.searchX() - this.leftPos - 8);
+        Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
+        drawContent(graphics, hover);
+        drawRenameBox(graphics, mouseX, mouseY, partialTick);
+        // 浮层打开时不再画底层的 tooltip：原版 tooltip 在 z=400，会压在弹窗上。
+        boolean dialogOpen = this.confirmDialog != null && this.confirmDialog.isOpen();
+        List<Component> tooltip = NodeTooltip.of(this.model.visibleNodes(), hover);
+        if (!tooltip.isEmpty() && !dialogOpen) {
+            graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
+        }
+        if (this.confirmDialog != null) {
+            this.confirmDialog.draw(graphics, mouseX, mouseY);
+        }
+    }
+
+    private void drawContent(GuiGraphics graphics, @Nullable Hit hover) {
+        NodeRender content = this.render;
+        NodeLayout current = this.layout;
+        if (content == null || current == null) {
+            return;
+        }
+        Viewport viewport = current.viewport();
+        graphics.enableScissor(viewport.x(), viewport.y(),
+                viewport.x() + viewport.width(), viewport.y() + viewport.height());
+        try {
+            content.draw(graphics, current, this.model.visibleNodes(), this.scroll, hover, null,
+                    emptyText());
+        } finally {
+            graphics.disableScissor();
+        }
+    }
+
+    private void drawRenameBox(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        SearchEditBox box = this.renameBox;
+        if (box == null) {
+            return;
+        }
+        syncRenameBox();
+        if (this.renameBox == null) {
+            return;
+        }
+        graphics.fill(box.getX() - 1, box.getY() - 1, box.getX() + box.getWidth() + 1,
+                box.getY() + box.getHeight() + 1, BEVEL_LIGHT);
+        graphics.fill(box.getX() - 1, box.getY() - 1, box.getX() + box.getWidth() + 1,
+                box.getY(), SLOT_BORDER_DARK);
+        box.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override
+    public void containerTick() {
+        super.containerTick();
+        if (++this.requestTicker >= REQUEST_INTERVAL) {
+            this.requestTicker = 0;
+            requestTable();
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (this.confirmDialog != null && this.confirmDialog.isOpen()) {
+            return this.confirmDialog.mouseClicked(mouseX, mouseY, button);
+        }
+        if (this.renameBox != null) {
+            if (this.renameBox.mouseClicked(mouseX, mouseY, button)) {
+                this.renameBox.setFocused(true);
+                return true;
+            }
+            commitRename();
+            return true;
+        }
+        if (this.layout != null && (button == 0 || button == 1)) {
+            Hit hit = this.layout.hit(mouseX, mouseY, this.scroll);
+            if (hit != null) {
+                clickHit(hit, button);
+                return true;
+            }
+            // 点到空白处：挂起的名字点击不再生效。
+            clearPendingClick();
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        NodeLayout current = this.layout;
+        if (current != null && inside(current.viewport(), mouseX, mouseY)) {
+            if (this.renameBox != null) {
+                commitRename();
+            }
+            this.scroll = Mth.clamp(this.scroll + (int) (-scrollY * NodeLayout.NODE_ROW_H),
+                    0, current.maxScroll(current.viewport().height()));
+            if (this.bar != null) {
+                this.bar.setCurrentScroll(this.scroll);
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (this.confirmDialog != null && this.confirmDialog.isOpen()) {
+            return this.confirmDialog.keyPressed(keyCode);
+        }
+        if (this.renameBox != null) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                commitRename();
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                cancelRename();
+                return true;
+            }
+            this.renameBox.keyPressed(keyCode, scanCode, modifiers);
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (this.renameBox != null) {
+            this.renameBox.charTyped(codePoint, modifiers);
+            return true;
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
+    public int containerId() {
+        return this.menu.containerId;
+    }
+
+    @Override
+    public void acceptFullPage(int containerId, long revision, int pageIndex, int pageCount,
+            ViewTable page) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.source.acceptFullPage(revision, pageIndex, pageCount, page);
+        if (merged != null) {
+            acceptTable(merged);
+        }
+    }
+
+    @Override
+    public void acceptDiff(int containerId, ViewTableDiff diff) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.source.acceptDiff(diff);
+        if (merged == null) {
+            // 版本对不上：丢弃这一版，下一轮请求会带着已知版本重新要全量。
+            this.source.reset();
+            requestTable();
+            return;
+        }
+        acceptTable(merged);
+    }
+
+    /**
+     * 接收拼装完成的视图表并重建排版。
+     *
+     * @param table 视图表
+     */
+    private void acceptTable(ViewTable table) {
+        // 改名框 / 删除确认框打开时冻结行序：快照照常更新数据，但列表不在用户操作期间跳动。
+        this.model.setSortFrozen(this.renameBox != null
+                || (this.confirmDialog != null && this.confirmDialog.isOpen()));
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
+        this.model.accept(table);
+        // 表里已经消失的节点不再占用展开状态；搜索过滤不会误删展开状态。
+        Set<UUID> alive = new HashSet<>();
+        for (ViewNode node : table.nodes()) {
+            alive.add(node.nodeId());
+        }
+        this.collapsed.retainAll(alive);
+        this.expandedAll.retainAll(alive);
+        rebuildLayout();
+    }
+
+    /**
+     * 反馈：失败走动作栏，成功由快照体现。
+     *
+     * @param result 回执
+     */
+    @Override
+    public void acceptCommandResult(CommandResult result) {
+        if (!result.ok() && this.minecraft != null && this.minecraft.player != null) {
+            if (result.ok()) {
+                    io.github.crafteve.ae2vf.client.screen.hud.HUDRenderer.success(
+                            Component.literal(CommandText.text(result)));
+                } else {
+                    io.github.crafteve.ae2vf.client.screen.hud.HUDRenderer.failure(
+                            Component.literal(CommandText.text(result)));
+                }
+        }
+    }
+
+    /**
+     * 接收服务端确认的排序偏好。
+     *
+     * <p>本地已经先改过；这里只处理两端不一致的情况（比如旧回执），一致时不做任何重排。</p>
+     *
+     * @param mode      档位
+     * @param direction 方向
+     */
+    public void acceptSort(TerminalSortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
+        this.model.resort();
+        rebuildLayout();
+    }
+
+    /**
+     * 档位按钮：左键下一个档位，右键上一个档位。
+     *
+     * @param reverse 右键反向时为 {@code true}
+     */
+    private void stepSortMode(boolean reverse) {
+        applySort(reverse ? this.sortMode.previous() : this.sortMode.next(), this.sortDirection);
+    }
+
+    /** 方向按钮：升序 / 降序互换。 */
+    private void toggleSortDirection() {
+        SortDir next = this.sortDirection == SortDir.ASCENDING
+                ? SortDir.DESCENDING : SortDir.ASCENDING;
+        applySort(this.sortMode, next);
+    }
+
+    /**
+     * 应用一次排序变化：本地先改并重排，再发请求让服务端写物品组件。
+     *
+     * @param mode      新档位
+     * @param direction 新方向
+     */
+    private void applySort(TerminalSortMode mode, SortDir direction) {
+        if (this.sortMode == mode && this.sortDirection == direction) {
+            return;
+        }
+        this.sortMode = mode;
+        this.sortDirection = direction;
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
+        this.model.resort();
+        rebuildLayout();
+        PacketDistributor.sendToServer(
+                new FactoryTerminalSortC2S(this.menu.containerId, mode, direction));
+    }
+
+    /**
+     * 当前排序上下文：档位、方向与玩家位置。
+     *
+     * <p>玩家位置只在快照到达时取一次，距离档因此按快照节拍重排，不做每帧重排。</p>
+     *
+     * @return 排序上下文
+     */
+    private SortContext sortContext() {
+        if (this.minecraft == null || this.minecraft.player == null) {
+            return new SortContext(this.sortMode, this.sortDirection, null, null);
+        }
+        return new SortContext(this.sortMode, this.sortDirection,
+                this.minecraft.player.level().dimension(),
+                this.minecraft.player.blockPosition());
+    }
+
+    void rebuildLayout() {
+        if (this.render == null) {
+            return;
+        }
+        Viewport viewport = contentViewport();
+        Set<UUID> open = new HashSet<>();
+        for (NodeModel.NodeRow row : this.model.rows()) {
+            if (!this.collapsed.contains(row.nodeId())) {
+                open.add(row.nodeId());
+            }
+        }
+        this.layout = NodeLayout.of(this.model.rows(), viewport, open, this.expandedAll);
+        // 改名框不在这里取消：每秒一次的快照刷新也会走 rebuildLayout，取消会让改名框活不过一秒。
+        // 位置在每帧 drawRenameBox 里按最新排版重贴；节点真的消失时才由 syncRenameBox 取消。
+        clampScroll();
+        int signature = this.model.rows().size() * 31 + totalMembers();
+        if (signature != this.lastLogSignature) {
+            this.lastLogSignature = signature;
+        }
+    }
+
+    private void clampScroll() {
+        if (this.layout == null) {
+            return;
+        }
+        int max = this.layout.maxScroll(this.layout.viewport().height());
+        this.scroll = Mth.clamp(this.scroll, 0, max);
+        if (this.bar != null) {
+            this.bar.setHeight(this.layout.viewport().height());
+            this.bar.setRange(0, max, this.layout.viewport().height());
+            this.bar.setCurrentScroll(this.scroll);
+            this.bar.setVisible(true);
+        }
+    }
+
+    private void syncFromBar() {
+        if (this.bar == null || this.layout == null) {
+            return;
+        }
+        int value = this.bar.getCurrentScroll();
+        if (value != this.scroll) {
+            this.scroll = Mth.clamp(value, 0,
+                    this.layout.maxScroll(this.layout.viewport().height()));
+        }
+    }
+
+    private void clickHit(Hit hit, int button) {
+        if (hit.node() < 0 || hit.node() >= this.model.rows().size()) {
+            return;
+        }
+        NodeRow node = this.model.rows().get(hit.node());
+        boolean reverse = button == 1;
+        switch (hit.kind()) {
+            case NODE -> {
+                if (!reverse) {
+                    toggleExpanded(node.nodeId());
+                }
+            }
+            case NAME -> {
+                // 名字区域单击先挂起，等到双击窗口过去还没第二次点击才切换；
+                // 双击则撤销挂起并直接改名，避免“点一下展开、再点一下收起”的抖动。
+                if (!reverse) {
+                    clickName(hit.node(), node);
+                }
+            }
+            case BLOCKING -> {
+                if (node.view().core().available()) {
+                    NodeActions.setBlocking(this.menu.containerId, node,
+                            !node.view().core().blocking().isOn());
+                }
+            }
+            case MULTIPLIER -> NodeActions.cycleMultiplier(this.menu.containerId, node, reverse);
+            case DISPATCH -> NodeActions.toggleDispatch(this.menu.containerId, node);
+            case EDIT -> {
+                if (!reverse) {
+                    NodeActions.edit(this.menu.containerId, node);
+                }
+            }
+            case DELETE -> {
+                if (!reverse) {
+                    requestDelete(node);
+                }
+            }
+            case MEMBER -> {
+                // 机器行主体不做事，定位在行尾准星上。
+            }
+            case LOCATE -> {
+                if (hit.member() >= 0 && hit.member() < node.members().size()) {
+                    MemberRow member = node.members().get(hit.member());
+                    NodeActions.locate(node, member);
+                }
+            }
+            case MORE -> {
+                this.collapsed.remove(node.nodeId());
+                this.expandedAll.add(node.nodeId());
+                rebuildLayout();
+            }
+        }
+    }
+
+    private void toggleExpanded(UUID nodeId) {
+        if (!this.collapsed.add(nodeId)) {
+            this.collapsed.remove(nodeId);
+        }
+        this.expandedAll.remove(nodeId);
+        rebuildLayout();
+    }
+
+    /** 全部节点是否都处于展开状态。 */
+    private boolean allExpanded() {
+        for (NodeModel.NodeRow row : this.model.rows()) {
+            if (this.collapsed.contains(row.nodeId())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 左侧工具栏的展开 / 收起全部。 */
+    private void toggleAllExpanded() {
+        if (allExpanded()) {
+            for (NodeModel.NodeRow row : this.model.rows()) {
+                this.collapsed.add(row.nodeId());
+            }
+        } else {
+            this.collapsed.clear();
+        }
+        rebuildLayout();
+    }
+
+    /**
+     * 名字区域的一次点击：第一次只挂起，第二次落在窗口内才当作双击改名。
+     *
+     * @param index 节点下标
+     * @param node  节点行
+     */
+    private void clickName(int index, NodeRow node) {
+        // 换一个节点或窗口已过：先把上一笔挂起的切换执行掉，别吞掉玩家的单击。
+        if (this.pendingToggleNode != null
+                && (this.pendingToggleIndex != index
+                        || System.currentTimeMillis() > this.pendingToggleAt)) {
+            UUID previous = this.pendingToggleNode;
+            clearPendingClick();
+            toggleExpanded(previous);
+        }
+        long now = System.currentTimeMillis();
+        if (this.pendingToggleIndex == index && now <= this.pendingToggleAt) {
+            // 双击：撤销挂起的展开 / 收起，直接进改名。
+            clearPendingClick();
+            beginRename(index, node);
+            return;
+        }
+        this.pendingToggleNode = node.nodeId();
+        this.pendingToggleIndex = index;
+        this.pendingToggleAt = now + DOUBLE_CLICK_MS;
+    }
+
+    /** 双击窗口到期后执行挂起的展开 / 收起。 */
+    private void flushPendingClick() {
+        if (this.pendingToggleNode == null) {
+            return;
+        }
+        if (System.currentTimeMillis() < this.pendingToggleAt) {
+            return;
+        }
+        UUID nodeId = this.pendingToggleNode;
+        clearPendingClick();
+        toggleExpanded(nodeId);
+    }
+
+    /** 清掉挂起的名字点击。 */
+    private void clearPendingClick() {
+        this.pendingToggleNode = null;
+        this.pendingToggleIndex = -1;
+        this.pendingToggleAt = 0L;
+    }
+
+    private void beginRename(int index, NodeRow node) {
+        NodeLayout current = this.layout;
+        if (current == null || index >= current.boxes().size()) {
+            return;
+        }
+        int top = NodeLayout.screenY(current.viewport(),
+                current.boxes().get(index).top(), this.scroll);
+        Viewport viewport = current.viewport();
+        int x = NodeLayout.nameX(viewport);
+        int width = Math.max(40, NodeLayout.nameWidth(viewport));
+        this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
+                Component.translatable("idlefactory.node.rename.hint"),
+                TEXT_PRIMARY, TEXT_DIM);
+        this.renameBox.setValue(node.view().core().name() == null ? ""
+                : node.view().core().name());
+        this.renameBox.setMaxLength(io.github.crafteve.ae2vf.config.IdleFactoryConfig.maxNameLength());
+        this.renameBox.setFocused(true);
+        // 搜索框让出焦点，避免两个输入框的焦点框同时亮着。
+        if (this.searchBox != null) {
+            this.searchBox.setFocused(false);
+        }
+        this.renamingNode = node.nodeId();
+    }
+
+    /**
+     * 把改名框贴回正在改名的节点：布局 / 滚动 / 快照变化后都按当前几何重新定位。
+     *
+     * <p>节点被删除或被搜索过滤掉时取消改名，避免输入框留在空处。</p>
+     */
+    private void syncRenameBox() {
+        SearchEditBox box = this.renameBox;
+        UUID nodeId = this.renamingNode;
+        NodeLayout current = this.layout;
+        if (box == null || nodeId == null) {
+            return;
+        }
+        int index = findNodeIndex(nodeId);
+        if (current == null || index < 0 || index >= current.boxes().size()) {
+            cancelRename();
+            return;
+        }
+        int top = NodeLayout.screenY(current.viewport(),
+                current.boxes().get(index).top(), this.scroll);
+        box.setX(NodeLayout.nameX(current.viewport()));
+        box.setY(top + 5);
+        box.setWidth(Math.max(40, NodeLayout.nameWidth(current.viewport())));
+    }
+
+    /**
+     * 节点在当前过滤结果里的下标。
+     *
+     * @param nodeId 节点 id
+     * @return 下标；不在可见行里为 -1
+     */
+    private int findNodeIndex(UUID nodeId) {
+        List<NodeRow> rows = this.model.rows();
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i).nodeId().equals(nodeId)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void commitRename() {
+        SearchEditBox box = this.renameBox;
+        UUID nodeId = this.renamingNode;
+        if (box == null || nodeId == null) {
+            cancelRename();
+            return;
+        }
+        String value = box.getValue();
+        this.renameBox = null;
+        this.renamingNode = null;
+        NodeRow node = findNode(nodeId);
+        if (node != null) {
+            NodeActions.rename(this.menu.containerId, node, value);
+        }
+    }
+
+    private void cancelRename() {
+        this.renameBox = null;
+        this.renamingNode = null;
+    }
+
+    @Nullable
+    private NodeRow findNode(@Nullable UUID nodeId) {
+        if (nodeId == null) {
+            return null;
+        }
+        for (NodeRow row : this.model.rows()) {
+            if (row.nodeId().equals(nodeId)) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    private void requestDelete(NodeRow node) {
+        if (!node.view().configured()) {
+            NodeActions.delete(this.menu.containerId, node);
+            return;
+        }
+        if (this.confirmDialog == null) {
+            return;
+        }
+        // 几何交给浮层自己算：可用区域是终端窗口，压暗区域是整个屏幕——
+        // AE2 左侧工具栏按钮画在 leftPos 之外，只压暗终端会让它们保持亮着。
+        this.confirmDialog.open(tr("idlefactory.node.delete.title"),
+                node.name() + "\n" + deleteDetail(node.view()),
+                tr("idlefactory.node.delete.button"), () -> NodeActions.delete(this.menu.containerId, node),
+                new ConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
+                        this.imageHeight),
+                new ConfirmDialog.Bounds(0, 0, this.width, this.height));
+    }
+
+    /**
+     * 删除确认里说清楚「删掉的是什么」：规则、样板，还是两者都有。
+     *
+     * <p>样板删节点时会退回背包，所以单独提一句；自动补的 FE 规则会和节点一起消失，
+     * 下次接机器会再补，不需要在弹窗里吓人。</p>
+     *
+     * @param view 节点视图
+     * @return 说明文字
+     */
+    private static String deleteDetail(ViewNode view) {
+        int rules = view.ruleCount();
+        int patterns = view.core().patternCount();
+        if (rules > 0 && patterns > 0) {
+            return tr("idlefactory.node.delete.detail.both", rules, patterns);
+        }
+        if (patterns > 0) {
+            return tr("idlefactory.node.delete.detail.patterns", patterns);
+        }
+        return tr("idlefactory.node.delete.detail.rules", rules);
+    }
+
+    /** 搜索框左边缘：贴着右侧滚动条预留区，标题只占它左边的空间。 */
+    private int searchX() {
+        return this.leftPos + this.imageWidth - SEARCH_W - 22;
+    }
+
+    /**
+     * 内容视口。
+     *
+     * @return 视口
+     */
+    Viewport contentViewport() {
+        int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
+        return new Viewport(TerminalLayout.contentX(this.leftPos),
+                TerminalLayout.contentY(this.topPos, header),
+                TerminalLayout.contentWidth(this.imageWidth),
+                TerminalLayout.contentHeight(this.rows, rowHeight()));
+    }
+
+    /**
+     * 工作区描边框外沿。
+     *
+     * @return 描边框
+     */
+    Viewport workAreaFrame() {
+        Viewport viewport = contentViewport();
+        return new Viewport(TerminalLayout.frameX(viewport.x()),
+                TerminalLayout.frameY(viewport.y()),
+                TerminalLayout.frameWidth(viewport.width()),
+                TerminalLayout.frameHeight(viewport.height()));
+    }
+
+    private void toggleTerminalStyle(
+            SettingToggleButton<appeng.api.config.TerminalStyle> button, boolean backwards) {
+        appeng.api.config.TerminalStyle next = button.getNextValue(backwards);
+        AEConfig.instance().setTerminalStyle(next);
+        button.set(next);
+        this.init();
+    }
+
+    private int rowHeight() {
+        return this.style.getTerminalStyle().getRow().getSrcHeight();
+    }
+
+    private void applyQuery(String raw) {
+        rememberedQuery = raw == null ? "" : raw;
+        this.model.setQuery(SearchQuery.parse(rememberedQuery,
+                JecharactersCompat::contains));
+        rebuildLayout();
+    }
+
+    private void requestTable() {
+        if (this.minecraft != null && this.minecraft.player != null) {
+            PacketDistributor.sendToServer(
+                    new ViewTableRequestC2S(this.menu.containerId, this.source.revision()));
+        }
+    }
+
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
+    }
+
+    private String emptyText() {
+        if (!this.model.hasFactory()) {
+            return tr("idlefactory.node.empty.no_factory");
+        }
+        if (this.model.filteredEmpty()) {
+            return tr("idlefactory.node.empty.filtered");
+        }
+        return tr("idlefactory.node.empty.none");
+    }
+
+    private int totalMembers() {
+        int total = 0;
+        for (NodeRow row : this.model.rows()) {
+            total += row.members().size();
+        }
+        return total;
+    }
+
+    private static boolean inside(Viewport viewport, double mouseX, double mouseY) {
+        return mouseX >= viewport.x() && mouseX < viewport.x() + viewport.width()
+                && mouseY >= viewport.y() && mouseY < viewport.y() + viewport.height();
+    }
+
+    // ---- 探针与包内访问 ----
+
+    NodeLayout layout() {
+        return this.layout;
+    }
+
+    NodeModel model() {
+        return this.model;
+    }
+
+    int scroll() {
+        return this.scroll;
+    }
+
+    int rows() {
+        return this.rows;
+    }
+}
