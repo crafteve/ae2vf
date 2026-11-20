@@ -30,10 +30,9 @@ import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
 import io.github.crafteve.idlefactory.network.ObservationNoticeListener;
 import io.github.crafteve.idlefactory.network.ViewPort;
-import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
+import io.github.crafteve.idlefactory.network.WandLinkPort;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -41,7 +40,6 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 工厂总调度室：绑定在服务器 tick 上的常驻服务。
@@ -269,22 +267,7 @@ public final class FactoryLifecycle {
      */
     public void markDirtyLinks(Factory factory) {
         markDirty();
-        pushLinksTo(factory);
-    }
-
-    /**
-     * 把一个工厂的最新链接快照推给它的在线拥有者。
-     *
-     * <p>工厂只属于一个玩家，所以这里按拥有者找在线连接；不在线就只留服务端状态，下次登录
-     * 或开终端时会主动请求一次。</p>
-     *
-     * @param factory 工厂
-     */
-    private void pushLinksTo(Factory factory) {
-        ServerPlayer owner = this.server.getPlayerList().getPlayer(factory.config().owner());
-        if (owner != null) {
-            PacketDistributor.sendToPlayer(owner, WandLinksS2C.of(factory));
-        }
+        WandLinkPort.push(this.server, factory);
     }
 
     /**
