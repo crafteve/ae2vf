@@ -2,61 +2,51 @@
 
 > modid `ae2vf` · Minecraft 1.21.1 · NeoForge 21.1.264 · **0.1.0-beta**
 
-An **Applied Energistics 2** add-on that turns "connect machines to the ME network" into terminal
-configuration instead of cable spaghetti.
+**Applied Energistics 2** 的附属模组：把“把机器接进 ME 网络”从铺线缆、摆接口、调 IO 面，变成在终端里配置节点与规则。
 
-Instead of placing interfaces, running cables and tuning IO faces on every machine, you bind machines
-to a **node** with the binding wand and edit the node's IO rules in a terminal. The mod only moves
-items, fluids and FE between machines and AE2 storage — recipes, energy and processing time are
-untouched.
+你只需要用绑定杖把机器接进一个**节点**，再在终端里给节点配输入输出规则；模组只负责机器与 AE2 仓库之间的物品、流体与 FE 搬运，不改配方、不改能量、不改加工时间。
 
-## Features
+## 功能
 
-- **Nodes** — one node manages 1..N machines, each with its own input/output rules.
-- **Passive IO** — rule-driven transfer every tick, with per-rule backoff and face learning.
-- **Active crafting** — nodes advertise patterns to AE2 CPUs through a virtual pattern provider and
-  feed dispatched jobs into their machines.
-- **Observation layer** — a second fact source for "is the block there / what is it / is it working";
-  the UI and IO gating read it instead of probing the world on the read path.
-- **Two terminals** — passive IO terminal (rule editing, list/tile views) and node terminal (nodes,
-  members, blocking, multiplier, dispatch), both with search, six sort keys and direction toggles.
-- **Machine binding wand** — right-click to bind/unbind, sneak-right-click to confirm a draft,
-  chain-bind neighbouring machines of the same type.
-- **JEI integration** — machine list, IO columns, storage, and a dedicated FE ingredient.
+- **节点**：一个节点管理 1..N 台机器，每台机器可以有自己的 IO 规则。
+- **被动 IO**：规则驱动，每 tick 搬运；按上一轮结果做规则级退避，并记住可用的面。
+- **主动合成**：节点通过虚拟样板供应器把样板广告给 AE2 CPU，接住派单后把输入推进机器、回收产物。
+- **观测层**：方块在不在、是什么、在不在干活由观测表回答；界面与执行门禁只读观测，不在读路径探世界。
+- **两个终端**：被动 IO 终端（规则编辑、列表 / 磁贴）与节点终端（节点、成员、阻挡、倍率、派单），都带搜索、六档排序与升降序。
+- **机器绑定杖**：右键绑定 / 解绑，蹲下右键确认草稿，连锁绑定同类型相邻机器。
+- **JEI 支持**：机器列表、IO 列、仓库，以及独立的 FE 配料。
 
-## Requirements
+## 依赖
 
-| Dependency | Version | Required |
+| 依赖 | 版本 | 必需 |
 |---|---|---|
-| Minecraft | 1.21.1 | yes |
-| NeoForge | 21.1.264 | yes |
-| Applied Energistics 2 | 19.2.10+ | yes |
-| Applied Flux | 1.21-2.1.5-neoforge+ | no (FE support) |
-| Applied Mekanistics | matching 1.21.1 build | no (chemical support) |
-| JEI | 19.21.1.304+ | no |
+| Minecraft | 1.21.1 | 是 |
+| NeoForge | 21.1.264 | 是 |
+| Applied Energistics 2 | 19.2.10+ | 是 |
+| Applied Flux | 1.21-2.1.5-neoforge+ | 否（FE 支持） |
+| Applied Mekanistics | 1.21.1 对应版本 | 否（化学品支持） |
+| JEI | 19.21.1.304+ | 否 |
 
-Without Applied Flux the mod simply has no FE resource; without Applied Mekanistics it has no
-chemical resource. Nothing degrades silently.
+没装 Applied Flux 就没有 FE 这类资源，没装 Applied Mekanistics 就没有化学品——不会静默降级、也不会伪造替代 key。
 
-## Installation
+## 安装
 
-1. Install the matching NeoForge version for Minecraft 1.21.1.
-2. Drop the jar into `mods/`.
-3. Start the game. The mod also needs Applied Energistics 2.
+1. 为 Minecraft 1.21.1 安装对应版本的 NeoForge；
+2. 把 jar 放进 `mods/`；
+3. 启动游戏。本模组还需要 Applied Energistics 2。
 
-## Building
+## 构建
 
 ```bash
 ./gradlew build
 ```
 
-The jar is written to `build/libs/ae2vf-<version>.jar`.
+产物在 `build/libs/ae2vf-<版本>.jar`。
 
-## Compatibility
+## 兼容性
 
-This is the first public beta. Mod ids, item ids and save data changed from the internal
-`idlefactory` builds to `ae2vf`: **old worlds and old items are not compatible** — start a new world.
+首个公开测试版。modid、物品 id 与存档数据已从内部版本的 `idlefactory` 迁移为 `ae2vf`：**旧世界与旧物品不兼容**，请新建世界。
 
-## License
+## 许可证
 
-MIT — see [LICENSE](LICENSE).
+MIT，见 [LICENSE](LICENSE)。
