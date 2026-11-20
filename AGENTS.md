@@ -48,7 +48,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `machine` | 机器（一个方块）、`ResourceSpec` / `MatchMode` 规则类型、`MachineHealth` 纯函数 | 世界探测、搬运 |
 | `storage` | 仓库解析（只解析 AE2 `MEStorage`） | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
-| `factory` | 工厂实例、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点 |
+| `factory` | 工厂实例与索引（`Factory` / `FactoryLibrary`）、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、短 id 解析（`FactoryResolver`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点、连锁查找 |
 | `runtime` | 活节点：`LiveNode` / `LiveNodeLibrary` / `LiveNodeApply` / `LiveNodeRunner` / `LiveNodeCraft` / 样板视图 | 配置、搬运 |
 | `node` | 节点配置数据：`Node` / `NodeIo` / `NodeIoRules` / `NodeCraft` / `NodeDispatchQueue` / `NodeDispatchOrder` / `NodeLibrary` / `NodeCodec` | 世界探测、搬运、存档根 |
 | `claim` | 方块占用表（机器 / 仓库锚点唯一性） | 世界探测 |
@@ -118,7 +118,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 协议常量（`NetworkProtocol`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 版本与线路上限（`NetworkVersion` / `NetworkLimit`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -268,7 +268,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryManager.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -299,6 +299,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-20 命名收敛：`NetworkProtocol` 拆成 `NetworkVersion` / `NetworkLimit`；`FactoryManager` → `FactoryLibrary`；`FactoryRefs` → `FactoryResolver`；连锁查找从 `factory` 移入 `command.CommandChain`（它只服务绑定杖，属于命令）。
 - 2026-11-20 包结构整理：`resource` + `location` 合并为 `key`；删除 `event` 包（不再拦截挖掘）；`registry` 类统一 `IdleFactory` 前缀并把负载注册收进来；编解码器集中到 `network.codec`；删除全部 `package-info`。
 - 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议发布前重置为 1，内部编号 41 / 42 只留在 ADR），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键；新增 `HudNoticeS2C` 把失联 / 恢复提示并入模组 HUD 条。
 - 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
