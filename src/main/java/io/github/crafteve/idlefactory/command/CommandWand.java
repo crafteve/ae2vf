@@ -217,6 +217,11 @@ public final class CommandWand {
             this.runtime.observations().refresh(block);
         }
         autoAddEnergyRule(factory, candidate.id(), List.of(block));
+        // 观测可能还没探到 FE 能力：排一条重试，探到后补规则；已经在上面补上时这里会重复一次，
+        // addRule 会以「这一侧已经有这条规则」拒绝，不会写出第二条。
+        EnergyRuleRetry.schedule(factory, candidate.id(), block,
+                this.runtime.server().overworld() == null
+                        ? 0L : this.runtime.server().overworld().getGameTime());
         return CommandResult.node(CommandReason.OK, candidate.id());
     }
 
