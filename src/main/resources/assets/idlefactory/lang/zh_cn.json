@@ -123,7 +123,7 @@
   "idlefactory.node.label.blocking": "阻",
   "idlefactory.node.label.round_robin": "轮",
   "idlefactory.node.label.sequential": "序",
-  "idlefactory.node.label.multiplier.off": "O",
+  "idlefactory.node.label.multiplier.off": "倍",
   "idlefactory.node.label.multiplier.smart": "智",
   "idlefactory.node.label.edit": "编",
   "idlefactory.node.label.delete": "删",

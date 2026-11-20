@@ -46,23 +46,23 @@ final class NodeRender {
     /** 模式键闲置底：冷灰。 */
     private static final int MODE_IDLE = 0xFFE3E5EE;
     /** 倍率关闭：纯白键。 */
-    private static final int MULT_OFF = MODE_IDLE;
+    private static final int MULT_OFF = 0xFF7FA6CC;
     /** 倍率固定档：浅蓝 + 深蓝字。 */
-    private static final int MULT_BLUE = 0xFFA8C4E4;
-    private static final int MULT_BLUE_TEXT = 0xFF12263A;
+    private static final int MULT_BLUE = 0xFF3F6EA8;
+    private static final int MULT_BLUE_TEXT = 0xFFFFFFFF;
     /** 倍率智能：浅青 + 黑字。 */
-    private static final int MULT_SMART = 0xFF2F5C9E;
+    private static final int MULT_SMART = 0xFF1F3E6E;
     /** 派单逐台：淡紫；轮询：淡黄。 */
     private static final int DISPATCH_SEQUENTIAL = 0xFFB7A6D8;
     private static final int DISPATCH_SEQUENTIAL_TEXT = 0xFF221933;
     private static final int DISPATCH_ROUND = 0xFFDCC163;
     private static final int DISPATCH_ROUND_TEXT = 0xFF33280A;
     /** 阻挡开启：淡绿 + 深绿字。 */
-    private static final int BLOCK_GREEN = 0xFFB7D8B0;
+    private static final int BLOCK_GREEN = 0xFF8FCB7F;
     private static final int BLOCK_GREEN_TEXT = 0xFF14300F;
     /** 动作键：编辑冷灰 + 黑字；删除灰红 + 白字。 */
     private static final int EDIT_KEY = 0xFFDCDEE6;
-    private static final int DELETE_KEY = 0xFFC0433F;
+    private static final int DELETE_KEY = 0xFFA63834;
     private static final int DELETE_ARMED = 0xFFFF5A5A;
 
     /** 正文色。 */
@@ -212,8 +212,7 @@ final class NodeRender {
                 == io.github.crafteve.idlefactory.node.MultiplierMode.SMART;
         int multiplierBg = !multiplierActive ? MULT_OFF
                 : smart ? MULT_SMART : MULT_BLUE;
-        int multiplierText = smart ? 0xFFFFFFFF
-                : multiplierActive ? MULT_BLUE_TEXT : TEXT_PRIMARY;
+        int multiplierText = 0xFFFFFFFF;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 1), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H, multiplierBg,
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
