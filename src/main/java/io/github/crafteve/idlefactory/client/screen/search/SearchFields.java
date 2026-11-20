@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.search;
 
 import io.github.crafteve.idlefactory.client.screen.UiResources;
 
@@ -26,8 +26,8 @@ import net.minecraft.resources.ResourceLocation;
  * <p>状态文字只取服务端下发的 {@link ViewNode}，两个终端对"失联""健康过期""运行"等词必须
  * 命中同一批节点。坐标取第一台成员（节点终端与被动 IO 都取第一台），其余是节点级计数。</p>
  */
-public final class FactoryNodeSearchFields {
-    private FactoryNodeSearchFields() {
+public final class SearchFields {
+    private SearchFields() {
         // 纯静态字段构造
     }
 

@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
+import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
@@ -225,7 +225,7 @@ final class FactoryPassiveIoModel {
         List<BlockView> next = new ArrayList<>(this.nodes.size());
         for (ViewNode node : this.nodes) {
             if (!this.query.isEmpty()
-                    && !this.query.matches(FactoryNodeSearchFields.of(node, this.theme, -1))) {
+                    && !this.query.matches(SearchFields.of(node, this.theme, -1))) {
                 continue;
             }
             next.add(new BlockView(node, FactoryStatus.of(node.core(), this.theme), rules(node)));

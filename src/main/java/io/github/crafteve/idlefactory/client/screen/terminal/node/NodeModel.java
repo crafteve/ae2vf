@@ -10,7 +10,7 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
+import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
@@ -92,7 +92,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
 
     @Override
     protected SearchQuery.Fields fields(NodeRow row) {
-        return FactoryNodeSearchFields.of(row.view(), theme(), row.view().core().patternCount());
+        return SearchFields.of(row.view(), theme(), row.view().core().patternCount());
     }
 
     /**
