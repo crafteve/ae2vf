@@ -7,7 +7,7 @@ import io.github.crafteve.idlefactory.command.CommandResult;
  *
  * <p>被动 IO 终端与节点终端都实现它；{@code client.network} 只按接口投递，不 import 具体屏幕。</p>
  */
-public interface FactoryFeedbackSink {
+public interface FeedbackSink {
     /**
      * @return 本屏幕所属菜单的容器 id
      */

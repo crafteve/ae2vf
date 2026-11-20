@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.wand;
 
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,13 +24,13 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>只读缓存，不参与业务判断；登录 / 换维度 / 打开终端时主动请求一次，之后靠推送更新。</p>
  */
-public final class WandLinks {
+public final class WandLinkCache {
     private static List<BlockKey> machineBlocks = List.of();
     private static Map<BlockKey, Owner> owners = Map.of();
     private static Map<UUID, BlockKey> machineBlocksById = Map.of();
     private static Map<UUID, FactoryLinksS2C.NodeLink> nodes = Map.of();
 
-    private WandLinks() {
+    private WandLinkCache() {
         // 纯静态缓存
     }
 

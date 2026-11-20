@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.item;
 
+import io.github.crafteve.idlefactory.client.wand.MachineWandInput;
+
 import org.jetbrains.annotations.Nullable;
 
 import appeng.api.implementations.menuobjects.IMenuItem;
@@ -19,7 +21,7 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * 机器绑定杖：1:1 toggle 与草稿编辑的入口物品。
  *
- * <p>不可堆叠、无耐久。右键手势在客户端 {@code client.wand.WandGesture}，服务端判定在
+ * <p>不可堆叠、无耐久。右键手势在客户端 {@code client.wand.MachineWandInput}，服务端判定在
  * {@code command.CommandWand}。实现 {@link IMenuItem} 只是让 AE2 能按物品定位器还原草稿面板的
  * 宿主，物品类仍不引用 {@code client.*}。</p>
  *
@@ -38,7 +40,7 @@ public class MachineBindingWandItem extends Item implements IMenuItem {
     /**
      * 右键方块：服务端抢在方块 {@code useItemOn} 之前消费掉这次交互，阻止机器 / 容器 GUI。
      *
-     * <p>客户端的事件层已经把这次右键交给 {@code WandGesture} 并取消了预测；服务端没有
+     * <p>客户端的事件层已经把这次右键交给 {@code MachineWandInput} 并取消了预测；服务端没有
      * 事件订阅，只能靠物品在这里返回 {@link InteractionResult#CONSUME}。旧实现同样是在这个钩子
      * 里先于 GUI 执行的。</p>
      *

@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.wand;
 
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -69,7 +71,7 @@ public final class WandPrecheck {
         if (minecraft.level.getBlockEntity(block.pos()) == null) {
             return CommandReason.NOT_A_MACHINE;
         }
-        if (WandLinks.owner(block).isPresent()) {
+        if (WandLinkCache.owner(block).isPresent()) {
             return CommandReason.BLOCK_CLAIMED;
         }
         if (checkType && typeId != null) {
@@ -91,7 +93,7 @@ public final class WandPrecheck {
     @Nullable
     public static ResourceLocation baseType(Minecraft minecraft, WandDraft draft) {
         if (draft.nodeId() != null) {
-            return WandLinks.node(draft.nodeId())
+            return WandLinkCache.node(draft.nodeId())
                     .map(io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C.NodeLink::typeBlockId)
                     .orElse(null);
         }

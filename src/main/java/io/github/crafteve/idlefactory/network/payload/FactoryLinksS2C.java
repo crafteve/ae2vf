@@ -7,7 +7,7 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
 
-import io.github.crafteve.idlefactory.client.network.ClientFactoryLinksHandler;
+import io.github.crafteve.idlefactory.client.network.ClientWandLinksHandler;
 import io.github.crafteve.idlefactory.factory.Factory;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
@@ -85,7 +85,7 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
      * @param context 上下文
      */
     public static void handle(FactoryLinksS2C payload, IPayloadContext context) {
-        ClientFactoryLinksHandler.handle(payload, context);
+        ClientWandLinksHandler.handle(payload, context);
     }
 
     private static void write(RegistryFriendlyByteBuf buf, FactoryLinksS2C payload) {

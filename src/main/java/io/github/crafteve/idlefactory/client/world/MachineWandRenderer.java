@@ -1,4 +1,9 @@
-package io.github.crafteve.idlefactory.client.wand;
+package io.github.crafteve.idlefactory.client.world;
+
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
+
 
 import java.util.EnumMap;
 import java.util.List;
@@ -50,12 +55,12 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
  * 再平移到相机相对坐标；每种颜色一份缓存 VBO，只在坐标集合变化时重建。只画没有被同组方块
  * 挡住的面，整组一次 draw，CPU 每帧不逐方块提交。</p>
  *
- * <p>数据只读：机器与仓库来自 {@link WandLinks}，草稿与冲突来自 {@link WandSession}。任意界面
+ * <p>数据只读：机器与仓库来自 {@link WandLinkCache}，草稿与冲突来自 {@link WandDraftState}。任意界面
  * 打开时（含草稿面板）不画；不做曲线、悬停、世界内动画。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
-public final class WandLinkRenderer {
+public final class MachineWandRenderer {
     /** 顶点缓冲初始大小。 */
     private static final int BUFFER_SIZE = 256;
     /** 加法混合用的透明度；三种颜色共用。 */
@@ -88,7 +93,7 @@ public final class WandLinkRenderer {
 
     private static final Map<Kind, VBOEntry> CACHE = new EnumMap<>(Kind.class);
 
-    private WandLinkRenderer() {
+    private MachineWandRenderer() {
         // 纯静态渲染
     }
 
@@ -110,16 +115,16 @@ public final class WandLinkRenderer {
             return;
         }
         ResourceKey<Level> dimension = minecraft.level.dimension();
-        boolean editing = WandSession.isEditing();
-        java.util.UUID editingNode = editing ? WandSession.draft().nodeId() : null;
+        boolean editing = WandDraftState.isEditing();
+        java.util.UUID editingNode = editing ? WandDraftState.draft().nodeId() : null;
         LongOpenHashSet machineBlocks = new LongOpenHashSet();
         LongOpenHashSet editableBlocks = new LongOpenHashSet();
-        for (BlockKey block : WandLinks.boundBlocks()) {
+        for (BlockKey block : WandLinkCache.boundBlocks()) {
             if (!block.dimension().equals(dimension)) {
                 continue;
             }
             boolean ownNode = editingNode != null
-                    && WandLinks.owner(block).map(owner -> owner.nodeId().equals(editingNode))
+                    && WandLinkCache.owner(block).map(owner -> owner.nodeId().equals(editingNode))
                             .orElse(false);
             if (ownNode) {
                 editableBlocks.add(block.pos().asLong());
@@ -132,16 +137,16 @@ public final class WandLinkRenderer {
             return;
         }
         // 编辑已有节点时，本节点的成员从绿框改成黄框：玩家要一眼看出这次能改哪些机器。
-        addBlocks(editableBlocks, WandSession.draft().added(), dimension);
-        for (BlockKey block : WandSession.removedBlocks()) {
+        addBlocks(editableBlocks, WandDraftState.draft().added(), dimension);
+        for (BlockKey block : WandDraftState.removedBlocks()) {
             if (block.dimension().equals(dimension)) {
                 editableBlocks.remove(block.pos().asLong());
             }
         }
         draw(Kind.DRAFT_ADDED, editableBlocks, event);
         LongOpenHashSet conflicts = new LongOpenHashSet();
-        addBlocks(conflicts, WandSession.conflictBlocks(), dimension);
-        addBlocks(conflicts, WandSession.removedBlocks(), dimension);
+        addBlocks(conflicts, WandDraftState.conflictBlocks(), dimension);
+        addBlocks(conflicts, WandDraftState.removedBlocks(), dimension);
         draw(Kind.DRAFT_CONFLICT, conflicts, event);
     }
 

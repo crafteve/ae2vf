@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.paint;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -11,13 +14,13 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>边框方向固定为「上 / 左亮、下 / 右暗」。三枚键帽并排时，平涂边框会像贴纸；有了明暗才
  * 像按得下去的键。</p>
  */
-public final class FactoryKeycap {
+public final class KeycapButton {
     /** 悬停提亮（白色 20%）。 */
     private static final int HOVER = 0x33FFFFFF;
     /** 灰显遮罩（白色 33%）。 */
     private static final int DISABLED = 0x55FFFFFF;
 
-    private FactoryKeycap() {
+    private KeycapButton() {
         // 纯静态绘制
     }
 

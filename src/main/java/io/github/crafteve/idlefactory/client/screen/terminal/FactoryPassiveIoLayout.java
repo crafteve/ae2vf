@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
@@ -35,8 +35,8 @@ final class FactoryPassiveIoLayout {
      * 因为卡片亮边和空档都落在同一块浅色底上。</p>
      */
     static final int BODY_GAP = 1;
-    /** 块左侧状态灯宽；宽度由 {@link FactoryLamp} 给出，排版只引用不另写数值。 */
-    static final int STATUS_W = FactoryLamp.WIDTH;
+    /** 块左侧状态灯宽；宽度由 {@link StatusBar} 给出，排版只引用不另写数值。 */
+    static final int STATUS_W = StatusBar.WIDTH;
     /** 块内左右内边距。 */
     static final int PAD = 2;
     /** 规则行 / 磁贴卡片相对块左边缘的内缩；卡片与块之间留 1px 让外阴影收口。 */

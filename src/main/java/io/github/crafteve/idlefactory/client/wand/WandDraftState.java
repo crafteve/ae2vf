@@ -1,5 +1,14 @@
 package io.github.crafteve.idlefactory.client.wand;
 
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
+
+
+import io.github.crafteve.idlefactory.client.screen.wand.WandHud;
+
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -8,10 +17,10 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
+import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.client.screen.text.CommandText;
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 
@@ -25,12 +34,12 @@ import net.minecraft.world.level.Level;
  *
  * <p>草稿只活在这份静态缓存里，不写物品组件、不跨登录；草稿的 authority 在客户端，但服务端
  * 提交时会全量重验，所以这里的所有结论都只是「先给玩家即时反馈」。每次结构变更取
- * {@link WandCoordinator#nextSeq()} 当版本号，提交与回执靠它配对。</p>
+ * {@link WandSubmitter#nextSeq()} 当版本号，提交与回执靠它配对。</p>
  *
  * <p>生命周期：登录 / 登出 / 换维度 / 换手 / 把杖放进容器 / 打开别的界面都丢草稿回 IDLE；
  * 只有草稿面板本身打开时不丢。</p>
  */
-public final class WandSession {
+public final class WandDraftState {
     /** 绑定杖状态；没有 mode 字段。 */
     public enum State {
         /** 手持杖、草稿为空。 */
@@ -55,7 +64,7 @@ public final class WandSession {
     @Nullable
     private static ResourceKey<Level> dimension;
 
-    private WandSession() {
+    private WandDraftState() {
         // 纯静态状态机
     }
 
@@ -109,7 +118,7 @@ public final class WandSession {
             refreshWandFailure(CommandReason.NOT_HOLDING_WAND);
             return;
         }
-        draft = WandDraft.empty(WandCoordinator.nextSeq());
+        draft = WandDraft.empty(WandSubmitter.nextSeq());
         state = State.EDITING;
         conflicts = List.of();
         conflictBlocks = Set.of();
@@ -128,14 +137,14 @@ public final class WandSession {
             refreshWandFailure(CommandReason.NOT_HOLDING_WAND);
             return;
         }
-        if (WandLinks.node(nodeId).isEmpty()) {
+        if (WandLinkCache.node(nodeId).isEmpty()) {
             refreshWandFailure(CommandReason.NODE_MISSING);
             return;
         }
         // 终端「+」进来时终端界面还开着；tick 的「打开别的界面就丢草稿」会在同一 tick
         // 把刚建的草稿清掉，玩家关掉终端后已经是 IDLE，右键机器只能落成 1:1。先关界面再进编辑态。
         closeOtherScreen(minecraft);
-        draft = new WandDraft(nodeId, List.of(), Set.of(), WandCoordinator.nextSeq());
+        draft = new WandDraft(nodeId, List.of(), Set.of(), WandSubmitter.nextSeq());
         state = State.EDITING;
         recheck(minecraft);
         WandHud.click();
@@ -155,7 +164,7 @@ public final class WandSession {
             applyDraft(minecraft, draft.withoutAddedBlock(block));
             return;
         }
-        Optional<WandLinks.Owner> owner = WandLinks.owner(block);
+        Optional<WandLinkCache.Owner> owner = WandLinkCache.owner(block);
         if (owner.isPresent()) {
             if (owner.get().nodeId().equals(draft.nodeId())) {
                 UUID machineId = owner.get().machineId();
@@ -165,7 +174,7 @@ public final class WandSession {
                 return;
             }
             WandHud.failure(net.minecraft.network.chat.Component.literal(
-                    CommandMessages.text(new io.github.crafteve.idlefactory.command.CommandResult(
+                    CommandText.text(new io.github.crafteve.idlefactory.command.CommandResult(
                             CommandReason.BLOCK_CLAIMED, null, null, List.of()))));
             return;
         }
@@ -173,7 +182,7 @@ public final class WandSession {
         CommandReason reason = WandPrecheck.checkBlock(minecraft, block, typeId, true);
         if (reason != CommandReason.OK) {
             WandHud.failure(net.minecraft.network.chat.Component.literal(
-                    CommandMessages.text(new io.github.crafteve.idlefactory.command.CommandResult(
+                    CommandText.text(new io.github.crafteve.idlefactory.command.CommandResult(
                             reason, null, null, List.of()))));
             return;
         }
@@ -194,7 +203,7 @@ public final class WandSession {
         int added = 0;
         int skipped = 0;
         for (BlockKey block : machines) {
-            if (draft.addsBlock(block) || WandLinks.owner(block).isPresent()
+            if (draft.addsBlock(block) || WandLinkCache.owner(block).isPresent()
                     || WandPrecheck.checkBlock(minecraft, block, typeId, true) != null) {
                 skipped++;
                 continue;
@@ -203,13 +212,13 @@ public final class WandSession {
             added++;
         }
         if (added > 0) {
-            draft = draft.withRequestSeq(WandCoordinator.nextSeq());
+            draft = draft.withRequestSeq(WandSubmitter.nextSeq());
             recheck(minecraft);
         }
         if (added == 0 && skipped == 0) {
-            WandHud.neutral(WandMessages.chainEmpty());
+            WandHud.neutral(WandText.chainEmpty());
         } else {
-            WandHud.success(WandMessages.chain(added, skipped));
+            WandHud.success(WandText.chain(added, skipped));
         }
     }
 
@@ -220,7 +229,7 @@ public final class WandSession {
      */
     public static WandDraft renewRequestSeq() {
         if (state == State.EDITING && !draft.isEmpty()) {
-            draft = draft.withRequestSeq(WandCoordinator.nextSeq());
+            draft = draft.withRequestSeq(WandSubmitter.nextSeq());
         }
         return draft;
     }
@@ -246,7 +255,7 @@ public final class WandSession {
 
     /** 清空草稿并回 IDLE，保留所属玩家 / 维度。 */
     public static void clear() {
-        WandCoordinator.abandonSubmission();
+        WandSubmitter.abandonSubmission();
         state = State.IDLE;
         draft = WandDraft.empty(0L);
         conflicts = List.of();
@@ -313,13 +322,13 @@ public final class WandSession {
      * @param next      新草稿
      */
     private static void refreshWandFailure(CommandReason reason) {
-        WandHud.failure(net.minecraft.network.chat.Component.literal(CommandMessages.text(
+        WandHud.failure(net.minecraft.network.chat.Component.literal(CommandText.text(
                 new io.github.crafteve.idlefactory.command.CommandResult(reason, null, null,
                         List.of()))));
     }
 
     private static void applyDraft(Minecraft minecraft, WandDraft next) {
-        draft = next.withRequestSeq(WandCoordinator.nextSeq());
+        draft = next.withRequestSeq(WandSubmitter.nextSeq());
         recheck(minecraft);
         WandHud.click();
     }
@@ -334,7 +343,7 @@ public final class WandSession {
         conflictBlocks = Set.copyOf(conflicts);
         Set<BlockKey> removed = new HashSet<>();
         for (UUID machineId : draft.removed()) {
-            WandLinks.blockOfMachine(machineId).ifPresent(removed::add);
+            WandLinkCache.blockOfMachine(machineId).ifPresent(removed::add);
         }
         removedBlocks = Set.copyOf(removed);
     }

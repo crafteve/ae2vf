@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;

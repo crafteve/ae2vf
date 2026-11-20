@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.search;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -12,14 +15,14 @@ import net.minecraft.network.chat.Component;
  * <p>复用原版 {@link EditBox} 的输入/选区/剪贴板逻辑，只是关掉原版边框、换成主题文字色，
  * 并在绘制后覆盖一条强调色光标（1.21.1 的 EditBox 把光标颜色写死成浅灰，没有 setter）。</p>
  */
-public class FactorySearchEditBox extends EditBox {
+public class SearchEditBox extends EditBox {
     private final FactoryGuiTheme theme;
     /** 占位提示；聚焦或有内容时临时清掉，避免和输入文字叠在一起。 */
     private final Component hint;
     /** 提示文字颜色。 */
     private final int hintColor;
 
-    public FactorySearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme, Component hint) {
+    public SearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme, Component hint) {
         this(font, x, y, width, height, theme, hint, 0xFFFFFFFF, 0xFFE6EEF8);
     }
 
@@ -34,7 +37,7 @@ public class FactorySearchEditBox extends EditBox {
      * @param textColor 输入文字颜色
      * @param hintColor 占位提示颜色
      */
-    public FactorySearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme,
+    public SearchEditBox(Font font, int x, int y, int width, int height, FactoryGuiTheme theme,
             Component hint, int textColor, int hintColor) {
         super(font, x, y, width, height, Component.empty());
         this.theme = theme;

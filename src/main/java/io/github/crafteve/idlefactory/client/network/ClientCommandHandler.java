@@ -1,6 +1,8 @@
 package io.github.crafteve.idlefactory.client.network;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
+
+import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandS2C;
 
 import net.minecraft.client.Minecraft;
@@ -20,12 +22,12 @@ public final class ClientCommandHandler {
      */
     public static void handle(FactoryCommandS2C payload) {
         if (payload.kind() == io.github.crafteve.idlefactory.command.CommandKind.WAND_COMMIT) {
-            io.github.crafteve.idlefactory.client.wand.WandCoordinator.handleCommitResult(
+            io.github.crafteve.idlefactory.client.wand.WandSubmitter.handleCommitResult(
                     payload.containerId(), payload.requestSeq(), payload.result());
             return;
         }
         if (payload.kind() == io.github.crafteve.idlefactory.command.CommandKind.WAND_TOGGLE) {
-            io.github.crafteve.idlefactory.client.wand.WandCoordinator
+            io.github.crafteve.idlefactory.client.wand.WandSubmitter
                     .handleToggleResult(payload.result());
             return;
         }
@@ -39,7 +41,7 @@ public final class ClientCommandHandler {
             }
             return;
         }
-        if (Minecraft.getInstance().screen instanceof FactoryFeedbackSink sink
+        if (Minecraft.getInstance().screen instanceof FeedbackSink sink
                 && sink.containerId() == payload.containerId()) {
             sink.acceptCommandResult(payload.result());
         }

@@ -1,5 +1,11 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
+import io.github.crafteve.idlefactory.client.screen.theme.GuiLayerSpec;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +23,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>几何分两部分：{@link Bounds} 是浮层自身的位置，{@link #backdrop()} 是要压暗的父面板。
  * 两者都由调用方（节点终端）直接给出屏幕矩形。</p>
  *
- * <p>绘制层级统一走 {@link FactoryGuiLayer#OVERLAY}：普通填充在 z=0，而物品图标在 z=150、
+ * <p>绘制层级统一走 {@link GuiLayerSpec#OVERLAY}：普通填充在 z=0，而物品图标在 z=150、
  * 数量装饰在 z=200，深度测试按 z 比较、不看绘制顺序，不抬层就会被列表里的图标盖住。</p>
  */
 public final class FactoryConfirmDialog {
@@ -129,14 +135,14 @@ public final class FactoryConfirmDialog {
         // 先把已有批次落屏（物品图标是延迟批处理的），再整体抬 z 画浮层。
         graphics.flush();
         graphics.pose().pushPose();
-        graphics.pose().translate(0.0F, 0.0F, FactoryGuiLayer.OVERLAY.z());
+        graphics.pose().translate(0.0F, 0.0F, GuiLayerSpec.OVERLAY.z());
         graphics.fill(parent.x(), parent.y(), parent.x() + parent.width(),
                 parent.y() + parent.height(), 0x90000000);
         // 浮层内区必须先铺一块完全不透明的底：用半透明分隔线贴图会让背后的机器图标透上来，
         // 看起来像浮层被压在内容下面（z 值问题），实际是底色没盖住。
         graphics.fill(box.x() + 1, box.y() + 1, box.x() + box.width() - 1,
                 box.y() + box.height() - 1, this.theme.panelBg());
-        FactoryNineSlice.panel(graphics, box.x(), box.y(), box.width(), box.height());
+        NineSliceRenderer.panel(graphics, box.x(), box.y(), box.width(), box.height());
         graphics.drawString(this.font, this.title, box.x() + 12, box.y() + 10,
                 this.theme.textPrimary(), false);
 
@@ -162,9 +168,9 @@ public final class FactoryConfirmDialog {
             boolean danger, int mouseX, int mouseY) {
         boolean hovered = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 18;
         if (hovered) {
-            FactoryNineSlice.buttonHover(graphics, x, y, w, 18);
+            NineSliceRenderer.buttonHover(graphics, x, y, w, 18);
         } else {
-            FactoryNineSlice.button(graphics, x, y, w, 18);
+            NineSliceRenderer.button(graphics, x, y, w, 18);
         }
         int color = danger ? this.theme.error() : this.theme.textPrimary();
         graphics.drawString(this.font, label,

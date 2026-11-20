@@ -1,4 +1,9 @@
-package io.github.crafteve.idlefactory.client.wand;
+package io.github.crafteve.idlefactory.client.screen.wand;
+
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
+
+
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -160,21 +165,21 @@ public final class WandHud {
      */
     @Nullable
     private static Component barText() {
-        return switch (WandSession.state()) {
+        return switch (WandDraftState.state()) {
             case IDLE -> null;
             case EDITING -> draftBar();
-            case SUBMITTING -> WandMessages.submitting();
+            case SUBMITTING -> WandText.submitting();
         };
     }
 
     /** 草稿条：新建报台数，编辑报节点名与加 / 删台数。 */
     private static Component draftBar() {
-        var draft = WandSession.draft();
+        var draft = WandDraftState.draft();
         if (draft.nodeId() != null) {
-            return WandMessages.draftEdit(WandMessages.nodeLabel(draft.nodeId()),
+            return WandText.draftEdit(WandText.nodeLabel(draft.nodeId()),
                     draft.added().size(), draft.removed().size());
         }
-        return WandMessages.draftNew(draft.added().size());
+        return WandText.draftNew(draft.added().size());
     }
 
     /**

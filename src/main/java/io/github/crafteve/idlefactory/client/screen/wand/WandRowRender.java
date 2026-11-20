@@ -1,8 +1,9 @@
-package io.github.crafteve.idlefactory.client.wand.screen;
+package io.github.crafteve.idlefactory.client.screen.wand;
+
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
-import io.github.crafteve.idlefactory.client.wand.WandMessages;
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.location.BlockKey;
 
 import net.minecraft.client.gui.Font;
@@ -15,7 +16,7 @@ import net.minecraft.world.item.ItemStack;
  * 草稿面板的行渲染：凹槽图标 + 方块名 + 坐标，删除态红字并带删除标记。
  *
  * <p>行是纯展示，不响应点击；撤销删除要回世界再右键一次。几何只在面板里算，本类只按给定
- * 矩形画一行。图标底色用 {@link FactoryNineSlice#slot}，和节点终端的成员行同一种凹槽。</p>
+ * 矩形画一行。图标底色用 {@link NineSliceRenderer#slot}，和节点终端的成员行同一种凹槽。</p>
  */
 public final class WandRowRender {
     /** 行高；18px 凹槽 + 0 间距，六行正好塞进行区。 */
@@ -57,12 +58,12 @@ public final class WandRowRender {
         if (removed) {
             graphics.fill(x, y, x + width, y + ROW_HEIGHT - 1, 0x22FF4D4D);
         }
-        FactoryNineSlice.slot(graphics, x, y, SLOT, SLOT);
+        NineSliceRenderer.slot(graphics, x, y, SLOT, SLOT);
         graphics.renderItem(new ItemStack(BuiltInRegistries.BLOCK.get(blockId).asItem()),
                 x + 1, y + 1);
 
         String pos = block.pos().toShortString();
-        String label = WandMessages.panelRemoved().getString();
+        String label = WandText.panelRemoved().getString();
         int rightReserve = RIGHT_PAD;
         if (removed) {
             graphics.drawString(font, label, x + width - RIGHT_PAD - font.width(label), y + TEXT_Y,
@@ -74,7 +75,7 @@ public final class WandRowRender {
                 theme.textDim(), false);
 
         int nameWidth = width - TEXT_X - rightReserve - LABEL_GAP;
-        String name = ellipsize(font, WandMessages.blockName(blockId), nameWidth);
+        String name = ellipsize(font, WandText.blockName(blockId), nameWidth);
         graphics.drawString(font, name, x + TEXT_X, y + TEXT_Y, color, false);
     }
 

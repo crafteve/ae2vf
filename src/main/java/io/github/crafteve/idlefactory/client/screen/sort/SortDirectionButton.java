@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.sort;
+
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -14,7 +15,7 @@ import net.minecraft.network.chat.Component;
  *
  * <p>方向是全局的：四个比较尺子一起翻，和 AE2 终端的排序方向语义一致。</p>
  */
-public final class FactorySortDirectionButton extends IconButton {
+public final class SortDirectionButton extends IconButton {
     /** 当前方向来源；按钮每帧现查，切换后下一帧自动换图标。 */
     private final Supplier<SortDir> direction;
 
@@ -22,7 +23,7 @@ public final class FactorySortDirectionButton extends IconButton {
      * @param direction 当前方向
      * @param press     点击动作
      */
-    public FactorySortDirectionButton(Supplier<SortDir> direction, OnPress press) {
+    public SortDirectionButton(Supplier<SortDir> direction, OnPress press) {
         super(press);
         this.direction = direction;
     }

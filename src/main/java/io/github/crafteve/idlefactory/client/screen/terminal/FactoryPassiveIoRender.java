@@ -6,13 +6,13 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryCard;
+import io.github.crafteve.idlefactory.client.screen.paint.Card;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.client.screen.FactoryKeycap;
+import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
-import io.github.crafteve.idlefactory.client.screen.FactoryResourceIconRender;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
+import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.BlockBox;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
@@ -32,11 +32,11 @@ import net.minecraft.world.item.Items;
  * 被动 IO 内容区的绘制。
  *
  * <p>只读模型与排版，不写任何状态：鼠标悬停由屏幕算好 {@link Hit} 传进来，滚动只影响
- * {@code scroll}，不改排版。所有静态外观来自 {@link FactoryNineSlice} 贴图与
+ * {@code scroll}，不改排版。所有静态外观来自 {@link NineSliceRenderer} 贴图与
  * {@link FactoryGuiTheme.Io} 色值。</p>
  *
  * <p>列表式为机器行 + 规则行；磁贴式为机器行 + 77×34 磁贴两列。每台机器只有一圈机器大卡片，
- * 机器行是它顶部的一条深色带；状态灯只画在机器行，走 {@link FactoryLamp}，落在卡片轮廓之内。
+ * 机器行是它顶部的一条深色带；状态灯只画在机器行，走 {@link StatusBar}，落在卡片轮廓之内。
  * 没有虚线新增行 / 磁贴：整张卡片就是拖入目标。</p>
  */
 final class FactoryPassiveIoRender {
@@ -91,9 +91,9 @@ final class FactoryPassiveIoRender {
                 continue;
             }
             // 宽度收到视口内 1px：外阴影画在卡片右侧，不收就会永远被视口裁剪。
-            FactoryCard.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
+            Card.draw(graphics, FactoryPassiveIoLayout.bodyX(viewport), top,
                     viewport.width() - 1, box.bottom() - box.top(),
-                    FactoryCard.Level.MACHINE, true);
+                    Card.Level.MACHINE, true);
             drawMachineRow(graphics, viewport, block, box, top, bottom, hover);
             if (layout.view() == FactoryPassiveIoView.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
@@ -219,9 +219,9 @@ final class FactoryPassiveIoRender {
             return;
         }
         graphics.fill(left, top + 1, right, top + 1 + height, this.theme.io().machineRow());
-        FactoryLamp.draw(graphics, left, top + 1, height, block.status().color());
+        StatusBar.draw(graphics, left, top + 1, height, block.status().color());
         int slotX = FactoryPassiveIoLayout.headerX(viewport);
-        FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
+        NineSliceRenderer.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
         ItemStack icon = block.node().core().health() == NodeHealth.OFFLINE
                 ? new ItemStack(Items.BARRIER) : FactoryLabels.blockStack(block.machine().blockId());
@@ -241,7 +241,7 @@ final class FactoryPassiveIoRender {
         graphics.drawString(this.font,
                 ellipsize(block.name(), nameRight - nameX), nameX, top + 6,
                 this.theme.textPrimary(), false);
-        FactoryNineSlice.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
+        NineSliceRenderer.icon(graphics, block.status().lamp(), lampX, top + 8, 3);
         if (hasEnergy) {
             drawEnergyButton(graphics, viewport, box, top, hover);
         }
@@ -265,7 +265,7 @@ final class FactoryPassiveIoRender {
         int y = FactoryPassiveIoLayout.feButtonY(top);
         boolean hovered = hover != null && hover.kind() == FactoryPassiveIoLayout.Kind.ENERGY
                 && hover.block() == box.index();
-        FactoryKeycap.draw(graphics, this.theme, x, y, FactoryPassiveIoLayout.FE_BUTTON,
+        KeycapButton.draw(graphics, this.theme, x, y, FactoryPassiveIoLayout.FE_BUTTON,
                 FactoryPassiveIoLayout.FE_BUTTON, this.theme.bevelLight(), true, hovered);
         graphics.pose().pushPose();
         graphics.pose().translate(x + 2, y + 4, 0.0F);
@@ -333,7 +333,7 @@ final class FactoryPassiveIoRender {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.key(), 0, 0);
+        ResourceIconRenderer.draw(graphics, this.font, rule.key(), 0, 0);
         graphics.pose().popPose();
     }
 
@@ -370,7 +370,7 @@ final class FactoryPassiveIoRender {
     private void drawChip(GuiGraphics graphics, int x, int y, String label, int background,
             int textColor, boolean enabled, boolean hovered) {
         int chip = FactoryPassiveIoLayout.CHIP;
-        FactoryKeycap.draw(graphics, this.theme, x, y, chip, chip, background, enabled, hovered);
+        KeycapButton.draw(graphics, this.theme, x, y, chip, chip, background, enabled, hovered);
         int textX = x + (chip - this.font.width(label)) / 2;
         graphics.drawString(this.font, label, textX, y + 2, textColor, false);
     }
@@ -412,12 +412,12 @@ final class FactoryPassiveIoRender {
 
     private void drawTile(GuiGraphics graphics, Viewport viewport, BlockView block, RuleRow rule,
             int blockIndex, int index, int x, int y, @Nullable Hit hover) {
-        FactoryCard.draw(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
-                FactoryPassiveIoLayout.TILE_H, FactoryCard.Level.IO, true);
+        Card.draw(graphics, x, y, FactoryPassiveIoLayout.TILE_W,
+                FactoryPassiveIoLayout.TILE_H, Card.Level.IO, true);
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;
-        FactoryNineSlice.slot(graphics, slotX, y + 2, FactoryPassiveIoLayout.SLOT,
+        NineSliceRenderer.slot(graphics, slotX, y + 2, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
+        ResourceIconRenderer.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
         int nameX = x + FactoryPassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
                 ellipsize(FactoryLabels.name(rule.key()), TILE_NAME_W), nameX, y + 7,

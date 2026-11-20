@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
-import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
 import io.github.crafteve.idlefactory.client.screen.FactorySortKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
@@ -41,7 +41,7 @@ final class FactoryPassiveIoModel {
     private List<ViewNode> nodes = List.of();
     private boolean hasFactory;
     private boolean storageOnline;
-    private FactorySearchQuery query = FactorySearchQuery.EMPTY;
+    private SearchQuery query = SearchQuery.EMPTY;
     /** 当前排序上下文：档位、方向与玩家位置。 */
     private FactorySortContext sortContext = FactorySortContext.defaults();
     private List<BlockView> blocks = List.of();
@@ -165,8 +165,8 @@ final class FactoryPassiveIoModel {
      *
      * @param next 新搜索条件
      */
-    void setQuery(@Nullable FactorySearchQuery next) {
-        this.query = next == null ? FactorySearchQuery.EMPTY : next;
+    void setQuery(@Nullable SearchQuery next) {
+        this.query = next == null ? SearchQuery.EMPTY : next;
         rebuild();
     }
 

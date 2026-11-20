@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.WandChainResult;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
@@ -43,7 +43,7 @@ public record WandChainS2C(WandChainResult result) implements CustomPacketPayloa
      * @param context 上下文
      */
     public static void handle(WandChainS2C payload, IPayloadContext context) {
-        context.enqueueWork(() -> WandCoordinator.handleChain(payload.result()));
+        context.enqueueWork(() -> WandSubmitter.handleChain(payload.result()));
     }
 
     private static void write(RegistryFriendlyByteBuf buf, WandChainS2C payload) {

@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.network;
 
-import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.client.screen.text.CommandText;
 import io.github.crafteve.idlefactory.command.CommandResult;
 
 /**
@@ -21,6 +21,6 @@ public final class ClientCommandText {
      * @return 中文文案
      */
     public static String hud(CommandResult result) {
-        return result.ok() ? "已更新仓库锚点" : CommandMessages.text(result);
+        return result.ok() ? "已更新仓库锚点" : CommandText.text(result);
     }
 }

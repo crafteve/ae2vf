@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload.wand;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.location.BlockKey;
@@ -44,7 +44,7 @@ public record WandOpenS2C(CommandResult result) implements CustomPacketPayload {
      * @param context 上下文
      */
     public static void handle(WandOpenS2C payload, IPayloadContext context) {
-        context.enqueueWork(() -> WandCoordinator.handleOpen(payload.result()));
+        context.enqueueWork(() -> WandSubmitter.handleOpen(payload.result()));
     }
 
     private static void write(RegistryFriendlyByteBuf buf, WandOpenS2C payload) {

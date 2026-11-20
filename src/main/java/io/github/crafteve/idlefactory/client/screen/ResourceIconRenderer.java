@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
 
@@ -24,13 +28,13 @@ import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
  * FE 优先用 Applied Flux 的 {@code EnergyType.FE} 图标，未装附属时退回「水贴图染绿」，
  * 保证任何环境都有可辨认的图标。JEI 的 FE 配料也复用这份绘制，避免两处图标不一致。</p>
  */
-public final class FactoryResourceIconRender {
+public final class ResourceIconRenderer {
     /** FE 没有 Applied Flux 时的备用染色：绿色。 */
     private static final int FE_FALLBACK_TINT = 0xFF55FF55;
     /** 缺省染色（不做染色）。 */
     private static final int NO_TINT = 0;
 
-    private FactoryResourceIconRender() {
+    private ResourceIconRenderer() {
         // 纯静态工具类
     }
 

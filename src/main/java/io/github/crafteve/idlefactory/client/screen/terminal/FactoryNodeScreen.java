@@ -21,19 +21,19 @@ import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
+import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
-import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
+import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 
-import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 
 import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
 
-import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
 
-import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
+import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
 
@@ -43,7 +43,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.Me
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 
-import io.github.crafteve.idlefactory.client.wand.WandLinks;
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 
@@ -51,7 +51,7 @@ import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 
 import io.github.crafteve.idlefactory.menu.FactorySortMode;
 
-import io.github.crafteve.idlefactory.client.CommandMessages;
+import io.github.crafteve.idlefactory.client.screen.text.CommandText;
 import io.github.crafteve.idlefactory.command.CommandResult;
 
 import io.github.crafteve.idlefactory.client.screen.ViewTableSink;
@@ -80,7 +80,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 还没有后端，按钮保留但只提示「待接入」。</p>
  */
 public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
-        implements FactoryFeedbackSink, ViewTableSink {
+        implements FeedbackSink, ViewTableSink {
     /** 最少内容行数。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -122,7 +122,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     private int scroll;
     private int requestTicker;
     @Nullable
-    private FactorySearchEditBox searchBox;
+    private SearchEditBox searchBox;
     /** 当前展开的节点。 */
     private final Set<UUID> expanded = new HashSet<>();
     /** 点过「… N 台」的节点，展开全部成员。 */
@@ -133,7 +133,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     @Nullable
     private UUID renamingNode;
     @Nullable
-    private FactorySearchEditBox renameBox;
+    private SearchEditBox renameBox;
     private int lastLogSignature = -1;
 
     /**
@@ -155,9 +155,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
-        this.addToLeftToolbar(new FactorySortModeButton(() -> this.sortMode,
+        this.addToLeftToolbar(new SortModeButton(() -> this.sortMode,
                 button -> this.cycleSortMode()));
-        this.addToLeftToolbar(new FactorySortDirectionButton(() -> this.sortDirection,
+        this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 button -> this.toggleSortDirection()));
     }
 
@@ -179,7 +179,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.setTextHidden("entriesShown", true);
         this.render = new FactoryNodeRender(this.font, FactoryGuiTheme.current());
         this.confirmDialog = new FactoryConfirmDialog(this.font, FactoryGuiTheme.current());
-        this.searchBox = new FactorySearchEditBox(this.font,
+        this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索节点…"));
         this.searchBox.setValue(rememberedQuery);
@@ -187,7 +187,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.addRenderableWidget(this.searchBox);
         this.applyQuery(rememberedQuery);
         this.requestTable();
-        WandLinks.request();
+        WandLinkCache.request();
     }
 
     @Override
@@ -247,7 +247,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     }
 
     private void drawRenameBox(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        FactorySearchEditBox box = this.renameBox;
+        SearchEditBox box = this.renameBox;
         if (box == null) {
             return;
         }
@@ -406,7 +406,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     public void acceptCommandResult(CommandResult result) {
         if (!result.ok() && this.minecraft != null && this.minecraft.player != null) {
             this.minecraft.player.displayClientMessage(
-                    Component.literal(CommandMessages.text(result)), true);
+                    Component.literal(CommandText.text(result)), true);
         }
     }
 
@@ -571,7 +571,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         Viewport viewport = current.viewport();
         int x = FactoryNodeLayout.nameX(viewport);
         int width = Math.max(40, FactoryNodeLayout.nameWidth(viewport));
-        this.renameBox = new FactorySearchEditBox(this.font, x, top + 5, width, RENAME_H,
+        this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
                 FactoryGuiTheme.current(), Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
         this.renameBox.setValue(node.view().core().name() == null ? ""
@@ -591,7 +591,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * <p>节点被删除或被搜索过滤掉时取消改名，避免输入框留在空处。</p>
      */
     private void syncRenameBox() {
-        FactorySearchEditBox box = this.renameBox;
+        SearchEditBox box = this.renameBox;
         UUID nodeId = this.renamingNode;
         FactoryNodeLayout current = this.layout;
         if (box == null || nodeId == null) {
@@ -626,7 +626,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     }
 
     private void commitRename() {
-        FactorySearchEditBox box = this.renameBox;
+        SearchEditBox box = this.renameBox;
         UUID nodeId = this.renamingNode;
         if (box == null || nodeId == null) {
             cancelRename();
@@ -735,7 +735,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private void applyQuery(String raw) {
         rememberedQuery = raw == null ? "" : raw;
-        this.model.setQuery(FactorySearchQuery.parse(rememberedQuery,
+        this.model.setQuery(SearchQuery.parse(rememberedQuery,
                 JecharactersCompat::contains));
         rebuildLayout();
     }

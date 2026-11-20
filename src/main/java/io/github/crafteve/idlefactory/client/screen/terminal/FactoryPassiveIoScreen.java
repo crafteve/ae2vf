@@ -15,13 +15,13 @@ import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
-import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
+import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
+import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
-import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
-import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
-import io.github.crafteve.idlefactory.client.wand.WandLinks;
-import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
+import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
@@ -58,7 +58,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 到达的机器快照体现。</p>
  */
 public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
-        implements ViewTableSink, FactoryFeedbackSink {
+        implements ViewTableSink, FeedbackSink {
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -106,7 +106,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private int requestTicker;
     /** 顶栏搜索框。 */
     @Nullable
-    private FactorySearchEditBox searchBox;
+    private SearchEditBox searchBox;
     /** 是否正在从 JEI 拖动资源。 */
     private boolean jeiDragging;
     /** 上一次日志签名，避免每秒刷一行表快照。 */
@@ -135,9 +135,9 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
-        this.addToLeftToolbar(new FactorySortModeButton(() -> this.sortMode,
+        this.addToLeftToolbar(new SortModeButton(() -> this.sortMode,
                 button -> this.cycleSortMode()));
-        this.addToLeftToolbar(new FactorySortDirectionButton(() -> this.sortDirection,
+        this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 button -> this.toggleSortDirection()));
         this.addToLeftToolbar(new FactoryPassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
@@ -163,7 +163,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         // base_terminal.json 带一条 ME 终端的「条目数」文本，本界面不用它，必须显式隐藏。
         this.setTextHidden("entriesShown", true);
         this.render = new FactoryPassiveIoRender(this.font, FactoryGuiTheme.current());
-        this.searchBox = new FactorySearchEditBox(this.font,
+        this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索机器…"));
         this.searchBox.setValue(rememberedQuery);
@@ -172,7 +172,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.applyQuery(rememberedQuery);
         FactoryPassiveIoProbe.logScreen(this);
         requestTable();
-        WandLinks.request();
+        WandLinkCache.request();
     }
 
     @Override
@@ -636,7 +636,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     private void applyQuery(String raw) {
         rememberedQuery = raw == null ? "" : raw;
-        this.model.setQuery(FactorySearchQuery.parse(rememberedQuery,
+        this.model.setQuery(SearchQuery.parse(rememberedQuery,
                 JecharactersCompat::contains));
         rebuildLayout();
     }

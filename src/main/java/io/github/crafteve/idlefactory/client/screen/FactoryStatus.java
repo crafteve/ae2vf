@@ -1,5 +1,11 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
+import io.github.crafteve.idlefactory.client.screen.theme.GuiTextures;
+
 import net.minecraft.resources.ResourceLocation;
 
 import io.github.crafteve.idlefactory.view.ViewNode.Activity;
@@ -137,28 +143,28 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     static FactoryStatus of(Kind kind, FactoryGuiTheme theme) {
         return switch (kind) {
             case OFFLINE -> new FactoryStatus("失联", theme.error(),
-                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
+                    GuiTextures.STATUS_STRIP_ERROR, GuiTextures.STATUS_LAMP_ERROR);
             case PARTIAL -> new FactoryStatus("缺机", theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
             case STALE -> new FactoryStatus("健康过期", theme.error(),
-                    FactoryGuiTextures.STATUS_STRIP_ERROR, FactoryGuiTextures.STATUS_LAMP_ERROR);
+                    GuiTextures.STATUS_STRIP_ERROR, GuiTextures.STATUS_LAMP_ERROR);
             case UNPROBED -> new FactoryStatus("未探测", theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
             case UNCONFIGURED -> new FactoryStatus("无规则",
-                    theme.statusIdle(), FactoryGuiTextures.STATUS_STRIP_IDLE,
-                    FactoryGuiTextures.STATUS_LAMP_IDLE);
+                    theme.statusIdle(), GuiTextures.STATUS_STRIP_IDLE,
+                    GuiTextures.STATUS_LAMP_IDLE);
             case RUNNING -> new FactoryStatus("运行", theme.statusRun(),
-                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
+                    GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
             case INPUT_OK -> new FactoryStatus("可输入", theme.statusRun(),
-                    FactoryGuiTextures.STATUS_STRIP_RUN, FactoryGuiTextures.STATUS_LAMP_RUN);
+                    GuiTextures.STATUS_STRIP_RUN, GuiTextures.STATUS_LAMP_RUN);
             case WAITING_MATERIAL -> new FactoryStatus("仓库缺料", theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
             case INPUT_BLOCKED -> new FactoryStatus("输入堵塞", theme.statusWarn(),
-                    FactoryGuiTextures.STATUS_STRIP_WARN, FactoryGuiTextures.STATUS_LAMP_WARN);
+                    GuiTextures.STATUS_STRIP_WARN, GuiTextures.STATUS_LAMP_WARN);
             case IDLE -> new FactoryStatus("空闲", theme.statusIdle(),
-                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
+                    GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
             case UNKNOWN -> new FactoryStatus("未知", theme.statusIdle(),
-                    FactoryGuiTextures.STATUS_STRIP_IDLE, FactoryGuiTextures.STATUS_LAMP_IDLE);
+                    GuiTextures.STATUS_STRIP_IDLE, GuiTextures.STATUS_LAMP_IDLE);
         };
     }
 

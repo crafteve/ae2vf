@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client;
+package io.github.crafteve.idlefactory.client.screen.text;
+
 
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.CommandResult;
@@ -9,8 +10,8 @@ import io.github.crafteve.idlefactory.command.CommandResult;
  * <p>服务端只回 {@link CommandReason}，文案全部在客户端；同一原因在不同界面上的措辞统一，
  * 不允许两个屏幕各写一份。</p>
  */
-public final class CommandMessages {
-    private CommandMessages() {
+public final class CommandText {
+    private CommandText() {
         // 纯静态映射
     }
 

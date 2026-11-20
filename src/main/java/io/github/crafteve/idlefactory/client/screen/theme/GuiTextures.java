@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.theme;
+
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -14,7 +15,7 @@ import io.github.crafteve.idlefactory.IdleFactory;
  * 粗分隔线与四种状态灯 / 状态条。旧工作台的表格、IO 详情、搜索框、排序图标等贴图连同常量
  * 一起删除，生成脚本里的对应条目也同步移除。</p>
  */
-public final class FactoryGuiTextures {
+public final class GuiTextures {
     /** 面板底：九宫格，边框 3。 */
     public static final ResourceLocation PANEL = id("panel");
     /** 凹槽格子：九宫格，边框 1。 */
@@ -77,7 +78,7 @@ public final class FactoryGuiTextures {
     /** AE2 搜索框纵向每段高度。 */
     public static final int AE2_TEXT_FIELD_SEGMENT = 12;
 
-    private FactoryGuiTextures() {
+    private GuiTextures() {
         // 纯常量持有类
     }
 

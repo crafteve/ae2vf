@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.sort;
+
+
+import io.github.crafteve.idlefactory.client.screen.theme.GuiTextures;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -23,7 +26,7 @@ import net.minecraft.resources.ResourceLocation;
  * 底图 + 同样的偏移），图标槽位也沿用 AE2 的 {@code (x, y+1+悬停)}，这样自绘图标和 AE2 原生按钮
  * 摆在一起看不出差别。</p>
  */
-public final class FactorySortModeButton extends IconButton {
+public final class SortModeButton extends IconButton {
     /** 当前档位来源；按钮每帧现查，切档后下一帧自动换图标。 */
     private final Supplier<FactorySortMode> mode;
 
@@ -31,7 +34,7 @@ public final class FactorySortModeButton extends IconButton {
      * @param mode  当前档位
      * @param press 点击动作
      */
-    public FactorySortModeButton(Supplier<FactorySortMode> mode, OnPress press) {
+    public SortModeButton(Supplier<FactorySortMode> mode, OnPress press) {
         super(press);
         this.mode = mode;
     }
@@ -67,7 +70,7 @@ public final class FactorySortModeButton extends IconButton {
             icon.opacity(0.5F);
         }
         icon.dest(this.getX(), this.getY() + 1 + (hovered ? 1 : 0),
-                        FactoryGuiTextures.SORT_ICON_SIZE, FactoryGuiTextures.SORT_ICON_SIZE)
+                        GuiTextures.SORT_ICON_SIZE, GuiTextures.SORT_ICON_SIZE)
                 .zOffset(3)
                 .blit(graphics);
     }
@@ -97,9 +100,9 @@ public final class FactorySortModeButton extends IconButton {
         if (texture == null) {
             return null;
         }
-        return Blitter.texture(texture, FactoryGuiTextures.SORT_ICON_SIZE,
-                        FactoryGuiTextures.SORT_ICON_SIZE)
-                .src(0, 0, FactoryGuiTextures.SORT_ICON_SIZE, FactoryGuiTextures.SORT_ICON_SIZE);
+        return Blitter.texture(texture, GuiTextures.SORT_ICON_SIZE,
+                        GuiTextures.SORT_ICON_SIZE)
+                .src(0, 0, GuiTextures.SORT_ICON_SIZE, GuiTextures.SORT_ICON_SIZE);
     }
 
     /**
@@ -127,9 +130,9 @@ public final class FactorySortModeButton extends IconButton {
     @Nullable
     private static ResourceLocation textureFor(FactorySortMode mode) {
         return switch (mode) {
-            case RULE_COUNT -> FactoryGuiTextures.SORT_RULE_COUNT;
-            case STATUS -> FactoryGuiTextures.SORT_STATUS;
-            case DISTANCE -> FactoryGuiTextures.SORT_DISTANCE;
+            case RULE_COUNT -> GuiTextures.SORT_RULE_COUNT;
+            case STATUS -> GuiTextures.SORT_STATUS;
+            case DISTANCE -> GuiTextures.SORT_DISTANCE;
             case NAME, ID, MACHINE_COUNT -> null;
         };
     }

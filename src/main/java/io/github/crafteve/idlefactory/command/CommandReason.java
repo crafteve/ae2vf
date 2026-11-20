@@ -1,9 +1,11 @@
 package io.github.crafteve.idlefactory.command;
 
+import io.github.crafteve.idlefactory.client.screen.text.CommandText;
+
 /**
  * 一次写命令的结果原因。
  *
- * <p>服务端只回原因、不回文本：文案由客户端 {@code CommandMessages} 统一映射。原因同时承担
+ * <p>服务端只回原因、不回文本：文案由客户端 {@code CommandText} 统一映射。原因同时承担
  * 「成功」与「失败」两种语义，{@link #ok()} 是唯一的判定入口，调用方不要按 {@code == OK} 写字面量。</p>
  */
 public enum CommandReason {

@@ -1,4 +1,9 @@
-package io.github.crafteve.idlefactory.client.wand;
+package io.github.crafteve.idlefactory.client.screen.text;
+
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+
+
+import io.github.crafteve.idlefactory.client.screen.text.CommandText;
 
 import java.util.UUID;
 
@@ -12,12 +17,12 @@ import net.minecraft.world.level.block.Block;
  * 绑定杖的全部文案。
  *
  * <p>HUD 与面板只从这里取 {@link Component}，不在调用点拼字符串：失败原因按
- * {@code CommandMessages} 查表，原因枚举新增时 {@code switch} 会编译失败，提醒补文案。</p>
+ * {@code CommandText} 查表，原因枚举新增时 {@code switch} 会编译失败，提醒补文案。</p>
  *
  * <p>不服务终端与仓库：那些仍走 {@code FactoryMessages}。</p>
  */
-public final class WandMessages {
-    private WandMessages() {
+public final class WandText {
+    private WandText() {
         // 纯文案表
     }
 
@@ -172,7 +177,7 @@ public final class WandMessages {
      * @return 可显示名字
      */
     public static String nodeLabel(UUID nodeId) {
-        return WandLinks.node(nodeId)
+        return WandLinkCache.node(nodeId)
                 .map(node -> blockName(node.typeBlockId()))
                 .orElseGet(() -> nodeId.toString().substring(0, 8));
     }

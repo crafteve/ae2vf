@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import io.github.crafteve.idlefactory.client.FactoryLocateRenderer;
-import io.github.crafteve.idlefactory.client.wand.WandSession;
+import io.github.crafteve.idlefactory.client.world.LocateRenderer;
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 import io.github.crafteve.idlefactory.io.DispatchMode;
@@ -79,7 +79,7 @@ final class FactoryNodeActions {
             message("节点在 " + dimension + " " + pos.toShortString());
             return;
         }
-        FactoryLocateRenderer.show(minecraft.level.dimension(), pos);
+        LocateRenderer.show(minecraft.level.dimension(), pos);
     }
 
     /**
@@ -103,7 +103,7 @@ final class FactoryNodeActions {
             }
             minecraft.player.getInventory().selected = slot;
         }
-        WandSession.startEdit(minecraft, node.nodeId());
+        WandDraftState.startEdit(minecraft, node.nodeId());
     }
 
     /**

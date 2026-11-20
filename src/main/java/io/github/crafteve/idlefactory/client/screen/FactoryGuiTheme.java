@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 /**
  * GUI 主题色板。
  *

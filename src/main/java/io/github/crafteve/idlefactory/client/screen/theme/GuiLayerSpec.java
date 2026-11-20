@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.theme;
+
 
 /**
  * 界面绘制层级（z）。
@@ -11,7 +12,7 @@ package io.github.crafteve.idlefactory.client.screen;
  * 所以「后画」不能代替「更高层」：OVERLAY 里的弹窗必须整体抬到 ITEM 之上，否则列表里的
  * 物品图标会盖在弹窗上。</p>
  */
-public enum FactoryGuiLayer {
+public enum GuiLayerSpec {
     /** 面板、文字、槽位、按钮等基础 2D 层。 */
     BASE(0.0F),
     /** 原版物品图标（{@code GuiGraphics.renderItem} 自带 150 偏移）。 */
@@ -29,7 +30,7 @@ public enum FactoryGuiLayer {
 
     private final float z;
 
-    FactoryGuiLayer(float z) {
+    GuiLayerSpec(float z) {
         this.z = z;
     }
 

@@ -2,8 +2,8 @@ package io.github.crafteve.idlefactory;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
-import io.github.crafteve.idlefactory.client.wand.WandMessages;
-import io.github.crafteve.idlefactory.client.wand.screen.WandDraftScreen;
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
+import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
@@ -72,7 +72,7 @@ public class IdleFactoryClient {
         event.<WandMenu, WandDraftScreen>register(
                 ModMenus.WAND_DRAFT.get(),
                 (WandMenu menu, Inventory inventory, Component title) ->
-                        new WandDraftScreen(menu, inventory, WandMessages.panelTitle(),
+                        new WandDraftScreen(menu, inventory, WandText.panelTitle(),
                                 StyleManager.loadStyleDoc(WAND_DRAFT_STYLE)));
     }
 }

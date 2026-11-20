@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client;
+package io.github.crafteve.idlefactory.client.wand;
+
+
+import io.github.crafteve.idlefactory.client.wand.MachineWandInput;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.command.CommandKind;
@@ -18,7 +21,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * ME 绑定杖的客户端输入：左键 toggle 仓库绑定。
  *
  * <p>全是「读按键并发命令」，真正的绑定写在服务端；服务端确认后靠链接快照与 HUD 回执同步。
- * 机器绑定杖的输入在 {@code client.wand.WandGesture}，两者互不引用。</p>
+ * 机器绑定杖的输入在 {@code client.wand.MachineWandInput}，两者互不引用。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)

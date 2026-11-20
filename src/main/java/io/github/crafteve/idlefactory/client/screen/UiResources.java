@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+
 
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
@@ -17,9 +21,9 @@ import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
  * <p>把「一行多色文字」、搜索字段需要的资源名/tooltip/tag，以及 tooltip/JEI 用的物品形态
  * 收在一起。这里全部是只读的注册表/物品栈查询，不探世界，也不改服务端状态。</p>
  */
-public final class FactoryUiText {
+public final class UiResources {
 
-    private FactoryUiText() {
+    private UiResources() {
         // 纯静态辅助
     }
 

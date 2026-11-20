@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.search;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,14 +18,14 @@ import java.util.Locale;
  * <p>纯逻辑，不读世界、不依赖界面；文本比较由调用方传入，默认可用
  * {@link FactoryTextMatcher#contains(String, String)} 获得拼音兼容。</p>
  */
-public final class FactorySearchQuery {
+public final class SearchQuery {
     /** 空查询。 */
-    public static final FactorySearchQuery EMPTY =
-            new FactorySearchQuery(List.of());
+    public static final SearchQuery EMPTY =
+            new SearchQuery(List.of());
 
     private final List<List<Term>> orGroups;
 
-    private FactorySearchQuery(List<List<Term>> orGroups) {
+    private SearchQuery(List<List<Term>> orGroups) {
         this.orGroups = orGroups;
     }
 
@@ -48,7 +49,7 @@ public final class FactorySearchQuery {
      * @param matcher 文本匹配器
      * @return 查询；空输入返回 {@link #EMPTY}
      */
-    public static FactorySearchQuery parse(String raw, TextMatcher matcher) {
+    public static SearchQuery parse(String raw, TextMatcher matcher) {
         if (raw == null || raw.trim().isEmpty()) {
             return EMPTY;
         }
@@ -68,7 +69,7 @@ public final class FactorySearchQuery {
                 groups.add(List.copyOf(terms));
             }
         }
-        return groups.isEmpty() ? EMPTY : new FactorySearchQuery(List.copyOf(groups));
+        return groups.isEmpty() ? EMPTY : new SearchQuery(List.copyOf(groups));
     }
 
     /**

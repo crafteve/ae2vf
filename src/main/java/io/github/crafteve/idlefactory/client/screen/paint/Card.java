@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.paint;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -9,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * 高光方向、暗边方向、外侧阴影颜色和偏移完全一致：上 / 左 1px 亮边，下 / 右 1px 暗边，
  * 下 / 右外侧 1px 半透明阴影。调用方负责在卡片外侧留出 1px 影子空间。</p>
  */
-public final class FactoryCard {
+public final class Card {
     /** 卡片层级；只决定底色，不改变光照方向。 */
     public enum Level {
         /** 工作区大卡片。 */
@@ -23,7 +26,7 @@ public final class FactoryCard {
     /** 外侧阴影：所有层级共用同一个颜色和 1px 偏移。 */
     private static final int OUTER_SHADOW = 0x33000000;
 
-    private FactoryCard() {
+    private Card() {
         // 纯静态组件
     }
 

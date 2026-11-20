@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
+
+import io.github.crafteve.idlefactory.client.screen.theme.GuiTextures;
+
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 
@@ -17,34 +21,34 @@ import net.minecraft.resources.ResourceLocation;
  * <p><b>注意</b>：{@code GuiGraphics.blit} 的源尺寸和目标尺寸是两组独立参数，不能混用——
  * 用「目标尺寸」当源尺寸去拉伸 1×1 贴图会采样越界，画出来是花屏。所有调用都显式给源矩形。</p>
  */
-public final class FactoryNineSlice {
-    private FactoryNineSlice() {
+public final class NineSliceRenderer {
+    private NineSliceRenderer() {
         // 纯静态工具类
     }
 
     // ------------------------------------------------------------------
-    // 具名快捷方法：边框宽度写在这里，和 FactoryGuiTextures 里的常量对应
+    // 具名快捷方法：边框宽度写在这里，和 GuiTextures 里的常量对应
     // ------------------------------------------------------------------
 
     /** 画面板底。 */
     public static void panel(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.PANEL, FactoryGuiTextures.PANEL_SIZE, FactoryGuiTextures.PANEL_BORDER,
+        slice(graphics, GuiTextures.PANEL, GuiTextures.PANEL_SIZE, GuiTextures.PANEL_BORDER,
                 x, y, width, height);
     }
 
     /** 画凹槽格子。 */
     public static void slot(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.SLOT, FactoryGuiTextures.SLOT_SIZE, 1, x, y, width, height);
+        slice(graphics, GuiTextures.SLOT, GuiTextures.SLOT_SIZE, 1, x, y, width, height);
     }
 
     /** 画凸起按钮。 */
     public static void button(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.BUTTON, FactoryGuiTextures.BUTTON_SIZE, 1, x, y, width, height);
+        slice(graphics, GuiTextures.BUTTON, GuiTextures.BUTTON_SIZE, 1, x, y, width, height);
     }
 
     /** 画按钮悬停底。 */
     public static void buttonHover(GuiGraphics graphics, int x, int y, int width, int height) {
-        slice(graphics, FactoryGuiTextures.BUTTON_HOVER, FactoryGuiTextures.IO_CELL_SIZE, 1,
+        slice(graphics, GuiTextures.BUTTON_HOVER, GuiTextures.IO_CELL_SIZE, 1,
                 x, y, width, height);
     }
 
@@ -66,23 +70,23 @@ public final class FactoryNineSlice {
      * @param width    宽度
      */
     public static void ae2TextField(GuiGraphics graphics, int x, int y, int width) {
-        int segment = FactoryGuiTextures.AE2_TEXT_FIELD_SEGMENT;
-        int size = FactoryGuiTextures.AE2_TEXT_FIELD_SIZE;
+        int segment = GuiTextures.AE2_TEXT_FIELD_SEGMENT;
+        int size = GuiTextures.AE2_TEXT_FIELD_SIZE;
         if (width <= 0) {
             return;
         }
         int inner = width - 2;
         if (inner <= 0) {
             // 太窄时整段拉伸，避免算出负宽度。
-            graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x, y, width, segment,
+            graphics.blit(GuiTextures.AE2_TEXT_FIELD, x, y, width, segment,
                     0.0F, 0.0F, width, segment, size, size);
             return;
         }
-        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x, y, 1, segment,
+        graphics.blit(GuiTextures.AE2_TEXT_FIELD, x, y, 1, segment,
                 0.0F, 0.0F, 1, segment, size, size);
-        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x + 1, y, inner, segment,
+        graphics.blit(GuiTextures.AE2_TEXT_FIELD, x + 1, y, inner, segment,
                 1.0F, 0.0F, inner, segment, size, size);
-        graphics.blit(FactoryGuiTextures.AE2_TEXT_FIELD, x + width - 1, y, 1, segment,
+        graphics.blit(GuiTextures.AE2_TEXT_FIELD, x + width - 1, y, 1, segment,
                 size - 1.0F, 0.0F, 1, segment, size, size);
     }
 

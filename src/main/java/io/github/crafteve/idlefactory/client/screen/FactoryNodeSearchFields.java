@@ -1,5 +1,15 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
+import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
+
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +42,7 @@ public final class FactoryNodeSearchFields {
      * @param patternCount 样板份数；传 -1 表示省略该段（被动 IO 终端不看样板）
      * @return 搜索字段
      */
-    public static FactorySearchQuery.Fields of(ViewNode view, FactoryGuiTheme theme,
+    public static SearchQuery.Fields of(ViewNode view, FactoryGuiTheme theme,
             int patternCount) {
         ViewMachine first = view.machines().isEmpty() ? null : view.machines().get(0);
         return build(view.core().name() != null
@@ -56,7 +66,7 @@ public final class FactoryNodeSearchFields {
      * @param patternCount 样板份数；-1 表示省略该段
      * @return 搜索字段
      */
-    private static FactorySearchQuery.Fields build(String name,
+    private static SearchQuery.Fields build(String name,
             @Nullable ResourceLocation typeBlockId, String statusText, @Nullable String dimensionId,
             @Nullable BlockPos pos, int machineCount, int ruleCount, int patternCount) {
         String id = typeBlockId == null ? "" : typeBlockId.toString();
@@ -70,7 +80,7 @@ public final class FactoryNodeSearchFields {
         if (patternCount >= 0) {
             tooltip.append(" · 样板 ").append(patternCount).append(" 份");
         }
-        return new FactorySearchQuery.Fields(name, id, namespace,
-                FactoryUiText.modName(namespace), tooltip.toString(), List.of());
+        return new SearchQuery.Fields(name, id, namespace,
+                UiResources.modName(namespace), tooltip.toString(), List.of());
     }
 }

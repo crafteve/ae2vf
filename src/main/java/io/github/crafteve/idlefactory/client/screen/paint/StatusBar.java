@@ -1,4 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.paint;
+
 
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -12,13 +13,13 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>只用纯色三列、不生成贴图：灯色随状态 / 方向变化，贴图会多出一处色源；三个 {@code fill}
  * 也没有采样成本。</p>
  */
-public final class FactoryLamp {
+public final class StatusBar {
     /** 灯宽（像素）；排版给灯预留的左缩进必须用它推导，不能写字面量 3。 */
     public static final int WIDTH = 3;
     /** 亮列 / 暗列相对本色的偏移，和状态灯贴图的 ±45 放在同一量级。 */
     private static final int SHADE_SHIFT = 38;
 
-    private FactoryLamp() {
+    private StatusBar() {
         // 纯静态绘制
     }
 

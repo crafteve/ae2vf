@@ -1,17 +1,19 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
+
 import java.util.ArrayList;
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryCard;
+import io.github.crafteve.idlefactory.client.screen.paint.Card;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.client.screen.FactoryKeycap;
+import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
-import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Kind;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.NodeBox;
@@ -32,7 +34,7 @@ import net.minecraft.world.item.Items;
  * 节点管理内容区的绘制。
  *
  * <p>只读模型与排版，不写状态：悬停由屏幕算好 {@link Hit} 传进来。节点行复用被动 IO 的
- * {@link FactoryCard} 层级、{@link FactoryKeycap} 键帽与 {@link FactoryLamp} 状态灯，不另造
+ * {@link Card} 层级、{@link KeycapButton} 键帽与 {@link StatusBar} 状态灯，不另造
  * 一套卡片外观。</p>
  */
 final class FactoryNodeRender {
@@ -120,9 +122,9 @@ final class FactoryNodeRender {
             if (bottom <= viewport.y() || top >= viewport.y() + viewport.height()) {
                 continue;
             }
-            FactoryCard.draw(graphics, FactoryNodeLayout.cardX(viewport), top,
+            Card.draw(graphics, FactoryNodeLayout.cardX(viewport), top,
                     FactoryNodeLayout.cardWidth(viewport), box.bottom() - box.top(),
-                    FactoryCard.Level.MACHINE, true);
+                    Card.Level.MACHINE, true);
             if (hover != null && hover.node() == box.index()
                     && (hover.kind() == Kind.NODE || hover.kind() == Kind.NAME)) {
                 // 卡片悬停铺满整张卡，但压在内容下面；按钮悬停只亮按钮自己。
@@ -143,10 +145,10 @@ final class FactoryNodeRender {
         int bandTop = top + 1;
         int bandBottom = top + FactoryNodeLayout.NODE_ROW_H - 1;
         graphics.fill(left, bandTop, right, bandBottom, this.theme.io().machineRow());
-        FactoryLamp.draw(graphics, left, bandTop, bandBottom - bandTop, row.status().color());
+        StatusBar.draw(graphics, left, bandTop, bandBottom - bandTop, row.status().color());
 
         int slotX = FactoryNodeLayout.nameX(viewport) - FactoryNodeLayout.SLOT - 1;
-        FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryNodeLayout.SLOT,
+        NineSliceRenderer.slot(graphics, slotX, top + 1, FactoryNodeLayout.SLOT,
                 FactoryNodeLayout.SLOT);
         ItemStack icon = row.present()
                 ? FactoryLabels.blockStack(row.typeBlockId()) : new ItemStack(Items.BARRIER);
@@ -167,7 +169,7 @@ final class FactoryNodeRender {
         int keyY = top + FactoryNodeLayout.KEY_INSET_Y;
         int keyTextY = keyY + 2;
 
-        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
+        KeycapButton.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 provider && row.blockingOn()
                         ? this.theme.statusRun() : this.theme.bevelLight(),
@@ -178,7 +180,7 @@ final class FactoryNodeRender {
 
         Multiplier multiplier = row.multiplier();
         boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
-        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 1), keyY,
+        KeycapButton.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 1), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 multiplierActive ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
@@ -187,7 +189,7 @@ final class FactoryNodeRender {
                 multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
 
         boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
-        FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
+        KeycapButton.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
@@ -199,9 +201,9 @@ final class FactoryNodeRender {
         int actionY = top + FactoryNodeLayout.KEY_INSET_Y;
         int editX = FactoryNodeLayout.actionX(viewport);
         int deleteX = FactoryNodeLayout.deleteX(viewport);
-        boolean editing = io.github.crafteve.idlefactory.client.wand.WandSession
+        boolean editing = io.github.crafteve.idlefactory.client.wand.WandDraftState
                 .isEditingNode(row.nodeId());
-        FactoryKeycap.draw(graphics, this.theme, editX, actionY,
+        KeycapButton.draw(graphics, this.theme, editX, actionY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
@@ -209,7 +211,7 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
-        FactoryKeycap.draw(graphics, this.theme, deleteX, actionY,
+        KeycapButton.draw(graphics, this.theme, deleteX, actionY,
                 FactoryNodeLayout.ACTION_W, FactoryNodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, box.index(), Kind.DELETE));
@@ -304,8 +306,8 @@ final class FactoryNodeRender {
             int y = FactoryNodeLayout.memberRowY(viewport, box, i, scroll);
             int x = FactoryNodeLayout.memberX(viewport);
             int width = FactoryNodeLayout.memberWidth(viewport);
-            FactoryCard.draw(graphics, x, y, width, FactoryNodeLayout.MEMBER_ROW_H,
-                    FactoryCard.Level.IO, true);
+            Card.draw(graphics, x, y, width, FactoryNodeLayout.MEMBER_ROW_H,
+                    Card.Level.IO, true);
             if (hover != null && hover.kind() == Kind.MEMBER && hover.node() == box.index()
                     && hover.member() == i) {
                 graphics.fill(x + 1, y + 1, x + width - 1, y + FactoryNodeLayout.MEMBER_ROW_H - 1,
@@ -322,10 +324,10 @@ final class FactoryNodeRender {
             graphics.pose().popPose();
             graphics.drawString(this.font, member.label(), FactoryNodeLayout.memberTextX(viewport),
                     y + 4, this.theme.textPrimary(), false);
-            FactoryNineSlice.icon(graphics, member.status().lamp(),
+            NineSliceRenderer.icon(graphics, member.status().lamp(),
                     FactoryNodeLayout.memberDotX(viewport), y + 6, 3);
             int locateX = FactoryNodeLayout.locateX(viewport);
-            FactoryKeycap.draw(graphics, this.theme, locateX, y + 1, FactoryNodeLayout.LOCATE,
+            KeycapButton.draw(graphics, this.theme, locateX, y + 1, FactoryNodeLayout.LOCATE,
                     FactoryNodeLayout.MEMBER_ROW_H - 2, this.theme.bevelLight(), true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);

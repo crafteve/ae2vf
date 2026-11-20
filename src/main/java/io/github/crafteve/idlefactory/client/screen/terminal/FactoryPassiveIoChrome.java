@@ -1,7 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryCard;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
+
+import io.github.crafteve.idlefactory.client.screen.paint.Card;
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -10,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * 被动 IO 终端的静态 chrome：标题与搜索框底板。
  *
  * <p>只画不接收输入；坐标由调用方给出，chunk 内不再第二次算位置。搜索框的输入控件是
- * {@code FactorySearchEditBox}，底板必须画在控件之前（{@code drawBG}），否则会盖住文字。</p>
+ * {@code SearchEditBox}，底板必须画在控件之前（{@code drawBG}），否则会盖住文字。</p>
  */
 final class FactoryPassiveIoChrome {
     /** 标题颜色：纯黑，跟正文一致。 */
@@ -21,7 +23,7 @@ final class FactoryPassiveIoChrome {
     }
 
     /**
-     * 画工作区大卡片：和其他卡片共用 {@link FactoryCard} 的光照与阴影，只换层级底色。
+     * 画工作区大卡片：和其他卡片共用 {@link Card} 的光照与阴影，只换层级底色。
      *
      * @param graphics 画布
      * @param x        左边缘
@@ -30,7 +32,7 @@ final class FactoryPassiveIoChrome {
      * @param height   高
      */
     static void drawWorkAreaFrame(GuiGraphics graphics, int x, int y, int width, int height) {
-        FactoryCard.draw(graphics, x, y, width, height, FactoryCard.Level.WORK_AREA, true);
+        Card.draw(graphics, x, y, width, height, Card.Level.WORK_AREA, true);
     }
 
     /**
@@ -56,6 +58,6 @@ final class FactoryPassiveIoChrome {
      */
     static void drawSearchField(GuiGraphics graphics, int x, int y, int width, int height) {
         // AE2 原生搜索框贴图：亮色边框 + 内凹阴影，和样板管理终端同款。
-        FactoryNineSlice.ae2TextField(graphics, x, y, width);
+        NineSliceRenderer.ae2TextField(graphics, x, y, width);
     }
 }

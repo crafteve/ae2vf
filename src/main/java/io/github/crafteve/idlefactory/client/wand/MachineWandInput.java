@@ -1,5 +1,18 @@
 package io.github.crafteve.idlefactory.client.wand;
 
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
+
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
+
+
+import io.github.crafteve.idlefactory.client.world.MachineWandRenderer;
+
+import io.github.crafteve.idlefactory.client.screen.wand.WandHud;
+
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
+
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
@@ -22,7 +35,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 /**
  * 机器绑定杖的客户端手势：方块与空气完全等价，方块不参与判断，也不自动加入草稿。
  *
- * <p>手势按 {@link WandSession.State} 分派：IDLE 普通右键发 1:1 toggle、蹲下右键进编辑态；
+ * <p>手势按 {@link WandDraftState.State} 分派：IDLE 普通右键发 1:1 toggle、蹲下右键进编辑态；
  * EDITING 普通右键改草稿、Ctrl + 右键连锁、蹲下右键开面板；SUBMITTING 全部忽略。左键完全不
  * 监听，挖掘由原版处理。事件只在客户端处理并取消，服务端不会收到方块交互包。</p>
  *
@@ -30,8 +43,8 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
-public final class WandGesture {
-    private WandGesture() {
+public final class MachineWandInput {
+    private MachineWandInput() {
         // 纯静态事件处理
     }
 
@@ -92,14 +105,14 @@ public final class WandGesture {
      */
     private static boolean handle(Minecraft minecraft, @Nullable BlockKey block, boolean sneaking,
             boolean ctrl) {
-        return switch (WandSession.state()) {
+        return switch (WandDraftState.state()) {
             case SUBMITTING -> {
-                WandHud.neutral(WandMessages.waiting());
+                WandHud.neutral(WandText.waiting());
                 yield true;
             }
             case IDLE -> {
                 if (sneaking) {
-                    WandSession.startNew(minecraft);
+                    WandDraftState.startNew(minecraft);
                     yield true;
                 }
                 if (block == null) {
@@ -107,22 +120,22 @@ public final class WandGesture {
                 }
                 // 空闲态 Ctrl + 右键没有动作（B3），但仍拦住方块交互，别让机器 GUI 弹出来
                 if (!ctrl) {
-                    WandCoordinator.toggle(block);
+                    WandSubmitter.toggle(block);
                 }
                 yield true;
             }
             case EDITING -> {
                 if (sneaking) {
-                    WandCoordinator.openDraft();
+                    WandSubmitter.openDraft();
                     yield true;
                 }
                 if (block == null) {
                     yield false;
                 }
                 if (ctrl) {
-                    WandCoordinator.chain(block);
+                    WandSubmitter.chain(block);
                 } else {
-                    WandSession.toggle(minecraft, block);
+                    WandDraftState.toggle(minecraft, block);
                 }
                 yield true;
             }
@@ -152,8 +165,8 @@ public final class WandGesture {
         if (minecraft.player == null) {
             return;
         }
-        WandSession.tick(minecraft);
-        WandCoordinator.tick(minecraft);
+        WandDraftState.tick(minecraft);
+        WandSubmitter.tick(minecraft);
         WandHud.tick(minecraft);
     }
 
@@ -165,8 +178,8 @@ public final class WandGesture {
     @SubscribeEvent
     static void onLogin(ClientPlayerNetworkEvent.LoggingIn event) {
         clearLocalState();
-        WandCoordinator.reset();
-        WandLinks.request();
+        WandSubmitter.reset();
+        WandLinkCache.request();
     }
 
     /**
@@ -177,7 +190,7 @@ public final class WandGesture {
     @SubscribeEvent
     static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         clearLocalState();
-        WandCoordinator.reset();
+        WandSubmitter.reset();
     }
 
     /**
@@ -188,14 +201,14 @@ public final class WandGesture {
     @SubscribeEvent
     static void onClone(ClientPlayerNetworkEvent.Clone event) {
         clearLocalState();
-        WandLinks.request();
+        WandLinkCache.request();
     }
 
     /** 清草稿、快照与渲染缓存。 */
     private static void clearLocalState() {
-        WandSession.clearAll();
-        WandLinks.clear();
-        WandLinkRenderer.clearCache();
+        WandDraftState.clearAll();
+        WandLinkCache.clear();
+        MachineWandRenderer.clearCache();
         WandHud.clear();
     }
 }

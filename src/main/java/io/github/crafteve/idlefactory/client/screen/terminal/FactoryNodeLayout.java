@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import io.github.crafteve.idlefactory.client.screen.paint.Card;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -7,12 +9,12 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 
 /**
  * 节点管理内容区的排版与命中：唯一的像素来源。
  *
- * <p>节点卡片复用被动 IO 终端的卡片层级：整张节点用 {@code FactoryCard.Level.MACHINE}，展开的
+ * <p>节点卡片复用被动 IO 终端的卡片层级：整张节点用 {@code Card.Level.MACHINE}，展开的
  * 机器行用 {@code Level.IO}。坐标相对内容区，绘制、命中、tooltip 都从这里取同一份结果；滚动只在
  * 取值时加 {@code scroll}，不重建排版。</p>
  *
@@ -31,7 +33,7 @@ final class FactoryNodeLayout {
     /** 节点块间距。 */
     static final int BLOCK_GAP = 2;
     /** 卡片左侧状态灯宽。 */
-    static final int STATUS_W = FactoryLamp.WIDTH;
+    static final int STATUS_W = StatusBar.WIDTH;
     /** 图标凹槽。 */
     static final int SLOT = 18;
     /** provider 键帽尺寸与间隔：与被动 IO 的 chip 同规格，方形、直接坐在状态带上。 */

@@ -1,4 +1,7 @@
-package io.github.crafteve.idlefactory.client.wand.screen;
+package io.github.crafteve.idlefactory.client.screen.wand;
+
+import io.github.crafteve.idlefactory.client.screen.wand.WandRowRender;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,12 +16,12 @@ import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.AE2Button;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
-import io.github.crafteve.idlefactory.client.wand.WandCoordinator;
-import io.github.crafteve.idlefactory.client.wand.WandLinks;
-import io.github.crafteve.idlefactory.client.wand.WandMessages;
+import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
+import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
+import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
+import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.client.wand.WandPrecheck;
-import io.github.crafteve.idlefactory.client.wand.WandSession;
+import io.github.crafteve.idlefactory.client.wand.WandDraftState;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
@@ -34,9 +37,9 @@ import net.minecraft.world.entity.player.Inventory;
  * <p>背景与两个按钮的几何来自 {@code assets/ae2/screens/idlefactory_wand_draft.json} 的
  * {@code generatedBackground}：那是 AE2 自己按尺寸生成的浅色边框底，不带任何烤死的表格线。
  * 面板内容（标题、摘要、草稿行、滚动条、状态行）全部自绘，用 {@code FactoryGuiTheme} 的
- * 文字色与 {@code FactoryNineSlice} 的凹槽贴图，和节点终端保持同一套外观。</p>
+ * 文字色与 {@code NineSliceRenderer} 的凹槽贴图，和节点终端保持同一套外观。</p>
  *
- * <p>行来自客户端草稿，问题以服务端预校验为准（{@link WandCoordinator#pendingIssues()}），
+ * <p>行来自客户端草稿，问题以服务端预校验为准（{@link WandSubmitter#pendingIssues()}），
  * 服务端还没回包时退回客户端预检结果。面板只是监视器：确定发提交意图，取消丢草稿，Esc /
  * 关闭保留草稿回到编辑态。</p>
  *
@@ -82,8 +85,8 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         super(menu, inventory, title, style);
         // 没有背包槽位：把原版的背包标签藏到屏幕外，免得压在草稿行上
         this.inventoryLabelY = -1000;
-        this.confirm = this.widgets.addButton("start", WandMessages.panelConfirm(), this::confirm);
-        this.cancel = this.widgets.addButton("cancel", WandMessages.panelCancel(), this::cancel);
+        this.confirm = this.widgets.addButton("start", WandText.panelConfirm(), this::confirm);
+        this.cancel = this.widgets.addButton("cancel", WandText.panelCancel(), this::cancel);
     }
 
     @Override
@@ -125,7 +128,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
 
     @Override
     public void removed() {
-        WandCoordinator.clearPendingIssues();
+        WandSubmitter.clearPendingIssues();
         super.removed();
     }
 
@@ -136,17 +139,17 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         if (!canConfirm()) {
             return;
         }
-        WandCoordinator.submit(this.menu.containerId);
+        WandSubmitter.submit(this.menu.containerId);
     }
 
     /**
      * 取消：丢草稿并关闭面板。
      */
     private void cancel() {
-        if (WandSession.state() == WandSession.State.SUBMITTING) {
+        if (WandDraftState.state() == WandDraftState.State.SUBMITTING) {
             return;
         }
-        WandSession.clear();
+        WandDraftState.clear();
         this.onClose();
         this.minecraft.setScreen(null);
     }
@@ -156,12 +159,12 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      */
     private void refreshRows() {
         this.rows.clear();
-        WandDraft draft = WandSession.draft();
+        WandDraft draft = WandDraftState.draft();
         for (BlockKey block : draft.added()) {
             this.rows.add(new Row(block, false));
         }
         for (UUID machineId : draft.removed()) {
-            Optional<BlockKey> block = WandLinks.blockOfMachine(machineId);
+            Optional<BlockKey> block = WandLinkCache.blockOfMachine(machineId);
             block.ifPresent(value -> this.rows.add(new Row(value, true)));
         }
         this.scroll = Math.min(this.scroll, maxScroll());
@@ -169,7 +172,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
 
     /** 按提交态与校验结果更新两个按钮。 */
     private void updateButtons() {
-        boolean submitting = WandSession.state() == WandSession.State.SUBMITTING;
+        boolean submitting = WandDraftState.state() == WandDraftState.State.SUBMITTING;
         if (this.confirm != null) {
             this.confirm.active = canConfirm();
         }
@@ -184,7 +187,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @return 可以提交时为 {@code true}
      */
     private boolean canConfirm() {
-        return WandSession.state() == WandSession.State.EDITING
+        return WandDraftState.state() == WandDraftState.State.EDITING
                 && !this.rows.isEmpty()
                 && conflicts().isEmpty();
     }
@@ -209,12 +212,12 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         int left = this.leftPos;
         int top = this.topPos;
 
-        graphics.drawString(this.font, WandMessages.panelTitle(), left + TITLE_X,
+        graphics.drawString(this.font, WandText.panelTitle(), left + TITLE_X,
                 top + TITLE_Y, theme.textPrimary(), false);
         graphics.drawString(this.font, summary(), left + TITLE_X, top + SUMMARY_Y,
                 theme.textDim(), false);
 
-        FactoryNineSlice.slot(graphics, left + FRAME_X, top + FRAME_Y, FRAME_W, FRAME_H);
+        NineSliceRenderer.slot(graphics, left + FRAME_X, top + FRAME_Y, FRAME_W, FRAME_H);
         int innerLeft = left + FRAME_X + INNER_PAD;
         int innerTop = top + FRAME_Y + INNER_PAD;
         int innerRight = left + INNER_RIGHT;
@@ -226,7 +229,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             graphics.disableScissor();
         }
         if (this.rows.isEmpty()) {
-            Component empty = WandMessages.panelEmpty();
+            Component empty = WandText.panelEmpty();
             graphics.drawString(this.font, empty,
                     left + FRAME_X + (FRAME_W - this.font.width(empty)) / 2,
                     (innerTop + innerBottom) / 2 - 4, theme.textDim(), false);
@@ -236,7 +239,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
     }
 
     private void drawRows(GuiGraphics graphics, FactoryGuiTheme theme) {
-        ResourceLocation fallback = WandPrecheck.baseType(this.minecraft, WandSession.draft());
+        ResourceLocation fallback = WandPrecheck.baseType(this.minecraft, WandDraftState.draft());
         int innerLeft = this.leftPos + FRAME_X + INNER_PAD;
         int rowWidth = INNER_RIGHT - FRAME_X - INNER_PAD;
         for (int index = 0; index < this.rows.size(); index++) {
@@ -293,16 +296,16 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         Component status;
         int color;
         if (!conflicts.isEmpty()) {
-            status = WandMessages.panelIssues(conflicts.size());
+            status = WandText.panelIssues(conflicts.size());
             color = theme.error();
-        } else if (WandSession.state() == WandSession.State.SUBMITTING) {
-            status = WandMessages.submitting();
+        } else if (WandDraftState.state() == WandDraftState.State.SUBMITTING) {
+            status = WandText.submitting();
             color = theme.textDim();
-        } else if (WandCoordinator.panelStatus() != null) {
-            status = WandCoordinator.panelStatus();
+        } else if (WandSubmitter.panelStatus() != null) {
+            status = WandSubmitter.panelStatus();
             color = theme.error();
         } else {
-            status = WandMessages.panelHint();
+            status = WandText.panelHint();
             color = theme.textDim();
         }
         graphics.drawString(this.font, status, this.leftPos + FRAME_X + 2,
@@ -315,12 +318,12 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @return 摘要
      */
     private Component summary() {
-        WandDraft draft = WandSession.draft();
+        WandDraft draft = WandDraftState.draft();
         if (draft.nodeId() != null) {
-            return WandMessages.panelSummaryEdit(WandMessages.nodeLabel(draft.nodeId()),
+            return WandText.panelSummaryEdit(WandText.nodeLabel(draft.nodeId()),
                     draft.added().size(), draft.removed().size());
         }
-        return WandMessages.panelSummaryNew(draft.added().size());
+        return WandText.panelSummaryNew(draft.added().size());
     }
 
     /**
@@ -329,10 +332,10 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @return 问题列表
      */
     private List<io.github.crafteve.idlefactory.location.BlockKey> conflicts() {
-        if (WandCoordinator.openResultReceived()) {
-            return WandCoordinator.pendingConflicts();
+        if (WandSubmitter.openResultReceived()) {
+            return WandSubmitter.pendingConflicts();
         }
-        return WandSession.conflicts();
+        return WandDraftState.conflicts();
     }
 
     /**

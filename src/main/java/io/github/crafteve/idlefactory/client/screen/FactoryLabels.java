@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+
+import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+
 import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;

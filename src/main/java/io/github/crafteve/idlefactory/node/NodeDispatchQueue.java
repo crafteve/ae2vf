@@ -7,7 +7,6 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
