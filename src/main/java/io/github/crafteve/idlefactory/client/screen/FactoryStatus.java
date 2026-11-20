@@ -5,6 +5,8 @@ import net.minecraft.resources.ResourceLocation;
 import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
 import io.github.crafteve.idlefactory.view.TotalState;
 import io.github.crafteve.idlefactory.view.NodeStatus;
+import io.github.crafteve.idlefactory.view.ViewNode.Activity;
+import io.github.crafteve.idlefactory.view.ViewNodeCore;
 
 /**
  * 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
@@ -83,7 +85,29 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      * @return 等级，0..10
      */
     public static int sortRank(NodeStatus status) {
-        return switch (kindOf(status)) {
+        return rank(kindOf(status));
+    }
+
+    /**
+     * 状态档的排序等级；视图表版本。
+     *
+     * <p>与 {@link #sortRank(NodeStatus)} 同一张表，第 3b 步切换后旧版本删除。</p>
+     *
+     * @param core 节点自身的字段
+     * @return 等级，0..10
+     */
+    public static int sortRank(ViewNodeCore core) {
+        return rank(kindOf(core));
+    }
+
+    /**
+     * 状态种类 → 等级。
+     *
+     * @param kind 状态种类
+     * @return 等级，0..10
+     */
+    private static int rank(Kind kind) {
+        return switch (kind) {
             case RUNNING -> 0;
             case INPUT_OK -> 1;
             case IDLE -> 2;
@@ -95,6 +119,48 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
             case PARTIAL -> 8;
             case STALE -> 9;
             case OFFLINE -> 10;
+        };
+    }
+
+    /**
+     * 取一个节点的状态种类；视图表版本。
+     *
+     * <p>判断顺序与 {@link #kindOf(NodeStatus)} 完全一致：未探测 / 过期优先，其次失联 / 缺机，
+     * 最后才看"在干什么"。视图表已经把结论字段算好，这里只做展示映射。</p>
+     *
+     * @param core 节点自身的字段
+     * @return 状态种类
+     */
+    static Kind kindOf(ViewNodeCore core) {
+        if (!core.probed()) {
+            return Kind.UNPROBED;
+        }
+        if (core.stale()) {
+            return Kind.STALE;
+        }
+        return switch (core.health()) {
+            case OFFLINE -> Kind.OFFLINE;
+            case PARTIAL -> Kind.PARTIAL;
+            case ONLINE -> kindOf(core.activity());
+        };
+    }
+
+    /**
+     * 健康已确定时，把节点活动映射成种类。
+     *
+     * @param activity 服务端节点活动
+     * @return 状态种类
+     */
+    private static Kind kindOf(Activity activity) {
+        return switch (activity) {
+            case OFFLINE -> Kind.OFFLINE;
+            case UNCONFIGURED -> Kind.UNCONFIGURED;
+            case RUNNING -> Kind.RUNNING;
+            case IDLE -> Kind.IDLE;
+            case WAITING_MATERIAL -> Kind.WAITING_MATERIAL;
+            case INPUT_OK -> Kind.INPUT_OK;
+            case INPUT_BLOCKED -> Kind.INPUT_BLOCKED;
+            case UNKNOWN -> Kind.UNKNOWN;
         };
     }
 
@@ -161,6 +227,19 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      */
     public static FactoryStatus of(NodeStatus status, FactoryGuiTheme theme) {
         return of(kindOf(status), theme);
+    }
+
+    /**
+     * 把视图表的节点字段映射成文字、颜色和贴图。
+     *
+     * <p>与 {@link #of(NodeStatus, FactoryGuiTheme)} 同一张映射表，第 3b 步切换后旧版本删除。</p>
+     *
+     * @param core  节点自身的字段
+     * @param theme 当前主题
+     * @return 状态展示
+     */
+    public static FactoryStatus of(ViewNodeCore core, FactoryGuiTheme theme) {
+        return of(kindOf(core), theme);
     }
 
 }

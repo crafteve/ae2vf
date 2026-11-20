@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
@@ -9,6 +10,7 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryKeycap;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNineSlice;
+import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.FactoryLamp;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Kind;
@@ -16,7 +18,13 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.N
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+import io.github.crafteve.idlefactory.io.DispatchMode;
+import io.github.crafteve.idlefactory.node.Multiplier;
+import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.view.NodeStatus;
+import io.github.crafteve.idlefactory.view.ViewMachine;
+import io.github.crafteve.idlefactory.view.ViewNode;
+import io.github.crafteve.idlefactory.view.ViewNodeCore;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -45,10 +53,75 @@ final class FactoryNodeRender {
     }
 
     /**
-     * 画整个内容区。
+     * 绘制一张节点卡所需的全部数据：与快照类型解耦。
+     *
+     * <p>旧的 {@link NodeRow} 与视图表的 {@link ViewNode} 都映射到它，绘制代码只认它。
+     * 第 3c 步删掉旧入口后，这份结构就是唯一的绘制输入。</p>
+     *
+     * @param nodeId       节点 id，编辑态与删除确认都按它比对
+     * @param name         显示名
+     * @param status       状态展示（文字、颜色、贴图）
+     * @param hint         名字后面的状态小字；空串表示不放
+     * @param present      图标是节点方块还是屏障
+     * @param typeBlockId  类型方块 id，图标用
+     * @param available    provider 是否可用
+     * @param blockingOn   阻挡是否打开
+     * @param multiplier   倍率
+     * @param dispatch     派单模式
+     * @param machineCount 机器台数，>1 时画数量角标
+     * @param members      展开后的成员行
+     */
+    private record CardData(java.util.UUID nodeId, String name, FactoryStatus status, String hint,
+            boolean present, net.minecraft.resources.ResourceLocation typeBlockId,
+            boolean available, boolean blockingOn, Multiplier multiplier, DispatchMode dispatch,
+            int machineCount, List<MemberCardData> members) {
+
+        private CardData {
+            members = List.copyOf(members);
+        }
+    }
+
+    /**
+     * 成员行的绘制数据。
+     *
+     * @param label   行标签
+     * @param blockId 观测到的方块 id，图标用
+     * @param status  状态展示，取灯贴图
+     */
+    private record MemberCardData(String label, @Nullable net.minecraft.resources.ResourceLocation blockId,
+            FactoryStatus status) {
+    }
+
+    /**
+     * 画整个内容区（旧入口：模型行）。
      */
     void draw(GuiGraphics graphics, FactoryNodeLayout layout, List<NodeRow> rows, int scroll,
             @Nullable Hit hover, @Nullable java.util.UUID pendingDelete, String emptyText) {
+        List<CardData> cards = new ArrayList<>(rows.size());
+        for (NodeRow row : rows) {
+            cards.add(cardOf(row));
+        }
+        drawCards(graphics, layout, cards, scroll, hover, pendingDelete, emptyText);
+    }
+
+    /**
+     * 画整个内容区（视图表入口）。
+     *
+     * <p>与 {@link #draw} 共用同一套绘制：节点结论、规则与机器已在服务端算好，这里只把
+     * 状态映射成颜色与贴图。</p>
+     */
+    void drawNodes(GuiGraphics graphics, FactoryNodeLayout layout, List<ViewNode> nodes, int scroll,
+            @Nullable Hit hover, @Nullable java.util.UUID pendingDelete, String emptyText) {
+        List<CardData> cards = new ArrayList<>(nodes.size());
+        for (ViewNode node : nodes) {
+            cards.add(cardOf(node));
+        }
+        drawCards(graphics, layout, cards, scroll, hover, pendingDelete, emptyText);
+    }
+
+    private void drawCards(GuiGraphics graphics, FactoryNodeLayout layout, List<CardData> rows,
+            int scroll, @Nullable Hit hover, @Nullable java.util.UUID pendingDelete,
+            String emptyText) {
         Viewport viewport = layout.viewport();
         if (rows.isEmpty()) {
             graphics.drawString(this.font, emptyText,
@@ -57,7 +130,7 @@ final class FactoryNodeRender {
             return;
         }
         for (NodeBox box : layout.boxes()) {
-            NodeRow row = rows.get(box.index());
+            CardData row = rows.get(box.index());
             int top = FactoryNodeLayout.screenY(viewport, box.top(), scroll);
             int bottom = FactoryNodeLayout.screenY(viewport, box.bottom(), scroll);
             if (bottom <= viewport.y() || top >= viewport.y() + viewport.height()) {
@@ -79,7 +152,7 @@ final class FactoryNodeRender {
         }
     }
 
-    private void drawNodeRow(GuiGraphics graphics, Viewport viewport, NodeBox box, NodeRow row,
+    private void drawNodeRow(GuiGraphics graphics, Viewport viewport, NodeBox box, CardData row,
             int top, @Nullable Hit hover, @Nullable java.util.UUID pendingDelete) {
         int left = FactoryNodeLayout.cardX(viewport) + 1;
         int right = FactoryNodeLayout.cardRight(viewport) - 1;
@@ -91,15 +164,14 @@ final class FactoryNodeRender {
         int slotX = FactoryNodeLayout.nameX(viewport) - FactoryNodeLayout.SLOT - 1;
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryNodeLayout.SLOT,
                 FactoryNodeLayout.SLOT);
-        boolean present = row.view().status().probed() && row.view().status().health().isOnline();
-        ItemStack icon = present
-                ? FactoryLabels.blockStack(row.view().typeBlockId()) : new ItemStack(Items.BARRIER);
+        ItemStack icon = row.present()
+                ? FactoryLabels.blockStack(row.typeBlockId()) : new ItemStack(Items.BARRIER);
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
-        if (row.view().machineCount() > 1) {
+        if (row.machineCount() > 1) {
             // 用原版物品数量修饰器：右下角白字黑描边，和物品同一渲染批次，不会被图标盖住。
             graphics.renderItemDecorations(this.font,
-                    icon.copyWithCount(row.view().machineCount()), slotX + 1, top + 2);
+                    icon.copyWithCount(row.machineCount()), slotX + 1, top + 2);
         }
 
         String name = ellipsize(row.name(), FactoryNodeLayout.nameWidth(viewport));
@@ -107,20 +179,20 @@ final class FactoryNodeRender {
                 this.theme.textPrimary(), false);
         drawStatusHints(graphics, viewport, row, top);
 
-        boolean provider = row.view().provider().available();
+        boolean provider = row.available();
         int keyY = top + FactoryNodeLayout.KEY_INSET_Y;
         int keyTextY = keyY + 2;
 
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 0), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
-                provider && row.view().provider().blocking().isOn()
+                provider && row.blockingOn()
                         ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, box.index(), Kind.BLOCKING));
         drawLabel(graphics, "阻", FactoryNodeLayout.keyX(viewport, 0), FactoryNodeLayout.KEY_W,
-                keyTextY, provider && row.view().provider().blocking().isOn()
+                keyTextY, provider && row.blockingOn()
                         ? 0xFFFFFFFF : this.theme.textPrimary());
 
-        var multiplier = row.view().provider().multiplier();
+        Multiplier multiplier = row.multiplier();
         boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 1), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
@@ -130,8 +202,7 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.KEY_W, keyTextY,
                 multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
 
-        boolean roundRobin = row.view().provider().dispatch()
-                == io.github.crafteve.idlefactory.io.DispatchMode.ROUND_ROBIN;
+        boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
         FactoryKeycap.draw(graphics, this.theme, FactoryNodeLayout.keyX(viewport, 2), keyY,
                 FactoryNodeLayout.KEY_W, FactoryNodeLayout.KEY_H,
                 roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
@@ -162,6 +233,62 @@ final class FactoryNodeRender {
                 FactoryNodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
     }
 
+    /**
+     * 旧入口的绘制数据：从模型行取。
+     *
+     * @param row 模型行
+     * @return 卡片数据
+     */
+    private CardData cardOf(NodeRow row) {
+        NodeStatus status = row.view().status();
+        List<MemberCardData> members = new ArrayList<>(row.members().size());
+        for (MemberRow member : row.members()) {
+            members.add(new MemberCardData(member.label(), member.member().blockId(),
+                    member.status()));
+        }
+        return new CardData(row.nodeId(), row.name(), row.status(),
+                statusHint(status.probed(), status.stale(), status.health(),
+                        row.view().provider().available()),
+                status.probed() && status.health().isOnline(), row.view().typeBlockId(),
+                row.view().provider().available(), row.view().provider().blocking().isOn(),
+                row.view().provider().multiplier(), row.view().provider().dispatch(),
+                row.view().machineCount(), members);
+    }
+
+    /**
+     * 视图表入口的绘制数据：从节点行取。
+     *
+     * <p>成员行的标签按加入顺序编号，与旧快照 {@code "#N"} 的口径一致。</p>
+     *
+     * @param node 节点行
+     * @return 卡片数据
+     */
+    private CardData cardOf(ViewNode node) {
+        ViewNodeCore core = node.core();
+        FactoryStatus status = FactoryStatus.of(core, this.theme);
+        List<MemberCardData> members = new ArrayList<>(node.machines().size());
+        for (int i = 0; i < node.machines().size(); i++) {
+            ViewMachine machine = node.machines().get(i);
+            members.add(new MemberCardData("#" + (i + 1), machine.blockId(), status));
+        }
+        return new CardData(core.nodeId(), displayName(node), status,
+                statusHint(core.probed(), core.stale(), core.health(), core.available()),
+                core.probed() && core.health().isOnline(), core.typeBlockId(), core.available(),
+                core.blocking().isOn(), core.multiplier(), core.dispatch(), node.machineCount(),
+                members);
+    }
+
+    /**
+     * 节点显示名：自定义名字优先，否则用方块名。
+     *
+     * @param node 节点行
+     * @return 显示名
+     */
+    private static String displayName(ViewNode node) {
+        return node.core().name() != null
+                ? node.core().name() : FactoryLabels.blockName(node.core().typeBlockId());
+    }
+
     /** 倍率键帽文字：关 / ×N / 智。 */
     private static String multiplierLabel(
             io.github.crafteve.idlefactory.node.Multiplier multiplier) {
@@ -172,8 +299,8 @@ final class FactoryNodeRender {
         };
     }
 
-    private void drawStatusHints(GuiGraphics graphics, Viewport viewport, NodeRow row, int top) {
-        String hint = statusHint(row);
+    private void drawStatusHints(GuiGraphics graphics, Viewport viewport, CardData row, int top) {
+        String hint = row.hint();
         int nameX = FactoryNodeLayout.nameX(viewport);
         int nameWidth = FactoryNodeLayout.nameWidth(viewport);
         int used = this.font.width(row.name());
@@ -186,26 +313,32 @@ final class FactoryNodeRender {
 
     /**
      * 状态小字：失联 / 未载 / 非 ME。只放得下时画，完整状态始终在 tooltip 里。
+     *
+     * @param probed    是否探测过
+     * @param stale     健康是否过期
+     * @param health    节点健康
+     * @param available provider 是否可用
+     * @return 小字；空串表示不放
      */
-    private String statusHint(NodeRow row) {
-        NodeStatus status = row.view().status();
-        if (!status.probed()) {
+    private static String statusHint(boolean probed, boolean stale, NodeHealth health,
+            boolean available) {
+        if (!probed) {
             return "未探测";
         }
-        if (status.stale()) {
+        if (stale) {
             return "健康过期";
         }
-        return switch (status.health()) {
+        return switch (health) {
             case OFFLINE -> "失联";
             case PARTIAL -> "缺机";
-            case ONLINE -> row.view().provider().available() ? "" : "非 ME";
+            case ONLINE -> available ? "" : "非 ME";
         };
     }
 
-    private void drawMembers(GuiGraphics graphics, Viewport viewport, NodeBox box, NodeRow row,
+    private void drawMembers(GuiGraphics graphics, Viewport viewport, NodeBox box, CardData row,
             int scroll, @Nullable Hit hover) {
         for (int i = 0; i < box.shownMembers(); i++) {
-            MemberRow member = row.members().get(i);
+            MemberCardData member = row.members().get(i);
             int y = FactoryNodeLayout.memberRowY(viewport, box, i, scroll);
             int x = FactoryNodeLayout.memberX(viewport);
             int width = FactoryNodeLayout.memberWidth(viewport);
@@ -218,7 +351,7 @@ final class FactoryNodeRender {
             }
             int iconX = FactoryNodeLayout.memberIconX(viewport);
             int iconY = y + (FactoryNodeLayout.MEMBER_ROW_H - FactoryNodeLayout.MEMBER_ICON) / 2;
-            ItemStack icon = FactoryLabels.blockStack(member.member().blockId());
+            ItemStack icon = FactoryLabels.blockStack(member.blockId());
             float scale = FactoryNodeLayout.MEMBER_ICON / 16.0F;
             graphics.pose().pushPose();
             graphics.pose().translate(iconX, iconY, 0.0F);
