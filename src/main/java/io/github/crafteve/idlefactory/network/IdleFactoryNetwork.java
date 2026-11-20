@@ -18,6 +18,7 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
 
+import io.github.crafteve.idlefactory.network.payload.HudNoticeS2C;
 import io.github.crafteve.idlefactory.network.payload.ViewTableDiffS2C;
 
 import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
@@ -44,7 +45,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class IdleFactoryNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "41";
+    public static final String PROTOCOL_VERSION = "42";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -119,6 +120,9 @@ public final class IdleFactoryNetwork {
                 ViewTableS2C::handle);
         registrar.playToClient(ViewTableDiffS2C.TYPE, ViewTableDiffS2C.STREAM_CODEC,
                 ViewTableDiffS2C::handle);
+
+        // HUD 提示：失联 / 恢复这类没有界面的通知，统一走模组自己的 HUD 条
+        registrar.playToClient(HudNoticeS2C.TYPE, HudNoticeS2C.STREAM_CODEC, HudNoticeS2C::handle);
 
         // 机器绑定杖：1:1 toggle、连锁、草稿预校验与提交
         registrar.playToServer(WandChainC2S.TYPE, WandChainC2S.STREAM_CODEC, WandChainC2S::handle);
