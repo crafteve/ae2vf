@@ -232,7 +232,7 @@ public final class PortExecutor implements ObservationChangeListener {
         }
         String cached = this.beTypes.get(machine.id());
         return cached == null || observation.beTypeId() == null
-                || cached.equals(observation.beTypeId());
+                || cached.equals(observation.beTypeId().toString());
     }
 
     private void store(UUID machineId, int faceIndex, MEStorage storage) {
@@ -274,7 +274,14 @@ public final class PortExecutor implements ObservationChangeListener {
         }
         BlockEntity be = level.getBlockEntity(pos);
         if (be != null) {
-            this.beTypes.put(machine.id(), be.getType().toString());
+            // 必须存注册名：BlockEntityType 没有重写 toString，直接 toString 会得到
+            // "BlockEntityType@1a2b"，和观测里的 beTypeId 永远不相等，于是每次取端口都被判成
+            // 「方块被换掉」，缓存反复失效，容量探测与智能倍率就会拿到 null / 0。
+            var typeId = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
+                    .getKey(be.getType());
+            if (typeId != null) {
+                this.beTypes.put(machine.id(), typeId.toString());
+            }
             this.machineByBlock.put(machine.block(), machine.id());
         }
         MEStorage nativeStorage = be != null
