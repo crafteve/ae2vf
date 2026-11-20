@@ -5,7 +5,8 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
 import io.github.crafteve.idlefactory.view.ViewMachine;

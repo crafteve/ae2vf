@@ -1,6 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.sort;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -142,7 +143,7 @@ public record SortKey(String name, String id, int machineCount, int ruleCount,
         if (nodeName != null && !nodeName.isEmpty()) {
             return nodeName;
         }
-        return typeBlockId == null ? "" : FactoryLabels.blockName(typeBlockId);
+        return typeBlockId == null ? "" : UiResources.blockName(typeBlockId);
     }
 
     /**

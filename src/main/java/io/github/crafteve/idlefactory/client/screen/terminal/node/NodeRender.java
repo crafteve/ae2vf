@@ -11,7 +11,8 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
 import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
@@ -159,7 +160,7 @@ final class NodeRender {
         NineSliceRenderer.slot(graphics, slotX, top + 1, NodeLayout.SLOT,
                 NodeLayout.SLOT);
         ItemStack icon = row.present()
-                ? FactoryLabels.blockStack(row.typeBlockId()) : new ItemStack(Items.BARRIER);
+                ? UiResources.blockStack(row.typeBlockId()) : new ItemStack(Items.BARRIER);
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
         if (row.machineCount() > 1) {
@@ -259,7 +260,7 @@ final class NodeRender {
      */
     private static String displayName(ViewNode node) {
         return node.core().name() != null
-                ? node.core().name() : FactoryLabels.blockName(node.core().typeBlockId());
+                ? node.core().name() : UiResources.blockName(node.core().typeBlockId());
     }
 
     /**
@@ -335,7 +336,7 @@ final class NodeRender {
             }
             int iconX = NodeLayout.memberIconX(viewport);
             int iconY = y + (NodeLayout.MEMBER_ROW_H - NodeLayout.MEMBER_ICON) / 2;
-            ItemStack icon = FactoryLabels.blockStack(member.blockId());
+            ItemStack icon = UiResources.blockStack(member.blockId());
             float scale = NodeLayout.MEMBER_ICON / 16.0F;
             graphics.pose().pushPose();
             graphics.pose().translate(iconX, iconY, 0.0F);

@@ -10,7 +10,8 @@ import appeng.api.stacks.AEItemKey;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
 import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
@@ -246,7 +247,7 @@ final class PassiveIoRender {
         NineSliceRenderer.slot(graphics, slotX, top + 1, PassiveIoLayout.SLOT,
                 PassiveIoLayout.SLOT);
         ItemStack icon = block.node().core().health() == NodeHealth.OFFLINE
-                ? new ItemStack(Items.BARRIER) : FactoryLabels.blockStack(block.machine().blockId());
+                ? new ItemStack(Items.BARRIER) : UiResources.blockStack(block.machine().blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
         int nameX = slotX + PassiveIoLayout.SLOT + PassiveIoLayout.GAP;
@@ -331,7 +332,7 @@ final class PassiveIoRender {
         int chipX = PassiveIoLayout.chipX(viewport, 0);
         int textY = y + (PassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
-                ellipsize(FactoryLabels.name(rule.key()), chipX - 2 - nameX), nameX,
+                ellipsize(UiResources.keyName(rule.key()), chipX - 2 - nameX), nameX,
                 textY, TEXT_PRIMARY, false);
         drawChips(graphics, viewport, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
@@ -399,9 +400,9 @@ final class PassiveIoRender {
 
     private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,
             int maxWidth) {
-        IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
+        IoReason reason = TerminalText.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? StatusColor.IDLE
-                : FactoryLabels.rateColorUi(rule.rate(), reason);
+                : TerminalText.rateColorUi(rule.rate(), reason);
         String clipped = ellipsize(rateText(rule), maxWidth);
         graphics.drawString(this.font, clipped, right - this.font.width(clipped), textY, color,
                 false);
@@ -417,9 +418,9 @@ final class PassiveIoRender {
      */
     private static String rateText(RuleRow rule) {
         if (AeKeyAdapter.isEnergy(rule.key())) {
-            return FactoryLabels.count(rule.rate()) + "/s";
+            return TerminalText.count(rule.rate()) + "/s";
         }
-        return FactoryLabels.rateText(rule.rate(), rule.key());
+        return TerminalText.rateText(rule.rate(), rule.key());
     }
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -442,7 +443,7 @@ final class PassiveIoRender {
         ResourceIconRenderer.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
         int nameX = x + PassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
-                ellipsize(FactoryLabels.name(rule.key()), TILE_NAME_W), nameX, y + 7,
+                ellipsize(UiResources.keyName(rule.key()), TILE_NAME_W), nameX, y + 7,
                 TEXT_PRIMARY, false);
         int chipY = y + PassiveIoLayout.TILE_CHIP_Y;
         int hoveredChip = chipIndex(hover, blockIndex, index);
@@ -458,9 +459,9 @@ final class PassiveIoRender {
                 item ? modeTextColor(rule) : TEXT_DIM, item, hoveredChip == 2);
         String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + PassiveIoLayout.TILE_W - 2;
-        IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
+        IoReason reason = TerminalText.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? StatusColor.IDLE
-                : FactoryLabels.rateColorUi(rule.rate(), reason);
+                : TerminalText.rateColorUi(rule.rate(), reason);
         // 速率和 chip 行同一中线：13px chip 的正文在 +2。
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 2, color,
                 false);
@@ -530,7 +531,7 @@ final class PassiveIoRender {
     }
 
     private static String faceLabel(RuleRow rule) {
-        return rule.face() == null ? tr("idlefactory.passive.chip.any_face") : FactoryLabels.face(rule.face());
+        return rule.face() == null ? tr("idlefactory.passive.chip.any_face") : TerminalText.face(rule.face());
     }
 
     private static String modeLabel(RuleRow spec) {

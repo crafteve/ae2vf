@@ -7,7 +7,8 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEKey;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.BlockBox;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
@@ -97,13 +98,13 @@ public final class PassiveIoJeiIngredients {
         }
         BlockView block = blocks.get(hit.block());
         if (hit.kind() == PassiveIoLayout.Kind.MACHINE) {
-            ItemStack stack = FactoryLabels.blockStack(block.machine().blockId());
+            ItemStack stack = UiResources.blockStack(block.machine().blockId());
             return stack.isEmpty() ? null
                     : new JeiTarget(false, stack, machineIconArea(layout, hit, scroll));
         }
         RuleRow rule = block.rules().get(hit.rule());
         AEKey key = rule.key();
-        return new JeiTarget(AeKeyAdapter.isEnergy(key), FactoryLabels.icon(key),
+        return new JeiTarget(AeKeyAdapter.isEnergy(key), UiResources.icon(key),
                 ruleIconArea(layout, hit, scroll));
     }
 

@@ -2,7 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.integration.appflux.AppFluxKeys;
@@ -62,7 +63,7 @@ public final class ResourceIconRenderer {
     }
 
     private static void drawItem(GuiGraphics graphics, Font font, AEKey key, int x, int y) {
-        ItemStack stack = FactoryLabels.icon(key);
+        ItemStack stack = UiResources.icon(key);
         graphics.renderItem(stack, x, y);
         // 数量由调用方自己画（支持 1.2k 这类长数字），这里只借装饰层画耐久/冷却。
         graphics.renderItemDecorations(font, stack, x, y, "");

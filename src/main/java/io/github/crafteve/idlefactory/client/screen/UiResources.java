@@ -1,14 +1,18 @@
 package io.github.crafteve.idlefactory.client.screen;
 
+import org.jetbrains.annotations.Nullable;
+
 import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 
-
+import appeng.api.stacks.AEItemKey;
+import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -22,6 +26,16 @@ import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
  * 收在一起。这里全部是只读的注册表/物品栈查询，不探世界，也不改服务端状态。</p>
  */
 public final class UiResources {
+
+    /**
+     * 取一条界面文案。
+     *
+     * @param key 语言键
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
+    }
 
     private UiResources() {
         // 纯静态辅助
@@ -84,7 +98,7 @@ public final class UiResources {
     static String faceName(ResourceSpec spec) {
         return spec.face() == null
                 ? net.minecraft.network.chat.Component.translatable("idlefactory.face.any").getString()
-                : FactoryLabels.face(spec.face());
+                : TerminalText.face(spec.face());
     }
 
     /**
@@ -97,6 +111,75 @@ public final class UiResources {
      * @return 物品栈
      */
     public static ItemStack iconStack(AEKey key) {
-        return FactoryLabels.icon(key);
+        return UiResources.icon(key);
+    }
+/**
+     * 机器方块对应的物品图标。
+     *
+     * @param blockId 观测到的方块 id
+     * @return 图标；未知方块返回空栈
+     */
+    public static ItemStack blockStack(@Nullable ResourceLocation blockId) {
+        if (blockId == null) {
+            return ItemStack.EMPTY;
+        }
+        Item item = BuiltInRegistries.BLOCK.get(blockId).asItem();
+        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
+    }
+
+/**
+     * 机器方块的显示名。
+     *
+     * @param blockId 观测到的方块 id
+     * @return 名称；未知方块返回注册名或“未知机器”
+     */
+    public static String blockName(@Nullable ResourceLocation blockId) {
+        if (blockId == null) {
+            return tr("idlefactory.common.unknown_machine");
+        }
+        var block = BuiltInRegistries.BLOCK.get(blockId);
+        return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();
+    }
+
+/**
+     * 资源对应的界面图标；流体按桶、能量按红石。
+     *
+     * @param key 资源
+     * @return 图标；未知资源用屏障
+     */
+    public static ItemStack icon(@Nullable AEKey key) {
+        if (AeKeyAdapter.isEnergy(key)) {
+            return new ItemStack(Items.REDSTONE);
+        }
+        if (AeKeyAdapter.isFluid(key)) {
+            var fluid = BuiltInRegistries.FLUID.get(key.getId());
+            Item bucket = fluid.getBucket();
+            return new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
+        }
+        ItemStack stack = AeKeyAdapter.toStack(key);
+        return stack.isEmpty() ? new ItemStack(Items.BARRIER) : stack;
+    }
+
+/**
+     * 资源显示名。
+     *
+     * @param key 资源
+     * @return 名称；查不到时退回注册名
+     */
+    public static String keyName(AEKey key) {
+        if (AeKeyAdapter.isEnergy(key)) {
+            return "FE";
+        }
+        if ((key instanceof AEFluidKey)) {
+            var fluid = BuiltInRegistries.FLUID.get(key.getId());
+            Item bucket = fluid.getBucket();
+            return bucket == Items.AIR ? key.getId().toString()
+                    : new ItemStack(bucket).getHoverName().getString();
+        }
+        if ((key instanceof AEItemKey)) {
+            ItemStack stack = AeKeyAdapter.toStack(key);
+            return stack.isEmpty() ? key.getId().toString() : stack.getHoverName().getString();
+        }
+        return key.getId().toString();
     }
 }

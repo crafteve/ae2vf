@@ -7,7 +7,8 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
@@ -83,22 +84,22 @@ final class PassiveIoTooltip {
 
     private static List<Component> rule(BlockView block, RuleRow row) {
         List<Component> lines = new ArrayList<>(6);
-        lines.add(Component.literal(FactoryLabels.name(row.key())).withStyle(ChatFormatting.BOLD));
+        lines.add(Component.literal(UiResources.keyName(row.key())).withStyle(ChatFormatting.BOLD));
         lines.add(line(tr("idlefactory.passive.tooltip.direction"),
                 tr(row.input() ? "idlefactory.passive.side.input" : "idlefactory.passive.side.output")));
         lines.add(line(tr("idlefactory.passive.tooltip.face"),
-                row.face() == null ? tr("idlefactory.passive.face.any") : FactoryLabels.face(row.face())));
+                row.face() == null ? tr("idlefactory.passive.face.any") : TerminalText.face(row.face())));
         if (row.key() instanceof AEItemKey) {
             lines.add(line(tr("idlefactory.passive.tooltip.mode"),
                 tr(row.mode() == MatchMode.EXACT
                         ? "idlefactory.passive.mode.exact" : "idlefactory.passive.mode.fuzzy")));
         }
         lines.add(line(tr("idlefactory.passive.tooltip.rate"),
-                FactoryLabels.rateText(row.rate(), row.key())));
-        IoReason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
+                TerminalText.rateText(row.rate(), row.key())));
+        IoReason reason = TerminalText.effectiveReason(row.rate(), row.reason());
         if (reason != IoReason.RUN) {
             lines.add(line(tr("idlefactory.passive.tooltip.reason"),
-                FactoryLabels.reason(reason, row.input())));
+                TerminalText.reason(reason, row.input())));
         }
         lines.add(Component.translatable("idlefactory.passive.tooltip.hint")
                 .withStyle(ChatFormatting.DARK_GRAY));

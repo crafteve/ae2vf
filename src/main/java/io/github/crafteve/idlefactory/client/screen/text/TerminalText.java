@@ -1,6 +1,7 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.text;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
+import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;
 import io.github.crafteve.idlefactory.client.screen.paint.TooltipPalette;
@@ -27,85 +28,23 @@ import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEItemKey;
 
 /**
- * 左表与 IO 详情共用的文案/图标解析。
+ * 终端里的文本：资源名、面名、速率、数量与原因文案。
  *
  * <p>资源名、单位、面名、数量缩写集中在这里；被动 IO 终端的列表与展开详情都用同一套说法，
  * 避免两处各写一份、翻译后对不上。</p>
  */
-public final class FactoryLabels {
-    private FactoryLabels() {
+public final class TerminalText {
+    private TerminalText() {
         // 纯静态工具类
     }
 
-    /**
-     * 机器方块对应的物品图标。
-     *
-     * @param blockId 观测到的方块 id
-     * @return 图标；未知方块返回空栈
-     */
-    public static ItemStack blockStack(@Nullable ResourceLocation blockId) {
-        if (blockId == null) {
-            return ItemStack.EMPTY;
-        }
-        Item item = BuiltInRegistries.BLOCK.get(blockId).asItem();
-        return item == Items.AIR ? ItemStack.EMPTY : new ItemStack(item);
-    }
+    
 
-    /**
-     * 机器方块的显示名。
-     *
-     * @param blockId 观测到的方块 id
-     * @return 名称；未知方块返回注册名或“未知机器”
-     */
-    public static String blockName(@Nullable ResourceLocation blockId) {
-        if (blockId == null) {
-            return tr("idlefactory.common.unknown_machine");
-        }
-        var block = BuiltInRegistries.BLOCK.get(blockId);
-        return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();
-    }
+    
 
-    /**
-     * 资源对应的界面图标；流体按桶、能量按红石。
-     *
-     * @param key 资源
-     * @return 图标；未知资源用屏障
-     */
-    public static ItemStack icon(@Nullable AEKey key) {
-        if (AeKeyAdapter.isEnergy(key)) {
-            return new ItemStack(Items.REDSTONE);
-        }
-        if (AeKeyAdapter.isFluid(key)) {
-            var fluid = BuiltInRegistries.FLUID.get(key.getId());
-            Item bucket = fluid.getBucket();
-            return new ItemStack(bucket == Items.AIR ? Items.BUCKET : bucket);
-        }
-        ItemStack stack = AeKeyAdapter.toStack(key);
-        return stack.isEmpty() ? new ItemStack(Items.BARRIER) : stack;
-    }
+    
 
-    /**
-     * 资源显示名。
-     *
-     * @param key 资源
-     * @return 名称；查不到时退回注册名
-     */
-    public static String name(AEKey key) {
-        if (AeKeyAdapter.isEnergy(key)) {
-            return "FE";
-        }
-        if ((key instanceof AEFluidKey)) {
-            var fluid = BuiltInRegistries.FLUID.get(key.getId());
-            Item bucket = fluid.getBucket();
-            return bucket == Items.AIR ? key.getId().toString()
-                    : new ItemStack(bucket).getHoverName().getString();
-        }
-        if ((key instanceof AEItemKey)) {
-            ItemStack stack = AeKeyAdapter.toStack(key);
-            return stack.isEmpty() ? key.getId().toString() : stack.getHoverName().getString();
-        }
-        return key.getId().toString();
-    }
+    
 
     /**
      * 配置面的中文单字。
