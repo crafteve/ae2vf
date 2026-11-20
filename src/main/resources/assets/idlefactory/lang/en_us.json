@@ -123,7 +123,7 @@
   "idlefactory.node.label.blocking": "B",
   "idlefactory.node.label.round_robin": "R",
   "idlefactory.node.label.sequential": "S",
-  "idlefactory.node.label.multiplier.off": "×",
+  "idlefactory.node.label.multiplier.off": "O",
   "idlefactory.node.label.multiplier.smart": "A",
   "idlefactory.node.label.edit": "E",
   "idlefactory.node.label.delete": "D",
