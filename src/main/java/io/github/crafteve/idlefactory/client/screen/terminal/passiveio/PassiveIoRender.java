@@ -76,6 +76,9 @@ final class PassiveIoRender {
     private static final int IO_MODE_EXACT = 0xFF8FB4D8;
     /** 精确模式 chip 字。 */
     private static final int IO_MODE_EXACT_TEXT = 0xFF000000;
+    /** 面 chip：淡紫底 + 深紫字，和模式 / 方向 chip 区分开。 */
+    private static final int FACE_CHIP = 0xFFD8C9EC;
+    private static final int FACE_CHIP_TEXT = 0xFF2A1E3A;
 
     private final Font font;
 
@@ -367,7 +370,7 @@ final class PassiveIoRender {
                 directionLabel(rule), directionColor(rule), 0xFFFFFFFF, true,
                 hoveredChip == 0);
         drawChip(graphics, PassiveIoLayout.chipX(viewport, 1), cy, faceLabel(rule),
-                BEVEL_LIGHT, TEXT_PRIMARY, true, hoveredChip == 1);
+                FACE_CHIP, FACE_CHIP_TEXT, true, hoveredChip == 1);
         boolean item = rule.key() instanceof AEItemKey;
         drawChip(graphics, PassiveIoLayout.chipX(viewport, 2), cy, modeLabel(rule),
                 item ? modeColor(rule) : BEVEL_LIGHT,
@@ -453,7 +456,7 @@ final class PassiveIoRender {
         drawChip(graphics, slotX, chipY, directionLabel(rule), directionColor(rule), 0xFFFFFFFF,
                 true, hoveredChip == 0);
         drawChip(graphics, slotX + PassiveIoLayout.CHIP + PassiveIoLayout.GAP, chipY,
-                faceLabel(rule), BEVEL_LIGHT, TEXT_PRIMARY, true,
+                faceLabel(rule), FACE_CHIP, FACE_CHIP_TEXT, true,
                 hoveredChip == 1);
         boolean item = rule.key() instanceof AEItemKey;
         drawChip(graphics, slotX + (PassiveIoLayout.CHIP + PassiveIoLayout.GAP) * 2,
