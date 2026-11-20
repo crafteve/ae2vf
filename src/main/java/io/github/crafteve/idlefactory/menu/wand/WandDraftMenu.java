@@ -12,9 +12,9 @@ import net.minecraft.world.inventory.MenuType;
  * 关闭时按容器 id 结束会话。玩家背包的 36 个槽位故意不创建：面板不是容器界面，鼠标移出
  * 也没有可交互槽位。</p>
  */
-public final class WandMenu extends AEBaseMenu {
+public final class WandDraftMenu extends AEBaseMenu {
     /** 面板宿主；只用于取物品定位器，不持有草稿。 */
-    private final WandMenuHost host;
+    private final WandDraftHost host;
 
     /**
      * @param menuType    注册出来的菜单类型
@@ -22,8 +22,8 @@ public final class WandMenu extends AEBaseMenu {
      * @param inventory   玩家物品栏
      * @param host        面板宿主
      */
-    public WandMenu(MenuType<?> menuType, int containerId, Inventory inventory,
-            WandMenuHost host) {
+    public WandDraftMenu(MenuType<?> menuType, int containerId, Inventory inventory,
+            WandDraftHost host) {
         super(menuType, containerId, inventory, host);
         this.host = host;
     }
@@ -31,7 +31,7 @@ public final class WandMenu extends AEBaseMenu {
     /**
      * @return 面板宿主
      */
-    public WandMenuHost host() {
+    public WandDraftHost host() {
         return this.host;
     }
 }

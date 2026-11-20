@@ -6,7 +6,7 @@ import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
 import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
 import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
-import io.github.crafteve.idlefactory.menu.wand.WandMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandDraftMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import appeng.client.gui.style.StyleManager;
@@ -68,9 +68,9 @@ public class IdleFactoryClient {
                         new NodeScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/base_terminal.json")));
-        event.<WandMenu, WandDraftScreen>register(
+        event.<WandDraftMenu, WandDraftScreen>register(
                 ModMenus.WAND_DRAFT.get(),
-                (WandMenu menu, Inventory inventory, Component title) ->
+                (WandDraftMenu menu, Inventory inventory, Component title) ->
                         new WandDraftScreen(menu, inventory, WandText.panelTitle(),
                                 StyleManager.loadStyleDoc(WAND_DRAFT_STYLE)));
     }

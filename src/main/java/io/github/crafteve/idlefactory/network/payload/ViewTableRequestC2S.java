@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
+import io.github.crafteve.idlefactory.menu.MenuGate;
 import io.github.crafteve.idlefactory.network.ViewPort;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -54,7 +54,7 @@ public record ViewTableRequestC2S(int containerId, long knownRevision)
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            if (!FactoryGuiOpening.isFactoryMenu(player.containerMenu, payload.containerId())) {
+            if (!MenuGate.allowsTerminal(player.containerMenu, payload.containerId())) {
                 return;
             }
             ViewPort.sync(player, payload.containerId(), payload.knownRevision());

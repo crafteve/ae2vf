@@ -8,7 +8,7 @@ import appeng.api.implementations.menuobjects.IMenuItem;
 import appeng.api.implementations.menuobjects.ItemMenuHost;
 import appeng.menu.locator.ItemMenuHostLocator;
 
-import io.github.crafteve.idlefactory.menu.wand.WandMenuHost;
+import io.github.crafteve.idlefactory.menu.wand.WandDraftHost;
 
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -71,6 +71,6 @@ public class MachineBindingWandItem extends Item implements IMenuItem {
     @Override
     public ItemMenuHost<?> getMenuHost(Player player, ItemMenuHostLocator locator,
             @Nullable BlockHitResult hitResult) {
-        return new WandMenuHost(this, player, locator);
+        return new WandDraftHost(this, player, locator);
     }
 }

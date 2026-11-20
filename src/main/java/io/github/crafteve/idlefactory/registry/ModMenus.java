@@ -5,8 +5,8 @@ import io.github.crafteve.idlefactory.menu.node.NodeTerminalHost;
 import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
 import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalHost;
 import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
-import io.github.crafteve.idlefactory.menu.wand.WandMenu;
-import io.github.crafteve.idlefactory.menu.wand.WandMenuHost;
+import io.github.crafteve.idlefactory.menu.wand.WandDraftMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandDraftHost;
 
 import appeng.menu.implementations.MenuTypeBuilder;
 
@@ -49,13 +49,13 @@ public final class ModMenus {
                             .buildUnregistered(id("node_terminal")));
 
     /** 机器绑定杖的草稿确认面板：无槽位，只做登录壳。 */
-    public static final DeferredHolder<MenuType<?>, MenuType<WandMenu>> WAND_DRAFT =
+    public static final DeferredHolder<MenuType<?>, MenuType<WandDraftMenu>> WAND_DRAFT =
             MENUS.register("wand_draft",
                     () -> MenuTypeBuilder
-                            .<WandMenu, WandMenuHost>create(
+                            .<WandDraftMenu, WandDraftHost>create(
                                     (type, containerId, inventory, host) ->
-                                            new WandMenu(type, containerId, inventory, host),
-                                    WandMenuHost.class)
+                                            new WandDraftMenu(type, containerId, inventory, host),
+                                    WandDraftHost.class)
                             .buildUnregistered(id("wand_draft")));
 
     private static ResourceLocation id(String path) {

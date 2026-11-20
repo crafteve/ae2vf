@@ -6,7 +6,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
-import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
+import io.github.crafteve.idlefactory.menu.MenuGate;
 import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
 import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 
@@ -75,7 +75,7 @@ public final class CommandGate {
         }
         return player.containerMenu instanceof PassiveIoTerminalMenu
                 || player.containerMenu instanceof NodeTerminalMenu
-                || player.containerMenu instanceof io.github.crafteve.idlefactory.menu.wand.WandMenu;
+                || player.containerMenu instanceof io.github.crafteve.idlefactory.menu.wand.WandDraftMenu;
     }
 
     /**

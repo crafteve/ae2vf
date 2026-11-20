@@ -23,7 +23,7 @@ import io.github.crafteve.idlefactory.client.wand.WandPrecheck;
 import io.github.crafteve.idlefactory.client.wand.WandDraftState;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
-import io.github.crafteve.idlefactory.menu.wand.WandMenu;
+import io.github.crafteve.idlefactory.menu.wand.WandDraftMenu;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -43,7 +43,7 @@ import net.minecraft.world.entity.player.Inventory;
  *
  * <p>不建任何槽位；背包标签按对话框惯例藏到屏幕外。</p>
  */
-public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
+public final class WandDraftScreen extends AEBaseScreen<WandDraftMenu> {
 
     /** 面板底色。 */
     private static final int PANEL_BG = 0xFFCBCCD4;
@@ -93,7 +93,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @param title     标题
      * @param style     AE2 对话框样式
      */
-    public WandDraftScreen(WandMenu menu, Inventory inventory, Component title,
+    public WandDraftScreen(WandDraftMenu menu, Inventory inventory, Component title,
             ScreenStyle style) {
         super(menu, inventory, title, style);
         // 没有背包槽位：把原版的背包标签藏到屏幕外，免得压在草稿行上
