@@ -19,8 +19,8 @@ public final class VoidFactoryCreativeTabs {
     public static final DeferredRegister<CreativeModeTab> TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, VoidFactory.MODID);
 
-    /** 放置工厂物品栏：图标用被动 IO 终端。 */
-    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> IDLE_FACTORY =
+    /** 本模组物品栏：图标用被动 IO 终端。 */
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> CREATIVE_TAB =
             TABS.register("ae2vf", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.ae2vf"))
                     .icon(() -> new ItemStack(VoidFactoryItems.PASSIVE_IO_TERMINAL.get()))

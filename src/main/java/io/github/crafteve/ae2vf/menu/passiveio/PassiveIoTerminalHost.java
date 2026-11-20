@@ -25,7 +25,7 @@ import net.minecraft.world.entity.player.Player;
  * 整张表写回。</p>
  *
  * <p>服务端打开终端时顺手保证玩家有工厂：指令删除后，这里是唯一会经过的「进入工厂」入口，
- * 原 {@code /idf gui} 与快捷键入口的自动建厂职责移到这里，否则界面会一直显示「你还没有工厂」。</p>
+ * 原指令入口与快捷键入口的自动建厂职责移到这里，否则界面会一直显示「你还没有工厂」。</p>
  */
 public final class PassiveIoTerminalHost extends ItemMenuHost<PassiveIoTerminalItem> {
     /** 终端自己的物品设置：列表 / 卡片视图、排序档位、排序方向。 */
