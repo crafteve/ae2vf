@@ -303,7 +303,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
             commitRename();
             return true;
         }
-        if (this.layout != null) {
+        if (this.layout != null && (button == 0 || button == 1)) {
             Hit hit = this.layout.hit(mouseX, mouseY, this.scroll);
             if (hit != null) {
                 clickHit(hit, button);
