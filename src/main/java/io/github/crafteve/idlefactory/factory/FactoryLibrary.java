@@ -40,7 +40,6 @@ public final class FactoryLibrary {
         this.byOwner.clear();
         for (Entry record : records) {
             UUID id = FactoryStore.idOf(record.owner());
-            FactoryConfig config = new FactoryConfig(record.owner(), record.anchor());
             Factory factory = new Factory(id, record.owner(), record.anchor());
             for (Node node : record.nodes()) {
                 NodeLibrary.Result added = factory.restoreNode(node);
