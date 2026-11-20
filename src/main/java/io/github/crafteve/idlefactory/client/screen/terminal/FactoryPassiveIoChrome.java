@@ -14,9 +14,9 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>只画不接收输入；坐标由调用方给出，chunk 内不再第二次算位置。搜索框的输入控件是
  * {@code SearchEditBox}，底板必须画在控件之前（{@code drawBG}），否则会盖住文字。</p>
  */
-final class FactoryPassiveIoChrome {
+public final class FactoryPassiveIoChrome {
     /** 标题颜色：纯黑，跟正文一致。 */
-    static final int TITLE_COLOR = 0xFF000000;
+    public static final int TITLE_COLOR = 0xFF000000;
 
     private FactoryPassiveIoChrome() {
         // 纯静态绘制
@@ -31,7 +31,7 @@ final class FactoryPassiveIoChrome {
      * @param width    宽
      * @param height   高
      */
-    static void drawWorkAreaFrame(GuiGraphics graphics, int x, int y, int width, int height) {
+    public static void drawWorkAreaFrame(GuiGraphics graphics, int x, int y, int width, int height) {
         Card.draw(graphics, x, y, width, height, Card.Level.WORK_AREA, true);
     }
 
@@ -43,7 +43,7 @@ final class FactoryPassiveIoChrome {
      * @param leftPos  面板左边缘
      * @param topPos   面板上边缘
      */
-    static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos) {
+    public static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos) {
         graphics.drawString(font, "被动 IO", leftPos + 8, topPos + 5, TITLE_COLOR, false);
     }
 
@@ -56,7 +56,7 @@ final class FactoryPassiveIoChrome {
      * @param width    宽
      * @param height   高
      */
-    static void drawSearchField(GuiGraphics graphics, int x, int y, int width, int height) {
+    public static void drawSearchField(GuiGraphics graphics, int x, int y, int width, int height) {
         // AE2 原生搜索框贴图：亮色边框 + 内凹阴影，和样板管理终端同款。
         NineSliceRenderer.ae2TextField(graphics, x, y, width);
     }

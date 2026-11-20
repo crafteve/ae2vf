@@ -1,9 +1,9 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
 import io.github.crafteve.idlefactory.client.world.LocateRenderer;
 import io.github.crafteve.idlefactory.client.wand.WandDraftState;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.MemberRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.NodeRow;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
@@ -24,8 +24,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>只发意图，不做本地乐观修改：服务端校验后回反馈与一份新快照。倍增、逐台/轮询与编辑会话
  * 还没有后端，这里明确提示「待接入」，不伪造一个会成功的动作。</p>
  */
-final class FactoryNodeActions {
-    private FactoryNodeActions() {
+final class NodeActions {
+    private NodeActions() {
         // 纯静态动作层
     }
 

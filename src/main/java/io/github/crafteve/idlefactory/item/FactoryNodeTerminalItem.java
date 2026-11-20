@@ -24,7 +24,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * 节点管理终端：右键打开节点列表界面。
  *
  * <p>与被动 IO 终端一样走 AE2 的 {@code base_terminal} 边框与 36 个玩家背包槽，内容区由
- * {@code FactoryNodeScreen} 自绘。只管节点、成员与节点级动作，不放 IO 规则。</p>
+ * {@code NodeScreen} 自绘。只管节点、成员与节点级动作，不放 IO 规则。</p>
  */
 public class FactoryNodeTerminalItem extends Item implements IMenuItem {
     /**

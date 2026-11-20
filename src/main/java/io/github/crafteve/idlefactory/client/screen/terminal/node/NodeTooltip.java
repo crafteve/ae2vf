@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
 import io.github.crafteve.idlefactory.view.ViewMachine;
 import io.github.crafteve.idlefactory.view.ViewNode;
 
@@ -23,8 +23,8 @@ import net.minecraft.network.chat.TextColor;
  * <p>只把视图表里已有的字段拼成文字，不重新判断状态；状态文案取 {@link FactoryStatus#text()}，
  * 坐标取成员机器的方块。</p>
  */
-final class FactoryNodeTooltip {
-    private FactoryNodeTooltip() {
+final class NodeTooltip {
+    private NodeTooltip() {
         // 纯静态工具类
     }
 
@@ -221,7 +221,7 @@ final class FactoryNodeTooltip {
 
     private static List<Component> moreLines(int memberCount) {
         return List.of(Component.literal("展开剩余 "
-                + (memberCount - FactoryNodeLayout.EXPANDED_LIMIT) + " 台"));
+                + (memberCount - NodeLayout.EXPANDED_LIMIT) + " 台"));
     }
 
     private static Component line(String label, String value) {

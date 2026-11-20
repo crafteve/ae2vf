@@ -1,4 +1,12 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoHelpButton;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoFrame;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoChrome;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalSource;
 
 import java.util.HashSet;
 import java.util.List;
@@ -35,13 +43,13 @@ import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Viewport;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.MemberRow;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.NodeRow;
 
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 
@@ -79,7 +87,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>删除有规则或样板的节点会先弹确认浮层；没有配置的节点直接删除。倍增、逐台/轮询与编辑会话
  * 还没有后端，按钮保留但只提示「待接入」。</p>
  */
-public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
+public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         implements FeedbackSink, ViewTableSink {
     /** 最少内容行数。 */
     private static final int MIN_ROWS = 3;
@@ -102,11 +110,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     private static final int RENAME_H = 10;
     /** 跨界面保留的搜索词。 */
     private static String rememberedQuery = "";
-    /** 开发者探针：只在非生产环境响应 F6–F9。 */
-    private static final boolean PROBES = !FMLLoader.isProduction();
-
     private int rows = MIN_ROWS;
-    private final FactoryNodeModel model;
+    private final NodeModel model;
     /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
     private final TerminalSource source;
     /** 当前排序档位；初值来自物品组件，切换后回写。 */
@@ -114,9 +119,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
     private SortDir sortDirection;
     @Nullable
-    private FactoryNodeLayout layout;
+    private NodeLayout layout;
     @Nullable
-    private FactoryNodeRender render;
+    private NodeRender render;
     @Nullable
     private Scrollbar bar;
     private int scroll;
@@ -142,11 +147,11 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param title     标题
      * @param style     AE2 终端样式
      */
-    public FactoryNodeScreen(FactoryNodeMenu menu, Inventory inventory, Component title,
+    public NodeScreen(FactoryNodeMenu menu, Inventory inventory, Component title,
             ScreenStyle style) {
         super(menu, inventory, title, style);
         this.source = new TerminalSource(menu.containerId);
-        this.model = new FactoryNodeModel(this.source, FactoryGuiTheme.current());
+        this.model = new NodeModel(this.source, FactoryGuiTheme.current());
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
         this.model.setSort(this.sortMode, this.sortDirection);
@@ -183,7 +188,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.imageHeight = terminal.getScreenHeight(this.rows);
         super.init();
         this.setTextHidden("entriesShown", true);
-        this.render = new FactoryNodeRender(this.font, FactoryGuiTheme.current());
+        this.render = new NodeRender(this.font, FactoryGuiTheme.current());
         this.confirmDialog = new FactoryConfirmDialog(this.font, FactoryGuiTheme.current());
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
@@ -225,7 +230,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
         // 浮层打开时不再画底层的 tooltip：原版 tooltip 在 z=400，会压在弹窗上。
         boolean dialogOpen = this.confirmDialog != null && this.confirmDialog.isOpen();
-        List<Component> tooltip = FactoryNodeTooltip.of(this.model.visibleNodes(),
+        List<Component> tooltip = NodeTooltip.of(this.model.visibleNodes(),
                 FactoryGuiTheme.current(), hover);
         if (!tooltip.isEmpty() && !dialogOpen) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
@@ -236,8 +241,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     }
 
     private void drawContent(GuiGraphics graphics, @Nullable Hit hover) {
-        FactoryNodeRender content = this.render;
-        FactoryNodeLayout current = this.layout;
+        NodeRender content = this.render;
+        NodeLayout current = this.layout;
         if (content == null || current == null) {
             return;
         }
@@ -303,12 +308,12 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        FactoryNodeLayout current = this.layout;
+        NodeLayout current = this.layout;
         if (current != null && inside(current.viewport(), mouseX, mouseY)) {
             if (this.renameBox != null) {
                 commitRename();
             }
-            this.scroll = Mth.clamp(this.scroll + (int) (-scrollY * FactoryNodeLayout.NODE_ROW_H),
+            this.scroll = Mth.clamp(this.scroll + (int) (-scrollY * NodeLayout.NODE_ROW_H),
                     0, current.maxScroll(current.viewport().height()));
             if (this.bar != null) {
                 this.bar.setCurrentScroll(this.scroll);
@@ -333,9 +338,6 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
                 return true;
             }
             this.renameBox.keyPressed(keyCode, scanCode, modifiers);
-            return true;
-        }
-        if (PROBES && FactoryNodeProbe.handleKey(this, keyCode)) {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -502,7 +504,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             return;
         }
         Viewport viewport = contentViewport();
-        this.layout = FactoryNodeLayout.of(this.model.rows(), viewport, this.expanded,
+        this.layout = NodeLayout.of(this.model.rows(), viewport, this.expanded,
                 this.expandedAll);
         // 改名框不在这里取消：每秒一次的快照刷新也会走 rebuildLayout，取消会让改名框活不过一秒。
         // 位置在每帧 drawRenameBox 里按最新排版重贴；节点真的消失时才由 syncRenameBox 取消。
@@ -510,7 +512,6 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int signature = this.model.rows().size() * 31 + totalMembers();
         if (signature != this.lastLogSignature) {
             this.lastLogSignature = signature;
-            FactoryNodeProbe.logTable(this);
         }
     }
 
@@ -549,13 +550,13 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             case NAME -> beginRename(hit.node(), node);
             case BLOCKING -> {
                 if (node.view().core().available()) {
-                    FactoryNodeActions.setBlocking(this.menu.containerId, node,
+                    NodeActions.setBlocking(this.menu.containerId, node,
                             !node.view().core().blocking().isOn());
                 }
             }
-            case MULTIPLIER -> FactoryNodeActions.cycleMultiplier(this.menu.containerId, node);
-            case DISPATCH -> FactoryNodeActions.toggleDispatch(this.menu.containerId, node);
-            case EDIT -> FactoryNodeActions.edit(this.menu.containerId, node);
+            case MULTIPLIER -> NodeActions.cycleMultiplier(this.menu.containerId, node);
+            case DISPATCH -> NodeActions.toggleDispatch(this.menu.containerId, node);
+            case EDIT -> NodeActions.edit(this.menu.containerId, node);
             case DELETE -> requestDelete(node);
             case MEMBER -> {
                 // 机器行主体不做事，定位在行尾准星上。
@@ -563,7 +564,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             case LOCATE -> {
                 if (hit.member() >= 0 && hit.member() < node.members().size()) {
                     MemberRow member = node.members().get(hit.member());
-                    FactoryNodeActions.locate(node, member);
+                    NodeActions.locate(node, member);
                 }
             }
             case MORE -> {
@@ -583,15 +584,15 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     }
 
     private void beginRename(int index, NodeRow node) {
-        FactoryNodeLayout current = this.layout;
+        NodeLayout current = this.layout;
         if (current == null || index >= current.boxes().size()) {
             return;
         }
-        int top = FactoryNodeLayout.screenY(current.viewport(),
+        int top = NodeLayout.screenY(current.viewport(),
                 current.boxes().get(index).top(), this.scroll);
         Viewport viewport = current.viewport();
-        int x = FactoryNodeLayout.nameX(viewport);
-        int width = Math.max(40, FactoryNodeLayout.nameWidth(viewport));
+        int x = NodeLayout.nameX(viewport);
+        int width = Math.max(40, NodeLayout.nameWidth(viewport));
         this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
                 FactoryGuiTheme.current(), Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
@@ -614,7 +615,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
     private void syncRenameBox() {
         SearchEditBox box = this.renameBox;
         UUID nodeId = this.renamingNode;
-        FactoryNodeLayout current = this.layout;
+        NodeLayout current = this.layout;
         if (box == null || nodeId == null) {
             return;
         }
@@ -623,11 +624,11 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             cancelRename();
             return;
         }
-        int top = FactoryNodeLayout.screenY(current.viewport(),
+        int top = NodeLayout.screenY(current.viewport(),
                 current.boxes().get(index).top(), this.scroll);
-        box.setX(FactoryNodeLayout.nameX(current.viewport()));
+        box.setX(NodeLayout.nameX(current.viewport()));
         box.setY(top + 5);
-        box.setWidth(Math.max(40, FactoryNodeLayout.nameWidth(current.viewport())));
+        box.setWidth(Math.max(40, NodeLayout.nameWidth(current.viewport())));
     }
 
     /**
@@ -658,7 +659,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.renamingNode = null;
         NodeRow node = findNode(nodeId);
         if (node != null) {
-            FactoryNodeActions.rename(this.menu.containerId, node, value);
+            NodeActions.rename(this.menu.containerId, node, value);
         }
     }
 
@@ -682,7 +683,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private void requestDelete(NodeRow node) {
         if (!node.view().configured()) {
-            FactoryNodeActions.delete(this.menu.containerId, node);
+            NodeActions.delete(this.menu.containerId, node);
             return;
         }
         if (this.confirmDialog == null) {
@@ -691,7 +692,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         // 几何交给浮层自己算：可用区域是终端窗口，压暗区域是整个屏幕——
         // AE2 左侧工具栏按钮画在 leftPos 之外，只压暗终端会让它们保持亮着。
         this.confirmDialog.open("删除节点", node.name() + "\n" + deleteDetail(node.view()),
-                "删除", () -> FactoryNodeActions.delete(this.menu.containerId, node),
+                "删除", () -> NodeActions.delete(this.menu.containerId, node),
                 new FactoryConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
                         this.imageHeight),
                 new FactoryConfirmDialog.Bounds(0, 0, this.width, this.height));
@@ -793,11 +794,11 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     // ---- 探针与包内访问 ----
 
-    FactoryNodeLayout layout() {
+    NodeLayout layout() {
         return this.layout;
     }
 
-    FactoryNodeModel model() {
+    NodeModel model() {
         return this.model;
     }
 

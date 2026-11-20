@@ -11,7 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>只负责 header + N 行 + bottom 三段贴图的拼接，不关心内容；尺寸全部从
  * {@link TerminalStyle} 取，避免把 195 / 17 / 18 / 99 这些数字散落在屏幕类里。</p>
  */
-final class FactoryPassiveIoFrame {
+public final class FactoryPassiveIoFrame {
     private FactoryPassiveIoFrame() {
         // 纯静态绘制工具
     }
@@ -25,7 +25,7 @@ final class FactoryPassiveIoFrame {
      * @param top      上边界
      * @param rows     中间行数
      */
-    static void draw(GuiGraphics graphics, TerminalStyle style, int left, int top, int rows) {
+    public static void draw(GuiGraphics graphics, TerminalStyle style, int left, int top, int rows) {
         int y = blit(style.getHeader(), graphics, left, top);
         for (int row = 0; row < rows; row++) {
             Blitter blitter = row == 0 ? style.getFirstRow()

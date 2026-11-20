@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
 
@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
  * <p>节点行结构：左边图标 + 名字，右侧 provider 三枚方形键帽，再右侧编辑 / 删除两枚同规格
  * 键帽横向并排。展开后机器行只在行尾放定位；节点行按钮不随展开消失。</p>
  */
-final class FactoryNodeLayout {
+final class NodeLayout {
     /** 节点行高。 */
     static final int NODE_ROW_H = 20;
     /** 机器行高。 */
@@ -124,7 +124,7 @@ final class FactoryNodeLayout {
     private final Viewport viewport;
     private final int contentHeight;
 
-    private FactoryNodeLayout(List<NodeBox> boxes, Viewport viewport, int contentHeight) {
+    private NodeLayout(List<NodeBox> boxes, Viewport viewport, int contentHeight) {
         this.boxes = boxes;
         this.viewport = viewport;
         this.contentHeight = contentHeight;
@@ -138,12 +138,12 @@ final class FactoryNodeLayout {
      * @param expanded 当前展开的节点 id
      * @return 排版
      */
-    static FactoryNodeLayout of(List<FactoryNodeModel.NodeRow> rows, Viewport viewport,
+    static NodeLayout of(List<NodeModel.NodeRow> rows, Viewport viewport,
             Set<UUID> expanded, Set<UUID> expandedAll) {
         List<NodeBox> boxes = new ArrayList<>(rows.size());
         int cursor = 0;
         for (int i = 0; i < rows.size(); i++) {
-            FactoryNodeModel.NodeRow row = rows.get(i);
+            NodeModel.NodeRow row = rows.get(i);
             boolean open = expanded.contains(row.nodeId());
             int total = row.members().size();
             int shown = !open ? 0
@@ -155,7 +155,7 @@ final class FactoryNodeLayout {
             cursor += height + BLOCK_GAP;
         }
         int contentHeight = boxes.isEmpty() ? 0 : cursor - BLOCK_GAP;
-        return new FactoryNodeLayout(List.copyOf(boxes), viewport, contentHeight);
+        return new NodeLayout(List.copyOf(boxes), viewport, contentHeight);
     }
 
     private static int height(boolean open, int total, int shown) {

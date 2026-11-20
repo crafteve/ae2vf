@@ -1,4 +1,8 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalSource;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalModel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +27,7 @@ import io.github.crafteve.idlefactory.view.ViewTable;
  *
  * <p>搜索与排序状态在 {@link TerminalModel} 里，本类只负责"表 → 行"和"行的搜索 / 排序字段"。</p>
  */
-final class FactoryNodeModel extends TerminalModel<FactoryNodeModel.NodeRow> {
+final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
     /**
      * 一台机器在节点终端里的样子。
      *
@@ -58,7 +62,7 @@ final class FactoryNodeModel extends TerminalModel<FactoryNodeModel.NodeRow> {
      * @param source 终端数据源
      * @param theme  当前主题
      */
-    FactoryNodeModel(TerminalSource source, FactoryGuiTheme theme) {
+    NodeModel(TerminalSource source, FactoryGuiTheme theme) {
         super(source, theme);
     }
 
