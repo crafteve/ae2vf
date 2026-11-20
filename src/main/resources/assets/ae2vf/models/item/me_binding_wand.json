@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/handheld",
   "textures": {
-    "layer0": "idlefactory:item/machine_binding_wand"
+    "layer0": "ae2vf:item/me_binding_wand"
   }
 }
