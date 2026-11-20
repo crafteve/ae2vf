@@ -1,7 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.wand;
 
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.location.BlockKey;
@@ -29,6 +28,12 @@ public final class WandRowRender {
     private static final int TEXT_Y = 5;
     /** 右侧至少有 2px 内边距。 */
     private static final int RIGHT_PAD = 2;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字（坐标）。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 待删除 / 冲突的红字。 */
+    private static final int ERROR = 0xFFD63A3A;
     /** 删除标记与坐标之间的间隙。 */
     private static final int LABEL_GAP = 6;
 
@@ -50,11 +55,11 @@ public final class WandRowRender {
      * @param removed      是否是待删除行
      * @param conflicted   是否被校验判为冲突
      */
-    public static void draw(GuiGraphics graphics, Font font, FactoryGuiTheme theme, int x, int y,
+    public static void draw(GuiGraphics graphics, Font font, int x, int y,
             int width, BlockKey block, ResourceLocation blockId, boolean removed,
             boolean conflicted) {
         boolean error = removed || conflicted;
-        int color = error ? theme.error() : theme.textPrimary();
+        int color = error ? ERROR : TEXT_PRIMARY;
         if (removed) {
             graphics.fill(x, y, x + width, y + ROW_HEIGHT - 1, 0x22FF4D4D);
         }
@@ -67,12 +72,12 @@ public final class WandRowRender {
         int rightReserve = RIGHT_PAD;
         if (removed) {
             graphics.drawString(font, label, x + width - RIGHT_PAD - font.width(label), y + TEXT_Y,
-                    theme.error(), false);
+                    ERROR, false);
             rightReserve += font.width(label) + LABEL_GAP;
         }
         rightReserve += font.width(pos);
         graphics.drawString(font, pos, x + width - rightReserve, y + TEXT_Y,
-                theme.textDim(), false);
+                TEXT_DIM, false);
 
         int nameWidth = width - TEXT_X - rightReserve - LABEL_GAP;
         String name = ellipsize(font, WandText.blockName(blockId), nameWidth);

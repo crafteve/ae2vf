@@ -15,7 +15,6 @@ import appeng.client.gui.AEBaseScreen;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.AE2Button;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
@@ -36,8 +35,7 @@ import net.minecraft.world.entity.player.Inventory;
  *
  * <p>背景与两个按钮的几何来自 {@code assets/ae2/screens/idlefactory_wand_draft.json} 的
  * {@code generatedBackground}：那是 AE2 自己按尺寸生成的浅色边框底，不带任何烤死的表格线。
- * 面板内容（标题、摘要、草稿行、滚动条、状态行）全部自绘，用 {@code FactoryGuiTheme} 的
- * 文字色与 {@code NineSliceRenderer} 的凹槽贴图，和节点终端保持同一套外观。</p>
+ * 面板内容（标题、摘要、草稿行、滚动条、状态行）全部自绘，颜色取自本类常量与文字色与 {@code NineSliceRenderer} 的凹槽贴图，和节点终端保持同一套外观。</p>
  *
  * <p>行来自客户端草稿，问题以服务端预校验为准（{@link WandSubmitter#pendingIssues()}），
  * 服务端还没回包时退回客户端预检结果。面板只是监视器：确定发提交意图，取消丢草稿，Esc /
@@ -46,6 +44,21 @@ import net.minecraft.world.entity.player.Inventory;
  * <p>不建任何槽位；背包标签按对话框惯例藏到屏幕外。</p>
  */
 public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
+
+    /** 面板底色。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 内凹阴影。 */
+    private static final int BEVEL_DARK = 0xFFBFC0C9;
+    /** 面板最外圈深色。 */
+    private static final int PANEL_BORDER = 0xFF413F54;
+    /** 错误色。 */
+    private static final int ERROR = 0xFFD63A3A;
     /** 标题行顶边。 */
     private static final int TITLE_Y = 8;
     /** 标题行左边距。 */
@@ -208,14 +221,13 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @param graphics 绘制上下文
      */
     private void drawPanel(GuiGraphics graphics) {
-        FactoryGuiTheme theme = FactoryGuiTheme.current();
         int left = this.leftPos;
         int top = this.topPos;
 
         graphics.drawString(this.font, WandText.panelTitle(), left + TITLE_X,
-                top + TITLE_Y, theme.textPrimary(), false);
+                top + TITLE_Y, TEXT_PRIMARY, false);
         graphics.drawString(this.font, summary(), left + TITLE_X, top + SUMMARY_Y,
-                theme.textDim(), false);
+                TEXT_DIM, false);
 
         NineSliceRenderer.slot(graphics, left + FRAME_X, top + FRAME_Y, FRAME_W, FRAME_H);
         int innerLeft = left + FRAME_X + INNER_PAD;
@@ -224,7 +236,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
         int innerBottom = top + FRAME_Y + FRAME_H - INNER_PAD;
         graphics.enableScissor(innerLeft, innerTop, innerRight, innerBottom);
         try {
-            drawRows(graphics, theme);
+            drawRows(graphics);
         } finally {
             graphics.disableScissor();
         }
@@ -232,13 +244,13 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             Component empty = WandText.panelEmpty();
             graphics.drawString(this.font, empty,
                     left + FRAME_X + (FRAME_W - this.font.width(empty)) / 2,
-                    (innerTop + innerBottom) / 2 - 4, theme.textDim(), false);
+                    (innerTop + innerBottom) / 2 - 4, TEXT_DIM, false);
         }
-        drawScrollbar(graphics, theme, innerTop, innerBottom);
-        drawStatus(graphics, theme);
+        drawScrollbar(graphics, innerTop, innerBottom);
+        drawStatus(graphics);
     }
 
-    private void drawRows(GuiGraphics graphics, FactoryGuiTheme theme) {
+    private void drawRows(GuiGraphics graphics) {
         ResourceLocation fallback = WandPrecheck.baseType(this.minecraft, WandDraftState.draft());
         int innerLeft = this.leftPos + FRAME_X + INNER_PAD;
         int rowWidth = INNER_RIGHT - FRAME_X - INNER_PAD;
@@ -257,7 +269,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             if (blockId == null) {
                 continue;
             }
-            WandRowRender.draw(graphics, this.font, theme, innerLeft, y, rowWidth,
+            WandRowRender.draw(graphics, this.font, innerLeft, y, rowWidth,
                     row.block(), blockId, row.removed(), isConflicted(row.block()));
         }
     }
@@ -270,7 +282,7 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @param innerTop   轨道顶边（屏幕坐标）
      * @param innerBottom 轨道底边（屏幕坐标）
      */
-    private void drawScrollbar(GuiGraphics graphics, FactoryGuiTheme theme, int innerTop,
+    private void drawScrollbar(GuiGraphics graphics, int innerTop,
             int innerBottom) {
         int viewport = viewportHeight();
         int total = this.rows.size() * WandRowRender.ROW_HEIGHT;
@@ -278,11 +290,11 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
             return;
         }
         int x = this.leftPos + SCROLL_X;
-        graphics.fill(x, innerTop, x + SCROLL_W, innerBottom, theme.bevelDark());
+        graphics.fill(x, innerTop, x + SCROLL_W, innerBottom, BEVEL_DARK);
         int thumbHeight = Math.max(10, viewport * viewport / total);
         int travel = viewport - thumbHeight;
         int thumbY = innerTop + travel * this.scroll / Math.max(1, maxScroll());
-        graphics.fill(x, thumbY, x + SCROLL_W, thumbY + thumbHeight, theme.panelBorder());
+        graphics.fill(x, thumbY, x + SCROLL_W, thumbY + thumbHeight, PANEL_BORDER);
     }
 
     /**
@@ -291,22 +303,22 @@ public final class WandDraftScreen extends AEBaseScreen<WandMenu> {
      * @param graphics 绘制上下文
      * @param theme    主题
      */
-    private void drawStatus(GuiGraphics graphics, FactoryGuiTheme theme) {
+    private void drawStatus(GuiGraphics graphics) {
         List<io.github.crafteve.idlefactory.location.BlockKey> conflicts = conflicts();
         Component status;
         int color;
         if (!conflicts.isEmpty()) {
             status = WandText.panelIssues(conflicts.size());
-            color = theme.error();
+            color = ERROR;
         } else if (WandDraftState.state() == WandDraftState.State.SUBMITTING) {
             status = WandText.submitting();
-            color = theme.textDim();
+            color = TEXT_DIM;
         } else if (WandSubmitter.panelStatus() != null) {
             status = WandSubmitter.panelStatus();
-            color = theme.error();
+            color = ERROR;
         } else {
             status = WandText.panelHint();
-            color = theme.textDim();
+            color = TEXT_DIM;
         }
         graphics.drawString(this.font, status, this.leftPos + FRAME_X + 2,
                 this.topPos + STATUS_Y, color, false);

@@ -8,7 +8,6 @@ import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -28,11 +27,20 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  * 同一时刻最多一条闪条，新的覆盖旧的，不排队。只有当前没有界面时才画。</p>
  *
  * <p>这是叠加层不是终端，所以底板用固定的 AE2 深色，状态点取
- * {@link FactoryGuiTheme} 的绿 / 黄 / 红三色。</p>
+ * 固定的绿 / 黄 / 红三色。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
 public final class WandHud {
+
+    /** 成功色。 */
+    private static final int RUN = 0xFF2E9E4F;
+    /** 警告色。 */
+    private static final int WARN = 0xFFD18A00;
+    /** 失败色。 */
+    private static final int ERROR = 0xFFD63A3A;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
     /** 深底；终端底色是浅色，HUD 用深色才不糊在天空上。 */
     private static final int BACKGROUND = 0xC0101418;
     /** 1px 边框。 */
@@ -107,7 +115,7 @@ public final class WandHud {
      * @param text 文案
      */
     public static void success(Component text) {
-        flash(text, FactoryGuiTheme.current().statusRun());
+        flash(text, RUN);
         play(SoundEvents.EXPERIENCE_ORB_PICKUP, 1.0F);
     }
 
@@ -117,7 +125,7 @@ public final class WandHud {
      * @param text 文案
      */
     public static void failure(Component text) {
-        flash(text, FactoryGuiTheme.current().error());
+        flash(text, ERROR);
         play(SoundEvents.VILLAGER_NO, 1.0F);
     }
 
@@ -127,7 +135,7 @@ public final class WandHud {
      * @param text 文案
      */
     public static void neutral(Component text) {
-        flash(text, FactoryGuiTheme.current().statusWarn());
+        flash(text, WARN);
         play(SoundEvents.UI_BUTTON_CLICK.value(), 1.0F);
     }
 
@@ -191,7 +199,7 @@ public final class WandHud {
         int barY = minecraft.getWindow().getGuiScaledHeight() - BOTTOM_INSET;
         Component bar = barText();
         if (bar != null) {
-            draw(graphics, minecraft, bar, barY, FactoryGuiTheme.current().textDim());
+            draw(graphics, minecraft, bar, barY, TEXT_DIM);
         }
         if (flashText != null) {
             draw(graphics, minecraft, flashText, barY - BAR_HEIGHT - FLASH_GAP, flashColor);
