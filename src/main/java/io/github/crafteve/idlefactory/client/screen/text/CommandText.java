@@ -23,45 +23,45 @@ public final class CommandText {
      */
     public static String text(CommandResult result) {
         return switch (result.reason()) {
-            case OK -> "已生效";
-            case NOT_STARTED -> "Idle Factory 尚未启动";
-            case FACTORY_MISSING -> "你还没有工厂";
-            case NODE_MISSING -> "找不到节点";
-            case RULE_FULL -> "规则已达上限";
-            case RULE_EXISTS -> "这一侧已经有这条规则";
-            case RULE_MISSING -> "找不到这条规则";
-            case SAME_SIDE -> "方向没有变化";
-            case NAME_TOO_LONG -> "名字太长";
-            case NAME_CONTROL_CHAR -> "名字不能包含控制字符";
-            case RENAME_FAILED -> "改名失败";
-            case RESOURCE_EMPTY -> "资源为空";
-            case RESOURCE_UNKNOWN_ITEM -> "未知物品";
-            case RESOURCE_UNKNOWN_FLUID -> "未知流体";
-            case RESOURCE_NOT_FE -> "能量规则只能使用 Applied Flux 的 FE";
-            case OCCUPIED_OTHER -> "这个位置属于别的工厂";
-            case OCCUPIED_SELF_ROLE -> "这个位置已经被本工厂的另一种角色占用";
-            case TARGET_UNLOADED -> "目标区块未加载";
-            case NOT_ME_BLOCK -> "该方块没有接入 ME 网络";
-            case OTHER_BOUND -> "已绑定其他仓库，先解绑";
-            case SESSION_MISMATCH -> "界面会话已过期，请重新打开终端";
-            case SEQ_STALE -> "这次提交已过期";
-            case TARGET_NOT_MACHINE -> "目标不是可接入的机器";
-            case NO_CHANGE -> "没有可执行的改动";
-            case INTERNAL -> "内部错误";
-            case EMPTY_DRAFT -> "草稿是空的";
-            case NOT_HOLDING_WAND -> "主手要拿绑定杖";
-            case STALE_REQUEST -> "这次提交已过期";
-            case TYPE_MISMATCH -> "节点里的机器类型不一致";
-            case DUPLICATE_BLOCK -> "同一个方块在草稿里出现了两次";
-            case BLOCK_CLAIMED -> "方块已经被占用";
-            case BLOCK_UNLOADED -> "目标区块未加载";
-            case NOT_A_MACHINE -> "目标不是可接入的机器";
-            case LIMIT_NODES -> "节点数已达上限";
-            case LIMIT_MACHINES -> "机器数已达上限";
-            case MEMBER_NOT_REMOVABLE -> "节点里还有别的机器，不能单独拆这一台";
-            case DELETE_BLOCKED_RULES -> "节点上还有规则，先清空规则";
-            case DELETE_BLOCKED_PATTERNS -> "节点上还有样板，先退回样板";
-            case INVALID_DRAFT -> "草稿结构非法";
+            case OK -> tr("idlefactory.command.ok");
+            case NOT_STARTED -> tr("idlefactory.command.not_started");
+            case FACTORY_MISSING -> tr("idlefactory.command.factory_missing");
+            case NODE_MISSING -> tr("idlefactory.command.node_missing");
+            case RULE_FULL -> tr("idlefactory.command.rule_full");
+            case RULE_EXISTS -> tr("idlefactory.command.rule_exists");
+            case RULE_MISSING -> tr("idlefactory.command.rule_missing");
+            case SAME_SIDE -> tr("idlefactory.command.same_side");
+            case NAME_TOO_LONG -> tr("idlefactory.command.name_too_long");
+            case NAME_CONTROL_CHAR -> tr("idlefactory.command.name_control_char");
+            case RENAME_FAILED -> tr("idlefactory.command.rename_failed");
+            case RESOURCE_EMPTY -> tr("idlefactory.command.resource_empty");
+            case RESOURCE_UNKNOWN_ITEM -> tr("idlefactory.command.resource_unknown_item");
+            case RESOURCE_UNKNOWN_FLUID -> tr("idlefactory.command.resource_unknown_fluid");
+            case RESOURCE_NOT_FE -> tr("idlefactory.command.resource_not_fe");
+            case OCCUPIED_OTHER -> tr("idlefactory.command.occupied_other");
+            case OCCUPIED_SELF_ROLE -> tr("idlefactory.command.occupied_self_role");
+            case TARGET_UNLOADED -> tr("idlefactory.command.target_unloaded");
+            case NOT_ME_BLOCK -> tr("idlefactory.command.not_me_block");
+            case OTHER_BOUND -> tr("idlefactory.command.other_bound");
+            case SESSION_MISMATCH -> tr("idlefactory.command.session_mismatch");
+            case SEQ_STALE -> tr("idlefactory.command.seq_stale");
+            case TARGET_NOT_MACHINE -> tr("idlefactory.command.target_not_machine");
+            case NO_CHANGE -> tr("idlefactory.command.no_change");
+            case INTERNAL -> tr("idlefactory.command.internal");
+            case EMPTY_DRAFT -> tr("idlefactory.command.empty_draft");
+            case NOT_HOLDING_WAND -> tr("idlefactory.command.not_holding_wand");
+            case STALE_REQUEST -> tr("idlefactory.command.stale_request");
+            case TYPE_MISMATCH -> tr("idlefactory.command.type_mismatch");
+            case DUPLICATE_BLOCK -> tr("idlefactory.command.duplicate_block");
+            case BLOCK_CLAIMED -> tr("idlefactory.command.block_claimed");
+            case BLOCK_UNLOADED -> tr("idlefactory.command.block_unloaded");
+            case NOT_A_MACHINE -> tr("idlefactory.command.not_a_machine");
+            case LIMIT_NODES -> tr("idlefactory.command.limit_nodes");
+            case LIMIT_MACHINES -> tr("idlefactory.command.limit_machines");
+            case MEMBER_NOT_REMOVABLE -> tr("idlefactory.command.member_not_removable");
+            case DELETE_BLOCKED_RULES -> tr("idlefactory.command.delete_blocked_rules");
+            case DELETE_BLOCKED_PATTERNS -> tr("idlefactory.command.delete_blocked_patterns");
+            case INVALID_DRAFT -> tr("idlefactory.command.invalid_draft");
         };
     }
 
@@ -71,6 +71,16 @@ public final class CommandText {
      * @param result 回执
      * @return 文案或空串
      */
+    /**
+     * 取一条命令文案。
+     *
+     * @param key 语言键
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
+    }
+
     public static String successText(CommandResult result) {
         return result.ok() ? text(result) : "";
     }
