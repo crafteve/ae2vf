@@ -97,8 +97,6 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     private static final int SEARCH_W = 124;
     private static final int SEARCH_H = 13;
 
-    /** 开发者探针：只在非生产环境响应 F6–F9，避免把调试键带进正式包。 */
-    private static final boolean PROBES = !FMLLoader.isProduction();
     /** 跨界面保留的搜索词；关闭界面再打开仍保留。 */
     private static String rememberedQuery = "";
 

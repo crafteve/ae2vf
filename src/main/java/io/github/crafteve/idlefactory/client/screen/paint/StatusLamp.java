@@ -18,21 +18,6 @@ public final class StatusLamp {
     }
 
     /**
-     * 档位对应的状态条贴图。
-     *
-     * @param kind 档位
-     * @return 贴图
-     */
-    public static ResourceLocation strip(StatusKind kind) {
-        return switch (kind) {
-            case RUNNING, INPUT_OK -> GuiTextures.STATUS_STRIP_RUN;
-            case OFFLINE, STALE -> GuiTextures.STATUS_STRIP_ERROR;
-            case WAITING_MATERIAL, INPUT_BLOCKED, UNPROBED, PARTIAL -> GuiTextures.STATUS_STRIP_WARN;
-            case IDLE, UNKNOWN, UNCONFIGURED -> GuiTextures.STATUS_STRIP_IDLE;
-        };
-    }
-
-    /**
      * 档位对应的状态灯贴图。
      *
      * @param kind 档位

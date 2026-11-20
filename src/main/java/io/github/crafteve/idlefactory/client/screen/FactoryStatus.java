@@ -17,11 +17,9 @@ import net.minecraft.resources.ResourceLocation;
  * @param kind  档位
  * @param text  状态文字
  * @param color 状态文字颜色
- * @param strip 1px 状态条贴图
  * @param lamp  状态灯贴图
  */
-public record FactoryStatus(StatusKind kind, String text, int color, ResourceLocation strip,
-        ResourceLocation lamp) {
+public record FactoryStatus(StatusKind kind, String text, int color, ResourceLocation lamp) {
 
     /**
      * 把节点行映射成展示。
@@ -41,7 +39,7 @@ public record FactoryStatus(StatusKind kind, String text, int color, ResourceLoc
      */
     public static FactoryStatus of(StatusKind kind) {
         return new FactoryStatus(kind, StatusText.of(kind), StatusColor.of(kind),
-                StatusLamp.strip(kind), StatusLamp.lamp(kind));
+                StatusLamp.lamp(kind));
     }
 
     /**

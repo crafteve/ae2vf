@@ -27,15 +27,6 @@ public final class GuiTextures {
     /** 粗分隔线：1×1，拉伸使用。 */
     public static final ResourceLocation DIVIDER_DARK = id("divider_dark");
 
-    /** 1px 状态条：运行。 */
-    public static final ResourceLocation STATUS_STRIP_RUN = id("status_strip_run");
-    /** 1px 状态条：警告。 */
-    public static final ResourceLocation STATUS_STRIP_WARN = id("status_strip_warn");
-    /** 1px 状态条：错误。 */
-    public static final ResourceLocation STATUS_STRIP_ERROR = id("status_strip_error");
-    /** 1px 状态条：空闲。 */
-    public static final ResourceLocation STATUS_STRIP_IDLE = id("status_strip_idle");
-
     /** 4×4 状态灯：运行。 */
     public static final ResourceLocation STATUS_LAMP_RUN = id("status_lamp_run");
     /** 4×4 状态灯：警告。 */
