@@ -132,7 +132,7 @@ public final class CommandTopology {
      * @return 回执
      */
     public CommandResult deleteNode(Factory factory, UUID nodeId, @Nullable ServerPlayer receiver) {
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -150,7 +150,7 @@ public final class CommandTopology {
      * @return 超限为 {@code true}
      */
     private static boolean overLimit(Factory factory, Node node) {
-        var nodes = factory.config().nodes();
+        var nodes = factory.nodes();
         boolean replacing = nodes.byId(node.id()).isPresent();
         if (!replacing && nodes.size() + 1 > IdleFactoryConfig.maxNodes()) {
             return true;
@@ -206,6 +206,6 @@ public final class CommandTopology {
 
     @Nullable
     private ServerPlayer onlineOwner(Factory factory) {
-        return this.server.getPlayerList().getPlayer(factory.config().owner());
+        return this.server.getPlayerList().getPlayer(factory.owner());
     }
 }

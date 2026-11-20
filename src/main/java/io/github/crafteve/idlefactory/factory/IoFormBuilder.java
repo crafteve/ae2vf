@@ -36,7 +36,7 @@ public final class IoFormBuilder {
     public IoForm build(Factory factory, BlockFacts.Source facts) {
         IoForm form = this.forms.computeIfAbsent(factory.id(), id -> new IoForm());
         form.beginRebuild();
-        for (Node node : factory.config().nodes().all()) {
+        for (Node node : factory.nodes().all()) {
             for (Machine machine : node.machines()) {
                 if (!MachineHealth.of(node, machine, facts).usable()) {
                     continue;

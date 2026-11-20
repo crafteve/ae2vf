@@ -86,6 +86,6 @@ public final class CommandGate {
      * @return 属于为 {@code true}
      */
     public static boolean ownsNode(Factory factory, UUID nodeId) {
-        return factory.config().nodes().byId(nodeId).isPresent();
+        return factory.nodes().byId(nodeId).isPresent();
     }
 }

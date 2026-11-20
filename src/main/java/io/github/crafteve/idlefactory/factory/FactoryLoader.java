@@ -131,13 +131,13 @@ public final class FactoryLoader {
     private List<BlockOccupancyTable.Entry> occupancyEntries() {
         List<BlockOccupancyTable.Entry> entries = new ArrayList<>();
         for (Factory factory : this.library.all()) {
-            for (var node : factory.config().nodes().all()) {
+            for (var node : factory.nodes().all()) {
                 for (var machine : node.machines()) {
                     entries.add(new BlockOccupancyTable.Entry(factory.id(),
                             BlockOccupancyTable.Role.MACHINE, machine.block()));
                 }
             }
-            var anchor = factory.config().storageAnchor();
+            var anchor = factory.storageAnchor();
             if (anchor != null) {
                 entries.add(new BlockOccupancyTable.Entry(factory.id(),
                         BlockOccupancyTable.Role.STORAGE, anchor));

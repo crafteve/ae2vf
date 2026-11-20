@@ -193,7 +193,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Blocking blocking)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -210,7 +210,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Multiplier multiplier)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -228,7 +228,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Dispatch dispatch)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -245,7 +245,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Rename rename)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -297,7 +297,7 @@ public final class CommandApply {
                     ? CommandReason.OCCUPIED_SELF_ROLE : CommandReason.OCCUPIED_OTHER,
                     target, List.of());
         }
-        BlockKey anchor = factory.config().storageAnchor();
+        BlockKey anchor = factory.storageAnchor();
         if (target.equals(anchor)) {
             // 落盘与推快照由 CommandController 统一做，这里只改内存。
             factory.bindStorage(null, context.runtime().storageResolver());
@@ -332,7 +332,7 @@ public final class CommandApply {
         if (!(body instanceof FactoryCommand.Migrate migrate)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
@@ -359,7 +359,7 @@ public final class CommandApply {
         if (nodeId == null) {
             return Optional.empty();
         }
-        return factory.config().nodes().byId(nodeId).map(Node::io);
+        return factory.nodes().byId(nodeId).map(Node::io);
     }
 
     private static List<ResourceSpec> rules(NodeIo io, IoSide side) {
@@ -403,7 +403,7 @@ public final class CommandApply {
             return;
         }
         runtime.markDirty();
-        factory.config().nodes().byId(nodeId).ifPresent(node -> {
+        factory.nodes().byId(nodeId).ifPresent(node -> {
             for (var machine : node.machines()) {
                 runtime.nodeIoRunner().wake(machine.id());
             }

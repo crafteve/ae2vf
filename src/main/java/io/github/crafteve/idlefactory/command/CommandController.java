@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryConfig;
 import io.github.crafteve.idlefactory.factory.FactoryLibrary;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
@@ -172,7 +171,7 @@ public final class CommandController {
             return;
         }
         UUID id = io.github.crafteve.idlefactory.factory.FactoryStore.idOf(player.getUUID());
-        Factory factory = new Factory(id, new FactoryConfig(player.getUUID(), null));
+        Factory factory = new Factory(id, player.getUUID(), null);
         if (!manager.add(factory)) {
             IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
             return;

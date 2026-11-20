@@ -119,7 +119,7 @@ final class FactoryRunner implements ObservationChangeListener {
         // 保留集合按「配置引用的机器」：含 UNLOADED，只有机器离开配置才释放账本 / 面经验 / 端口缓存。
         Set<UUID> liveMachines = new HashSet<>();
         for (Factory factory : this.manager.all()) {
-            for (Node node : factory.config().nodes().all()) {
+            for (Node node : factory.nodes().all()) {
                 for (Machine machine : node.machines()) {
                     liveMachines.add(machine.id());
                 }
@@ -144,7 +144,7 @@ final class FactoryRunner implements ObservationChangeListener {
     private void collectKeys() {
         this.referenced.clear();
         for (Factory factory : this.manager.all()) {
-            for (Node node : factory.config().nodes().all()) {
+            for (Node node : factory.nodes().all()) {
                 for (Machine machine : node.machines()) {
                     this.observationRunner.ensure(machine.block());
                     this.referenced.add(machine.block());
@@ -158,7 +158,7 @@ final class FactoryRunner implements ObservationChangeListener {
         long now = this.observations.currentTick();
         long staleTicks = IdleFactoryConfig.staleHealthTicks();
         for (Factory factory : this.manager.all()) {
-            for (Node node : factory.config().nodes().all()) {
+            for (Node node : factory.nodes().all()) {
                 Node current = node;
                 Optional<ResourceLocation> migration = CommandController.migrationTarget(current,
                         this.observations, now, staleTicks);
@@ -168,7 +168,7 @@ final class FactoryRunner implements ObservationChangeListener {
                                     CommandSource.SYSTEM, current.id(), null, 0L,
                                     new FactoryCommand.Migrate(migration.get())));
                     if (result.ok()) {
-                        current = factory.config().nodes().byId(current.id()).orElse(current);
+                        current = factory.nodes().byId(current.id()).orElse(current);
                     }
                 }
                 NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(current,
@@ -189,7 +189,7 @@ final class FactoryRunner implements ObservationChangeListener {
             List<LiveNodeLibrary.Spec> specs = new ArrayList<>();
             Map<UUID, Set<UUID>> onlineMachines = new HashMap<>();
             for (Factory factory : this.manager.all()) {
-                BlockKey anchor = factory.config().storageAnchor();
+                BlockKey anchor = factory.storageAnchor();
                 if (anchor == null) {
                     continue;
                 }
@@ -203,7 +203,7 @@ final class FactoryRunner implements ObservationChangeListener {
                 }
                 long now = this.observations.currentTick();
                 long staleTicks = IdleFactoryConfig.staleHealthTicks();
-                for (Node node : factory.config().nodes().all()) {
+                for (Node node : factory.nodes().all()) {
                     NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(node,
                             this.observations, now, staleTicks);
                     boolean available = snapshot.health() != NodeHealth.OFFLINE;
@@ -231,8 +231,8 @@ final class FactoryRunner implements ObservationChangeListener {
      * @return 各节点的输入，顺序与节点库一致
      */
     private List<DispatchState> dispatchStates(Factory factory) {
-        List<DispatchState> states = new ArrayList<>(factory.config().nodes().size());
-        for (Node node : factory.config().nodes().all()) {
+        List<DispatchState> states = new ArrayList<>(factory.nodes().size());
+        for (Node node : factory.nodes().all()) {
             LiveNode runtime = this.nodeApply.node(node.id());
             if (runtime != null) {
                 states.add(runtime.dispatchState());
@@ -255,7 +255,7 @@ final class FactoryRunner implements ObservationChangeListener {
      */
     private void handleChange(ObservationChange.BlockChange change) {
         for (Factory factory : this.manager.all()) {
-            Optional<Machine> machineFound = factory.config().nodes().machineAt(change.key());
+            Optional<Machine> machineFound = factory.nodes().machineAt(change.key());
             if (machineFound.isEmpty()) {
                 continue;
             }

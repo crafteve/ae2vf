@@ -33,7 +33,7 @@ public final class FactoryResolver {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        return factory.config().nodes().machineByShortId(ref);
+        return factory.nodes().machineByShortId(ref);
     }
 
     /**
@@ -47,7 +47,7 @@ public final class FactoryResolver {
         if (factory == null || ref == null || ref.isBlank()) {
             return Optional.empty();
         }
-        return factory.config().nodes().byShortId(ref);
+        return factory.nodes().byShortId(ref);
     }
 
     /**

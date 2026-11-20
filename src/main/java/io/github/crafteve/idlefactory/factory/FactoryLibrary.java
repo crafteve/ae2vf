@@ -41,7 +41,7 @@ public final class FactoryLibrary {
         for (Entry record : records) {
             UUID id = FactoryStore.idOf(record.owner());
             FactoryConfig config = new FactoryConfig(record.owner(), record.anchor());
-            Factory factory = new Factory(id, config);
+            Factory factory = new Factory(id, record.owner(), record.anchor());
             for (Node node : record.nodes()) {
                 NodeLibrary.Result added = factory.restoreNode(node);
                 if (added != NodeLibrary.Result.ADDED) {
@@ -94,11 +94,11 @@ public final class FactoryLibrary {
      */
     public boolean add(Factory factory) {
         if (this.byId.containsKey(factory.id())
-                || this.byOwner.containsKey(factory.config().owner())) {
+                || this.byOwner.containsKey(factory.owner())) {
             return false;
         }
         this.byId.put(factory.id(), factory);
-        this.byOwner.put(factory.config().owner(), factory);
+        this.byOwner.put(factory.owner(), factory);
         return true;
     }
 
@@ -113,7 +113,7 @@ public final class FactoryLibrary {
         if (removed == null) {
             return false;
         }
-        this.byOwner.remove(removed.config().owner());
+        this.byOwner.remove(removed.owner());
         return true;
     }
 

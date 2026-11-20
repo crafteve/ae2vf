@@ -67,14 +67,14 @@ public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> node
      */
     public static WandLinksS2C of(Factory factory) {
         List<NodeLink> nodes = new ArrayList<>();
-        for (Node node : factory.config().nodes().all()) {
+        for (Node node : factory.nodes().all()) {
             List<MachineLink> machines = new ArrayList<>(node.machineCount());
             for (Machine machine : node.machines()) {
                 machines.add(new MachineLink(machine.id(), machine.block()));
             }
             nodes.add(new NodeLink(node.id(), node.typeBlockId(), machines));
         }
-        return new WandLinksS2C(factory.config().storageAnchor(), nodes);
+        return new WandLinksS2C(factory.storageAnchor(), nodes);
     }
 
     /** 空状态：没有工厂或还没有节点。 */

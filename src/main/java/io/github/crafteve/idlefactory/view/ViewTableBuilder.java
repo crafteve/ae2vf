@@ -79,7 +79,7 @@ public final class ViewTableBuilder {
         long healthNow = observations == null ? 0L : observations.currentTick();
         long staleTicks = IdleFactoryConfig.staleHealthTicks();
         boolean storageOnline = factory.storageOnline();
-        List<Node> configured = factory.config().nodes().all();
+        List<Node> configured = factory.nodes().all();
         List<ViewNode> rows = new ArrayList<>(configured.size());
         for (Node node : configured) {
             rows.add(buildNode(factory, node, rows.size(), facts, healthNow, staleTicks,

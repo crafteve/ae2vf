@@ -15,14 +15,19 @@ import appeng.api.storage.MEStorage;
 /**
  * 一个工厂实例：id + 配置 + 运行时。
  *
- * <p>它是服务端对象，不感知终端是否存在。配置在 {@link FactoryConfig}，写档；运行时在
- * 仓库缓存与执行账房直接挂在工厂上，可随时从配置重建。</p>
+ * <p>它是服务端对象，不感知终端是否存在。写档部分只有三样：拥有者、仓库锚点、节点库；
+ * 仓库缓存与执行账房是运行时，可随时从写档部分重建。</p>
  */
 public final class Factory {
     /** 工厂唯一 id。 */
     private final UUID id;
-    /** 写档部分：拥有者、仓库锚点、节点库。 */
-    private final FactoryConfig config;
+    /** 拥有者玩家 uuid；鉴权只看这个字段。 */
+    private final UUID owner;
+    /** 仓库锚点方块；未绑定为 {@code null}。 */
+    @Nullable
+    private BlockKey storageAnchor;
+    /** 节点库：工厂接管的全部节点与机器。 */
+    private final NodeLibrary nodes = new NodeLibrary();
     /** 当前仓库；离线时为 {@code null}。 */
     @Nullable
     private MEStorage storage;
@@ -35,12 +40,14 @@ public final class Factory {
     private final IoAnalyzer analyzer = new IoAnalyzer();
 
     /**
-     * @param id     工厂 id
-     * @param config 写档配置
+     * @param id            工厂 id
+     * @param owner         拥有者玩家 uuid
+     * @param storageAnchor 仓库锚点方块；未绑定为 {@code null}
      */
-    public Factory(UUID id, FactoryConfig config) {
+    public Factory(UUID id, UUID owner, @Nullable BlockKey storageAnchor) {
         this.id = id;
-        this.config = config;
+        this.owner = owner;
+        this.storageAnchor = storageAnchor;
     }
 
     /** 工厂 id。 */
@@ -48,9 +55,27 @@ public final class Factory {
         return this.id;
     }
 
-    /** 写档配置。 */
-    public FactoryConfig config() {
-        return this.config;
+    /** 拥有者玩家 uuid。 */
+    public UUID owner() {
+        return this.owner;
+    }
+
+    /** 仓库锚点方块；未绑定为 {@code null}。 */
+    @Nullable
+    public BlockKey storageAnchor() {
+        return this.storageAnchor;
+    }
+
+    /**
+     * 节点库的只读视图。
+     *
+     * <p>写入口是 {@link #addNode} / {@link #removeNode} / {@link #replaceNode}（运行时）与
+     * {@link #restoreNode}（读档），调用方拿不到可变句柄。</p>
+     *
+     * @return 节点库视图
+     */
+    public io.github.crafteve.idlefactory.node.NodeLibraryView nodes() {
+        return this.nodes;
     }
 
     /** 当前仓库；离线时为 {@code null}。 */
@@ -82,7 +107,7 @@ public final class Factory {
      * @param resolver 仓库解析器；{@code null} 表示运行时未就绪
      */
     public void bindStorage(@Nullable BlockKey anchor, @Nullable MeStorageResolver resolver) {
-        this.config.setStorageAnchor(anchor);
+        this.storageAnchor = anchor;
         this.refresh(anchor, resolver);
     }
 
@@ -93,7 +118,7 @@ public final class Factory {
      * @return 加入结果；id 重复或库满时不是 {@code ADDED}
      */
     NodeLibrary.Result restoreNode(Node node) {
-        return this.config.library().add(node);
+        return this.nodes.add(node);
     }
 
     /**
@@ -103,7 +128,7 @@ public final class Factory {
      * @return 节点库的写入结果
      */
     public NodeLibrary.Result addNode(Node node) {
-        return this.config.library().add(node);
+        return this.nodes.add(node);
     }
 
     /**
@@ -113,7 +138,7 @@ public final class Factory {
      * @return 节点库的写入结果
      */
     public NodeLibrary.Result removeNode(java.util.UUID nodeId) {
-        return this.config.library().remove(nodeId);
+        return this.nodes.remove(nodeId);
     }
 
     /**
@@ -123,7 +148,7 @@ public final class Factory {
      * @return 节点库的写入结果
      */
     public NodeLibrary.Result replaceNode(Node node) {
-        return this.config.library().replace(node);
+        return this.nodes.replace(node);
     }
 
     /**
@@ -133,7 +158,7 @@ public final class Factory {
      * @return 在线状态是否变化
      */
     public boolean refreshStorage(@Nullable MeStorageResolver resolver) {
-        return this.refresh(this.config.storageAnchor(), resolver);
+        return this.refresh(this.storageAnchor, resolver);
     }
 
     /**

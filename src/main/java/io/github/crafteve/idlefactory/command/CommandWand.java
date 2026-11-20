@@ -72,7 +72,7 @@ public final class CommandWand {
         if (level == null || !level.isLoaded(block.pos())) {
             return CommandResult.of(CommandReason.BLOCK_UNLOADED);
         }
-        Optional<Machine> bound = factory.config().nodes().machineAt(block);
+        Optional<Machine> bound = factory.nodes().machineAt(block);
         CommandResult result = bound.isPresent()
                 ? disconnect(factory, bound.get(), block, player)
                 : connect(factory, level, block, player);
@@ -153,7 +153,7 @@ public final class CommandWand {
                     check.conflicts());
         }
         Node base = draft.nodeId() == null ? null
-                : factory.config().nodes().byId(draft.nodeId()).orElse(null);
+                : factory.nodes().byId(draft.nodeId()).orElse(null);
         int baseMachines = base == null ? 0 : base.machineCount();
         int finalMachines = baseMachines - draft.removed().size() + draft.added().size();
         Node candidate = finalMachines == 0 ? null : buildCandidate(base, draft);
@@ -231,7 +231,7 @@ public final class CommandWand {
      */
     private CommandResult disconnect(Factory factory, Machine machine, BlockKey block,
             ServerPlayer player) {
-        Optional<Node> found = factory.config().nodes().nodeOfMachine(machine.id());
+        Optional<Node> found = factory.nodes().nodeOfMachine(machine.id());
         if (found.isEmpty()) {
             return CommandResult.of(CommandReason.NODE_MISSING);
         }
@@ -271,7 +271,7 @@ public final class CommandWand {
         if (energy == null || this.runtime.observations() == null || added.isEmpty()) {
             return;
         }
-        Optional<Node> found = factory.config().nodes().byId(nodeId);
+        Optional<Node> found = factory.nodes().byId(nodeId);
         if (found.isEmpty()) {
             return;
         }

@@ -25,7 +25,7 @@ public final class WandLinkPort {
      * @param factory 发生结构变化的工厂
      */
     public static void push(MinecraftServer server, Factory factory) {
-        ServerPlayer owner = server.getPlayerList().getPlayer(factory.config().owner());
+        ServerPlayer owner = server.getPlayerList().getPlayer(factory.owner());
         if (owner != null) {
             PacketDistributor.sendToPlayer(owner, WandLinksS2C.of(factory));
         }

@@ -43,7 +43,7 @@ public final class ObservationNoticeListener implements ObservationChangeListene
     public void onObservationChanged(ObservationChange change) {
         for (ObservationChange.BlockChange blockChange : change.changes()) {
             for (Factory factory : this.manager.all()) {
-                Optional<Machine> machine = factory.config().nodes().machineAt(blockChange.key());
+                Optional<Machine> machine = factory.nodes().machineAt(blockChange.key());
                 if (machine.isEmpty()) {
                     continue;
                 }
@@ -76,7 +76,7 @@ public final class ObservationNoticeListener implements ObservationChangeListene
         for (UUID factoryId : factoryIds) {
             Factory factory = this.manager.byId(factoryId).orElse(null);
             ServerPlayer player = factory == null ? null
-                    : this.server.getPlayerList().getPlayer(factory.config().owner());
+                    : this.server.getPlayerList().getPlayer(factory.owner());
             int missing = this.missingNotices.getOrDefault(factoryId, 0);
             int restored = this.restoredNotices.getOrDefault(factoryId, 0);
             this.missingNotices.remove(factoryId);

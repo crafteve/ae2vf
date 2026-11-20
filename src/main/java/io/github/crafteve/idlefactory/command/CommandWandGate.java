@@ -92,7 +92,7 @@ public final class CommandWandGate {
         if (!(player.getMainHandItem().getItem() instanceof MachineBindingWandItem)) {
             return CommandReason.NOT_HOLDING_WAND;
         }
-        if (!factory.config().owner().equals(player.getUUID())) {
+        if (!factory.owner().equals(player.getUUID())) {
             return CommandReason.FACTORY_MISSING;
         }
         return CommandReason.OK;
@@ -114,7 +114,7 @@ public final class CommandWandGate {
         }
         Node base = null;
         if (draft.nodeId() != null) {
-            Optional<Node> found = factory.config().nodes().byId(draft.nodeId());
+            Optional<Node> found = factory.nodes().byId(draft.nodeId());
             if (found.isEmpty()) {
                 return new WandGateResult(CommandReason.NODE_MISSING, List.of());
             }
@@ -169,13 +169,13 @@ public final class CommandWandGate {
         }
         int baseMachines = base == null ? 0 : base.machineCount();
         int finalMachines = baseMachines - draft.removed().size() + draft.added().size();
-        if (base == null && factory.config().nodes().size() + 1 > IdleFactoryConfig.maxNodes()) {
+        if (base == null && factory.nodes().size() + 1 > IdleFactoryConfig.maxNodes()) {
             return new WandGateResult(CommandReason.LIMIT_NODES, List.of());
         }
         if (finalMachines > IdleFactoryConfig.maxMachinesPerNode()) {
             return new WandGateResult(CommandReason.LIMIT_MACHINES, List.of());
         }
-        if (factory.config().nodes().totalMachineCount() - baseMachines + finalMachines
+        if (factory.nodes().totalMachineCount() - baseMachines + finalMachines
                 > IdleFactoryConfig.maxTotalMachines()) {
             return new WandGateResult(CommandReason.LIMIT_MACHINES, List.of());
         }
@@ -225,7 +225,7 @@ public final class CommandWandGate {
         if (!CommandChain.isMachine(level, block.pos())) {
             return BlockCheck.failed(CommandReason.NOT_A_MACHINE);
         }
-        if (factory.config().nodes().machineAt(block).isPresent()) {
+        if (factory.nodes().machineAt(block).isPresent()) {
             return BlockCheck.failed(CommandReason.BLOCK_CLAIMED);
         }
         if (this.occupancy.check(block, factory.id(), BlockOccupancyTable.Role.MACHINE).kind()

@@ -164,8 +164,8 @@ public final class FactoryStore extends SavedData {
     }
 
     private static Entry toEntry(io.github.crafteve.idlefactory.factory.Factory factory) {
-        return new Entry(factory.config().owner(), factory.config().storageAnchor(),
-                factory.config().nodes().all());
+        return new Entry(factory.owner(), factory.storageAnchor(),
+                factory.nodes().all());
     }
 
     @Override
