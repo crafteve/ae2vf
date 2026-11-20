@@ -133,12 +133,15 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     private final Set<UUID> collapsed = new HashSet<>();
     /** 点过「… N 台」的节点，展开全部成员。 */
     private final Set<UUID> expandedAll = new HashSet<>();
-    /** 上一次点击名字区域的下标与时刻：双击才进改名。 */
-    private long lastNameClickAt;
-    private int lastNameClickNode = -1;
-
+    /** 名字区域第一次点击的节点：等双击窗口过去还没第二次点击，才执行展开 / 收起。 */
+    @Nullable
+    private UUID pendingToggleNode;
+    /** 待切换的节点下标；{@code -1} 表示没有挂起的点击。 */
+    private int pendingToggleIndex = -1;
+    /** 挂起点击的到期时刻（毫秒）。 */
+    private long pendingToggleAt;
     /** 双击判定窗口（毫秒）。 */
-    private static final long DOUBLE_CLICK_MS = 320L;
+    private static final long DOUBLE_CLICK_MS = 250L;
     @Nullable
     private ConfirmDialog confirmDialog;
     /** 正在改名的节点；{@code null} 表示不在改名。 */
@@ -282,6 +285,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
 
     @Override
     public void containerTick() {
+        flushPendingClick();
         super.containerTick();
         if (++this.requestTicker >= REQUEST_INTERVAL) {
             this.requestTicker = 0;
@@ -308,6 +312,8 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 clickHit(hit, button);
                 return true;
             }
+            // 点到空白处：挂起的名字点击不再生效。
+            clearPendingClick();
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -573,12 +579,10 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 }
             }
             case NAME -> {
-                // 单击 = 展开 / 收起；双击名字区域才改名（双击时抵消第一次的切换）。
-                if (!reverse && isDoubleClick(hit.node())) {
-                    toggleExpanded(node.nodeId());
-                    beginRename(hit.node(), node);
-                } else if (!reverse) {
-                    toggleExpanded(node.nodeId());
+                // 名字区域单击先挂起，等到双击窗口过去还没第二次点击才切换；
+                // 双击则撤销挂起并直接改名，避免“点一下展开、再点一下收起”的抖动。
+                if (!reverse) {
+                    clickName(hit.node(), node);
                 }
             }
             case BLOCKING -> {
@@ -647,18 +651,50 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     }
 
     /**
-     * 是否构成对同一节点名字区域的双击。
+     * 名字区域的一次点击：第一次只挂起，第二次落在窗口内才当作双击改名。
      *
-     * @param node 节点下标
-     * @return 距上次点击同一节点不足 {@link #DOUBLE_CLICK_MS} 时为 {@code true}
+     * @param index 节点下标
+     * @param node  节点行
      */
-    private boolean isDoubleClick(int node) {
+    private void clickName(int index, NodeRow node) {
+        // 换一个节点或窗口已过：先把上一笔挂起的切换执行掉，别吞掉玩家的单击。
+        if (this.pendingToggleNode != null
+                && (this.pendingToggleIndex != index
+                        || System.currentTimeMillis() > this.pendingToggleAt)) {
+            UUID previous = this.pendingToggleNode;
+            clearPendingClick();
+            toggleExpanded(previous);
+        }
         long now = System.currentTimeMillis();
-        boolean doubled = this.lastNameClickNode == node
-                && now - this.lastNameClickAt <= DOUBLE_CLICK_MS;
-        this.lastNameClickNode = doubled ? -1 : node;
-        this.lastNameClickAt = doubled ? 0L : now;
-        return doubled;
+        if (this.pendingToggleIndex == index && now <= this.pendingToggleAt) {
+            // 双击：撤销挂起的展开 / 收起，直接进改名。
+            clearPendingClick();
+            beginRename(index, node);
+            return;
+        }
+        this.pendingToggleNode = node.nodeId();
+        this.pendingToggleIndex = index;
+        this.pendingToggleAt = now + DOUBLE_CLICK_MS;
+    }
+
+    /** 双击窗口到期后执行挂起的展开 / 收起。 */
+    private void flushPendingClick() {
+        if (this.pendingToggleNode == null) {
+            return;
+        }
+        if (System.currentTimeMillis() < this.pendingToggleAt) {
+            return;
+        }
+        UUID nodeId = this.pendingToggleNode;
+        clearPendingClick();
+        toggleExpanded(nodeId);
+    }
+
+    /** 清掉挂起的名字点击。 */
+    private void clearPendingClick() {
+        this.pendingToggleNode = null;
+        this.pendingToggleIndex = -1;
+        this.pendingToggleAt = 0L;
     }
 
     private void beginRename(int index, NodeRow node) {
