@@ -94,7 +94,7 @@ public final class WandPrecheck {
     public static ResourceLocation baseType(Minecraft minecraft, WandDraft draft) {
         if (draft.nodeId() != null) {
             return WandLinkCache.node(draft.nodeId())
-                    .map(io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C.NodeLink::typeBlockId)
+                    .map(io.github.crafteve.idlefactory.network.payload.WandLinksS2C.NodeLink::typeBlockId)
                     .orElse(null);
         }
         for (BlockKey block : draft.added()) {

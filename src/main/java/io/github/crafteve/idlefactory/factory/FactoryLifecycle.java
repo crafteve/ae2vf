@@ -30,7 +30,7 @@ import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
 import io.github.crafteve.idlefactory.network.ObservationNoticeListener;
 import io.github.crafteve.idlefactory.network.ViewPort;
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -278,7 +278,7 @@ public final class FactoryLifecycle {
     private void pushLinksTo(Factory factory) {
         ServerPlayer owner = this.server.getPlayerList().getPlayer(factory.config().owner());
         if (owner != null) {
-            PacketDistributor.sendToPlayer(owner, FactoryLinksS2C.of(factory));
+            PacketDistributor.sendToPlayer(owner, WandLinksS2C.of(factory));
         }
     }
 

@@ -15,21 +15,21 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 客户端请求当前工厂的链接快照。
  *
- * <p>进服、换维度、打开终端时发一次；服务端回 {@link FactoryLinksS2C}。没有工厂时回空快照，
+ * <p>进服、换维度、打开终端时发一次；服务端回 {@link WandLinksS2C}。没有工厂时回空快照，
  * 让客户端把旧缓存清掉。结构变更后的刷新靠服务端推送，不再轮询。</p>
  */
-public record FactoryLinksRequestC2S() implements CustomPacketPayload {
+public record WandLinksRequestC2S() implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:factory_links_request}。 */
-    public static final Type<FactoryLinksRequestC2S> TYPE =
+    public static final Type<WandLinksRequestC2S> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
-                    "factory_links_request"));
+                    "wand_links_request"));
 
     /** 空负载编解码器。 */
-    public static final StreamCodec<RegistryFriendlyByteBuf, FactoryLinksRequestC2S> STREAM_CODEC =
-            StreamCodec.unit(new FactoryLinksRequestC2S());
+    public static final StreamCodec<RegistryFriendlyByteBuf, WandLinksRequestC2S> STREAM_CODEC =
+            StreamCodec.unit(new WandLinksRequestC2S());
 
     @Override
-    public Type<FactoryLinksRequestC2S> type() {
+    public Type<WandLinksRequestC2S> type() {
         return TYPE;
     }
 
@@ -39,19 +39,19 @@ public record FactoryLinksRequestC2S() implements CustomPacketPayload {
      * @param payload 请求
      * @param context 上下文
      */
-    public static void handle(FactoryLinksRequestC2S payload, IPayloadContext context) {
+    public static void handle(WandLinksRequestC2S payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
             FactoryLifecycle runtime = FactoryLifecycle.get();
             if (runtime == null) {
-                PacketDistributor.sendToPlayer(player, FactoryLinksS2C.empty());
+                PacketDistributor.sendToPlayer(player, WandLinksS2C.empty());
                 return;
             }
             Factory factory = runtime.manager().byOwner(player.getUUID()).orElse(null);
             PacketDistributor.sendToPlayer(player, factory == null
-                    ? FactoryLinksS2C.empty() : FactoryLinksS2C.of(factory));
+                    ? WandLinksS2C.empty() : WandLinksS2C.of(factory));
         });
     }
 }

@@ -9,13 +9,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.location.BlockKey;
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.WandLinksRequestC2S;
+import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
 
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 客户端链接快照：服务端 {@link FactoryLinksS2C} 的唯一缓存。
+ * 客户端链接快照：服务端 {@link WandLinksS2C} 的唯一缓存。
  *
  * <p>服务端每次结构变更都会推送整份快照，客户端整体替换，不累积、不合并。缓存同时维护三张
  * 索引：{@code BlockKey → 归属} 与 {@code machineId → 方块} 供草稿三态、红框与面板用，
@@ -28,7 +28,7 @@ public final class WandLinkCache {
     private static List<BlockKey> machineBlocks = List.of();
     private static Map<BlockKey, Owner> owners = Map.of();
     private static Map<UUID, BlockKey> machineBlocksById = Map.of();
-    private static Map<UUID, FactoryLinksS2C.NodeLink> nodes = Map.of();
+    private static Map<UUID, WandLinksS2C.NodeLink> nodes = Map.of();
 
     private WandLinkCache() {
         // 纯静态缓存
@@ -48,14 +48,14 @@ public final class WandLinkCache {
      *
      * @param payload 同步包
      */
-    public static void update(FactoryLinksS2C payload) {
+    public static void update(WandLinksS2C payload) {
         Map<BlockKey, Owner> nextOwners = new HashMap<>();
         Map<UUID, BlockKey> nextMachineBlocks = new HashMap<>();
-        Map<UUID, FactoryLinksS2C.NodeLink> nextNodes = new HashMap<>();
+        Map<UUID, WandLinksS2C.NodeLink> nextNodes = new HashMap<>();
         List<BlockKey> nextBlocks = new ArrayList<>();
-        for (FactoryLinksS2C.NodeLink node : payload.nodes()) {
+        for (WandLinksS2C.NodeLink node : payload.nodes()) {
             nextNodes.put(node.nodeId(), node);
-            for (FactoryLinksS2C.MachineLink machine : node.machines()) {
+            for (WandLinksS2C.MachineLink machine : node.machines()) {
                 nextOwners.put(machine.block(),
                         new Owner(node.nodeId(), machine.machineId()));
                 nextMachineBlocks.put(machine.machineId(), machine.block());
@@ -107,12 +107,12 @@ public final class WandLinkCache {
      * @param nodeId 节点 id
      * @return 节点；没有该节点时为空
      */
-    public static Optional<FactoryLinksS2C.NodeLink> node(UUID nodeId) {
+    public static Optional<WandLinksS2C.NodeLink> node(UUID nodeId) {
         return Optional.ofNullable(nodes.get(nodeId));
     }
 
     /** 主动请求一份全量快照；登录、换维度、打开终端时调。 */
     public static void request() {
-        PacketDistributor.sendToServer(new FactoryLinksRequestC2S());
+        PacketDistributor.sendToServer(new WandLinksRequestC2S());
     }
 }

@@ -27,7 +27,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
 
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;

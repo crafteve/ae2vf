@@ -3,9 +3,9 @@ package io.github.crafteve.idlefactory.network;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksRequestC2S;
+import io.github.crafteve.idlefactory.network.payload.WandLinksRequestC2S;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandS2C;
@@ -44,7 +44,7 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  */
 public final class IdleFactoryNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "40";
+    public static final String PROTOCOL_VERSION = "41";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -107,10 +107,10 @@ public final class IdleFactoryNetwork {
                 FactoryTerminalSortS2C.STREAM_CODEC, FactoryTerminalSortS2C::handle);
 
         // 绑定杖：链接快照（仓库绑定已并入统一写命令）
-        registrar.playToServer(FactoryLinksRequestC2S.TYPE, FactoryLinksRequestC2S.STREAM_CODEC,
-                FactoryLinksRequestC2S::handle);
-        registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
-                FactoryLinksS2C::handle);
+        registrar.playToServer(WandLinksRequestC2S.TYPE, WandLinksRequestC2S.STREAM_CODEC,
+                WandLinksRequestC2S::handle);
+        registrar.playToClient(WandLinksS2C.TYPE, WandLinksS2C.STREAM_CODEC,
+                WandLinksS2C::handle);
 
         // 视图表：请求、全量分页、差量（读侧唯一通道，第 3c 步后旧两对包删除）
         registrar.playToServer(ViewTableRequestC2S.TYPE, ViewTableRequestC2S.STREAM_CODEC,

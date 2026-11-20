@@ -36,22 +36,22 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param nodes 全部节点
  */
-public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload {
+public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:factory_links}。 */
-    public static final Type<FactoryLinksS2C> TYPE =
+    public static final Type<WandLinksS2C> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
-                    "factory_links"));
+                    "wand_links"));
 
     /** 编解码器。 */
-    public static final StreamCodec<RegistryFriendlyByteBuf, FactoryLinksS2C> STREAM_CODEC =
-            StreamCodec.of(FactoryLinksS2C::write, FactoryLinksS2C::read);
+    public static final StreamCodec<RegistryFriendlyByteBuf, WandLinksS2C> STREAM_CODEC =
+            StreamCodec.of(WandLinksS2C::write, WandLinksS2C::read);
 
-    public FactoryLinksS2C {
+    public WandLinksS2C {
         nodes = List.copyOf(nodes);
     }
 
     @Override
-    public Type<FactoryLinksS2C> type() {
+    public Type<WandLinksS2C> type() {
         return TYPE;
     }
 
@@ -61,7 +61,7 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
      * @param factory 工厂
      * @return 同步包
      */
-    public static FactoryLinksS2C of(Factory factory) {
+    public static WandLinksS2C of(Factory factory) {
         List<NodeLink> nodes = new ArrayList<>();
         for (Node node : factory.config().nodes().all()) {
             List<MachineLink> machines = new ArrayList<>(node.machineCount());
@@ -70,12 +70,12 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
             }
             nodes.add(new NodeLink(node.id(), node.typeBlockId(), machines));
         }
-        return new FactoryLinksS2C(nodes);
+        return new WandLinksS2C(nodes);
     }
 
     /** 空状态：没有工厂或还没有节点。 */
-    public static FactoryLinksS2C empty() {
-        return new FactoryLinksS2C(List.of());
+    public static WandLinksS2C empty() {
+        return new WandLinksS2C(List.of());
     }
 
     /**
@@ -84,11 +84,11 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
      * @param payload 同步包
      * @param context 上下文
      */
-    public static void handle(FactoryLinksS2C payload, IPayloadContext context) {
+    public static void handle(WandLinksS2C payload, IPayloadContext context) {
         ClientWandLinksHandler.handle(payload, context);
     }
 
-    private static void write(RegistryFriendlyByteBuf buf, FactoryLinksS2C payload) {
+    private static void write(RegistryFriendlyByteBuf buf, WandLinksS2C payload) {
         int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
         int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
         int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
@@ -111,7 +111,7 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
         }
     }
 
-    private static FactoryLinksS2C read(RegistryFriendlyByteBuf buf) {
+    private static WandLinksS2C read(RegistryFriendlyByteBuf buf) {
         int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
         int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
         int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
@@ -133,7 +133,7 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
             readMachines += machineCount;
             nodes.add(new NodeLink(nodeId, typeBlockId, machines));
         }
-        return new FactoryLinksS2C(nodes);
+        return new WandLinksS2C(nodes);
     }
 
     private static int readCount(RegistryFriendlyByteBuf buf, int limit, String what) {

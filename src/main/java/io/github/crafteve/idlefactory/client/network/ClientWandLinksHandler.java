@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.client.network;
 
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
-import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
+import io.github.crafteve.idlefactory.network.payload.WandLinksS2C;
 
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -19,7 +19,7 @@ public final class ClientWandLinksHandler {
      * @param payload 同步包
      * @param context 上下文
      */
-    public static void handle(FactoryLinksS2C payload, IPayloadContext context) {
+    public static void handle(WandLinksS2C payload, IPayloadContext context) {
         context.enqueueWork(() -> WandLinkCache.update(payload));
     }
 }
