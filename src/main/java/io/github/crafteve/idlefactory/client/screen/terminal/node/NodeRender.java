@@ -182,7 +182,7 @@ final class NodeRender {
                 provider && row.blockingOn()
                         ? StatusColor.RUN : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.BLOCKING));
-        drawLabel(graphics, "阻", NodeLayout.keyX(viewport, 0), NodeLayout.KEY_W,
+        drawLabel(graphics, tr("idlefactory.node.label.blocking"), NodeLayout.keyX(viewport, 0), NodeLayout.KEY_W,
                 keyTextY, provider && row.blockingOn()
                         ? 0xFFFFFFFF : TEXT_PRIMARY);
 
@@ -201,7 +201,8 @@ final class NodeRender {
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 roundRobin ? StatusColor.RUN : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
-        drawLabel(graphics, roundRobin ? "轮" : "序", NodeLayout.keyX(viewport, 2),
+        drawLabel(graphics, tr(roundRobin
+                ? "idlefactory.node.label.round_robin" : "idlefactory.node.label.sequential"), NodeLayout.keyX(viewport, 2),
                 NodeLayout.KEY_W, keyTextY,
                 roundRobin ? 0xFFFFFFFF : TEXT_DIM);
 
@@ -261,13 +262,24 @@ final class NodeRender {
                 ? node.core().name() : FactoryLabels.blockName(node.core().typeBlockId());
     }
 
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
+    }
+
     /** 倍率键帽文字：关 / ×N / 智。 */
     private static String multiplierLabel(
             io.github.crafteve.idlefactory.node.Multiplier multiplier) {
         return switch (multiplier.mode()) {
-            case OFF -> "倍";
+            case OFF -> tr("idlefactory.node.label.multiplier.off");
             case FIXED -> multiplier.factor() >= 8 ? "8" : Integer.toString(multiplier.factor());
-            case SMART -> "智";
+            case SMART -> tr("idlefactory.node.label.multiplier.smart");
         };
     }
 
@@ -295,15 +307,15 @@ final class NodeRender {
     private static String statusHint(boolean probed, boolean stale, NodeHealth health,
             boolean available) {
         if (!probed) {
-            return "未探测";
+            return tr("idlefactory.status.unprobed");
         }
         if (stale) {
-            return "健康过期";
+            return tr("idlefactory.status.stale");
         }
         return switch (health) {
-            case OFFLINE -> "失联";
-            case PARTIAL -> "缺机";
-            case ONLINE -> available ? "" : "非 ME";
+            case OFFLINE -> tr("idlefactory.status.offline");
+            case PARTIAL -> tr("idlefactory.status.partial");
+            case ONLINE -> available ? "" : tr("idlefactory.node.hint.not_me");
         };
     }
 
@@ -339,14 +351,14 @@ final class NodeRender {
                     NodeLayout.MEMBER_ROW_H - 2, BEVEL_LIGHT, true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);
-            drawLabel(graphics, "定", locateX, NodeLayout.LOCATE, y + 3,
+            drawLabel(graphics, tr("idlefactory.node.label.locate"), locateX, NodeLayout.LOCATE, y + 3,
                     TEXT_PRIMARY);
         }
         if (box.totalMembers() > box.shownMembers()) {
             int y = NodeLayout.moreRowY(viewport, box, scroll);
             int x = NodeLayout.memberX(viewport);
             graphics.drawString(this.font,
-                    "… " + (box.totalMembers() - box.shownMembers()) + " 台", x + 4, y + 3,
+                    tr("idlefactory.node.more", box.totalMembers() - box.shownMembers()), x + 4, y + 3,
                     TEXT_DIM, false);
         }
     }

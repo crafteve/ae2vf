@@ -76,7 +76,7 @@ final class NodeActions {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
                 || !minecraft.level.dimension().location().equals(dimension)) {
-            message("节点在 " + dimension + " " + pos.toShortString());
+            message(tr("idlefactory.node.locate.other_dimension", dimension, pos.toShortString()));
             return;
         }
         LocateRenderer.show(minecraft.level.dimension(), pos);
@@ -98,7 +98,7 @@ final class NodeActions {
                 instanceof io.github.crafteve.idlefactory.item.MachineBindingWandItem)) {
             int slot = wandHotbarSlot(minecraft.player);
             if (slot < 0) {
-                message("把绑定杖放到快捷栏才能编辑节点");
+                message(tr("idlefactory.node.edit.no_wand"));
                 return;
             }
             minecraft.player.getInventory().selected = slot;
@@ -174,6 +174,17 @@ final class NodeActions {
             FactoryCommand.Body body) {
         PacketDistributor.sendToServer(new FactoryCommandC2S(new FactoryCommand(containerId, kind,
                 CommandSource.PLAYER, nodeId, null, 0L, body)));
+    }
+
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
     }
 
     private static void message(String text) {

@@ -201,7 +201,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.confirmDialog = new FactoryConfirmDialog(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, Component.literal("搜索节点…"));
+                SEARCH_W - 6, 10, Component.translatable("idlefactory.node.search.hint"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
@@ -232,7 +232,8 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         syncFromBar();
         super.render(graphics, mouseX, mouseY, partialTick);
-        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos, "节点管理");
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
+                tr("idlefactory.node.title"));
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
         drawContent(graphics, hover);
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
@@ -600,7 +601,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int x = NodeLayout.nameX(viewport);
         int width = Math.max(40, NodeLayout.nameWidth(viewport));
         this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
-                Component.literal("节点名"),
+                Component.translatable("idlefactory.node.rename.hint"),
                 TEXT_PRIMARY, TEXT_DIM);
         this.renameBox.setValue(node.view().core().name() == null ? ""
                 : node.view().core().name());
@@ -697,8 +698,9 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         }
         // 几何交给浮层自己算：可用区域是终端窗口，压暗区域是整个屏幕——
         // AE2 左侧工具栏按钮画在 leftPos 之外，只压暗终端会让它们保持亮着。
-        this.confirmDialog.open("删除节点", node.name() + "\n" + deleteDetail(node.view()),
-                "删除", () -> NodeActions.delete(this.menu.containerId, node),
+        this.confirmDialog.open(tr("idlefactory.node.delete.title"),
+                node.name() + "\n" + deleteDetail(node.view()),
+                tr("idlefactory.node.delete.button"), () -> NodeActions.delete(this.menu.containerId, node),
                 new FactoryConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
                         this.imageHeight),
                 new FactoryConfirmDialog.Bounds(0, 0, this.width, this.height));
@@ -717,12 +719,12 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int rules = view.ruleCount();
         int patterns = view.core().patternCount();
         if (rules > 0 && patterns > 0) {
-            return "有 " + rules + " 条 IO 规则、" + patterns + " 份样板，删除后不可恢复。";
+            return tr("idlefactory.node.delete.detail.both", rules, patterns);
         }
         if (patterns > 0) {
-            return "有 " + patterns + " 份样板（会退回背包），删除后不可恢复。";
+            return tr("idlefactory.node.delete.detail.patterns", patterns);
         }
-        return "有 " + rules + " 条 IO 规则，删除后不可恢复。";
+        return tr("idlefactory.node.delete.detail.rules", rules);
     }
 
     /**
@@ -775,14 +777,25 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         }
     }
 
+    /**
+     * 取一条界面文案。
+     *
+     * @param key  语言键
+     * @param args 占位符实参
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key, Object... args) {
+        return net.minecraft.network.chat.Component.translatable(key, args).getString();
+    }
+
     private String emptyText() {
         if (!this.model.hasFactory()) {
-            return "工厂未就绪：重新打开一次终端";
+            return tr("idlefactory.node.empty.no_factory");
         }
         if (this.model.filteredEmpty()) {
-            return "没有匹配的节点";
+            return tr("idlefactory.node.empty.filtered");
         }
-        return "还没有机器 · 用机器绑定杖右键方块接入";
+        return tr("idlefactory.node.empty.none");
     }
 
     private int totalMembers() {
