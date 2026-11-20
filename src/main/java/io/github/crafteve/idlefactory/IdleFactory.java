@@ -28,7 +28,7 @@ public class IdleFactory {
         IdleFactoryCreativeTabs.TABS.register(modEventBus);
 
         // 网络包注册（P0 只有通道自检包）
-        IdleFactoryNetwork.register(modEventBus);
+        io.github.crafteve.idlefactory.registry.IdleFactoryPayloads.register(modEventBus);
 
         modEventBus.addListener(this::commonSetup);
         // 工厂上限与观测调优统一走 COMMON 配置；旧的模板 Config 已删除
