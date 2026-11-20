@@ -57,6 +57,46 @@ public final class WandHud {
     private static int flashColor = 0xFFFFFFFF;
     private static long flashExpireTick;
 
+    /** 注入给状态机与提交器的实现；HUD 自己仍是静态渲染。 */
+    public static final io.github.crafteve.idlefactory.client.wand.WandFeedback INSTANCE =
+            new io.github.crafteve.idlefactory.client.wand.WandFeedback() {
+                @Override
+                public void success(Component text) {
+                    WandHud.success(text);
+                }
+
+                @Override
+                public void neutral(Component text) {
+                    WandHud.neutral(text);
+                }
+
+                @Override
+                public void failure(Component text) {
+                    WandHud.failure(text);
+                }
+
+                @Override
+                public void click() {
+                    WandHud.click();
+                }
+
+                @Override
+                public void tick(net.minecraft.client.Minecraft minecraft) {
+                    WandHud.tick(minecraft);
+                }
+
+                @Override
+                public void clear() {
+                    WandHud.clear();
+                }
+
+                @Override
+                public boolean draftScreenOpen() {
+                    return net.minecraft.client.Minecraft.getInstance().screen
+                            instanceof WandDraftScreen;
+                }
+            };
+
     private WandHud() {
         // 纯静态渲染
     }

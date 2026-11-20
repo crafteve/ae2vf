@@ -5,7 +5,6 @@ import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
 
 
-import io.github.crafteve.idlefactory.client.screen.wand.WandHud;
 
 import io.github.crafteve.idlefactory.client.screen.text.WandText;
 
@@ -17,7 +16,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.client.screen.text.CommandText;
@@ -40,6 +38,17 @@ import net.minecraft.world.level.Level;
  * 只有草稿面板本身打开时不丢。</p>
  */
 public final class WandDraftState {
+    /** 反馈出口；由输入层注入，状态机不直接依赖 HUD。 */
+    private static WandFeedback feedback = new WandFeedback() {
+        @Override public void success(net.minecraft.network.chat.Component text) { }
+        @Override public void neutral(net.minecraft.network.chat.Component text) { }
+        @Override public void failure(net.minecraft.network.chat.Component text) { }
+        @Override public void click() { }
+        @Override public void tick(net.minecraft.client.Minecraft minecraft) { }
+        @Override public void clear() { }
+        @Override public boolean draftScreenOpen() { return false; }
+    };
+
     /** 绑定杖状态；没有 mode 字段。 */
     public enum State {
         /** 手持杖、草稿为空。 */
@@ -123,7 +132,7 @@ public final class WandDraftState {
         conflicts = List.of();
         conflictBlocks = Set.of();
         removedBlocks = Set.of();
-        WandHud.click();
+        feedback.click();
     }
 
     /**
@@ -147,7 +156,7 @@ public final class WandDraftState {
         draft = new WandDraft(nodeId, List.of(), Set.of(), WandSubmitter.nextSeq());
         state = State.EDITING;
         recheck(minecraft);
-        WandHud.click();
+        feedback.click();
     }
 
     /**
@@ -173,7 +182,7 @@ public final class WandDraftState {
                         : draft.withRemovedMachine(machineId));
                 return;
             }
-            WandHud.failure(net.minecraft.network.chat.Component.literal(
+            feedback.failure(net.minecraft.network.chat.Component.literal(
                     CommandText.text(new io.github.crafteve.idlefactory.command.CommandResult(
                             CommandReason.BLOCK_CLAIMED, null, null, List.of()))));
             return;
@@ -181,7 +190,7 @@ public final class WandDraftState {
         ResourceLocation typeId = WandPrecheck.baseType(minecraft, draft);
         CommandReason reason = WandPrecheck.checkBlock(minecraft, block, typeId, true);
         if (reason != CommandReason.OK) {
-            WandHud.failure(net.minecraft.network.chat.Component.literal(
+            feedback.failure(net.minecraft.network.chat.Component.literal(
                     CommandText.text(new io.github.crafteve.idlefactory.command.CommandResult(
                             reason, null, null, List.of()))));
             return;
@@ -216,9 +225,9 @@ public final class WandDraftState {
             recheck(minecraft);
         }
         if (added == 0 && skipped == 0) {
-            WandHud.neutral(WandText.chainEmpty());
+            feedback.neutral(WandText.chainEmpty());
         } else {
-            WandHud.success(WandText.chain(added, skipped));
+            feedback.success(WandText.chain(added, skipped));
         }
     }
 
@@ -310,7 +319,7 @@ public final class WandDraftState {
         }
         handSlot = slot;
         // 开别的界面就丢草稿；草稿面板本身是例外，关面板回编辑态还要接着用
-        if (minecraft.screen != null && !(minecraft.screen instanceof WandDraftScreen)) {
+        if (minecraft.screen != null && !feedback.draftScreenOpen()) {
             clear();
         }
     }
@@ -322,7 +331,7 @@ public final class WandDraftState {
      * @param next      新草稿
      */
     private static void refreshWandFailure(CommandReason reason) {
-        WandHud.failure(net.minecraft.network.chat.Component.literal(CommandText.text(
+        feedback.failure(net.minecraft.network.chat.Component.literal(CommandText.text(
                 new io.github.crafteve.idlefactory.command.CommandResult(reason, null, null,
                         List.of()))));
     }
@@ -330,7 +339,7 @@ public final class WandDraftState {
     private static void applyDraft(Minecraft minecraft, WandDraft next) {
         draft = next.withRequestSeq(WandSubmitter.nextSeq());
         recheck(minecraft);
-        WandHud.click();
+        feedback.click();
     }
 
     /**
@@ -373,5 +382,14 @@ public final class WandDraftState {
         return minecraft.player != null
                 && minecraft.player.getMainHandItem().getItem()
                 instanceof MachineBindingWandItem;
+    }
+
+    /**
+     * 注入反馈实现（输入层调用）。
+     *
+     * @param next 反馈口
+     */
+    public static void feedback(WandFeedback next) {
+        feedback = next;
     }
 }

@@ -107,7 +107,7 @@ public final class MachineWandInput {
             boolean ctrl) {
         return switch (WandDraftState.state()) {
             case SUBMITTING -> {
-                WandHud.neutral(WandText.waiting());
+                feedback().neutral(WandText.waiting());
                 yield true;
             }
             case IDLE -> {
@@ -167,7 +167,7 @@ public final class MachineWandInput {
         }
         WandDraftState.tick(minecraft);
         WandSubmitter.tick(minecraft);
-        WandHud.tick(minecraft);
+        feedback().tick(minecraft);
     }
 
     /**
@@ -209,6 +209,20 @@ public final class MachineWandInput {
         WandDraftState.clearAll();
         WandLinkCache.clear();
         MachineWandRenderer.clearCache();
-        WandHud.clear();
+        feedback().clear();
+    }
+
+    /**
+     * 输入层持有的反馈实现：HUD 在表现层，状态机只认 {@link WandFeedback}。
+     *
+     * <p>每次调用都顺手把实现注入给状态机与提交器，避免初始化顺序问题。</p>
+     *
+     * @return 反馈口
+     */
+    private static WandFeedback feedback() {
+        WandFeedback feedback = WandHud.INSTANCE;
+        WandDraftState.feedback(feedback);
+        WandSubmitter.feedback(feedback);
+        return feedback;
     }
 }
