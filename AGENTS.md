@@ -232,12 +232,14 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 5.4 Git
 
-- 目前**没有 GitHub 远程**：禁止 `git remote add`、禁止 push、禁止假装推送成功。
+- 远程在 GitHub：`origin` = `https://github.com/crafteve/ae2vf.git`。
+- **推送时机：一个大任务（一个计划全部完成、`build` 通过）收口后推一次**；不要每完成一个小 commit 就 push。中途的小提交留在本地，攒到大任务结束时统一推送。
+- 禁止假装推送成功：push 失败如实报告，不写「已推送」。
 - Conventional Commits + scope：`feat`、`fix`、`refactor`、`docs`、`chore`、`perf`、`test`、`style`；scope 用模块名，如 `io`、`ui`、`command`、`storage`、`tools`。
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
 - `.tmp/` 是 Agent 的临时工作目录（审查报告、校验脚本、diff 落盘）。它已被 git 忽略，**禁止 Agent 私自删除**；确需清理必须先征得用户同意，且只删自己本轮新建的文件，不得整目录清空。
-- 当前分支 `view-client-refactor-20261120`（视图表与客户端重构）；`1.21.1neoforge` 已快进并含本轮文档提交，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
+- 当前分支 `1.21.1neoforge`；`view-client-refactor-20261120` 为视图表与客户端重构分支，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
 
 ### 5.5 草稿纸（讨论文档）
 
@@ -299,6 +301,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-21 远程与推送约定：`origin` 指向 GitHub（`https://github.com/crafteve/ae2vf.git`）。原「没有远程、禁止 push」作废；改为大任务收口、`build` 通过后统一推送，不逐个小 commit push。
 - 2026-11-21 清理旧名残留：创造栏常量 `IDLE_FACTORY` 改 `CREATIVE_TAB`；创造栏名中英改为「虚空工厂」/「AE2 Void Factory」，停服文案同步；`tools/gui` 与 `tools/item` 三个生成脚本的输出目录从 `assets/idlefactory` 改回 `assets/ae2vf`，并删掉已不存在的 `FactoryLayout.java` 与 `Idle Factory UI:` 日志判据。
 - 2026-11-20 改名 `ae2vf`：modid、包名（`io.github.crafteve.ae2vf`）、类前缀（`VoidFactory*`）、注册 id、语言键、资源目录与存档文件名全部迁移；版本改 `0.1.0-beta`。旧存档与 `idlefactory:*` 物品不再兼容。
 - 2026-11-20 命名收敛：`NetworkProtocol` 拆成 `NetworkVersion` / `NetworkLimit`；`FactoryManager` → `FactoryLibrary`；`FactoryRefs` → `FactoryResolver`；连锁查找从 `factory` 移入 `command.CommandChain`（它只服务绑定杖，属于命令）。
