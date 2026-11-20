@@ -86,7 +86,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
     /** 顶栏搜索框的外框位置与尺寸。 */
     /** 顶栏搜索框：右对齐，宽度固定。 */
     private static final int SEARCH_Y = 4;
-    private static final int SEARCH_W = 112;
+    private static final int SEARCH_W = 104;
     private static final int SEARCH_H = 13;
 
     /** 跨界面保留的搜索词；关闭界面再打开仍保留。 */
@@ -222,7 +222,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         }
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
-                tr("idlefactory.passive.title"), this.searchX() - this.leftPos - 12);
+                tr("idlefactory.passive.title"), this.searchX() - this.leftPos - 8);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
         List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);

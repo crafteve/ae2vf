@@ -103,7 +103,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     private static final int REQUEST_INTERVAL = 20;
     /** 顶栏搜索框：右对齐，宽度固定。 */
     private static final int SEARCH_Y = 4;
-    private static final int SEARCH_W = 112;
+    private static final int SEARCH_W = 104;
     private static final int SEARCH_H = 13;
     /** 改名输入框高度。 */
     private static final int RENAME_H = 10;
@@ -223,7 +223,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         syncFromBar();
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
-                tr("idlefactory.node.title"), this.searchX() - this.leftPos - 12);
+                tr("idlefactory.node.title"), this.searchX() - this.leftPos - 8);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
         drawContent(graphics, hover);
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
