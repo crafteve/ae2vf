@@ -1053,7 +1053,7 @@
 
 1. `resource`（`AeKeyAdapter`）与 `location`（`BlockKey`）合并为 `key` 包；两者都是「身份键」，`BlockKey` 不需要 Adapter——它本身就是本模组的不可变值对象，没有外部序列化形态要适配。
 2. 删除 `event` 包：唯一类 `FactoryWandEvents` 只拦 ME 杖左键挖掘，按产品决定取消该行为，不再需要这个包。
-3. `registry` 保留，类名统一模组前缀：`IdleFactoryItems` / `IdleFactoryMenus` / `IdleFactoryCreativeTabs` / `IdleFactoryPayloads`；负载注册属于「注册」，从 `network` 移到这里，`network.IdleFactoryNetwork` 只留协议版本与线路上限。
+3. `registry` 保留，类名统一模组前缀：`IdleFactoryItems` / `IdleFactoryMenus` / `IdleFactoryCreativeTabs` / `IdleFactoryPayloads`；负载注册属于「注册」，从 `network` 移到这里，`network.NetworkProtocol` 只留协议版本与线路上限（类名同步改掉「Network」这个泛称）。
 4. 编解码器集中到 `network.codec`：`AeKeyCodec`、`ViewTableCodec`。
 5. 删除全部 `package-info.java`。
 6. `config` 保留，只有模组配置可以叫 config；`FactoryConfig`（工厂持久化部分）的命名问题留到 factory 重构时一并处理。

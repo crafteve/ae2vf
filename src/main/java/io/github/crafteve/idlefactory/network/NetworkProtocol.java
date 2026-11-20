@@ -6,7 +6,7 @@ package io.github.crafteve.idlefactory.network;
  * <p>只放「双方必须一致」的数字：协议版本与线协议条目硬上限。负载注册在
  * {@code registry.IdleFactoryPayloads}；收发与会话在 {@code network} 包的 Port / Listener 里。</p>
  */
-public final class IdleFactoryNetwork {
+public final class NetworkProtocol {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时必须递增。 */
     public static final String PROTOCOL_VERSION = "1";
 
@@ -18,7 +18,7 @@ public final class IdleFactoryNetwork {
      */
     public static final int HARD_WIRE_ENTRIES = 32768;
 
-    private IdleFactoryNetwork() {
+    private NetworkProtocol() {
         // 纯常量持有类
     }
 

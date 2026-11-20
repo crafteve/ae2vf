@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.key.BlockKey;
-import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
+import io.github.crafteve.idlefactory.network.NetworkProtocol;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -41,7 +41,7 @@ public final class WandDraftCodec {
      * @return 加与删各自的数量上限
      */
     public static int draftLimit() {
-        return IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        return NetworkProtocol.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
     }
 
     /**

@@ -118,7 +118,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 协议常量（`IdleFactoryNetwork`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 协议常量（`NetworkProtocol`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 

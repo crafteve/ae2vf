@@ -17,7 +17,7 @@ import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenC2S;
 import io.github.crafteve.idlefactory.network.payload.wand.WandOpenS2C;
-import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
+import io.github.crafteve.idlefactory.network.NetworkProtocol;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -44,7 +44,7 @@ public final class IdleFactoryPayloads {
     }
 
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(IdleFactoryNetwork.PROTOCOL_VERSION);
+        PayloadRegistrar registrar = event.registrar(NetworkProtocol.PROTOCOL_VERSION);
 
         // 写命令：节点、规则、provider 与应用内一切屏幕写操作都走这一对包
         registrar.playToServer(FactoryCommandC2S.TYPE, FactoryCommandC2S.STREAM_CODEC,
@@ -88,6 +88,6 @@ public final class IdleFactoryPayloads {
         registrar.playToClient(WandOpenS2C.TYPE, WandOpenS2C.STREAM_CODEC, WandOpenS2C::handle);
 
         IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})",
-                IdleFactoryNetwork.PROTOCOL_VERSION);
+                NetworkProtocol.PROTOCOL_VERSION);
     }
 }
