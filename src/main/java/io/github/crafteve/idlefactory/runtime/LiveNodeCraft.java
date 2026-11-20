@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.runtime;
 
+import io.github.crafteve.idlefactory.IdleFactory;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -288,7 +290,11 @@ final class LiveNodeCraft implements ICraftingProvider {
                 break;
             }
         }
-        return Math.max(1, (int) (total / 4L));
+        int factor = Math.max(1, (int) (total / 4L));
+        // 智能档位只影响派单倍数：把探测结果打出来，方便在日志里核对「为什么是 ×1」。
+        IdleFactory.LOGGER.debug("智能倍率：节点 {} 容量 {} 份 → ×{}",
+                this.node.node().id(), total, factor);
+        return factor;
     }
 
     /**
