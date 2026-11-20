@@ -1,5 +1,8 @@
 package io.github.crafteve.idlefactory.client.screen.terminal;
 
+import appeng.client.gui.style.Blitter;
+import appeng.client.gui.style.TerminalStyle;
+
 import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
@@ -43,8 +46,35 @@ public final class TerminalChrome {
      * @param leftPos  面板左边缘
      * @param topPos   面板上边缘
      */
-    public static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos) {
-        graphics.drawString(font, "被动 IO", leftPos + 8, topPos + 5, TITLE_COLOR, false);
+    public static void drawTitle(GuiGraphics graphics, Font font, int leftPos, int topPos,
+            String title) {
+        graphics.drawString(font, title, leftPos + 8, topPos + 5, TITLE_COLOR, false);
+    }
+
+    /**
+     * 按行数拼出 AE2 终端边框；调用方负责保证 {@code rows >= 2}。
+     *
+     * @param graphics 绘制器
+     * @param style    终端样式
+     * @param left     左边界
+     * @param top      上边界
+     * @param rows     中间行数
+     */
+    public static void drawFrame(GuiGraphics graphics, TerminalStyle style, int left, int top,
+            int rows) {
+        int y = blit(style.getHeader(), graphics, left, top);
+        for (int row = 0; row < rows; row++) {
+            Blitter blitter = row == 0 ? style.getFirstRow()
+                    : row == rows - 1 ? style.getLastRow() : style.getRow();
+            y = blit(blitter, graphics, left, y);
+        }
+        blit(style.getBottom(), graphics, left, y);
+    }
+
+    private static int blit(Blitter blitter, GuiGraphics graphics, int x, int y) {
+        // copy() 避免把缓存的样式对象上的 dest 坐标留到下一次绘制。
+        blitter.copy().dest(x, y).blit(graphics);
+        return y + blitter.getSrcHeight();
     }
 
     /**

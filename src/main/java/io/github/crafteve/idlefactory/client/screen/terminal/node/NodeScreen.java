@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.TerminalFrame;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
@@ -205,7 +204,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        TerminalFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
+        TerminalChrome.drawFrame(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
         graphics.fill(this.leftPos + 2, this.topPos + header,
@@ -223,8 +222,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         syncFromBar();
         super.render(graphics, mouseX, mouseY, partialTick);
-        graphics.drawString(this.font, "节点管理", this.leftPos + 8, this.topPos + 5,
-                0xFF000000, false);
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos, "节点管理");
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
         drawContent(graphics, hover);
         drawRenameBox(graphics, mouseX, mouseY, partialTick);

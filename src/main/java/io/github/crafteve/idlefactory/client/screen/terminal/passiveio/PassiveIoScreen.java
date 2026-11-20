@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoViewButton
 
 import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.TerminalFrame;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
@@ -198,7 +197,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        TerminalFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
+        TerminalChrome.drawFrame(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
         // AE2 的终端行贴图中间带一排物品槽（ME 终端用来放仓库格）；本界面内容区自绘，
         // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。右侧 174 之后是
@@ -222,7 +221,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
             syncFromBar();
         }
         super.render(graphics, mouseX, mouseY, partialTick);
-        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos, "被动 IO");
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
         List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);
