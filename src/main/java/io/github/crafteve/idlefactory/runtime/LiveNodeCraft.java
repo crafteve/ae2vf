@@ -242,69 +242,6 @@ final class LiveNodeCraft implements ICraftingProvider {
     }
 
 
-    /**
-     * 智能倍率的诊断文本：在线机器、每张样板的每份输入、各机器可装份数与最终倍数。
-     *
-     * <p>只读：不写缓存、不改队列，用来在游戏里核对「为什么智能倍率是 ×1」。</p>
-     *
-     * @return 多行文本
-     */
-    String capacityReport() {
-        NodeCraft provider = this.node.node().provider();
-        Level level = this.node.decodeLevel();
-        List<Machine> online = this.node.onlineMachines();
-        StringBuilder out = new StringBuilder("容量探测：在线 ").append(online.size()).append(" 台");
-        if (online.isEmpty()) {
-            return out.append("（没有在线机器，智能倍率只能是 ×1）").toString();
-        }
-        boolean any = false;
-        for (int slot = 0; slot < provider.capacity(); slot++) {
-            var stack = provider.pattern(slot);
-            if (stack.isEmpty() || !AEItems.PROCESSING_PATTERN.is(stack)) {
-                continue;
-            }
-            IPatternDetails details = decode(stack, level);
-            if (details == null) {
-                continue;
-            }
-            any = true;
-            var perPortion = perPortion(details);
-            StringBuilder keys = new StringBuilder();
-            perPortion.forEach((key, amount) -> keys.append(' ').append(key).append('×').append(amount));
-            out.append("\n槽 ").append(slot).append("：").append(keys);
-            long total = 0L;
-            for (Machine machine : online) {
-                long fit = this.node.capacityPick().portionsThatFit(machine, perPortion);
-                total += fit;
-                out.append("\n  ").append(machine.block().pos().toShortString())
-                        .append("：可装 ").append(fit);
-                AEKey first = perPortion.keySet().stream().findFirst().orElse(null);
-                long amount = first == null ? 0L : perPortion.get(first);
-                for (Direction face : Direction.values()) {
-                    out.append("\n    ").append(face).append(' ');
-                    try {
-                        var storage = this.node.ports().storage(machine, face);
-                        if (storage == null) {
-                            out.append("无存储");
-                            continue;
-                        }
-                        long sim = first == null ? 0L
-                                : storage.insert(first, amount,
-                                        appeng.api.config.Actionable.SIMULATE,
-                                        io.github.crafteve.idlefactory.resource.AeKeyAdapter.SOURCE);
-                        out.append("收 ").append(sim).append('/').append(amount);
-                    } catch (RuntimeException e) {
-                        out.append("异常 ").append(e.getClass().getSimpleName());
-                    }
-                }
-            }
-            out.append("\n  合计 ").append(total).append(" → ×").append(Math.max(1L, total / 4L));
-        }
-        if (!any) {
-            out.append("（没有可解码的处理样板）");
-        }
-        return out.toString();
-    }
 
     /**
      * 智能倍率：按节点所有在线机器的容量之和取 25%（向下取整，至少 1）。

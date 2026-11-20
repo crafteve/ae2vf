@@ -460,15 +460,6 @@ public final class LiveNode
 
 
     /**
-     * 智能倍率的诊断文本；只读，不写缓存。
-     *
-     * @return 多行文本
-     */
-    public String capacityReport() {
-        return this.craft.capacityReport();
-    }
-
-    /**
      * 锚点网络的库存。
      *
      * @return ME 库存；节点还没接进网络时为 {@code null}
@@ -497,7 +488,6 @@ public final class LiveNode
     Set<AEKey> products() {
         return this.craft.products();
     }
-
 
     /** 派单时用的动作源，标记成机器自己发起。 */
     IActionSource actionSource() {

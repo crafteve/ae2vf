@@ -9,7 +9,6 @@ import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryManager;
-import io.github.crafteve.idlefactory.factory.FactoryMessages;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.observation.Health;
 import io.github.crafteve.idlefactory.observation.ObservationChange;
@@ -99,12 +98,12 @@ public final class ObservationNoticeListener implements ObservationChangeListene
                 // 走模组 HUD 条：和绑定杖、ME 杖、定位提示同一种底板，不用原版动作栏。
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
-                                FactoryMessages.warn(missing + " 台机器失联"),
+                                net.minecraft.network.chat.Component.literal(missing + " 台机器失联"),
                                 io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.FAILURE));
             } else if (restored > 0) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
-                                FactoryMessages.ok(restored + " 台机器回来了"),
+                                net.minecraft.network.chat.Component.literal(restored + " 台机器回来了"),
                                 io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.SUCCESS));
             }
             this.missingNotices.remove(factoryId);

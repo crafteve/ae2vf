@@ -58,21 +58,8 @@ public final class CommandController {
             return CommandResult.of(denied);
         }
         if (command.kind() == CommandKind.WAND_TOGGLE) {
-            CommandResult result = new CommandWand(runtime).toggle(player, command.target());
-            // 诊断钩子：绑定成功时把该节点的容量探测结果发到聊天栏。
-            if (result.ok() && result.nodeId() != null) {
-                var live = runtime.nodeManager().node(result.nodeId());
-                if (live != null) {
-                    player.displayClientMessage(
-                            net.minecraft.network.chat.Component.literal(live.capacityReport()),
-                            false);
-                } else {
-                    // 绑定这一 tick 活节点还没建出来：排到后面几 tick 再打印。
-                    CapacityReportQueue.schedule(player, result.nodeId());
-                }
-            }
-            return result;
-        }
+            return new CommandWand(runtime).toggle(player, command.target());
+       }
         if (command.kind() == CommandKind.WAND_COMMIT
                 && command.body() instanceof FactoryCommand.Wand wand) {
             return new CommandWand(runtime).commit(player, wand.draft());

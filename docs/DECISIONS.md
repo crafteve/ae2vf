@@ -1005,3 +1005,10 @@
 - 协议号 41；旧的两张表负载与客户端 Handler 已删，没有兼容层。
 - `AGENTS.md` §2.1 / §2.4 / §3.2 / §5.4 / §6.1–6.3 已同步；`docs/README.md` 与 `README.md` 的结构说明同步更新。
 - 偏差记录：多出 `ViewTableCodec` 一个编解码文件；`FactoryLifecycle.stop()` 额外调用 `ViewPort.clear()`；客户端 `TerminalFrame` 已并入 `TerminalChrome`，`PassiveIoScroll` 已删除（直连 AE2 `Scrollbar`）。
+
+**2026-11-20 追加：HUD 条与协议 42**
+
+- 新增 `HudNoticeS2C(text, Kind{SUCCESS,NEUTRAL,FAILURE})`，把失联 / 恢复这类没有界面的通知从原版动作栏改成模组 HUD 条；`PROTOCOL_VERSION` 升到 42。
+- 客户端统一入口 `client/screen/hud/HUDRenderer`：深底、1px 边框、左侧状态点；`WandHud` 常驻草稿条复用 `drawBar`，绑杖 / ME 杖 / 定位 / 改名 / 失联共五类提示全部落到这里。
+- 约定：**服务端只发无色文本，颜色由 `Kind` 决定**；条内文本自带颜色会与状态点打架，`FactoryMessages` 因此删除。
+- `EnergyPick` 在接入时直接探 FE 能力，不再依赖观测 tick；`EnergyRuleRetry` 双保险已移除。
