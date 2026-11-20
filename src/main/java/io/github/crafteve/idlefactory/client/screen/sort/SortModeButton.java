@@ -43,8 +43,10 @@ public final class SortModeButton extends IconButton {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 1 && this.active && this.visible && clicked(mouseX, mouseY)) {
-            this.press.press(true);
+        // 左键正向、右键反向：只处理右键会让左键点击落到空的 onPress 上，表现为按钮点不动。
+        if ((button == 0 || button == 1) && this.active && this.visible
+                && clicked(mouseX, mouseY)) {
+            this.press.press(button == 1);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
