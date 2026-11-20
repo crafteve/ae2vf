@@ -1,47 +1,32 @@
 package io.github.crafteve.idlefactory.client.world;
 
-import io.github.crafteve.idlefactory.client.world.MachineWandRenderer;
-
-
 import org.jetbrains.annotations.Nullable;
-
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
- * 节点终端的「定位」高亮：在目标方块周围画 3 秒线框。
+ * 节点终端的「定位」高亮：把目标方块画成六面半透明填充，持续 3 秒。
  *
- * <p>纯客户端，不发包。与绑定杖的连接高亮不同，它在界面打开时也要画，所以不复用
- * {@link io.github.crafteve.idlefactory.client.world.MachineWandRenderer} 的 {@code screen != null}
- * 早退；只画一个方块，不需要 VBO 缓存。</p>
+ * <p>纯客户端，不发包。绘制统一走 {@link BlockHighlightRenderer}，与两种绑定杖同一套外观；
+ * 界面打开时也照常绘制，所以没有 {@code screen != null} 早退。</p>
  */
 @EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
         value = Dist.CLIENT)
 public final class LocateRenderer {
     /** 高亮持续时间（毫秒）。 */
     private static final long DURATION_MS = 3000L;
-    /** 线框颜色：青蓝。 */
-    private static final float RED = 0.35F;
-    private static final float GREEN = 0.85F;
-    private static final float BLUE = 1.0F;
-    private static final float ALPHA = 1.0F;
+    /** 高亮颜色：青蓝。 */
+    private static final int COLOR = 0xFF59D9FF;
 
     @Nullable
     private static Target target;
@@ -79,27 +64,10 @@ public final class LocateRenderer {
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || minecraft.player == null
-                || !minecraft.level.dimension().equals(current.dimension())) {
+        if (minecraft.level == null || !minecraft.level.dimension().equals(current.dimension())) {
             return;
         }
-        Vec3 camera = event.getCamera().getPosition();
-        PoseStack pose = event.getPoseStack();
-        pose.pushPose();
-        pose.translate(current.pos().getX() - camera.x, current.pos().getY() - camera.y,
-                current.pos().getZ() - camera.z);
-        VertexConsumer consumer = minecraft.renderBuffers().bufferSource()
-                .getBuffer(RenderType.lines());
-        RenderSystem.disableDepthTest();
-        try {
-            LevelRenderer.renderLineBox(pose, consumer,
-                    new AABB(0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D).inflate(0.002D),
-                    RED, GREEN, BLUE, ALPHA);
-        } finally {
-            RenderSystem.enableDepthTest();
-        }
-        minecraft.renderBuffers().bufferSource().endBatch(RenderType.lines());
-        pose.popPose();
+        BlockHighlightRenderer.drawBlock(COLOR, current.pos(), event);
     }
 
     /** 一次定位请求。 */
