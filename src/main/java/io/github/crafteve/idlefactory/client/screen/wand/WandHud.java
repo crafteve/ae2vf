@@ -22,8 +22,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  * <p>闪条（成功 / 失败 / 中性）统一交给 {@link HUDRenderer}，本类只画常驻草稿条；
  * 两者用同一套底板与状态点，不再各写一份。同一时刻最多一条闪条，新的覆盖旧的。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class WandHud {
     /** 常驻条距屏幕底部的距离，避开快捷栏。 */
     private static final int BOTTOM_INSET = 58;

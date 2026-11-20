@@ -41,7 +41,7 @@ final class FeIngredientRenderer implements IIngredientRenderer<FeIngredient> {
      * @return 只有一行 {@code FE}
      */
     @Override
-    @SuppressWarnings("deprecation")
+    @SuppressWarnings({"deprecation", "removal"})
     public List<Component> getTooltip(FeIngredient ingredient, TooltipFlag tooltipFlag) {
         return List.of(Component.literal("FE"));
     }

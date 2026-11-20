@@ -45,6 +45,7 @@ final class FeIngredientHelper implements IIngredientHelper<FeIngredient> {
      */
     @Override
     @Deprecated
+    @SuppressWarnings("removal")
     public String getUniqueId(FeIngredient ingredient, UidContext context) {
         return FeIngredient.UID;
     }

@@ -41,8 +41,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
  *
  * <p>登录 / 换维度 / 登出也在这里清缓存并请求一次链接快照，不再轮询。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class MachineWandInput {
     private MachineWandInput() {
         // 纯静态事件处理

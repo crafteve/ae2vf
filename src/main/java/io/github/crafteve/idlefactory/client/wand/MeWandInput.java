@@ -23,8 +23,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>全是「读按键并发命令」，真正的绑定写在服务端；服务端确认后靠链接快照与 HUD 回执同步。
  * 机器绑定杖的输入在 {@code client.wand.MachineWandInput}，两者互不引用。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class MeWandInput {
     private MeWandInput() {
         // 纯静态事件处理

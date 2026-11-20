@@ -22,8 +22,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  * <p>绑定杖、ME 绑定杖、定位提示与命令回执都用这一套，不再往原版动作栏塞白字。
  * 闪条同一时刻最多一条，新的覆盖旧的；{@link #drawBar} 给常驻条复用。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class HUDRenderer {
     /** 成功色。 */
     public static final int RUN = 0xFF2E9E4F;

@@ -20,8 +20,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
  * <p>纯客户端，不发包。绘制统一走 {@link BlockHighlightRenderer}，与两种绑定杖同一套外观；
  * 界面打开时也照常绘制，所以没有 {@code screen != null} 早退。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class LocateRenderer {
     /** 高亮持续时间（毫秒）。 */
     private static final long DURATION_MS = 3000L;

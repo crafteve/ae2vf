@@ -20,8 +20,7 @@ import io.github.crafteve.idlefactory.location.BlockKey;
  * <p>锚点来自 {@link WandLinkCache#storageAnchor()}（随链接快照整体替换，未绑定为 {@code null}）。
  * 只决定"画哪块、什么颜色"，绘制交给 {@link BlockHighlightRenderer}；界面打开时照常绘制。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class MeWandRenderer {
     /** 仓库锚点颜色：蓝。 */
     private static final int COLOR = 0xFF4DA6FF;

@@ -30,8 +30,7 @@ import io.github.crafteve.idlefactory.location.BlockKey;
  * <p>数据只读：机器与仓库来自 {@link WandLinkCache}，草稿与冲突来自 {@link WandDraftState}。
  * 界面打开时照常绘制：高亮是世界信息。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME,
-        value = Dist.CLIENT)
+@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
 public final class MachineWandRenderer {
     private MachineWandRenderer() {
         // 纯静态渲染

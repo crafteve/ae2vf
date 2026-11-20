@@ -14,7 +14,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
  * <p>存储杖左键不能挖方块，只在主手时取消。机器绑定杖左键完全不拦（B5）：它要靠正常挖掘
  * 清理现场，左键手势也不存在。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, bus = EventBusSubscriber.Bus.GAME)
+@EventBusSubscriber(modid = IdleFactory.MODID)
 public final class FactoryWandEvents {
     private FactoryWandEvents() {
         // 纯静态事件处理
