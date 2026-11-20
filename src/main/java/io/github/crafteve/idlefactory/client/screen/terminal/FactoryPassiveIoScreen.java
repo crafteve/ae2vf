@@ -93,7 +93,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     /** 内容模型：视图表 + 搜索词 → 机器块。 */
     private final FactoryPassiveIoModel model;
     /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
-    private final ViewTableSink.Buffer viewTable = new ViewTableSink.Buffer();
+    private final TerminalSource source;
     /** 本帧排版；由模型、视图与视口重建。 */
     @Nullable
     private FactoryPassiveIoLayout layout;
@@ -122,6 +122,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
         this.view = menu.host().view();
+        this.source = new TerminalSource(menu.containerId);
         this.model = new FactoryPassiveIoModel(FactoryGuiTheme.current());
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
@@ -286,7 +287,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (containerId != containerId()) {
             return;
         }
-        ViewTable merged = this.viewTable.acceptPage(revision, pageIndex, pageCount, page);
+        ViewTable merged = this.source.acceptFullPage(revision, pageIndex, pageCount, page);
         if (merged != null) {
             acceptTable(merged);
         }
@@ -297,10 +298,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (containerId != containerId()) {
             return;
         }
-        ViewTable merged = this.viewTable.acceptDiff(diff);
+        ViewTable merged = this.source.acceptDiff(diff);
         if (merged == null) {
             // 版本对不上：丢弃这一版，下一轮请求会带着已知版本重新要全量。
-            this.viewTable.reset();
+            this.source.reset();
             requestTable();
             return;
         }
@@ -644,7 +645,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private void requestTable() {
         if (this.minecraft != null && this.minecraft.player != null) {
             PacketDistributor.sendToServer(
-                    new ViewTableRequestC2S(this.menu.containerId, this.viewTable.revision()));
+                    new ViewTableRequestC2S(this.menu.containerId, this.source.revision()));
         }
     }
 
