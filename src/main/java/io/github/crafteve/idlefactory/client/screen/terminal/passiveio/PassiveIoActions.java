@@ -47,7 +47,6 @@ final class PassiveIoActions {
     static void flip(int containerId, PassiveIoModel.BlockView block,
             PassiveIoModel.RuleRow rule) {
         IoSide target = rule.side() == IoSide.INPUT ? IoSide.OUTPUT : IoSide.INPUT;
-        probe("flip", block, rule, "-> " + target);
         sendRule(containerId, block.nodeId(), CommandKind.RULE_MOVE, rule.side(),
                 rule.key(), rule.face(), rule.mode(), target);
     }
@@ -63,7 +62,6 @@ final class PassiveIoActions {
     static void cycleFace(int containerId, PassiveIoModel.BlockView block,
             PassiveIoModel.RuleRow rule, boolean backwards) {
         Direction next = backwards ? previousFace(rule.face()) : nextFace(rule.face());
-        probe("face", block, rule, String.valueOf(next));
         sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
                 rule.key(), next, rule.mode(), null);
     }
@@ -82,7 +80,6 @@ final class PassiveIoActions {
         }
         MatchMode next = rule.mode() == MatchMode.EXACT
                 ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
-        probe("mode", block, rule, next.name());
         sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
                 rule.key(), rule.face(), next, null);
     }
@@ -96,7 +93,6 @@ final class PassiveIoActions {
      */
     static void delete(int containerId, PassiveIoModel.BlockView block,
             PassiveIoModel.RuleRow rule) {
-        probe("delete", block, rule, "");
         sendRule(containerId, block.nodeId(), CommandKind.RULE_REMOVE, rule.side(),
                 rule.key(), rule.face(), rule.mode(), null);
     }
@@ -116,8 +112,6 @@ final class PassiveIoActions {
             // 没装 Applied Flux：没有 FE 这类资源，按钮本来也不该出现。
             return;
         }
-        IdleFactory.LOGGER.info("[ui-probe] add-energy block={} node={} key={}",
-                block.name(), block.nodeId(), key.getId());
         sendRule(containerId, block.nodeId(), CommandKind.RULE_ADD, IoSide.INPUT, key, null,
                 MatchMode.EXACT, null);
     }
@@ -131,8 +125,6 @@ final class PassiveIoActions {
      */
     static void add(int containerId, PassiveIoModel.BlockView block, AEKey key) {
         MatchMode mode = new ResourceSpec(key, null, 0L).mode();
-        IdleFactory.LOGGER.info("[ui-probe] add block={} machine={} key={} mode={}",
-                block.name(), block.machineId(), key.getId(), mode);
         sendRule(containerId, block.nodeId(), CommandKind.RULE_ADD, IoSide.INPUT, key, null,
                 mode, null);
     }
@@ -195,10 +187,4 @@ final class PassiveIoActions {
                 new FactoryCommand.Rule(side, key, face, mode, targetSide))));
     }
 
-    private static void probe(String action, PassiveIoModel.BlockView block,
-            PassiveIoModel.RuleRow rule, String detail) {
-        IdleFactory.LOGGER.info("[ui-probe] {} block={} machine={} side={} key={} {}",
-                action, block.name(), block.machineId(), rule.side(), rule.key().getId(),
-                detail);
-    }
 }
