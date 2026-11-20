@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,11 +8,11 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.BlockBox;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.BlockBox;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 
@@ -25,8 +25,8 @@ import net.minecraft.world.item.ItemStack;
  * <p>两类目标都从同一份排版算出来：拖拽目标是整张机器大卡片（含机器行），查询目标是
  * 机器图标与规则图标。几何不在插件里重算，插件只负责把目标交给 JEI。</p>
  */
-public final class FactoryPassiveIoJeiTargets {
-    private FactoryPassiveIoJeiTargets() {
+public final class PassiveIoJeiIngredients {
+    private PassiveIoJeiIngredients() {
         // 纯静态目标构造
     }
 
@@ -59,17 +59,17 @@ public final class FactoryPassiveIoJeiTargets {
      * @param scroll 当前滚动
      * @return 每台机器一条
      */
-    static List<AddTarget> addTargets(FactoryPassiveIoLayout layout, int scroll) {
+    static List<AddTarget> addTargets(PassiveIoLayout layout, int scroll) {
         List<AddTarget> targets = new ArrayList<>();
         Viewport viewport = layout.viewport();
-        int left = FactoryPassiveIoLayout.bodyX(viewport);
+        int left = PassiveIoLayout.bodyX(viewport);
         int width = viewport.width() - 1;
         int viewTop = viewport.y();
         int viewBottom = viewport.y() + viewport.height();
         for (BlockBox box : layout.boxes()) {
-            int top = Math.max(viewTop, FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll));
+            int top = Math.max(viewTop, PassiveIoLayout.screenY(viewport, box.top(), scroll));
             int bottom = Math.min(viewBottom,
-                    FactoryPassiveIoLayout.screenY(viewport, box.bottom(), scroll));
+                    PassiveIoLayout.screenY(viewport, box.bottom(), scroll));
             if (bottom <= top) {
                 continue;
             }
@@ -89,14 +89,14 @@ public final class FactoryPassiveIoJeiTargets {
      * @return 目标；没有物品时为 {@code null}
      */
     @Nullable
-    static JeiTarget targetAt(FactoryPassiveIoLayout layout, List<BlockView> blocks, int scroll,
+    static JeiTarget targetAt(PassiveIoLayout layout, List<BlockView> blocks, int scroll,
             double mouseX, double mouseY) {
         Hit hit = layout.hit(mouseX, mouseY, scroll);
-        if (hit == null || hit.kind() == FactoryPassiveIoLayout.Kind.ADD) {
+        if (hit == null || hit.kind() == PassiveIoLayout.Kind.ADD) {
             return null;
         }
         BlockView block = blocks.get(hit.block());
-        if (hit.kind() == FactoryPassiveIoLayout.Kind.MACHINE) {
+        if (hit.kind() == PassiveIoLayout.Kind.MACHINE) {
             ItemStack stack = FactoryLabels.blockStack(block.machine().blockId());
             return stack.isEmpty() ? null
                     : new JeiTarget(false, stack, machineIconArea(layout, hit, scroll));
@@ -107,26 +107,26 @@ public final class FactoryPassiveIoJeiTargets {
                 ruleIconArea(layout, hit, scroll));
     }
 
-    private static Rect2i machineIconArea(FactoryPassiveIoLayout layout, Hit hit, int scroll) {
+    private static Rect2i machineIconArea(PassiveIoLayout layout, Hit hit, int scroll) {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hit.block());
-        int x = FactoryPassiveIoLayout.headerX(viewport);
-        int y = FactoryPassiveIoLayout.screenY(viewport, box.top(), scroll) + 1;
-        return new Rect2i(x, y, FactoryPassiveIoLayout.SLOT, FactoryPassiveIoLayout.SLOT);
+        int x = PassiveIoLayout.headerX(viewport);
+        int y = PassiveIoLayout.screenY(viewport, box.top(), scroll) + 1;
+        return new Rect2i(x, y, PassiveIoLayout.SLOT, PassiveIoLayout.SLOT);
     }
 
-    private static Rect2i ruleIconArea(FactoryPassiveIoLayout layout, Hit hit, int scroll) {
+    private static Rect2i ruleIconArea(PassiveIoLayout layout, Hit hit, int scroll) {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hit.block());
         if (layout.view() == FactoryPassiveIoView.LIST) {
-            int y = FactoryPassiveIoLayout.rowY(viewport, box, hit.rule(), scroll)
-                    + (FactoryPassiveIoLayout.ROW_H - FactoryPassiveIoLayout.RULE_ICON) / 2;
-            return new Rect2i(FactoryPassiveIoLayout.slotX(viewport), y,
-                    FactoryPassiveIoLayout.RULE_ICON, FactoryPassiveIoLayout.RULE_ICON);
+            int y = PassiveIoLayout.rowY(viewport, box, hit.rule(), scroll)
+                    + (PassiveIoLayout.ROW_H - PassiveIoLayout.RULE_ICON) / 2;
+            return new Rect2i(PassiveIoLayout.slotX(viewport), y,
+                    PassiveIoLayout.RULE_ICON, PassiveIoLayout.RULE_ICON);
         }
-        int x = FactoryPassiveIoLayout.tileX(viewport, hit.rule() % 2)
-                + FactoryPassiveIoLayout.TILE_INSET;
-        int y = FactoryPassiveIoLayout.tileRowY(viewport, box, hit.rule() / 2, scroll) + 2;
-        return new Rect2i(x, y, FactoryPassiveIoLayout.SLOT, FactoryPassiveIoLayout.SLOT);
+        int x = PassiveIoLayout.tileX(viewport, hit.rule() % 2)
+                + PassiveIoLayout.TILE_INSET;
+        int y = PassiveIoLayout.tileRowY(viewport, box, hit.rule() / 2, scroll) + 2;
+        return new Rect2i(x, y, PassiveIoLayout.SLOT, PassiveIoLayout.SLOT);
     }
 }

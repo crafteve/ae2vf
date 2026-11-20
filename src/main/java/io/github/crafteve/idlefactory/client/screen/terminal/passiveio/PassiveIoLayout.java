@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
  * （上边紧贴机器行，下边留 2px 内边距，77×34 两列，列间隔 2）。块与块之间留 2px，
  * 刚好容下 1px 外阴影。</p>
  */
-final class FactoryPassiveIoLayout {
+final class PassiveIoLayout {
     /** 规则行高；16px 时 13px chip 上下各余 1~2px。 */
     static final int ROW_H = 16;
     /** 列表规则行之间的间距：行底交替着色，不再留缝。 */
@@ -131,7 +131,7 @@ final class FactoryPassiveIoLayout {
     private final FactoryPassiveIoView view;
     private final int contentHeight;
 
-    private FactoryPassiveIoLayout(List<BlockBox> boxes, Viewport viewport,
+    private PassiveIoLayout(List<BlockBox> boxes, Viewport viewport,
             FactoryPassiveIoView view, int contentHeight) {
         this.boxes = boxes;
         this.viewport = viewport;
@@ -147,12 +147,12 @@ final class FactoryPassiveIoLayout {
      * @param view     列表 / 磁贴
      * @return 排版
      */
-    static FactoryPassiveIoLayout of(List<FactoryPassiveIoModel.BlockView> blocks,
+    static PassiveIoLayout of(List<PassiveIoModel.BlockView> blocks,
             Viewport viewport, FactoryPassiveIoView view) {
         List<BlockBox> boxes = new ArrayList<>(blocks.size());
         int cursor = 0;
         for (int i = 0; i < blocks.size(); i++) {
-            FactoryPassiveIoModel.BlockView block = blocks.get(i);
+            PassiveIoModel.BlockView block = blocks.get(i);
             int height = blockHeight(block, view);
             int bodyTop = cursor + MACHINE_ROW_H + BODY_GAP;
             boxes.add(new BlockBox(i, cursor, bodyTop, cursor + height,
@@ -160,7 +160,7 @@ final class FactoryPassiveIoLayout {
             cursor += height + BLOCK_GAP;
         }
         int contentHeight = boxes.isEmpty() ? 0 : cursor - BLOCK_GAP;
-        return new FactoryPassiveIoLayout(List.copyOf(boxes), viewport, view, contentHeight);
+        return new PassiveIoLayout(List.copyOf(boxes), viewport, view, contentHeight);
     }
 
     /**
@@ -172,7 +172,7 @@ final class FactoryPassiveIoLayout {
      * @param view  视图
      * @return 像素高度
      */
-    static int blockHeight(FactoryPassiveIoModel.BlockView block, FactoryPassiveIoView view) {
+    static int blockHeight(PassiveIoModel.BlockView block, FactoryPassiveIoView view) {
         int rules = block.rules().size();
         if (rules == 0) {
             return MACHINE_ROW_H;

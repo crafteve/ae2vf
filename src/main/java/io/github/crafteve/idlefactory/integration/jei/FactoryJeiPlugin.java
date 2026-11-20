@@ -12,8 +12,8 @@ import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoJeiIngredients;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import mezz.jei.api.IModPlugin;
@@ -75,9 +75,9 @@ public final class FactoryJeiPlugin implements IModPlugin {
 
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        registration.addGuiContainerHandler(FactoryPassiveIoScreen.class,
+        registration.addGuiContainerHandler(PassiveIoScreen.class,
                 new PassiveIoGuiHandler());
-        registration.addGhostIngredientHandler(FactoryPassiveIoScreen.class,
+        registration.addGhostIngredientHandler(PassiveIoScreen.class,
                 new PassiveIoGhostHandler());
         // 兜底：部分区域被 JEI 当成普通容器处理时，全局 handler 仍然能给出目标。
         registration.addGlobalGuiHandler(new FactoryGlobalGuiHandler());
@@ -98,8 +98,8 @@ public final class FactoryJeiPlugin implements IModPlugin {
     // ------------------------------------------------------------------
 
     private static Optional<IClickableIngredient<?>> clickableAt(
-            FactoryPassiveIoScreen screen, double mouseX, double mouseY) {
-        FactoryPassiveIoJeiTargets.JeiTarget target = screen.jeiTargetAt(mouseX, mouseY);
+            PassiveIoScreen screen, double mouseX, double mouseY) {
+        PassiveIoJeiIngredients.JeiTarget target = screen.jeiTargetAt(mouseX, mouseY);
         if (target == null || runtime == null) {
             return Optional.empty();
         }
@@ -118,10 +118,10 @@ public final class FactoryJeiPlugin implements IModPlugin {
     }
 
     private static final class PassiveIoGuiHandler
-            implements IGuiContainerHandler<FactoryPassiveIoScreen> {
+            implements IGuiContainerHandler<PassiveIoScreen> {
         @Override
         public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
-                FactoryPassiveIoScreen screen, double mouseX, double mouseY) {
+                PassiveIoScreen screen, double mouseX, double mouseY) {
             return clickableAt(screen, mouseX, mouseY);
         }
     }
@@ -130,7 +130,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
         @Override
         public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
                 double mouseX, double mouseY) {
-            if (Minecraft.getInstance().screen instanceof FactoryPassiveIoScreen screen) {
+            if (Minecraft.getInstance().screen instanceof PassiveIoScreen screen) {
                 return clickableAt(screen, mouseX, mouseY);
             }
             return Optional.empty();
@@ -185,16 +185,16 @@ public final class FactoryJeiPlugin implements IModPlugin {
     }
 
     private static final class PassiveIoGhostHandler
-            implements IGhostIngredientHandler<FactoryPassiveIoScreen> {
+            implements IGhostIngredientHandler<PassiveIoScreen> {
         @Override
-        public <I> List<Target<I>> getTargetsTyped(FactoryPassiveIoScreen screen,
+        public <I> List<Target<I>> getTargetsTyped(PassiveIoScreen screen,
                 ITypedIngredient<I> ingredient, boolean doStart) {
             AEKey key = toKey(ingredient.getIngredient());
             if (key == null) {
                 return List.of();
             }
             List<Target<I>> targets = new ArrayList<>();
-            for (FactoryPassiveIoJeiTargets.AddTarget area : screen.addTargets()) {
+            for (PassiveIoJeiIngredients.AddTarget area : screen.addTargets()) {
                 targets.add(new Target<>() {
                     @Override
                     public Rect2i getArea() {
@@ -212,7 +212,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
 
         @Override
         public void onComplete() {
-            if (Minecraft.getInstance().screen instanceof FactoryPassiveIoScreen screen) {
+            if (Minecraft.getInstance().screen instanceof PassiveIoScreen screen) {
                 screen.setJeiDragging(false);
             }
         }

@@ -1,10 +1,10 @@
 package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoHelpButton;
+import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoFrame;
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalFrame;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoChrome;
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.TerminalSource;
 
@@ -161,7 +161,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
                 this.minecraft == null || this.minecraft.player == null
                         ? null : this.minecraft.player.blockPosition());
         this.bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
+        this.addToLeftToolbar(new PassiveIoHelpButton(button -> {
             // 指南页待接入。
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
@@ -205,7 +205,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        FactoryPassiveIoFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
+        TerminalFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
         graphics.fill(this.leftPos + 2, this.topPos + header,
@@ -213,9 +213,9 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
                 this.topPos + header + this.rows * rowHeight(),
                 FactoryGuiTheme.current().panelBg());
         Viewport frame = workAreaFrame();
-        FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
+        TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
                 frame.height());
-        FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
+        TerminalChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
 

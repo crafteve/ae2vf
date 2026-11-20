@@ -15,7 +15,7 @@ import net.minecraft.network.chat.Component;
  *
  * <p>用 AE2 现成的 {@code IconButton}，不另画底图；tooltip 说明点下去会切到哪种视图。</p>
  */
-final class FactoryPassiveIoViewButton extends IconButton {
+public final class PassiveIoViewButton extends IconButton {
     /** 当前视图来源；按钮每帧现查，切换后下一帧自动换图标。 */
     private final Supplier<FactoryPassiveIoView> view;
 
@@ -23,7 +23,7 @@ final class FactoryPassiveIoViewButton extends IconButton {
      * @param view  当前视图
      * @param press 点击动作
      */
-    FactoryPassiveIoViewButton(Supplier<FactoryPassiveIoView> view, OnPress press) {
+    public PassiveIoViewButton(Supplier<FactoryPassiveIoView> view, OnPress press) {
         super(press);
         this.view = view;
     }

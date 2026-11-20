@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.network;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
 
 import net.minecraft.client.Minecraft;
@@ -19,7 +19,7 @@ public final class ClientPassiveIoViewHandler {
      * @param payload 负载
      */
     public static void handle(FactoryPassiveIoViewS2C payload) {
-        if (Minecraft.getInstance().screen instanceof FactoryPassiveIoScreen screen
+        if (Minecraft.getInstance().screen instanceof PassiveIoScreen screen
                 && screen.containerId() == payload.containerId()) {
             screen.acceptView(payload.view());
         }

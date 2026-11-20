@@ -24,7 +24,7 @@ import net.minecraft.world.phys.BlockHitResult;
  * 被动 IO 管理终端：右键打开第三版 IO 配置界面。
  *
  * <p>界面走 AE2 的 {@code base_terminal} 边框与 36 个玩家背包槽，中间内容区由
- * {@code FactoryPassiveIoScreen} 自绘。物品本身不可堆叠、无耐久，菜单宿主只负责
+ * {@code PassiveIoScreen} 自绘。物品本身不可堆叠、无耐久，菜单宿主只负责
  * 按物品定位器还原同一个物品栈。</p>
  */
 public class FactoryPassiveIoTerminalItem extends Item implements IMenuItem {

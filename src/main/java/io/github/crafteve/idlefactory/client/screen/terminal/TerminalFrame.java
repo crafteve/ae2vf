@@ -11,8 +11,8 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>只负责 header + N 行 + bottom 三段贴图的拼接，不关心内容；尺寸全部从
  * {@link TerminalStyle} 取，避免把 195 / 17 / 18 / 99 这些数字散落在屏幕类里。</p>
  */
-public final class FactoryPassiveIoFrame {
-    private FactoryPassiveIoFrame() {
+public final class TerminalFrame {
+    private TerminalFrame() {
         // 纯静态绘制工具
     }
 

@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -8,9 +8,9 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEItemKey;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
@@ -27,8 +27,8 @@ import net.minecraft.network.chat.TextColor;
  * 速率取服务端算好的值，原因取逐规则原因。chip 的 tooltip 与整行共用一份，鼠标停在 chip 上
  * 也能看到完整说明。</p>
  */
-final class FactoryPassiveIoTooltip {
-    private FactoryPassiveIoTooltip() {
+final class PassiveIoTooltip {
+    private PassiveIoTooltip() {
         // 纯静态工具类
     }
 

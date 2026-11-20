@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +36,7 @@ import net.minecraft.core.Direction;
  * <p>模型只存服务端已经算好的视图，不探世界、不推导执行状态；过滤、排序都在 {@link #rebuild()}
  * 一处重算。绘制与命中只读 {@link #blocks()}。</p>
  */
-final class FactoryPassiveIoModel {
+final class PassiveIoModel {
     private final FactoryGuiTheme theme;
     private List<ViewNode> nodes = List.of();
     private boolean hasFactory;
@@ -144,7 +144,7 @@ final class FactoryPassiveIoModel {
     /**
      * @param theme 当前主题，状态文字与搜索字段取色用
      */
-    FactoryPassiveIoModel(FactoryGuiTheme theme) {
+    PassiveIoModel(FactoryGuiTheme theme) {
         this.theme = theme;
     }
 

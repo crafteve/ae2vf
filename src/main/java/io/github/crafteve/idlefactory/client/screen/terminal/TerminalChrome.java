@@ -14,11 +14,11 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>只画不接收输入；坐标由调用方给出，chunk 内不再第二次算位置。搜索框的输入控件是
  * {@code SearchEditBox}，底板必须画在控件之前（{@code drawBG}），否则会盖住文字。</p>
  */
-public final class FactoryPassiveIoChrome {
+public final class TerminalChrome {
     /** 标题颜色：纯黑，跟正文一致。 */
     public static final int TITLE_COLOR = 0xFF000000;
 
-    private FactoryPassiveIoChrome() {
+    private TerminalChrome() {
         // 纯静态绘制
     }
 

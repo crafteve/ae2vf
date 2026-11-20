@@ -19,8 +19,8 @@ import dev.emi.emi.api.stack.EmiIngredient;
 import dev.emi.emi.api.stack.EmiStack;
 import dev.emi.emi.api.widget.Bounds;
 
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoJeiIngredients.AddTarget;
 
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.ItemStack;
@@ -31,7 +31,7 @@ import net.minecraft.world.level.material.Fluid;
  *
  * <p>EMI 和 JEI 的拖拽是两套 API：JEI 走 {@code IGhostIngredientHandler}，EMI 走
  * {@link EmiDragDropHandler}。本类只做「把 EMI 配料转成 AE2 的 {@link AEKey}，再交给
- * 终端已有的 {@code addFromJei}」，目标区域仍由 {@link FactoryPassiveIoScreen#targets()}
+ * 终端已有的 {@code addFromJei}」，目标区域仍由 {@link PassiveIoScreen#targets()}
  * 从同一份排版算出，不在插件里重算几何。</p>
  *
  * <p>FE 不参与拖拽：FE 由绑定链路决定，和 JEI 侧保持一致。EMI 没有装时本类不会被加载，
@@ -41,7 +41,7 @@ import net.minecraft.world.level.material.Fluid;
 public final class FactoryEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
-        registry.addDragDropHandler(FactoryPassiveIoScreen.class, new PassiveIoDragDrop());
+        registry.addDragDropHandler(PassiveIoScreen.class, new PassiveIoDragDrop());
     }
 
     /**
@@ -77,7 +77,7 @@ public final class FactoryEmiPlugin implements EmiPlugin {
      * 基于矩形区域的拖拽处理器：EMI 负责命中判断与高亮，本类只提供区域和落点动作。
      */
     private static final class PassiveIoDragDrop
-            extends EmiDragDropHandler.BoundsBased<FactoryPassiveIoScreen> {
+            extends EmiDragDropHandler.BoundsBased<PassiveIoScreen> {
         private PassiveIoDragDrop() {
             super(PassiveIoDragDrop::bounds);
         }
@@ -89,7 +89,7 @@ public final class FactoryEmiPlugin implements EmiPlugin {
          * @return 区域 → 落下动作
          */
         private static Map<Bounds, Consumer<EmiIngredient>> bounds(
-                FactoryPassiveIoScreen screen) {
+                PassiveIoScreen screen) {
             Map<Bounds, Consumer<EmiIngredient>> map = new LinkedHashMap<>();
             for (AddTarget target : screen.targets()) {
                 Rect2i area = target.area();
@@ -100,7 +100,7 @@ public final class FactoryEmiPlugin implements EmiPlugin {
             return map;
         }
 
-        private static void drop(FactoryPassiveIoScreen screen, int block,
+        private static void drop(PassiveIoScreen screen, int block,
                 EmiIngredient ingredient) {
             AEKey key = toKey(ingredient);
             if (key != null) {

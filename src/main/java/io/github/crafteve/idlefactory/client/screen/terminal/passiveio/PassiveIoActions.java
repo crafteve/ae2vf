@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -26,14 +26,14 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>面的循环顺序固定为「任意 → 上 → 下 → 北 → 南 → 东 → 西 → 任意」，点满七次回到起点。</p>
  */
-final class FactoryPassiveIoActions {
+final class PassiveIoActions {
     /** 面按钮的循环顺序；不含「任意」，任意由 {@code null} 表示。 */
     private static final Direction[] FACE_ORDER = {
         Direction.UP, Direction.DOWN, Direction.NORTH, Direction.SOUTH,
         Direction.EAST, Direction.WEST,
     };
 
-    private FactoryPassiveIoActions() {
+    private PassiveIoActions() {
         // 纯静态动作层
     }
 
@@ -44,8 +44,8 @@ final class FactoryPassiveIoActions {
      * @param block       机器块
      * @param rule        规则
      */
-    static void flip(int containerId, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule) {
+    static void flip(int containerId, PassiveIoModel.BlockView block,
+            PassiveIoModel.RuleRow rule) {
         IoSide target = rule.side() == IoSide.INPUT ? IoSide.OUTPUT : IoSide.INPUT;
         probe("flip", block, rule, "-> " + target);
         sendRule(containerId, block.nodeId(), CommandKind.RULE_MOVE, rule.side(),
@@ -60,8 +60,8 @@ final class FactoryPassiveIoActions {
      * @param rule        规则
      * @param backwards   是否反向
      */
-    static void cycleFace(int containerId, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule, boolean backwards) {
+    static void cycleFace(int containerId, PassiveIoModel.BlockView block,
+            PassiveIoModel.RuleRow rule, boolean backwards) {
         Direction next = backwards ? previousFace(rule.face()) : nextFace(rule.face());
         probe("face", block, rule, String.valueOf(next));
         sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
@@ -75,8 +75,8 @@ final class FactoryPassiveIoActions {
      * @param block       机器块
      * @param rule        规则
      */
-    static void toggleMode(int containerId, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule) {
+    static void toggleMode(int containerId, PassiveIoModel.BlockView block,
+            PassiveIoModel.RuleRow rule) {
         if (!(rule.key() instanceof AEItemKey)) {
             return;
         }
@@ -94,8 +94,8 @@ final class FactoryPassiveIoActions {
      * @param block       机器块
      * @param rule        规则
      */
-    static void delete(int containerId, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule) {
+    static void delete(int containerId, PassiveIoModel.BlockView block,
+            PassiveIoModel.RuleRow rule) {
         probe("delete", block, rule, "");
         sendRule(containerId, block.nodeId(), CommandKind.RULE_REMOVE, rule.side(),
                 rule.key(), rule.face(), rule.mode(), null);
@@ -110,7 +110,7 @@ final class FactoryPassiveIoActions {
      * @param containerId 菜单容器 id
      * @param block       机器块
      */
-    static void addEnergy(int containerId, FactoryPassiveIoModel.BlockView block) {
+    static void addEnergy(int containerId, PassiveIoModel.BlockView block) {
         AEKey key = AeKeyAdapter.energy();
         if (key == null) {
             // 没装 Applied Flux：没有 FE 这类资源，按钮本来也不该出现。
@@ -129,7 +129,7 @@ final class FactoryPassiveIoActions {
      * @param block       落到哪台机器
      * @param key         资源
      */
-    static void add(int containerId, FactoryPassiveIoModel.BlockView block, AEKey key) {
+    static void add(int containerId, PassiveIoModel.BlockView block, AEKey key) {
         MatchMode mode = new ResourceSpec(key, null, 0L).mode();
         IdleFactory.LOGGER.info("[ui-probe] add block={} machine={} key={} mode={}",
                 block.name(), block.machineId(), key.getId(), mode);
@@ -195,8 +195,8 @@ final class FactoryPassiveIoActions {
                 new FactoryCommand.Rule(side, key, face, mode, targetSide))));
     }
 
-    private static void probe(String action, FactoryPassiveIoModel.BlockView block,
-            FactoryPassiveIoModel.RuleRow rule, String detail) {
+    private static void probe(String action, PassiveIoModel.BlockView block,
+            PassiveIoModel.RuleRow rule, String detail) {
         IdleFactory.LOGGER.info("[ui-probe] {} block={} machine={} side={} key={} {}",
                 action, block.name(), block.machineId(), rule.side(), rule.key().getId(),
                 detail);

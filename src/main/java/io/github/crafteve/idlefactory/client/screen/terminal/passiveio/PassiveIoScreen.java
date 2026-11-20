@@ -1,4 +1,14 @@
-package io.github.crafteve.idlefactory.client.screen.terminal;
+package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalSource;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoViewButton;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalFrame;
+
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
 import java.util.List;
 
@@ -22,13 +32,13 @@ import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Kind;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Viewport;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoJeiIngredients.AddTarget;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoJeiIngredients.JeiTarget;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Kind;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
@@ -57,7 +67,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈不在界面上展示，动作结果只由随后
  * 到达的机器快照体现。</p>
  */
-public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
+public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         implements ViewTableSink, FeedbackSink {
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
@@ -91,17 +101,17 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
     private SortDir sortDirection;
     /** 内容模型：视图表 + 搜索词 → 机器块。 */
-    private final FactoryPassiveIoModel model;
+    private final PassiveIoModel model;
     /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
     private final TerminalSource source;
     /** 本帧排版；由模型、视图与视口重建。 */
     @Nullable
-    private FactoryPassiveIoLayout layout;
+    private PassiveIoLayout layout;
     /** 内容区绘制器；init 时按当前字体与主题创建。 */
     @Nullable
-    private FactoryPassiveIoRender render;
+    private PassiveIoRender render;
     /** 滚动状态与 AE2 滚动条。 */
-    private final FactoryPassiveIoScroll scroll;
+    private final PassiveIoScroll scroll;
     /** 请求节拍计数。 */
     private int requestTicker;
     /** 顶栏搜索框。 */
@@ -118,20 +128,20 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      * @param title     标题
      * @param style     AE2 终端样式
      */
-    public FactoryPassiveIoScreen(FactoryPassiveIoMenu menu, Inventory inventory,
+    public PassiveIoScreen(FactoryPassiveIoMenu menu, Inventory inventory,
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
         this.view = menu.host().view();
         this.source = new TerminalSource(menu.containerId);
-        this.model = new FactoryPassiveIoModel(FactoryGuiTheme.current());
+        this.model = new PassiveIoModel(FactoryGuiTheme.current());
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
         this.model.setSortContext(this.sortContext());
         Scrollbar bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.scroll = new FactoryPassiveIoScroll(bar);
+        this.scroll = new PassiveIoScroll(bar);
         // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
         // 先用一个同图标、同位置的按钮占位，等指南页确定后再换成 GuideME 跳转。
-        this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
+        this.addToLeftToolbar(new PassiveIoHelpButton(button -> {
             // 指南页待接入。
         }));
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
@@ -140,7 +150,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
                 button -> this.cycleSortMode()));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 button -> this.toggleSortDirection()));
-        this.addToLeftToolbar(new FactoryPassiveIoViewButton(() -> this.view,
+        this.addToLeftToolbar(new PassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
     }
 
@@ -163,7 +173,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         super.init();
         // base_terminal.json 带一条 ME 终端的「条目数」文本，本界面不用它，必须显式隐藏。
         this.setTextHidden("entriesShown", true);
-        this.render = new FactoryPassiveIoRender(this.font, FactoryGuiTheme.current());
+        this.render = new PassiveIoRender(this.font, FactoryGuiTheme.current());
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, FactoryGuiTheme.current(), Component.literal("搜索机器…"));
@@ -171,7 +181,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
         this.applyQuery(rememberedQuery);
-        FactoryPassiveIoProbe.logScreen(this);
         requestTable();
         WandLinkCache.request();
     }
@@ -180,7 +189,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
             float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        FactoryPassiveIoFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
+        TerminalFrame.draw(graphics, this.style.getTerminalStyle(), this.leftPos,
                 this.topPos, this.rows);
         // AE2 的终端行贴图中间带一排物品槽（ME 终端用来放仓库格）；本界面内容区自绘，
         // 必须把这块槽位网格盖成纯面板色，否则空内容区会露出一片格子。右侧 174 之后是
@@ -192,9 +201,9 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
                 FactoryGuiTheme.current().panelBg());
         // 填充停在滑轨左侧，保留 AE2 终端贴图自带的滑轨与 Scrollbar 原始渲染。
         Viewport frame = workAreaFrame();
-        FactoryPassiveIoChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
+        TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
                 frame.height());
-        FactoryPassiveIoChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
+        TerminalChrome.drawSearchField(graphics, this.leftPos + SEARCH_X,
                 this.topPos + SEARCH_Y, SEARCH_W, SEARCH_H);
     }
 
@@ -204,10 +213,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             this.scroll.syncFromBar(this.layout);
         }
         super.render(graphics, mouseX, mouseY, partialTick);
-        FactoryPassiveIoChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
+        TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
-        List<Component> tooltip = FactoryPassiveIoTooltip.of(this.model.blocks(), hover);
+        List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);
         if (!tooltip.isEmpty()) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
@@ -220,8 +229,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      * @param hover    当前命中
      */
     private void drawContent(GuiGraphics graphics, @Nullable Hit hover) {
-        FactoryPassiveIoRender content = this.render;
-        FactoryPassiveIoLayout current = this.layout;
+        PassiveIoRender content = this.render;
+        PassiveIoLayout current = this.layout;
         if (content == null || current == null) {
             return;
         }
@@ -262,7 +271,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (this.layout != null && insideViewport(this.layout.viewport(), mouseX, mouseY)) {
-            this.scroll.scrollBy(this.layout, (int) (-scrollY * FactoryPassiveIoLayout.ROW_H));
+            this.scroll.scrollBy(this.layout, (int) (-scrollY * PassiveIoLayout.ROW_H));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -270,9 +279,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (PROBES && FactoryPassiveIoProbe.handleKey(this, keyCode)) {
-            return true;
-        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
@@ -320,7 +326,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         int signature = table.nodes().size() * 37 + totalRules();
         if (signature != this.lastLogSignature) {
             this.lastLogSignature = signature;
-            FactoryPassiveIoProbe.logTable(this);
         }
     }
 
@@ -348,7 +353,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         }
         this.view = next;
         rebuildLayout();
-        FactoryPassiveIoProbe.logScreen(this);
     }
 
     /**
@@ -427,7 +431,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             return;
         }
         Viewport viewport = contentViewport();
-        this.layout = FactoryPassiveIoLayout.of(this.model.blocks(), viewport, this.view);
+        this.layout = PassiveIoLayout.of(this.model.blocks(), viewport, this.view);
         this.scroll.clampTo(this.layout);
     }
 
@@ -464,12 +468,12 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     /** 当前排版；可能为 {@code null}。 */
     @Nullable
-    FactoryPassiveIoLayout layout() {
+    PassiveIoLayout layout() {
         return this.layout;
     }
 
     /** 当前模型。 */
-    FactoryPassiveIoModel model() {
+    PassiveIoModel model() {
         return this.model;
     }
 
@@ -515,7 +519,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (this.layout == null) {
             return List.of();
         }
-        return FactoryPassiveIoJeiTargets.addTargets(this.layout, scroll());
+        return PassiveIoJeiIngredients.addTargets(this.layout, scroll());
     }
 
     /**
@@ -528,7 +532,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (block < 0 || block >= this.model.blocks().size()) {
             return;
         }
-        FactoryPassiveIoActions.add(this.menu.containerId, this.model.blocks().get(block), key);
+        PassiveIoActions.add(this.menu.containerId, this.model.blocks().get(block), key);
     }
 
     /**
@@ -543,7 +547,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (this.layout == null) {
             return null;
         }
-        return FactoryPassiveIoJeiTargets.targetAt(this.layout, this.model.blocks(), scroll(),
+        return PassiveIoJeiIngredients.targetAt(this.layout, this.model.blocks(), scroll(),
                 mouseX, mouseY);
     }
 
@@ -564,7 +568,7 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         if (hit.kind() == Kind.ENERGY) {
             // FE 按钮不挂在规则行上，必须先于规则下标守卫处理。
             if (button == 0) {
-                FactoryPassiveIoActions.addEnergy(this.menu.containerId, block);
+                PassiveIoActions.addEnergy(this.menu.containerId, block);
             }
             return;
         }
@@ -574,12 +578,12 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         RuleRow rule = block.rules().get(hit.rule());
         if (button == 1) {
             switch (hit.kind()) {
-                case CHIP_DIR -> FactoryPassiveIoActions.flip(this.menu.containerId, block, rule);
-                case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block,
+                case CHIP_DIR -> PassiveIoActions.flip(this.menu.containerId, block, rule);
+                case CHIP_FACE -> PassiveIoActions.cycleFace(this.menu.containerId, block,
                         rule, true);
-                case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block,
+                case CHIP_MODE -> PassiveIoActions.toggleMode(this.menu.containerId, block,
                         rule);
-                case RULE -> FactoryPassiveIoActions.delete(this.menu.containerId, block, rule);
+                case RULE -> PassiveIoActions.delete(this.menu.containerId, block, rule);
                 default -> {
                     // 机器行与新增行的右键不做事。
                 }
@@ -590,10 +594,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
             return;
         }
         switch (hit.kind()) {
-            case CHIP_DIR -> FactoryPassiveIoActions.flip(this.menu.containerId, block, rule);
-            case CHIP_FACE -> FactoryPassiveIoActions.cycleFace(this.menu.containerId, block,
+            case CHIP_DIR -> PassiveIoActions.flip(this.menu.containerId, block, rule);
+            case CHIP_FACE -> PassiveIoActions.cycleFace(this.menu.containerId, block,
                     rule, false);
-            case CHIP_MODE -> FactoryPassiveIoActions.toggleMode(this.menu.containerId, block,
+            case CHIP_MODE -> PassiveIoActions.toggleMode(this.menu.containerId, block,
                     rule);
             default -> {
                 // 卡片本体左键不做事，取消选中模式。
@@ -613,7 +617,6 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
         PacketDistributor.sendToServer(
                 new FactoryPassiveIoViewC2S(this.menu.containerId, next));
         rebuildLayout();
-        FactoryPassiveIoProbe.logScreen(this);
     }
 
     /**

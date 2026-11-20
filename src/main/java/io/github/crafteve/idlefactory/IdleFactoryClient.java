@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeScreen;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
@@ -57,10 +57,10 @@ public class IdleFactoryClient {
      */
     @SubscribeEvent
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
-        event.<FactoryPassiveIoMenu, FactoryPassiveIoScreen>register(
+        event.<FactoryPassiveIoMenu, PassiveIoScreen>register(
                 ModMenus.PASSIVE_IO_TERMINAL.get(),
                 (FactoryPassiveIoMenu menu, Inventory inventory, Component title) ->
-                        new FactoryPassiveIoScreen(menu, inventory, title,
+                        new PassiveIoScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/base_terminal.json")));
         event.<FactoryNodeMenu, NodeScreen>register(

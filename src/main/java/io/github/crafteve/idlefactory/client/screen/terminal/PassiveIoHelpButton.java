@@ -13,11 +13,11 @@ import net.minecraft.network.chat.Component;
  * <p>AE2 的 {@code OpenGuideButton} 只在 {@code getHelpTopic()} 非空时显示；本模组还没
  * 有指南页，所以在指南页接入前先用这个按钮保证左侧按钮数量与设计稿一致。</p>
  */
-public final class FactoryPassiveIoHelpButton extends IconButton {
+public final class PassiveIoHelpButton extends IconButton {
     /**
      * @param press 点击动作；指南页接入前为空操作
      */
-    public FactoryPassiveIoHelpButton(OnPress press) {
+    public PassiveIoHelpButton(OnPress press) {
         super(press);
     }
 

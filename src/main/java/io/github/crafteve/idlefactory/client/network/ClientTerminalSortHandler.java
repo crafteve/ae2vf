@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.client.network;
 
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeScreen;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoScreen;
+import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
 
 import net.minecraft.client.Minecraft;
@@ -28,7 +28,7 @@ public final class ClientTerminalSortHandler {
         if (screen instanceof NodeScreen node
                 && node.containerId() == payload.containerId()) {
             node.acceptSort(payload.mode(), payload.direction());
-        } else if (screen instanceof FactoryPassiveIoScreen passive
+        } else if (screen instanceof PassiveIoScreen passive
                 && passive.containerId() == payload.containerId()) {
             passive.acceptSort(payload.mode(), payload.direction());
         }
