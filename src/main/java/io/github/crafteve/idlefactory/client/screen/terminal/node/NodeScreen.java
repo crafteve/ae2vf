@@ -37,6 +37,7 @@ import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.terminal.ExpandAllButton;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 
@@ -176,6 +177,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 reverse -> this.toggleSortDirection()));
+        this.addToLeftToolbar(new ExpandAllButton(this::allExpanded, this::toggleAllExpanded));
     }
 
     @Override

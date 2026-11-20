@@ -30,6 +30,7 @@ import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.terminal.ExpandAllButton;
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
@@ -163,6 +164,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
                 reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 reverse -> this.toggleSortDirection()));
+        this.addToLeftToolbar(new ExpandAllButton(this::allExpanded, this::toggleAllExpanded));
         this.addToLeftToolbar(new PassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
     }
