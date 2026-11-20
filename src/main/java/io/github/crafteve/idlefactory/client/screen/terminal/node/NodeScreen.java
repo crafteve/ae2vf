@@ -1,5 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
+import io.github.crafteve.idlefactory.client.screen.terminal.TerminalLayout;
 import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton;
 
 
@@ -101,13 +102,6 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     /** 最少内容行数。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
-    private static final int CONTENT_PADDING = 4;
-    /** 右侧滚动条占用宽度。 */
-    private static final int SCROLLBAR_RESERVE = 20;
-    /** 工作区描边框宽。 */
-    private static final int WORK_FRAME = 3;
-    /** 描边框与顶栏的间距。 */
-    private static final int WORK_GAP = 2;
     /** 节点表请求节拍。 */
     private static final int REQUEST_INTERVAL = 20;
     /** 顶栏搜索框位置与尺寸。 */
@@ -760,10 +754,10 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
      */
     Viewport contentViewport() {
         int header = this.style.getTerminalStyle().getHeader().getSrcHeight();
-        return new Viewport(this.leftPos + CONTENT_PADDING + WORK_FRAME,
-                this.topPos + header + WORK_GAP + WORK_FRAME,
-                this.imageWidth - CONTENT_PADDING * 2 - SCROLLBAR_RESERVE - WORK_FRAME * 2,
-                this.rows * rowHeight() - WORK_GAP - WORK_FRAME * 2);
+        return new Viewport(TerminalLayout.contentX(this.leftPos),
+                TerminalLayout.contentY(this.topPos, header),
+                TerminalLayout.contentWidth(this.imageWidth),
+                TerminalLayout.contentHeight(this.rows, rowHeight()));
     }
 
     /**
@@ -773,8 +767,10 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
      */
     Viewport workAreaFrame() {
         Viewport viewport = contentViewport();
-        return new Viewport(viewport.x() - WORK_FRAME, viewport.y() - WORK_FRAME,
-                viewport.width() + WORK_FRAME * 2, viewport.height() + WORK_FRAME * 2);
+        return new Viewport(TerminalLayout.frameX(viewport.x()),
+                TerminalLayout.frameY(viewport.y()),
+                TerminalLayout.frameWidth(viewport.width()),
+                TerminalLayout.frameHeight(viewport.height()));
     }
 
     private void toggleTerminalStyle(
