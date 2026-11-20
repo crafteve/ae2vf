@@ -11,7 +11,7 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
-import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
 import io.github.crafteve.idlefactory.view.ViewMachine;
@@ -35,7 +35,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
      * @param status  状态展示
      * @param label   行标签；多机时是 #1、#2
      */
-    record MemberRow(ViewMachine machine, FactoryStatus status, String label) {
+    record MemberRow(ViewMachine machine, StatusView status, String label) {
     }
 
     /**
@@ -46,7 +46,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
      * @param name    显示名（方块名或自定义名）
      * @param members 机器行
      */
-    record NodeRow(ViewNode view, FactoryStatus status, String name,
+    record NodeRow(ViewNode view, StatusView status, String name,
             List<MemberRow> members) {
         NodeRow {
             members = List.copyOf(members);
@@ -83,7 +83,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
     protected List<NodeRow> buildRows(ViewTable table) {
         List<NodeRow> rows = new ArrayList<>(table.nodes().size());
         for (ViewNode view : table.nodes()) {
-            FactoryStatus status = FactoryStatus.of(view.core());
+            StatusView status = StatusView.of(view.core());
             rows.add(new NodeRow(view, status, displayName(view), members(view, status)));
         }
         return rows;
@@ -114,7 +114,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
             }
         }
         return new SortKey(row.name(), view.core().typeBlockId().toString(),
-                view.machineCount(), view.ruleCount(), FactoryStatus.sortRank(view.core()), nearest,
+                view.machineCount(), view.ruleCount(), StatusView.sortRank(view.core()), nearest,
                 row.nodeId());
     }
 
@@ -123,7 +123,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
         return row.nodeId();
     }
 
-    private List<MemberRow> members(ViewNode view, FactoryStatus status) {
+    private List<MemberRow> members(ViewNode view, StatusView status) {
         List<MemberRow> rows = new ArrayList<>(view.machines().size());
         for (int i = 0; i < view.machines().size(); i++) {
             rows.add(new MemberRow(view.machines().get(i), status, "#" + (i + 1)));

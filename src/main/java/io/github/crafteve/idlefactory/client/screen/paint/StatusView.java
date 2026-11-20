@@ -1,9 +1,5 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.paint;
 
-import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;
-import io.github.crafteve.idlefactory.client.screen.paint.StatusKind;
-import io.github.crafteve.idlefactory.client.screen.paint.StatusLamp;
-import io.github.crafteve.idlefactory.client.screen.paint.StatusText;
 import io.github.crafteve.idlefactory.view.ViewNodeCore;
 
 import net.minecraft.resources.ResourceLocation;
@@ -11,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * 一个节点状态档位的完整展示：文字、颜色、状态条与状态灯。
  *
- * <p>是 {@link StatusKind} 四个查表的组合结果，本身不再判断状态、也不再吃主题——颜色属于组件，
+ * <p>是 {@link StatusKind} 三个查表的组合结果，本身不再判断状态、也不再吃主题——颜色属于组件，
  * 文案与贴图按档位固定。绘制、搜索字段与 tooltip 共用这一份结果。</p>
  *
  * @param kind  档位
@@ -19,7 +15,7 @@ import net.minecraft.resources.ResourceLocation;
  * @param color 状态文字颜色
  * @param lamp  状态灯贴图
  */
-public record FactoryStatus(StatusKind kind, String text, int color, ResourceLocation lamp) {
+public record StatusView(StatusKind kind, String text, int color, ResourceLocation lamp) {
 
     /**
      * 把节点行映射成展示。
@@ -27,7 +23,7 @@ public record FactoryStatus(StatusKind kind, String text, int color, ResourceLoc
      * @param core 节点自身的字段
      * @return 状态展示
      */
-    public static FactoryStatus of(ViewNodeCore core) {
+    public static StatusView of(ViewNodeCore core) {
         return of(StatusKind.of(core));
     }
 
@@ -37,8 +33,8 @@ public record FactoryStatus(StatusKind kind, String text, int color, ResourceLoc
      * @param kind 档位
      * @return 状态展示
      */
-    public static FactoryStatus of(StatusKind kind) {
-        return new FactoryStatus(kind, StatusText.of(kind), StatusColor.of(kind),
+    public static StatusView of(StatusKind kind) {
+        return new StatusView(kind, StatusText.of(kind), StatusColor.of(kind),
                 StatusLamp.lamp(kind));
     }
 

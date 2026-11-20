@@ -26,7 +26,7 @@ import appeng.core.AEConfig;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
+import io.github.crafteve.idlefactory.client.screen.ConfirmDialog;
 
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 
@@ -142,7 +142,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     /** 点过「… N 台」的节点，展开全部成员。 */
     private final Set<UUID> expandedAll = new HashSet<>();
     @Nullable
-    private FactoryConfirmDialog confirmDialog;
+    private ConfirmDialog confirmDialog;
     /** 正在改名的节点；{@code null} 表示不在改名。 */
     @Nullable
     private UUID renamingNode;
@@ -198,7 +198,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         super.init();
         this.setTextHidden("entriesShown", true);
         this.render = new NodeRender(this.font);
-        this.confirmDialog = new FactoryConfirmDialog(this.font);
+        this.confirmDialog = new ConfirmDialog(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, Component.translatable("idlefactory.node.search.hint"));
@@ -701,9 +701,9 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.confirmDialog.open(tr("idlefactory.node.delete.title"),
                 node.name() + "\n" + deleteDetail(node.view()),
                 tr("idlefactory.node.delete.button"), () -> NodeActions.delete(this.menu.containerId, node),
-                new FactoryConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
+                new ConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
                         this.imageHeight),
-                new FactoryConfirmDialog.Bounds(0, 0, this.width, this.height));
+                new ConfirmDialog.Bounds(0, 0, this.width, this.height));
     }
 
     /**

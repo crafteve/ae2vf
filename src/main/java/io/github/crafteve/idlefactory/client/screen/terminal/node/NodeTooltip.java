@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
-import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
 import io.github.crafteve.idlefactory.view.ViewMachine;
 import io.github.crafteve.idlefactory.view.ViewNode;
@@ -79,7 +79,7 @@ final class NodeTooltip {
     private static List<Component> nodeLines(ViewNode node) {
         List<Component> lines = new ArrayList<>(7);
         lines.add(bold(Component.literal(displayName(node))));
-        FactoryStatus status = FactoryStatus.of(node.core());
+        StatusView status = StatusView.of(node.core());
         lines.add(Component.literal(status.text()).withStyle(
                 style -> style.withColor(TextColor.fromRgb(status.color() & 0xFFFFFF))));
         lines.add(keyed("idlefactory.node.tooltip.provider", node.core().available()

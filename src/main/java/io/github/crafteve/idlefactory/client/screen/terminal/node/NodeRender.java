@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
 import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
-import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Kind;
@@ -79,7 +79,7 @@ final class NodeRender {
      * @param machineCount 机器台数，>1 时画数量角标
      * @param members      展开后的成员行
      */
-    private record CardData(java.util.UUID nodeId, String name, FactoryStatus status, String hint,
+    private record CardData(java.util.UUID nodeId, String name, StatusView status, String hint,
             boolean present, net.minecraft.resources.ResourceLocation typeBlockId,
             boolean available, boolean blockingOn, Multiplier multiplier, DispatchMode dispatch,
             int machineCount, List<MemberCardData> members) {
@@ -97,7 +97,7 @@ final class NodeRender {
      * @param status  状态展示，取灯贴图
      */
     private record MemberCardData(String label, @Nullable net.minecraft.resources.ResourceLocation blockId,
-            FactoryStatus status) {
+            StatusView status) {
     }
 
     /**
@@ -239,7 +239,7 @@ final class NodeRender {
      */
     private CardData cardOf(ViewNode node) {
         ViewNodeCore core = node.core();
-        FactoryStatus status = FactoryStatus.of(core);
+        StatusView status = StatusView.of(core);
         List<MemberCardData> members = new ArrayList<>(node.machines().size());
         for (int i = 0; i < node.machines().size(); i++) {
             ViewMachine machine = node.machines().get(i);

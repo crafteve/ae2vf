@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
-import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
@@ -81,7 +81,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
      * @param status 状态展示
      * @param rules  输入在前、输出在后
      */
-    record BlockView(ViewNode node, FactoryStatus status, List<RuleRow> rules) {
+    record BlockView(ViewNode node, StatusView status, List<RuleRow> rules) {
         BlockView {
             rules = List.copyOf(rules);
         }
@@ -138,7 +138,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
     protected List<BlockView> buildRows(ViewTable table) {
         List<BlockView> blocks = new ArrayList<>(table.nodes().size());
         for (ViewNode node : table.nodes()) {
-            blocks.add(new BlockView(node, FactoryStatus.of(node.core()), rules(node)));
+            blocks.add(new BlockView(node, StatusView.of(node.core()), rules(node)));
         }
         return blocks;
     }
@@ -160,7 +160,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
         return new SortKey(SortKey.displayName(block.node().core().name(),
                         block.node().core().typeBlockId()),
                 block.node().core().typeBlockId().toString(), block.machineCount(),
-                block.node().ruleCount(), FactoryStatus.sortRank(block.node().core()), nearest,
+                block.node().ruleCount(), StatusView.sortRank(block.node().core()), nearest,
                 block.nodeId());
     }
 
