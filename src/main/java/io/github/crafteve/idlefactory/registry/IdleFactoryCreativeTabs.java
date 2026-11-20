@@ -14,7 +14,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  *
  * <p>开发期放本模组的终端、绑定杖，方便直接取用；后续有方块或更多物品再扩展。</p>
  */
-public final class ModCreativeTabs {
+public final class IdleFactoryCreativeTabs {
     /** 创造栏注册表。 */
     public static final DeferredRegister<CreativeModeTab> TABS =
             DeferredRegister.create(Registries.CREATIVE_MODE_TAB, IdleFactory.MODID);
@@ -23,16 +23,16 @@ public final class ModCreativeTabs {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> IDLE_FACTORY =
             TABS.register("idlefactory", () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.idlefactory"))
-                    .icon(() -> new ItemStack(ModItems.PASSIVE_IO_TERMINAL.get()))
+                    .icon(() -> new ItemStack(IdleFactoryItems.PASSIVE_IO_TERMINAL.get()))
                     .displayItems((parameters, output) -> {
-                        output.accept(ModItems.PASSIVE_IO_TERMINAL.get());
-                        output.accept(ModItems.NODE_TERMINAL.get());
-                        output.accept(ModItems.MACHINE_BINDING_WAND.get());
-                        output.accept(ModItems.ME_BINDING_WAND.get());
+                        output.accept(IdleFactoryItems.PASSIVE_IO_TERMINAL.get());
+                        output.accept(IdleFactoryItems.NODE_TERMINAL.get());
+                        output.accept(IdleFactoryItems.MACHINE_BINDING_WAND.get());
+                        output.accept(IdleFactoryItems.ME_BINDING_WAND.get());
                     })
                     .build());
 
-    private ModCreativeTabs() {
+    private IdleFactoryCreativeTabs() {
         // 纯注册表持有类，不实例化
     }
 }

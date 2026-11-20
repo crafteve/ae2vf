@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.network.payload;
+package io.github.crafteve.idlefactory.network.codec;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
-import io.github.crafteve.idlefactory.network.AeKeyCodec;
+import io.github.crafteve.idlefactory.network.codec.AeKeyCodec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.node.Node;

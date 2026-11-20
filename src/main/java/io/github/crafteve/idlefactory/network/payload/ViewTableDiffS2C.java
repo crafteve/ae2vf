@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload;
 
+import io.github.crafteve.idlefactory.network.codec.ViewTableCodec;
+
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.view.ViewTableDiff;
 

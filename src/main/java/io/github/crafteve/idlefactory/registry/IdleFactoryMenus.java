@@ -22,7 +22,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  * <p>两个 AE2 终端菜单（被动 IO 配置与节点管理）复用 AE2 的边框与背包槽，不接 ME 库存
  * 菜单；草稿确认面板是不带槽位的对话框菜单，只负责打开与关闭。</p>
  */
-public final class ModMenus {
+public final class IdleFactoryMenus {
     /** 菜单注册表。 */
     public static final DeferredRegister<MenuType<?>> MENUS =
             DeferredRegister.create(Registries.MENU, IdleFactory.MODID);
@@ -62,7 +62,7 @@ public final class ModMenus {
         return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, path);
     }
 
-    private ModMenus() {
+    private IdleFactoryMenus() {
         // 纯注册表持有类，不实例化
     }
 }

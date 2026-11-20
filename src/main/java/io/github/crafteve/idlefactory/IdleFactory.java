@@ -6,9 +6,9 @@ import com.mojang.logging.LogUtils;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
-import io.github.crafteve.idlefactory.registry.ModCreativeTabs;
-import io.github.crafteve.idlefactory.registry.ModItems;
-import io.github.crafteve.idlefactory.registry.ModMenus;
+import io.github.crafteve.idlefactory.registry.IdleFactoryCreativeTabs;
+import io.github.crafteve.idlefactory.registry.IdleFactoryItems;
+import io.github.crafteve.idlefactory.registry.IdleFactoryMenus;
 
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -23,9 +23,9 @@ public class IdleFactory {
 
     public IdleFactory(IEventBus modEventBus, ModContainer modContainer) {
         // 注册表挂在 mod 事件总线上：菜单、物品、创造栏
-        ModMenus.MENUS.register(modEventBus);
-        ModItems.ITEMS.register(modEventBus);
-        ModCreativeTabs.TABS.register(modEventBus);
+        IdleFactoryMenus.MENUS.register(modEventBus);
+        IdleFactoryItems.ITEMS.register(modEventBus);
+        IdleFactoryCreativeTabs.TABS.register(modEventBus);
 
         // 网络包注册（P0 只有通道自检包）
         IdleFactoryNetwork.register(modEventBus);

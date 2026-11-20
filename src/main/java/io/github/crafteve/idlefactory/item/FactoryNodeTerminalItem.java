@@ -9,7 +9,7 @@ import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
 
 import io.github.crafteve.idlefactory.menu.node.NodeTerminalHost;
-import io.github.crafteve.idlefactory.registry.ModMenus;
+import io.github.crafteve.idlefactory.registry.IdleFactoryMenus;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -46,7 +46,7 @@ public class FactoryNodeTerminalItem extends Item implements IMenuItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            MenuOpener.open(ModMenus.NODE_TERMINAL.get(), serverPlayer,
+            MenuOpener.open(IdleFactoryMenus.NODE_TERMINAL.get(), serverPlayer,
                     MenuLocators.forHand(player, hand));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);

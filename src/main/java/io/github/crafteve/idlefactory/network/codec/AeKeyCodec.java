@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.network;
+package io.github.crafteve.idlefactory.network.codec;
 
 import appeng.api.stacks.AEKey;
 

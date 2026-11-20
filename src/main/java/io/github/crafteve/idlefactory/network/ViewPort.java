@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
 import io.github.crafteve.idlefactory.network.payload.ViewTableDiffS2C;
-import io.github.crafteve.idlefactory.network.payload.ViewTableCodec;
+import io.github.crafteve.idlefactory.network.codec.ViewTableCodec;
 import io.github.crafteve.idlefactory.network.payload.ViewTableS2C;
 import io.github.crafteve.idlefactory.view.ViewHeader;
 import io.github.crafteve.idlefactory.view.ViewIoRule;

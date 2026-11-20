@@ -16,7 +16,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  *
  * <p>终端与两种绑定杖都不可堆叠、无耐久；这里只负责注册，绑定行为后续再加。</p>
  */
-public final class ModItems {
+public final class IdleFactoryItems {
     /** 物品注册表。 */
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(Registries.ITEM, IdleFactory.MODID);
@@ -50,7 +50,7 @@ public final class ModItems {
         return new Item.Properties().stacksTo(1);
     }
 
-    private ModItems() {
+    private IdleFactoryItems() {
         // 纯注册表持有类，不实例化
     }
 }

@@ -6,7 +6,7 @@ import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.command.CommandWand;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
-import io.github.crafteve.idlefactory.registry.ModMenus;
+import io.github.crafteve.idlefactory.registry.IdleFactoryMenus;
 
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
@@ -67,7 +67,7 @@ public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
                 return;
             }
             // 物品定位器走主手：面板与那把杖绑定，关掉再开仍是同一件物品
-            boolean opened = MenuOpener.open(ModMenus.WAND_DRAFT.get(), player,
+            boolean opened = MenuOpener.open(IdleFactoryMenus.WAND_DRAFT.get(), player,
                     MenuLocators.forHand(player, InteractionHand.MAIN_HAND));
             if (!opened) {
                 IdleFactory.LOGGER.warn("Idle Factory: 草稿面板打开失败：player={}",
