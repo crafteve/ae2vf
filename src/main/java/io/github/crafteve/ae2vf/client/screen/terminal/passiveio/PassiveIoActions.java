@@ -5,7 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.io.IoSide;
 import io.github.crafteve.ae2vf.machine.MatchMode;
 import io.github.crafteve.ae2vf.machine.IoRuleSpec;

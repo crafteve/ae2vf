@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.factory.FactoryStore.Entry;
 import io.github.crafteve.ae2vf.node.Node;
 import io.github.crafteve.ae2vf.node.NodeLibrary;
@@ -44,14 +44,14 @@ public final class FactoryLibrary {
             for (Node node : record.nodes()) {
                 NodeLibrary.Result added = factory.restoreNode(node);
                 if (added != NodeLibrary.Result.ADDED) {
-                    IdleFactory.LOGGER.warn(
-                            "Idle Factory: 载入工厂 {} 时节点 {} 未登记（{}），保留先登记的那个",
+                    VoidFactory.LOGGER.warn(
+                            "AE2 Void Factory: 载入工厂 {} 时节点 {} 未登记（{}），保留先登记的那个",
                             id, shortId(node), addResultText(added));
                 }
             }
             if (!add(factory)) {
-                IdleFactory.LOGGER.warn(
-                        "Idle Factory: 载入工厂 {}（拥有者 {}）失败：id 或拥有者与先登记的记录冲突，本条已忽略",
+                VoidFactory.LOGGER.warn(
+                        "AE2 Void Factory: 载入工厂 {}（拥有者 {}）失败：id 或拥有者与先登记的记录冲突，本条已忽略",
                         id, record.owner());
             }
         }

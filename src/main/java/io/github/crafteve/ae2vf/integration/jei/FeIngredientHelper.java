@@ -41,7 +41,7 @@ final class FeIngredientHelper implements IIngredientHelper<FeIngredient> {
      *
      * @param ingredient FE 配料
      * @param context    查询上下文
-     * @return {@code idlefactory:fe}
+     * @return {@code ae2vf:fe}
      */
     @Override
     @Deprecated
@@ -55,7 +55,7 @@ final class FeIngredientHelper implements IIngredientHelper<FeIngredient> {
      *
      * @param ingredient FE 配料
      * @param context    查询上下文
-     * @return {@code idlefactory:fe}
+     * @return {@code ae2vf:fe}
      */
     @Override
     public Object getUid(FeIngredient ingredient, UidContext context) {
@@ -66,7 +66,7 @@ final class FeIngredientHelper implements IIngredientHelper<FeIngredient> {
      * 注册名；JEI 用它显示所属模组。
      *
      * @param ingredient FE 配料
-     * @return {@code idlefactory:fe}
+     * @return {@code ae2vf:fe}
      */
     @Override
     public ResourceLocation getResourceLocation(FeIngredient ingredient) {

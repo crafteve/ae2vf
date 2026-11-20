@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.client.screen.wand;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.screen.hud.HUDRenderer;
 import io.github.crafteve.ae2vf.client.screen.text.WandText;
 import io.github.crafteve.ae2vf.client.wand.WandDraftState;
@@ -22,7 +22,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
  * <p>闪条（成功 / 失败 / 中性）统一交给 {@link HUDRenderer}，本类只画常驻草稿条；
  * 两者用同一套底板与状态点，不再各写一份。同一时刻最多一条闪条，新的覆盖旧的。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = VoidFactory.MODID, value = Dist.CLIENT)
 public final class WandHud {
     /** 常驻条距屏幕底部的距离，避开快捷栏。 */
     private static final int BOTTOM_INSET = 58;

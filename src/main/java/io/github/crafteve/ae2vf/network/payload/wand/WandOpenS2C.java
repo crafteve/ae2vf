@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload.wand;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.wand.WandSubmitter;
 import io.github.crafteve.ae2vf.command.CommandReason;
 import io.github.crafteve.ae2vf.command.CommandResult;
@@ -23,9 +23,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param result 预校验结果
  */
 public record WandOpenS2C(CommandResult result) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:wand_open_result}。 */
+    /** 包类型：{@code ae2vf:wand_open_result}。 */
     public static final Type<WandOpenS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "wand_open_result"));
 
     /** 编解码器。 */

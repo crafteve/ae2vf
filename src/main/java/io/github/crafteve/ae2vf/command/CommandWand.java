@@ -9,9 +9,9 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.claim.BlockOccupancyTable;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.command.CommandChain;
 import io.github.crafteve.ae2vf.factory.FactoryResolver;
@@ -165,7 +165,7 @@ public final class CommandWand {
         CommandTopology.TopologyOutcome outcome = topology.apply(factory, base, candidate,
                 draft.removed(), player);
         if (!outcome.applied()) {
-            IdleFactory.LOGGER.warn("Idle Factory: 绑定杖提交写库结果与预期不符：result={}, node={},"
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 绑定杖提交写库结果与预期不符：result={}, node={},"
                     + " added={}, removed={}", outcome.result(), draft.nodeId(),
                     draft.added().size(), draft.removed().size());
             return CommandResult.of(CommandReason.INTERNAL);
@@ -301,7 +301,7 @@ public final class CommandWand {
         CommandResult result = CommandApply.addRule(factory, nodeId,
                 new FactoryCommand.Rule(IoSide.INPUT, energy, null, MatchMode.EXACT, null));
         if (!result.ok()) {
-            IdleFactory.LOGGER.debug("Idle Factory: 自动补 FE 规则未写入：{}", result.reason());
+            VoidFactory.LOGGER.debug("AE2 Void Factory: 自动补 FE 规则未写入：{}", result.reason());
         }
     }
 

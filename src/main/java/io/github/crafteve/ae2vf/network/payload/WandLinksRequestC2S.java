@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
 
@@ -19,9 +19,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 让客户端把旧缓存清掉。结构变更后的刷新靠服务端推送，不再轮询。</p>
  */
 public record WandLinksRequestC2S() implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:factory_links_request}。 */
+    /** 包类型：{@code ae2vf:factory_links_request}。 */
     public static final Type<WandLinksRequestC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "wand_links_request"));
 
     /** 空负载编解码器。 */

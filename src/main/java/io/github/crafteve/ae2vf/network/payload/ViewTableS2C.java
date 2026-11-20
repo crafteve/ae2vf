@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.network.payload;
 
 import io.github.crafteve.ae2vf.network.codec.ViewTableCodec;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.view.ViewTable;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -29,9 +29,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record ViewTableS2C(int containerId, long revision, int pageIndex, int pageCount,
         ViewTable page) implements CustomPacketPayload {
 
-    /** 包类型：{@code idlefactory:view_table}。 */
+    /** 包类型：{@code ae2vf:view_table}。 */
     public static final Type<ViewTableS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "view_table"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "view_table"));
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, ViewTableS2C> STREAM_CODEC =

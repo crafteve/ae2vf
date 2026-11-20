@@ -522,7 +522,7 @@ final class PassiveIoRender {
     }
 
     private static String directionLabel(RuleRow rule) {
-        return tr(rule.input() ? "idlefactory.passive.chip.input" : "idlefactory.passive.chip.output");
+        return tr(rule.input() ? "ae2vf.passive.chip.input" : "ae2vf.passive.chip.output");
     }
 
     /**
@@ -543,7 +543,7 @@ final class PassiveIoRender {
     private static String modeLabel(RuleRow spec) {
         // 非物品固定精确，chip 仍然写「精」但灰显禁用，保持和物品规则同一套外形。
         return spec.mode() == io.github.crafteve.ae2vf.machine.MatchMode.EXACT
-                ? tr("idlefactory.passive.chip.exact") : tr("idlefactory.passive.chip.fuzzy");
+                ? tr("ae2vf.passive.chip.exact") : tr("ae2vf.passive.chip.fuzzy");
     }
 
     private int modeColor(RuleRow spec) {

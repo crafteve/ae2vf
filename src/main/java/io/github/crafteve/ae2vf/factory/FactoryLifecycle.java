@@ -5,7 +5,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.ae2vf.command.CommitSeqStore;
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 
 import io.github.crafteve.ae2vf.io.IoForm;
 
@@ -336,11 +336,11 @@ public final class FactoryLifecycle {
     private void logNodeNotice(LiveNodeLibrary.Notice notice) {
         Factory factory = this.manager.byId(notice.factoryId()).orElse(null);
         if (factory == null) {
-            IdleFactory.LOGGER.warn("Idle Factory: 节点告警来自不存在的工厂 [{}]：{}",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 节点告警来自不存在的工厂 [{}]：{}",
                     notice.nodeId(), notice.message());
             return;
         }
-        IdleFactory.LOGGER.debug("Idle Factory: 节点 {} 告警：{}", notice.nodeId(), notice.message());
+        VoidFactory.LOGGER.debug("AE2 Void Factory: 节点 {} 告警：{}", notice.nodeId(), notice.message());
     }
 
 }

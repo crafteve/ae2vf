@@ -7,8 +7,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.VoidFactory;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
 import io.github.crafteve.ae2vf.io.IoRunner;
@@ -152,15 +152,15 @@ public final class CommandTopology {
     private static boolean overLimit(Factory factory, Node node) {
         var nodes = factory.nodes();
         boolean replacing = nodes.byId(node.id()).isPresent();
-        if (!replacing && nodes.size() + 1 > IdleFactoryConfig.maxNodes()) {
+        if (!replacing && nodes.size() + 1 > VoidFactoryConfig.maxNodes()) {
             return true;
         }
-        if (node.machineCount() > IdleFactoryConfig.maxMachinesPerNode()) {
+        if (node.machineCount() > VoidFactoryConfig.maxMachinesPerNode()) {
             return true;
         }
         Node old = nodes.byId(node.id()).orElse(null);
         int machineDelta = node.machineCount() - (old == null ? 0 : old.machineCount());
-        return nodes.totalMachineCount() + machineDelta > IdleFactoryConfig.maxTotalMachines();
+        return nodes.totalMachineCount() + machineDelta > VoidFactoryConfig.maxTotalMachines();
     }
 
     /**

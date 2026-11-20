@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.network.payload;
 
 import io.github.crafteve.ae2vf.network.codec.ViewTableCodec;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.view.ViewTableDiff;
 
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -25,9 +25,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record ViewTableDiffS2C(int containerId, long baseRevision, long revision,
         ViewTableDiff diff) implements CustomPacketPayload {
 
-    /** 包类型：{@code idlefactory:view_table_diff}。 */
+    /** 包类型：{@code ae2vf:view_table_diff}。 */
     public static final Type<ViewTableDiffS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "view_table_diff"));
 
     /** 编解码器。 */

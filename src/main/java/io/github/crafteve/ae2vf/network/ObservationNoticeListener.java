@@ -90,12 +90,12 @@ public final class ObservationNoticeListener implements ObservationChangeListene
                 // 走模组 HUD 条：和绑定杖、ME 杖、定位提示同一种底板，不用原版动作栏。
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.ae2vf.network.payload.HudNoticeS2C(
-                                Component.translatable("idlefactory.notice.missing", missing),
+                                Component.translatable("ae2vf.notice.missing", missing),
                                 io.github.crafteve.ae2vf.network.payload.HudNoticeS2C.Kind.FAILURE));
             } else if (restored > 0) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.ae2vf.network.payload.HudNoticeS2C(
-                                Component.translatable("idlefactory.notice.restored", restored),
+                                Component.translatable("ae2vf.notice.restored", restored),
                                 io.github.crafteve.ae2vf.network.payload.HudNoticeS2C.Kind.SUCCESS));
             }
         }

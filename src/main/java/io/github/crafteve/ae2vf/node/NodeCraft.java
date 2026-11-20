@@ -8,7 +8,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.io.BlockingMode;
 import io.github.crafteve.ae2vf.io.DispatchMode;
 import io.github.crafteve.ae2vf.node.NodeDispatchOrder;
@@ -385,7 +385,7 @@ public final class NodeCraft {
             long[] missing = batchTag.getLongArray(TAG_BATCH_MISSING);
             if (missing.length != lines.size()) {
                 // 行数对不上：这一条半份已经没法精确补齐，丢掉它比按错位补料安全。
-                IdleFactory.LOGGER.warn("Idle Factory: 订单 {} 的半份行数不匹配，已丢弃该半份",
+                VoidFactory.LOGGER.warn("AE2 Void Factory: 订单 {} 的半份行数不匹配，已丢弃该半份",
                         tag.getUUID(TAG_ORDER_ID));
                 continue;
             }

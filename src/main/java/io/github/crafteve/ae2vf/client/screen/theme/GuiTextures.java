@@ -3,13 +3,13 @@ package io.github.crafteve.ae2vf.client.screen.theme;
 
 import net.minecraft.resources.ResourceLocation;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 
 /**
  * 界面贴图的资源 id。
  *
  * <p>全部由 {@code tools/gui/gen_textures.py} 离线生成，落在
- * {@code assets/idlefactory/textures/gui/}。Java 侧只引用，不拼路径字符串。</p>
+ * {@code assets/ae2vf/textures/gui/}。Java 侧只引用，不拼路径字符串。</p>
  *
  * <p>第一版工作台删除后，只剩被动 IO 终端与共享渲染组件真正用到的贴图：面板、凹槽、按钮、
  * 粗分隔线与四种状态灯 / 状态条。旧工作台的表格、IO 详情、搜索框、排序图标等贴图连同常量
@@ -74,6 +74,6 @@ public final class GuiTextures {
     }
 
     private static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "textures/gui/" + path + ".png");
+        return ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "textures/gui/" + path + ".png");
     }
 }

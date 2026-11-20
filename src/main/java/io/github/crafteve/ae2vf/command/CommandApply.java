@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.ae2vf.claim.BlockOccupancyTable;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.integration.ae2.Ae2Binder;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
@@ -82,7 +82,7 @@ public final class CommandApply {
         }
         NodeIo io = ioFound.get();
         List<IoRuleSpec> rules = rules(io, rule.side());
-        int maxRules = IdleFactoryConfig.maxRulesPerSide();
+        int maxRules = VoidFactoryConfig.maxRulesPerSide();
         if (rules.size() >= maxRules) {
             return CommandResult.node(CommandReason.RULE_FULL, nodeId);
         }
@@ -144,7 +144,7 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.RULE_MISSING, nodeId);
         }
         List<IoRuleSpec> target = rules(io, to);
-        int maxRules = IdleFactoryConfig.maxRulesPerSide();
+        int maxRules = VoidFactoryConfig.maxRulesPerSide();
         if (target.size() >= maxRules) {
             return CommandResult.node(CommandReason.RULE_FULL, nodeId);
         }
@@ -253,7 +253,7 @@ public final class CommandApply {
         if (runtime == null) {
             return CommandResult.node(CommandReason.NOT_STARTED, nodeId);
         }
-        int maxLength = IdleFactoryConfig.maxNameLength();
+        int maxLength = VoidFactoryConfig.maxNameLength();
         String next = rename.name().trim();
         if (next.length() > maxLength) {
             return CommandResult.node(CommandReason.NAME_TOO_LONG, nodeId);

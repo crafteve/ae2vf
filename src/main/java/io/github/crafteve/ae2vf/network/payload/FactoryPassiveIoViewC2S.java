@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.ae2vf.menu.PassiveIoViewMode;
 
@@ -26,9 +26,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record FactoryPassiveIoViewC2S(int containerId, PassiveIoViewMode view)
         implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:passive_io_view}。 */
+    /** 包类型：{@code ae2vf:passive_io_view}。 */
     public static final Type<FactoryPassiveIoViewC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "passive_io_view"));
 
     /** 编解码器。 */

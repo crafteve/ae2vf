@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.registry;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.menu.node.NodeTerminalHost;
 import io.github.crafteve.ae2vf.menu.node.NodeTerminalMenu;
 import io.github.crafteve.ae2vf.menu.passiveio.PassiveIoTerminalHost;
@@ -22,10 +22,10 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  * <p>两个 AE2 终端菜单（被动 IO 配置与节点管理）复用 AE2 的边框与背包槽，不接 ME 库存
  * 菜单；草稿确认面板是不带槽位的对话框菜单，只负责打开与关闭。</p>
  */
-public final class IdleFactoryMenus {
+public final class VoidFactoryMenus {
     /** 菜单注册表。 */
     public static final DeferredRegister<MenuType<?>> MENUS =
-            DeferredRegister.create(Registries.MENU, IdleFactory.MODID);
+            DeferredRegister.create(Registries.MENU, VoidFactory.MODID);
 
     /** 被动 IO 管理终端：AE2 菜单构建器负责按物品定位器还原宿主。 */
     public static final DeferredHolder<MenuType<?>, MenuType<PassiveIoTerminalMenu>>
@@ -59,10 +59,10 @@ public final class IdleFactoryMenus {
                             .buildUnregistered(id("wand_draft")));
 
     private static ResourceLocation id(String path) {
-        return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, path);
+        return ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, path);
     }
 
-    private IdleFactoryMenus() {
+    private VoidFactoryMenus() {
         // 纯注册表持有类，不实例化
     }
 }

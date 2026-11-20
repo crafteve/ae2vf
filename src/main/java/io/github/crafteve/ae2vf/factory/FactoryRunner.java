@@ -9,13 +9,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.command.CommandController;
 import io.github.crafteve.ae2vf.command.CommandKind;
 import io.github.crafteve.ae2vf.command.CommandResult;
 import io.github.crafteve.ae2vf.command.CommandSource;
 import io.github.crafteve.ae2vf.command.FactoryCommand;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.integration.ae2.Ae2Binder;
 import io.github.crafteve.ae2vf.io.DispatchState;
 import io.github.crafteve.ae2vf.io.IoForm;
@@ -135,7 +135,7 @@ final class FactoryRunner implements ObservationChangeListener {
 
 
         if (this.tickCounter % HEARTBEAT_INTERVAL == 0) {
-            IdleFactory.LOGGER.trace("Idle Factory heartbeat: {} factory instance(s), tick {}",
+            VoidFactory.LOGGER.trace("AE2 Void Factory heartbeat: {} factory instance(s), tick {}",
                     this.manager.all().size(), this.tickCounter);
         }
     }
@@ -156,7 +156,7 @@ final class FactoryRunner implements ObservationChangeListener {
     /** 解析每个节点的健康与类型迁移。 */
     private void resolveNodes() {
         long now = this.observations.currentTick();
-        long staleTicks = IdleFactoryConfig.staleHealthTicks();
+        long staleTicks = VoidFactoryConfig.staleHealthTicks();
         for (Factory factory : this.manager.all()) {
             for (Node node : factory.nodes().all()) {
                 Node current = node;
@@ -202,7 +202,7 @@ final class FactoryRunner implements ObservationChangeListener {
                     continue;
                 }
                 long now = this.observations.currentTick();
-                long staleTicks = IdleFactoryConfig.staleHealthTicks();
+                long staleTicks = VoidFactoryConfig.staleHealthTicks();
                 for (Node node : factory.nodes().all()) {
                     NodeHealthResolver.Snapshot snapshot = NodeHealthResolver.resolve(node,
                             this.observations, now, staleTicks);
@@ -220,7 +220,7 @@ final class FactoryRunner implements ObservationChangeListener {
             this.nodeRunner.reconcile(specs, onlineMachines);
         } catch (RuntimeException e) {
             // 对账炸了不能让整个服务器 tick 跟着炸；下一轮对账会把状态补齐
-            IdleFactory.LOGGER.warn("Idle Factory: 虚拟节点对账失败：{}", e.toString());
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 虚拟节点对账失败：{}", e.toString());
         }
     }
 

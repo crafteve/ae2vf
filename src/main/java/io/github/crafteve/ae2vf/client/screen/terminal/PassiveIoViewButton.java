@@ -56,7 +56,7 @@ public final class PassiveIoViewButton extends IconButton {
     @Override
     public List<Component> getTooltipMessage() {
         String next = tr(this.view.get() == PassiveIoViewMode.LIST
-                ? "idlefactory.passive.view.tile" : "idlefactory.passive.view.list");
-        return List.of(Component.translatable("idlefactory.passive.view.switch", next));
+                ? "ae2vf.passive.view.tile" : "ae2vf.passive.view.list");
+        return List.of(Component.translatable("ae2vf.passive.view.switch", next));
     }
 }

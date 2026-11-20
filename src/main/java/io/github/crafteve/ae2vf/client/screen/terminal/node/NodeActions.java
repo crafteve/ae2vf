@@ -75,7 +75,7 @@ final class NodeActions {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
                 || !minecraft.level.dimension().location().equals(dimension)) {
-            message(tr("idlefactory.node.locate.other_dimension", dimension.toString(),
+            message(tr("ae2vf.node.locate.other_dimension", dimension.toString(),
                     pos.toShortString()));
             return;
         }
@@ -98,7 +98,7 @@ final class NodeActions {
                 instanceof io.github.crafteve.ae2vf.item.MachineBindingWandItem)) {
             int slot = wandHotbarSlot(minecraft.player);
             if (slot < 0) {
-                message(tr("idlefactory.node.edit.no_wand"));
+                message(tr("ae2vf.node.edit.no_wand"));
                 return;
             }
             minecraft.player.getInventory().selected = slot;

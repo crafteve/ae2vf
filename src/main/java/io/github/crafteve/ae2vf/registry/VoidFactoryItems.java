@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.registry;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.item.NodeTerminalItem;
 import io.github.crafteve.ae2vf.item.PassiveIoTerminalItem;
 import io.github.crafteve.ae2vf.item.MachineBindingWandItem;
@@ -16,10 +16,10 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  *
  * <p>终端与两种绑定杖都不可堆叠、无耐久；这里只负责注册，绑定行为后续再加。</p>
  */
-public final class IdleFactoryItems {
+public final class VoidFactoryItems {
     /** 物品注册表。 */
     public static final DeferredRegister<Item> ITEMS =
-            DeferredRegister.create(Registries.ITEM, IdleFactory.MODID);
+            DeferredRegister.create(Registries.ITEM, VoidFactory.MODID);
 
     /** 被动 IO 管理终端；右键打开第三版框架界面。 */
     public static final DeferredHolder<Item, PassiveIoTerminalItem> PASSIVE_IO_TERMINAL =
@@ -50,7 +50,7 @@ public final class IdleFactoryItems {
         return new Item.Properties().stacksTo(1);
     }
 
-    private IdleFactoryItems() {
+    private VoidFactoryItems() {
         // 纯注册表持有类，不实例化
     }
 }

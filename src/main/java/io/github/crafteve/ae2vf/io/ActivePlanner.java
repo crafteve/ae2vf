@@ -9,7 +9,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.node.NodeDispatchOrder;
 import io.github.crafteve.ae2vf.machine.Machine;
 import io.github.crafteve.ae2vf.key.AeKeyAdapter;
@@ -514,7 +514,7 @@ public final class ActivePlanner {
         }
         if (order.orphan() && now - order.orphanedAt() > ORPHAN_TIMEOUT_TICKS) {
             // 网络长时间收不回：剩余量按 D21 丢弃，只记日志，不生成掉落物。
-            IdleFactory.LOGGER.warn("Idle Factory: 半份退回网络超时，{} 件已按丢弃处理",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 半份退回网络超时，{} 件已按丢弃处理",
                     left);
             next = order.completeBatch(refund.machineId);
         }

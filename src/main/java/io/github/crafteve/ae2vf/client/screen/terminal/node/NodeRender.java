@@ -202,7 +202,7 @@ final class NodeRender {
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 provider && row.blockingOn() ? BLOCK_GREEN : MODE_IDLE,
                 provider, hovered(hover, box.index(), Kind.BLOCKING));
-        drawLabel(graphics, tr("idlefactory.node.label.blocking"), NodeLayout.keyX(viewport, 0), NodeLayout.KEY_W,
+        drawLabel(graphics, tr("ae2vf.node.label.blocking"), NodeLayout.keyX(viewport, 0), NodeLayout.KEY_W,
                 keyTextY, provider && row.blockingOn() ? BLOCK_GREEN_TEXT : TEXT_DIM);
 
         Multiplier multiplier = row.multiplier();
@@ -225,7 +225,7 @@ final class NodeRender {
                 roundRobin ? DISPATCH_ROUND : DISPATCH_SEQUENTIAL,
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
         drawLabel(graphics, tr(roundRobin
-                ? "idlefactory.node.label.round_robin" : "idlefactory.node.label.sequential"),
+                ? "ae2vf.node.label.round_robin" : "ae2vf.node.label.sequential"),
                 NodeLayout.keyX(viewport, 2), NodeLayout.KEY_W, keyTextY,
                 roundRobin ? DISPATCH_ROUND_TEXT : DISPATCH_SEQUENTIAL_TEXT);
 
@@ -236,13 +236,13 @@ final class NodeRender {
         KeycapButton.draw(graphics, editX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H, EDIT_KEY,
                 true, hovered(hover, box.index(), Kind.EDIT));
-        drawLabel(graphics, tr("idlefactory.node.label.edit"), editX,
+        drawLabel(graphics, tr("ae2vf.node.label.edit"), editX,
                 NodeLayout.ACTION_W, keyTextY, TEXT_PRIMARY);
 
         KeycapButton.draw(graphics, deleteX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H, DELETE_KEY, true,
                 hovered(hover, box.index(), Kind.DELETE));
-        drawLabel(graphics, tr("idlefactory.node.label.delete"), deleteX,
+        drawLabel(graphics, tr("ae2vf.node.label.delete"), deleteX,
                 NodeLayout.ACTION_W, keyTextY, 0xFFFFFFFF);
     }
 
@@ -295,9 +295,9 @@ final class NodeRender {
     private static String multiplierLabel(
             io.github.crafteve.ae2vf.node.Multiplier multiplier) {
         return switch (multiplier.mode()) {
-            case OFF -> tr("idlefactory.node.label.multiplier.off");
+            case OFF -> tr("ae2vf.node.label.multiplier.off");
             case FIXED -> Integer.toString(multiplier.factor());
-            case SMART -> tr("idlefactory.node.label.multiplier.smart");
+            case SMART -> tr("ae2vf.node.label.multiplier.smart");
         };
     }
 
@@ -325,15 +325,15 @@ final class NodeRender {
     private static String statusHint(boolean probed, boolean stale, NodeHealth health,
             boolean available) {
         if (!probed) {
-            return tr("idlefactory.status.unprobed");
+            return tr("ae2vf.status.unprobed");
         }
         if (stale) {
-            return tr("idlefactory.status.stale");
+            return tr("ae2vf.status.stale");
         }
         return switch (health) {
-            case OFFLINE -> tr("idlefactory.status.offline");
-            case PARTIAL -> tr("idlefactory.status.partial");
-            case ONLINE -> available ? "" : tr("idlefactory.node.hint.not_me");
+            case OFFLINE -> tr("ae2vf.status.offline");
+            case PARTIAL -> tr("ae2vf.status.partial");
+            case ONLINE -> available ? "" : tr("ae2vf.node.hint.not_me");
         };
     }
 
@@ -369,14 +369,14 @@ final class NodeRender {
                     NodeLayout.MEMBER_ROW_H - 2, BEVEL_LIGHT, true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);
-            drawLabel(graphics, tr("idlefactory.node.label.locate"), locateX, NodeLayout.LOCATE, y + 3,
+            drawLabel(graphics, tr("ae2vf.node.label.locate"), locateX, NodeLayout.LOCATE, y + 3,
                     TEXT_PRIMARY);
         }
         if (box.totalMembers() > box.shownMembers()) {
             int y = NodeLayout.moreRowY(viewport, box, scroll);
             int x = NodeLayout.memberX(viewport);
             graphics.drawString(this.font,
-                    tr("idlefactory.node.more", box.totalMembers() - box.shownMembers()), x + 4, y + 3,
+                    tr("ae2vf.node.more", box.totalMembers() - box.shownMembers()), x + 4, y + 3,
                     TEXT_DIM, false);
         }
     }

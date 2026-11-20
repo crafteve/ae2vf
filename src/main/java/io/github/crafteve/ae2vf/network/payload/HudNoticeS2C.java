@@ -8,7 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.network.ClientHudNoticeHandler;
 
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -34,7 +34,7 @@ public record HudNoticeS2C(Component text, Kind kind) implements CustomPacketPay
 
     /** 负载类型 id。 */
     public static final Type<HudNoticeS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "hud_notice"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "hud_notice"));
 
     /** 线编解码。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, HudNoticeS2C> STREAM_CODEC =

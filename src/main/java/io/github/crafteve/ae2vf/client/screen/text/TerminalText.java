@@ -64,15 +64,15 @@ public final class TerminalText {
      */
     public static String face(@Nullable Direction face) {
         if (face == null) {
-            return tr("idlefactory.face.any");
+            return tr("ae2vf.face.any");
         }
         return switch (face) {
-            case UP -> tr("idlefactory.face.up");
-            case DOWN -> tr("idlefactory.face.down");
-            case NORTH -> tr("idlefactory.face.north");
-            case SOUTH -> tr("idlefactory.face.south");
-            case EAST -> tr("idlefactory.face.east");
-            case WEST -> tr("idlefactory.face.west");
+            case UP -> tr("ae2vf.face.up");
+            case DOWN -> tr("ae2vf.face.down");
+            case NORTH -> tr("ae2vf.face.north");
+            case SOUTH -> tr("ae2vf.face.south");
+            case EAST -> tr("ae2vf.face.east");
+            case WEST -> tr("ae2vf.face.west");
         };
     }
 
@@ -84,9 +84,9 @@ public final class TerminalText {
      */
     public static String faceShort(@Nullable Direction face) {
         if (face == null) {
-            return tr("idlefactory.passive.chip.any_face");
+            return tr("ae2vf.passive.chip.any_face");
         }
-        return tr("idlefactory.face.short." + face.getName());
+        return tr("ae2vf.face.short." + face.getName());
     }
 
     private static final String[] COMPACT_UNITS = {"E", "P", "T", "G", "M", "k"};
@@ -190,17 +190,17 @@ public final class TerminalText {
      */
     public static String reason(IoReason reason, boolean input) {
         return switch (reason) {
-            case RUN -> tr("idlefactory.reason.run");
-            case SLEEPING -> tr("idlefactory.reason.sleeping");
+            case RUN -> tr("ae2vf.reason.run");
+            case SLEEPING -> tr("ae2vf.reason.sleeping");
             case NO_MATERIAL -> tr(input
-                    ? "idlefactory.reason.no_material.input" : "idlefactory.reason.no_material.output");
+                    ? "ae2vf.reason.no_material.input" : "ae2vf.reason.no_material.output");
             case FULL -> tr(input
-                    ? "idlefactory.reason.full.input" : "idlefactory.reason.full.output");
-            case NO_FACE -> tr("idlefactory.reason.no_face");
-            case BUDGET_OUT -> tr("idlefactory.reason.budget_out");
-            case REJECTED -> tr("idlefactory.reason.rejected");
-            case FACE_CONFIG_INVALID -> tr("idlefactory.reason.face_invalid");
-            case ERROR -> tr("idlefactory.reason.error");
+                    ? "ae2vf.reason.full.input" : "ae2vf.reason.full.output");
+            case NO_FACE -> tr("ae2vf.reason.no_face");
+            case BUDGET_OUT -> tr("ae2vf.reason.budget_out");
+            case REJECTED -> tr("ae2vf.reason.rejected");
+            case FACE_CONFIG_INVALID -> tr("ae2vf.reason.face_invalid");
+            case ERROR -> tr("ae2vf.reason.error");
         };
     }
 
@@ -331,7 +331,7 @@ public final class TerminalText {
      */
     static Component state(IoReason reason, boolean input) {
         return Component.empty()
-                .append(colored(tr("idlefactory.tooltip.state"), TooltipPalette.LABEL))
+                .append(colored(tr("ae2vf.tooltip.state"), TooltipPalette.LABEL))
                 .append(coloredBold(reason(reason, input), tooltipReasonColor(reason)));
     }
 }

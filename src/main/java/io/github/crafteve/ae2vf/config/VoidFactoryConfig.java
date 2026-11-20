@@ -18,7 +18,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
  * {@link #observationEventBudgetPerTick} 与 {@link #staleHealthTicks} 是调优项，
  * 不是玩法上限，默认值非 -1。</p>
  */
-public final class IdleFactoryConfig {
+public final class VoidFactoryConfig {
     /** 节点数硬上限。 */
     public static final int HARD_MAX_NODES = NodeLibrary.HARD_MAX_NODES;
     /** 单节点机器数硬上限。 */
@@ -85,10 +85,10 @@ public final class IdleFactoryConfig {
             .defineInRange("staleHealthTicks", DEFAULT_STALE_HEALTH_TICKS, 1,
                     HARD_MAX_STALE_HEALTH_TICKS);
 
-    /** COMMON 配置规格；由 {@code IdleFactory} 注册。 */
+    /** COMMON 配置规格；由 {@code VoidFactory} 注册。 */
     public static final ModConfigSpec SPEC = BUILDER.build();
 
-    private IdleFactoryConfig() {
+    private VoidFactoryConfig() {
         // 纯配置容器，禁止实例化
     }
 

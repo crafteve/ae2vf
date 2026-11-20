@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.key.BlockKey;
 import io.github.crafteve.ae2vf.network.NetworkLimit;
 import io.github.crafteve.ae2vf.network.NetworkVersion;
@@ -42,7 +42,7 @@ public final class WandDraftCodec {
      * @return 加与删各自的数量上限
      */
     public static int draftLimit() {
-        return NetworkLimit.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        return NetworkLimit.wireLimit(VoidFactoryConfig.maxMachinesPerNode());
     }
 
     /**

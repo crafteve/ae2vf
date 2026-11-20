@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.command.FactoryCommand;
 import io.github.crafteve.ae2vf.network.CommandPort;
 
@@ -19,9 +19,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param command 命令
  */
 public record FactoryCommandC2S(FactoryCommand command) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:command}。 */
+    /** 包类型：{@code ae2vf:command}。 */
     public static final Type<FactoryCommandC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "command"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "command"));
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, FactoryCommandC2S> STREAM_CODEC =

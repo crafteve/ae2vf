@@ -11,7 +11,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.machine.Machine;
 
 import appeng.api.stacks.AEKey;
@@ -289,7 +289,7 @@ public final class IoAnalyzer {
         }
         if (oldestKey != null) {
             hints.remove(oldestKey);
-            IdleFactory.LOGGER.debug("Idle Factory: 机器 {} 的经验面超过 {} 条，淘汰最久未用的一条",
+            VoidFactory.LOGGER.debug("AE2 Void Factory: 机器 {} 的经验面超过 {} 条，淘汰最久未用的一条",
                     machine.shortId(), FACE_HINT_FENCE);
         }
     }

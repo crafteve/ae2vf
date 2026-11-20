@@ -49,8 +49,8 @@ final class PassiveIoTooltip {
             case MACHINE -> machine(block);
             case ENERGY -> energy();
             case ADD -> List.of(
-                    Component.translatable("idlefactory.passive.tooltip.add_row"),
-                    Component.translatable("idlefactory.passive.tooltip.add_row.default_input").withStyle(ChatFormatting.GRAY));
+                    Component.translatable("ae2vf.passive.tooltip.add_row"),
+                    Component.translatable("ae2vf.passive.tooltip.add_row.default_input").withStyle(ChatFormatting.GRAY));
             default -> rule(block, block.rules().get(hit.rule()));
         };
     }
@@ -62,10 +62,10 @@ final class PassiveIoTooltip {
      */
     private static List<Component> energy() {
         return List.of(
-                Component.translatable("idlefactory.passive.tooltip.fe_input").withStyle(ChatFormatting.BOLD),
-                Component.translatable("idlefactory.passive.tooltip.fe_input.hint")
+                Component.translatable("ae2vf.passive.tooltip.fe_input").withStyle(ChatFormatting.BOLD),
+                Component.translatable("ae2vf.passive.tooltip.fe_input.hint")
                         .withStyle(ChatFormatting.GRAY),
-                Component.translatable("idlefactory.passive.tooltip.fe_input.switch").withStyle(ChatFormatting.DARK_GRAY));
+                Component.translatable("ae2vf.passive.tooltip.fe_input.switch").withStyle(ChatFormatting.DARK_GRAY));
     }
 
     private static List<Component> machine(BlockView block) {
@@ -75,9 +75,9 @@ final class PassiveIoTooltip {
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
         lines.add(Component.literal(block.machine().block().dimension().location()
                 + " " + block.machine().block().pos().toShortString()).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.translatable("idlefactory.passive.tooltip.members", block.machineCount())
+        lines.add(Component.translatable("ae2vf.passive.tooltip.members", block.machineCount())
                 .withStyle(ChatFormatting.GRAY));
-        lines.add(Component.translatable("idlefactory.passive.tooltip.rules", block.rules().size())
+        lines.add(Component.translatable("ae2vf.passive.tooltip.rules", block.rules().size())
                 .withStyle(ChatFormatting.GRAY));
         return lines;
     }
@@ -85,23 +85,23 @@ final class PassiveIoTooltip {
     private static List<Component> rule(BlockView block, RuleRow row) {
         List<Component> lines = new ArrayList<>(6);
         lines.add(Component.literal(UiText.keyName(row.key())).withStyle(ChatFormatting.BOLD));
-        lines.add(line(tr("idlefactory.passive.tooltip.direction"),
-                tr(row.input() ? "idlefactory.passive.side.input" : "idlefactory.passive.side.output")));
-        lines.add(line(tr("idlefactory.passive.tooltip.face"),
-                row.face() == null ? tr("idlefactory.passive.face.any") : TerminalText.face(row.face())));
+        lines.add(line(tr("ae2vf.passive.tooltip.direction"),
+                tr(row.input() ? "ae2vf.passive.side.input" : "ae2vf.passive.side.output")));
+        lines.add(line(tr("ae2vf.passive.tooltip.face"),
+                row.face() == null ? tr("ae2vf.passive.face.any") : TerminalText.face(row.face())));
         if (row.key() instanceof AEItemKey) {
-            lines.add(line(tr("idlefactory.passive.tooltip.mode"),
+            lines.add(line(tr("ae2vf.passive.tooltip.mode"),
                 tr(row.mode() == MatchMode.EXACT
-                        ? "idlefactory.passive.mode.exact" : "idlefactory.passive.mode.fuzzy")));
+                        ? "ae2vf.passive.mode.exact" : "ae2vf.passive.mode.fuzzy")));
         }
-        lines.add(line(tr("idlefactory.passive.tooltip.rate"),
+        lines.add(line(tr("ae2vf.passive.tooltip.rate"),
                 TerminalText.rateText(row.rate(), row.key())));
         IoReason reason = TerminalText.effectiveReason(row.rate(), row.reason());
         if (reason != IoReason.RUN) {
-            lines.add(line(tr("idlefactory.passive.tooltip.reason"),
+            lines.add(line(tr("ae2vf.passive.tooltip.reason"),
                 TerminalText.reason(reason, row.input())));
         }
-        lines.add(Component.translatable("idlefactory.passive.tooltip.hint")
+        lines.add(Component.translatable("ae2vf.passive.tooltip.hint")
                 .withStyle(ChatFormatting.DARK_GRAY));
         return lines;
     }

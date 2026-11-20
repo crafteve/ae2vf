@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.registry;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.network.payload.FactoryCommandC2S;
 import io.github.crafteve.ae2vf.network.payload.FactoryCommandS2C;
 import io.github.crafteve.ae2vf.network.payload.FactoryPassiveIoViewC2S;
@@ -30,8 +30,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
  * <p>注册属于「注册」这件事，放在 registry 包；协议行为（版本、线路上限、会话、收发）留在
  * {@code network} 包。两条注册都必须挂在 mod 事件总线上。</p>
  */
-public final class IdleFactoryPayloads {
-    private IdleFactoryPayloads() {
+public final class VoidFactoryPayloads {
+    private VoidFactoryPayloads() {
         // 纯静态注册
     }
 
@@ -41,7 +41,7 @@ public final class IdleFactoryPayloads {
      * @param modEventBus mod 事件总线
      */
     public static void register(IEventBus modEventBus) {
-        modEventBus.addListener(IdleFactoryPayloads::onRegisterPayloadHandlers);
+        modEventBus.addListener(VoidFactoryPayloads::onRegisterPayloadHandlers);
     }
 
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
@@ -88,7 +88,7 @@ public final class IdleFactoryPayloads {
         registrar.playToServer(WandOpenC2S.TYPE, WandOpenC2S.STREAM_CODEC, WandOpenC2S::handle);
         registrar.playToClient(WandOpenS2C.TYPE, WandOpenS2C.STREAM_CODEC, WandOpenS2C::handle);
 
-        IdleFactory.LOGGER.debug("Idle Factory payload channel registered (version {})",
+        VoidFactory.LOGGER.debug("AE2 Void Factory payload channel registered (version {})",
                 NetworkVersion.PROTOCOL_VERSION);
     }
 }

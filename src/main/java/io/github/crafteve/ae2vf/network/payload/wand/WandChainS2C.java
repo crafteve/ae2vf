@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload.wand;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.wand.WandSubmitter;
 import io.github.crafteve.ae2vf.command.CommandReason;
 import io.github.crafteve.ae2vf.command.WandChainResult;
@@ -22,9 +22,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param result 机器列表与原因
  */
 public record WandChainS2C(WandChainResult result) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:wand_chain_result}。 */
+    /** 包类型：{@code ae2vf:wand_chain_result}。 */
     public static final Type<WandChainS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "wand_chain_result"));
 
     /** 编解码器。 */

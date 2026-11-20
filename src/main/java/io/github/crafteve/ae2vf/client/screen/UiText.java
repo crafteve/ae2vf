@@ -96,7 +96,7 @@ public final class UiText {
      */
     static String faceName(IoRuleSpec spec) {
         return spec.face() == null
-                ? net.minecraft.network.chat.Component.translatable("idlefactory.face.any").getString()
+                ? net.minecraft.network.chat.Component.translatable("ae2vf.face.any").getString()
                 : TerminalText.face(spec.face());
     }
 
@@ -134,7 +134,7 @@ public final class UiText {
      */
     public static String blockName(@Nullable ResourceLocation blockId) {
         if (blockId == null) {
-            return tr("idlefactory.common.unknown_machine");
+            return tr("ae2vf.common.unknown_machine");
         }
         var block = BuiltInRegistries.BLOCK.get(blockId);
         return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();

@@ -50,7 +50,7 @@ public final class BlockHighlightRenderer {
 
     @SuppressWarnings("deprecation")
     private static final RenderType LINK_TYPE = RenderType.create(
-            "idlefactory_links",
+            "ae2vf_links",
             DefaultVertexFormat.POSITION_COLOR,
             VertexFormat.Mode.QUADS,
             BUFFER_SIZE,

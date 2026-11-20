@@ -86,7 +86,7 @@ public final class Ae2Storage implements MEStorage {
     /** 仓库在 AE2 快照里的描述文本。 */
     @Override
     public net.minecraft.network.chat.Component getDescription() {
-        return net.minecraft.network.chat.Component.literal("Idle Factory ME 仓库");
+        return net.minecraft.network.chat.Component.literal("AE2 Void Factory ME 仓库");
     }
 
     /** AE2 侧的写入入口：转调布尔版本，转换只在这里发生。 */

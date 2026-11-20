@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.ae2vf.claim.BlockOccupancyTable;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.command.WandDraft;
 import io.github.crafteve.ae2vf.item.MachineBindingWandItem;
@@ -169,14 +169,14 @@ public final class CommandWandGate {
         }
         int baseMachines = base == null ? 0 : base.machineCount();
         int finalMachines = baseMachines - draft.removed().size() + draft.added().size();
-        if (base == null && factory.nodes().size() + 1 > IdleFactoryConfig.maxNodes()) {
+        if (base == null && factory.nodes().size() + 1 > VoidFactoryConfig.maxNodes()) {
             return new WandGateResult(CommandReason.LIMIT_NODES, List.of());
         }
-        if (finalMachines > IdleFactoryConfig.maxMachinesPerNode()) {
+        if (finalMachines > VoidFactoryConfig.maxMachinesPerNode()) {
             return new WandGateResult(CommandReason.LIMIT_MACHINES, List.of());
         }
         if (factory.nodes().totalMachineCount() - baseMachines + finalMachines
-                > IdleFactoryConfig.maxTotalMachines()) {
+                > VoidFactoryConfig.maxTotalMachines()) {
             return new WandGateResult(CommandReason.LIMIT_MACHINES, List.of());
         }
         if (base != null && finalMachines == 0) {

@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.io.BlockingMode;
 import io.github.crafteve.ae2vf.io.DispatchMode;
 import io.github.crafteve.ae2vf.io.IoReason;
@@ -79,7 +79,7 @@ public final class ViewTableCodec {
      */
     public static ViewTable readTable(RegistryFriendlyByteBuf buf) {
         ViewHeader header = readHeader(buf);
-        int count = readCount(buf, NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
+        int count = readCount(buf, NetworkLimit.wireLimit(VoidFactoryConfig.maxNodes()), "nodes");
         List<ViewNode> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
@@ -118,7 +118,7 @@ public final class ViewTableCodec {
         for (int i = 0; i < ruleCount; i++) {
             rules.add(readRule(buf));
         }
-        int machineCount = readCount(buf, IdleFactoryConfig.maxMachinesPerNode(), "machines");
+        int machineCount = readCount(buf, VoidFactoryConfig.maxMachinesPerNode(), "machines");
         List<ViewMachine> machines = new ArrayList<>(machineCount);
         for (int i = 0; i < machineCount; i++) {
             machines.add(readMachine(buf));
@@ -155,7 +155,7 @@ public final class ViewTableCodec {
         long baseRevision = buf.readLong();
         long revision = buf.readLong();
         ViewHeader header = buf.readBoolean() ? readHeader(buf) : null;
-        int count = readCount(buf, NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes()), "diff nodes");
+        int count = readCount(buf, NetworkLimit.wireLimit(VoidFactoryConfig.maxNodes()), "diff nodes");
         List<ViewNodeDiff> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNodeDiff(buf));
@@ -310,13 +310,13 @@ public final class ViewTableCodec {
         for (int i = 0; i < ruleRemoveCount; i++) {
             ruleRemoves.add(readRuleKey(buf));
         }
-        int machineUpsertCount = readCount(buf, IdleFactoryConfig.maxMachinesPerNode(),
+        int machineUpsertCount = readCount(buf, VoidFactoryConfig.maxMachinesPerNode(),
                 "machine upserts");
         List<ViewMachine> machineUpserts = new ArrayList<>(machineUpsertCount);
         for (int i = 0; i < machineUpsertCount; i++) {
             machineUpserts.add(readMachine(buf));
         }
-        int machineRemoveCount = readCount(buf, IdleFactoryConfig.maxMachinesPerNode(),
+        int machineRemoveCount = readCount(buf, VoidFactoryConfig.maxMachinesPerNode(),
                 "machine removes");
         List<UUID> machineRemoves = new ArrayList<>(machineRemoveCount);
         for (int i = 0; i < machineRemoveCount; i++) {
@@ -341,7 +341,7 @@ public final class ViewTableCodec {
      * @return 解码时可接受的最大规则数
      */
     private static int ruleLimit() {
-        return IdleFactoryConfig.maxRulesPerSide() * 2;
+        return VoidFactoryConfig.maxRulesPerSide() * 2;
     }
 
     private static <E extends Enum<E>> E readEnum(RegistryFriendlyByteBuf buf, E[] values,

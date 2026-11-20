@@ -16,9 +16,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * <p>它只做转发，不写业务判断：启动读档、停止落盘、每 tick 推进、玩家下线清提交序号，
  * 具体实现全在 {@link FactoryLifecycle}。这样事件注册只有一处，生命周期类保持可测试。</p>
  */
-@EventBusSubscriber(modid = IdleFactory.MODID)
-public final class IdleFactoryServer {
-    private IdleFactoryServer() {
+@EventBusSubscriber(modid = VoidFactory.MODID)
+public final class VoidFactoryServer {
+    private VoidFactoryServer() {
         // 纯静态事件处理
     }
 

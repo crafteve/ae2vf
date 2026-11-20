@@ -37,8 +37,8 @@ import net.minecraft.world.level.saveddata.SavedData;
  * <p>工厂 id 由拥有者派生（{@link #idOf}），不写进存档；存档只记 Owner、锚点与节点。</p>
  */
 public final class FactoryStore extends SavedData {
-    /** 存档文件名（{@code data/idlefactory_factories.dat}）。 */
-    private static final String DATA_NAME = "idlefactory_factories";
+    /** 存档文件名（{@code data/ae2vf_factories.dat}）。 */
+    private static final String DATA_NAME = "ae2vf_factories";
     private static final String TAG_FACTORIES = "Factories";
     private static final String TAG_OWNER = "Owner";
     /** 仓库锚点维度；缺这条表示未绑定。 */
@@ -81,7 +81,7 @@ public final class FactoryStore extends SavedData {
      * @return 工厂 id
      */
     public static UUID idOf(UUID owner) {
-        return UUID.nameUUIDFromBytes(("idlefactory:" + owner).getBytes(StandardCharsets.UTF_8));
+        return UUID.nameUUIDFromBytes(("ae2vf:" + owner).getBytes(StandardCharsets.UTF_8));
     }
 
     /**

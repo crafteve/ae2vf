@@ -24,7 +24,7 @@ import appeng.client.gui.widgets.Scrollbar;
 import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 
 
 import io.github.crafteve.ae2vf.client.screen.FeedbackSink;
@@ -202,7 +202,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         this.confirmDialog = new ConfirmDialog(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.searchX() + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, Component.translatable("idlefactory.node.search.hint"));
+                SEARCH_W - 6, 10, Component.translatable("ae2vf.node.search.hint"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
@@ -236,7 +236,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         syncFromBar();
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
-                tr("idlefactory.node.title"), this.searchX() - this.leftPos - 8);
+                tr("ae2vf.node.title"), this.searchX() - this.leftPos - 8);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, this.scroll);
         drawContent(graphics, hover);
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
@@ -708,11 +708,11 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         int x = NodeLayout.nameX(viewport);
         int width = Math.max(40, NodeLayout.nameWidth(viewport));
         this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
-                Component.translatable("idlefactory.node.rename.hint"),
+                Component.translatable("ae2vf.node.rename.hint"),
                 TEXT_PRIMARY, TEXT_DIM);
         this.renameBox.setValue(node.view().core().name() == null ? ""
                 : node.view().core().name());
-        this.renameBox.setMaxLength(io.github.crafteve.ae2vf.config.IdleFactoryConfig.maxNameLength());
+        this.renameBox.setMaxLength(io.github.crafteve.ae2vf.config.VoidFactoryConfig.maxNameLength());
         this.renameBox.setFocused(true);
         // 搜索框让出焦点，避免两个输入框的焦点框同时亮着。
         if (this.searchBox != null) {
@@ -805,9 +805,9 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         }
         // 几何交给浮层自己算：可用区域是终端窗口，压暗区域是整个屏幕——
         // AE2 左侧工具栏按钮画在 leftPos 之外，只压暗终端会让它们保持亮着。
-        this.confirmDialog.open(tr("idlefactory.node.delete.title"),
+        this.confirmDialog.open(tr("ae2vf.node.delete.title"),
                 node.name() + "\n" + deleteDetail(node.view()),
-                tr("idlefactory.node.delete.button"), () -> NodeActions.delete(this.menu.containerId, node),
+                tr("ae2vf.node.delete.button"), () -> NodeActions.delete(this.menu.containerId, node),
                 new ConfirmDialog.Bounds(this.leftPos, this.topPos, this.imageWidth,
                         this.imageHeight),
                 new ConfirmDialog.Bounds(0, 0, this.width, this.height));
@@ -826,12 +826,12 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         int rules = view.ruleCount();
         int patterns = view.core().patternCount();
         if (rules > 0 && patterns > 0) {
-            return tr("idlefactory.node.delete.detail.both", rules, patterns);
+            return tr("ae2vf.node.delete.detail.both", rules, patterns);
         }
         if (patterns > 0) {
-            return tr("idlefactory.node.delete.detail.patterns", patterns);
+            return tr("ae2vf.node.delete.detail.patterns", patterns);
         }
-        return tr("idlefactory.node.delete.detail.rules", rules);
+        return tr("ae2vf.node.delete.detail.rules", rules);
     }
 
     /** 搜索框左边缘：贴着右侧滚动条预留区，标题只占它左边的空间。 */
@@ -904,12 +904,12 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
 
     private String emptyText() {
         if (!this.model.hasFactory()) {
-            return tr("idlefactory.node.empty.no_factory");
+            return tr("ae2vf.node.empty.no_factory");
         }
         if (this.model.filteredEmpty()) {
-            return tr("idlefactory.node.empty.filtered");
+            return tr("ae2vf.node.empty.filtered");
         }
-        return tr("idlefactory.node.empty.none");
+        return tr("ae2vf.node.empty.none");
     }
 
     private int totalMembers() {

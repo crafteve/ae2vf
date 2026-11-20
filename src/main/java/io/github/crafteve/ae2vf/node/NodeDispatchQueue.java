@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.node.NodeDispatchOrder;
 import io.github.crafteve.ae2vf.key.AeKeyAdapter;
 
@@ -178,7 +178,7 @@ public final class NodeDispatchQueue {
         this.orders.clear();
         this.dirty = true;
         if (lost > 0L) {
-            IdleFactory.LOGGER.warn("Idle Factory: 队列退回网络失败，{} 件已按丢弃处理（{}）",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 队列退回网络失败，{} 件已按丢弃处理（{}）",
                     lost, now);
         }
         return new RefundReport(orderCount, lineCount, lost);
@@ -196,7 +196,7 @@ public final class NodeDispatchQueue {
             return network.insert(key, amount, appeng.api.config.Actionable.MODULATE,
                     AeKeyAdapter.SOURCE);
         } catch (RuntimeException e) {
-            IdleFactory.LOGGER.warn("Idle Factory: 退回队列材料异常（{}）：{}",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 退回队列材料异常（{}）：{}",
                     AeKeyAdapter.describe(key), e.toString());
             return 0L;
         }

@@ -11,7 +11,7 @@ import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKey;
 import appeng.api.stacks.GenericStack;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoJeiIngredients;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.ae2vf.key.AeKeyAdapter;
@@ -54,7 +54,7 @@ public final class FactoryJeiPlugin implements IModPlugin {
 
     @Override
     public ResourceLocation getPluginUid() {
-        return ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "factory_jei");
+        return ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "factory_jei");
     }
 
     @Override
@@ -68,9 +68,9 @@ public final class FactoryJeiPlugin implements IModPlugin {
     public void registerRecipes(IRecipeRegistration registration) {
         // R/U 没有真实配方可查；给 FE 一条信息页，至少让查询落在 FE 上而不是红石粉。
         registration.addIngredientInfo(FeIngredient.INSTANCE, FeIngredient.TYPE,
-                Component.translatable("jei.idlefactory.fe.info.1"),
-                Component.translatable("jei.idlefactory.fe.info.2"),
-                Component.translatable("jei.idlefactory.fe.info.3"));
+                Component.translatable("jei.ae2vf.fe.info.1"),
+                Component.translatable("jei.ae2vf.fe.info.2"),
+                Component.translatable("jei.ae2vf.fe.info.3"));
     }
 
     @Override

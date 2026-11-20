@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.machine.IoRuleSpec;
 
 import appeng.api.stacks.AEKey;
@@ -132,7 +132,7 @@ public final class NodeIoRules {
             }
         }
         if (list.size() > MAX_RULES_PER_SIDE) {
-            IdleFactory.LOGGER.warn("Idle Factory: 节点 {} 的{}规则超过上限 {}，已丢弃 {} 条",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 节点 {} 的{}规则超过上限 {}，已丢弃 {} 条",
                     ownerId, side, MAX_RULES_PER_SIDE, list.size() - MAX_RULES_PER_SIDE);
         }
         return rules;

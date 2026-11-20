@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.integration.jei;
 
 import com.mojang.serialization.Codec;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 
 import mezz.jei.api.ingredients.IIngredientType;
 
@@ -15,17 +15,17 @@ import net.minecraft.resources.ResourceLocation;
  * R/U 和收藏都会落到红石粉的配方上。这里给 FE 一个独立配料身份，让 JEI 的点击、
  * 收藏和配方查询都停在 FE 本身。</p>
  *
- * <p>类型 UID 固定为 {@code idlefactory:fe}，收藏落盘后即使类名调整也能读回。</p>
+ * <p>类型 UID 固定为 {@code ae2vf:fe}，收藏落盘后即使类名调整也能读回。</p>
  */
 enum FeIngredient {
     /** 唯一的 FE 配料实例。 */
     INSTANCE;
 
     /** 稳定 UID；收藏持久化按它查类型。 */
-    static final String UID = IdleFactory.MODID + ":fe";
+    static final String UID = VoidFactory.MODID + ":fe";
     /** 图标/错误信息用的注册名，和 {@code ResourceKey.ENERGY} 的 id 保持一致。 */
     static final ResourceLocation ID =
-            ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "fe");
+            ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "fe");
     /** 配料类型；JEI 只把它当作可点击/可收藏的 FE 标记。 */
     static final IIngredientType<FeIngredient> TYPE = new Type();
     /** 收藏持久化使用的 codec；只写一个固定字符串，避免依赖物品序列化。 */
@@ -51,7 +51,7 @@ enum FeIngredient {
         /**
          * 持久化用的类型 UID。
          *
-         * @return {@code idlefactory:fe}
+         * @return {@code ae2vf:fe}
          */
         @Override
         public String getUid() {

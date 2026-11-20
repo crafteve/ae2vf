@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.network.payload;
 
 import appeng.api.config.SortDir;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.menu.node.NodeTerminalMenu;
 import io.github.crafteve.ae2vf.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.ae2vf.menu.TerminalSortMode;
@@ -31,9 +31,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  */
 public record FactoryTerminalSortC2S(int containerId, TerminalSortMode mode, SortDir direction)
         implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:terminal_sort}。 */
+    /** 包类型：{@code ae2vf:terminal_sort}。 */
     public static final Type<FactoryTerminalSortC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "terminal_sort"));
 
     /** 编解码器。 */

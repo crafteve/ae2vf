@@ -6,7 +6,7 @@ import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.machine.Machine;
 import io.github.crafteve.ae2vf.key.AeKeyAdapter;
 
@@ -193,7 +193,7 @@ public final class IoExecutor {
         long lost = amount - inserted;
         if (lost > 0L) {
             // 退回失败按 D21 记日志丢弃：不生成掉落物，也不把错误藏起来。
-            IdleFactory.LOGGER.warn("Idle Factory: 退回仓库失败，{} × {} 已按丢弃处理",
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 退回仓库失败，{} × {} 已按丢弃处理",
                     lost, AeKeyAdapter.displayName(key));
         }
         return new IoResult(inserted, inserted > 0L ? IoReason.RUN : IoReason.FULL);
@@ -280,7 +280,7 @@ public final class IoExecutor {
     }
 
     private void log(String message, @Nullable AEKey key, RuntimeException cause) {
-        IdleFactory.LOGGER.warn("Idle Factory: {}（{}）", message,
+        VoidFactory.LOGGER.warn("AE2 Void Factory: {}（{}）", message,
                 key == null ? "未知资源" : AeKeyAdapter.describe(key), cause);
     }
 }

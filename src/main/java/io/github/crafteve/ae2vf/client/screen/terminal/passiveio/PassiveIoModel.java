@@ -111,7 +111,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
                 return this.node.core().name();
             }
             return this.node.core().health() == NodeHealth.OFFLINE
-                    ? net.minecraft.network.chat.Component.translatable("idlefactory.common.offline")
+                    ? net.minecraft.network.chat.Component.translatable("ae2vf.common.offline")
                             .getString()
                     : UiText.blockName(this.machine().blockId());
         }

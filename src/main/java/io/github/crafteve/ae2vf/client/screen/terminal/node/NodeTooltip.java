@@ -19,7 +19,7 @@ import net.minecraft.network.chat.TextColor;
 /**
  * 节点终端的 tooltip：节点、provider 键、机器行、定位与占位按钮的说明。
  *
- * <p>只把视图表里已有的字段拼成文字，不重新判断状态；文案走 {@code idlefactory.node.tooltip.*}
+ * <p>只把视图表里已有的字段拼成文字，不重新判断状态；文案走 {@code ae2vf.node.tooltip.*}
  * 语言键，带数值的用占位符，短标签单独成键。</p>
  */
 final class NodeTooltip {
@@ -42,22 +42,22 @@ final class NodeTooltip {
         return switch (hit.kind()) {
             case NODE, NAME -> nodeLines(node);
             case BLOCKING -> List.of(
-                    bold(Component.translatable("idlefactory.node.tooltip.blocking")),
-                    keyed("idlefactory.node.tooltip.blocking.value",
+                    bold(Component.translatable("ae2vf.node.tooltip.blocking")),
+                    keyed("ae2vf.node.tooltip.blocking.value",
                             Component.translatable(node.core().blocking().isOn()
-                                    ? "idlefactory.common.on" : "idlefactory.common.off")),
-                    hint(Component.translatable("idlefactory.node.tooltip.click_toggle")));
+                                    ? "ae2vf.common.on" : "ae2vf.common.off")),
+                    hint(Component.translatable("ae2vf.node.tooltip.click_toggle")));
             case MULTIPLIER -> List.of(
-                    bold(Component.translatable("idlefactory.node.tooltip.multiplier")),
-                    hint(Component.translatable("idlefactory.node.tooltip.multiplier.smart")),
-                    hint(Component.translatable("idlefactory.node.tooltip.multiplier.cycle")));
+                    bold(Component.translatable("ae2vf.node.tooltip.multiplier")),
+                    hint(Component.translatable("ae2vf.node.tooltip.multiplier.smart")),
+                    hint(Component.translatable("ae2vf.node.tooltip.multiplier.cycle")));
             case DISPATCH -> List.of(
-                    bold(Component.translatable("idlefactory.node.tooltip.dispatch")),
-                    hint(Component.translatable("idlefactory.node.tooltip.dispatch.toggle")));
+                    bold(Component.translatable("ae2vf.node.tooltip.dispatch")),
+                    hint(Component.translatable("ae2vf.node.tooltip.dispatch.toggle")));
             case EDIT -> List.of(
-                    bold(Component.translatable("idlefactory.node.tooltip.edit")),
-                    hint(Component.translatable("idlefactory.node.tooltip.edit.hint")),
-                    hint(Component.translatable("idlefactory.node.tooltip.edit.wand")));
+                    bold(Component.translatable("ae2vf.node.tooltip.edit")),
+                    hint(Component.translatable("ae2vf.node.tooltip.edit.hint")),
+                    hint(Component.translatable("ae2vf.node.tooltip.edit.wand")));
             case DELETE -> deleteLines(node);
             case MEMBER -> {
                 if (hit.member() < 0 || hit.member() >= node.machines().size()) {
@@ -72,7 +72,7 @@ final class NodeTooltip {
                 }
                 yield locateLines(node.machines().get(hit.member()));
             }
-            case MORE -> List.of(Component.translatable("idlefactory.node.tooltip.more",
+            case MORE -> List.of(Component.translatable("ae2vf.node.tooltip.more",
                     node.machines().size() - NodeLayout.EXPANDED_LIMIT));
         };
     }
@@ -83,39 +83,39 @@ final class NodeTooltip {
         StatusView status = StatusView.of(node.core());
         lines.add(Component.literal(status.text()).withStyle(
                 style -> style.withColor(TextColor.fromRgb(status.color() & 0xFFFFFF))));
-        lines.add(keyed("idlefactory.node.tooltip.provider", node.core().available()
-                ? Component.translatable("idlefactory.node.tooltip.provider.available",
+        lines.add(keyed("ae2vf.node.tooltip.provider", node.core().available()
+                ? Component.translatable("ae2vf.node.tooltip.provider.available",
                         Component.translatable(node.core().blocking().isOn()
-                                ? "idlefactory.common.on" : "idlefactory.common.off"))
-                : Component.translatable("idlefactory.node.tooltip.provider.unavailable")));
-        lines.add(keyed("idlefactory.node.tooltip.members", node.machineCount()));
-        lines.add(keyed("idlefactory.node.tooltip.rules_patterns", node.ruleCount(),
+                                ? "ae2vf.common.on" : "ae2vf.common.off"))
+                : Component.translatable("ae2vf.node.tooltip.provider.unavailable")));
+        lines.add(keyed("ae2vf.node.tooltip.members", node.machineCount()));
+        lines.add(keyed("ae2vf.node.tooltip.rules_patterns", node.ruleCount(),
                 node.core().patternCount()));
         if (node.core().pendingCount() > 0) {
-            lines.add(keyed("idlefactory.node.tooltip.pending", node.core().pendingCount(),
+            lines.add(keyed("ae2vf.node.tooltip.pending", node.core().pendingCount(),
                     waitedText(node.core().pendingOldestAt())));
         }
         if (!node.machines().isEmpty()) {
             ViewMachine first = node.machines().get(0);
-            lines.add(keyed("idlefactory.node.tooltip.position",
+            lines.add(keyed("ae2vf.node.tooltip.position",
                     first.block().dimension().location().toString(),
                     first.block().pos().toShortString()));
         }
-        lines.add(hint(Component.translatable("idlefactory.node.tooltip.node.hint")));
+        lines.add(hint(Component.translatable("ae2vf.node.tooltip.node.hint")));
         return lines;
     }
 
     private static List<Component> deleteLines(ViewNode node) {
         List<Component> lines = new ArrayList<>(3);
-        lines.add(bold(Component.translatable("idlefactory.node.tooltip.delete")));
+        lines.add(bold(Component.translatable("ae2vf.node.tooltip.delete")));
         if (node.configured()) {
-            lines.add(hint(Component.translatable("idlefactory.node.tooltip.delete.configured",
+            lines.add(hint(Component.translatable("ae2vf.node.tooltip.delete.configured",
                     node.ruleCount(), node.core().patternCount())));
-            lines.add(hint(Component.translatable("idlefactory.node.tooltip.delete.confirm")));
+            lines.add(hint(Component.translatable("ae2vf.node.tooltip.delete.confirm")));
         } else if (node.core().autoEnergyOnly()) {
-            lines.add(hint(Component.translatable("idlefactory.node.tooltip.delete.energy")));
+            lines.add(hint(Component.translatable("ae2vf.node.tooltip.delete.energy")));
         } else {
-            lines.add(hint(Component.translatable("idlefactory.node.tooltip.delete.empty")));
+            lines.add(hint(Component.translatable("ae2vf.node.tooltip.delete.empty")));
         }
         return lines;
     }
@@ -123,21 +123,21 @@ final class NodeTooltip {
     private static List<Component> memberLines(String label, ViewMachine machine) {
         List<Component> lines = new ArrayList<>(4);
         lines.add(bold(Component.literal(label)));
-        lines.add(hint(Component.translatable("idlefactory.node.tooltip.member.position",
+        lines.add(hint(Component.translatable("ae2vf.node.tooltip.member.position",
                 machine.block().dimension().location().toString(),
                 machine.block().pos().toShortString())));
         lines.add(hint(Component.literal(machine.health().describe())));
-        lines.add(hint(Component.translatable("idlefactory.node.tooltip.member.locate")));
+        lines.add(hint(Component.translatable("ae2vf.node.tooltip.member.locate")));
         return lines;
     }
 
     private static List<Component> locateLines(ViewMachine machine) {
         return List.of(
-                bold(Component.translatable("idlefactory.node.tooltip.locate")),
-                hint(Component.translatable("idlefactory.node.tooltip.member.position",
+                bold(Component.translatable("ae2vf.node.tooltip.locate")),
+                hint(Component.translatable("ae2vf.node.tooltip.member.position",
                         machine.block().dimension().location().toString(),
                         machine.block().pos().toShortString())),
-                hint(Component.translatable("idlefactory.node.tooltip.locate.hint")));
+                hint(Component.translatable("ae2vf.node.tooltip.locate.hint")));
     }
 
     /**

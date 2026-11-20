@@ -25,45 +25,45 @@ public final class CommandText {
      */
     public static String text(CommandResult result) {
         return switch (result.reason()) {
-            case OK -> tr("idlefactory.command.ok");
-            case NOT_STARTED -> tr("idlefactory.command.not_started");
-            case FACTORY_MISSING -> tr("idlefactory.command.factory_missing");
-            case NODE_MISSING -> tr("idlefactory.command.node_missing");
-            case RULE_FULL -> tr("idlefactory.command.rule_full");
-            case RULE_EXISTS -> tr("idlefactory.command.rule_exists");
-            case RULE_MISSING -> tr("idlefactory.command.rule_missing");
-            case SAME_SIDE -> tr("idlefactory.command.same_side");
-            case NAME_TOO_LONG -> tr("idlefactory.command.name_too_long");
-            case NAME_CONTROL_CHAR -> tr("idlefactory.command.name_control_char");
-            case RENAME_FAILED -> tr("idlefactory.command.rename_failed");
-            case RESOURCE_EMPTY -> tr("idlefactory.command.resource_empty");
-            case RESOURCE_UNKNOWN_ITEM -> tr("idlefactory.command.resource_unknown_item");
-            case RESOURCE_UNKNOWN_FLUID -> tr("idlefactory.command.resource_unknown_fluid");
-            case RESOURCE_NOT_FE -> tr("idlefactory.command.resource_not_fe");
-            case OCCUPIED_OTHER -> tr("idlefactory.command.occupied_other");
-            case OCCUPIED_SELF_ROLE -> tr("idlefactory.command.occupied_self_role");
-            case TARGET_UNLOADED -> tr("idlefactory.command.target_unloaded");
-            case NOT_ME_BLOCK -> tr("idlefactory.command.not_me_block");
-            case OTHER_BOUND -> tr("idlefactory.command.other_bound");
-            case SESSION_MISMATCH -> tr("idlefactory.command.session_mismatch");
-            case SEQ_STALE -> tr("idlefactory.command.seq_stale");
-            case TARGET_NOT_MACHINE -> tr("idlefactory.command.target_not_machine");
-            case NO_CHANGE -> tr("idlefactory.command.no_change");
-            case INTERNAL -> tr("idlefactory.command.internal");
-            case EMPTY_DRAFT -> tr("idlefactory.command.empty_draft");
-            case NOT_HOLDING_WAND -> tr("idlefactory.command.not_holding_wand");
-            case STALE_REQUEST -> tr("idlefactory.command.stale_request");
-            case TYPE_MISMATCH -> tr("idlefactory.command.type_mismatch");
-            case DUPLICATE_BLOCK -> tr("idlefactory.command.duplicate_block");
-            case BLOCK_CLAIMED -> tr("idlefactory.command.block_claimed");
-            case BLOCK_UNLOADED -> tr("idlefactory.command.block_unloaded");
-            case NOT_A_MACHINE -> tr("idlefactory.command.not_a_machine");
-            case LIMIT_NODES -> tr("idlefactory.command.limit_nodes");
-            case LIMIT_MACHINES -> tr("idlefactory.command.limit_machines");
-            case MEMBER_NOT_REMOVABLE -> tr("idlefactory.command.member_not_removable");
-            case DELETE_BLOCKED_RULES -> tr("idlefactory.command.delete_blocked_rules");
-            case DELETE_BLOCKED_PATTERNS -> tr("idlefactory.command.delete_blocked_patterns");
-            case INVALID_DRAFT -> tr("idlefactory.command.invalid_draft");
+            case OK -> tr("ae2vf.command.ok");
+            case NOT_STARTED -> tr("ae2vf.command.not_started");
+            case FACTORY_MISSING -> tr("ae2vf.command.factory_missing");
+            case NODE_MISSING -> tr("ae2vf.command.node_missing");
+            case RULE_FULL -> tr("ae2vf.command.rule_full");
+            case RULE_EXISTS -> tr("ae2vf.command.rule_exists");
+            case RULE_MISSING -> tr("ae2vf.command.rule_missing");
+            case SAME_SIDE -> tr("ae2vf.command.same_side");
+            case NAME_TOO_LONG -> tr("ae2vf.command.name_too_long");
+            case NAME_CONTROL_CHAR -> tr("ae2vf.command.name_control_char");
+            case RENAME_FAILED -> tr("ae2vf.command.rename_failed");
+            case RESOURCE_EMPTY -> tr("ae2vf.command.resource_empty");
+            case RESOURCE_UNKNOWN_ITEM -> tr("ae2vf.command.resource_unknown_item");
+            case RESOURCE_UNKNOWN_FLUID -> tr("ae2vf.command.resource_unknown_fluid");
+            case RESOURCE_NOT_FE -> tr("ae2vf.command.resource_not_fe");
+            case OCCUPIED_OTHER -> tr("ae2vf.command.occupied_other");
+            case OCCUPIED_SELF_ROLE -> tr("ae2vf.command.occupied_self_role");
+            case TARGET_UNLOADED -> tr("ae2vf.command.target_unloaded");
+            case NOT_ME_BLOCK -> tr("ae2vf.command.not_me_block");
+            case OTHER_BOUND -> tr("ae2vf.command.other_bound");
+            case SESSION_MISMATCH -> tr("ae2vf.command.session_mismatch");
+            case SEQ_STALE -> tr("ae2vf.command.seq_stale");
+            case TARGET_NOT_MACHINE -> tr("ae2vf.command.target_not_machine");
+            case NO_CHANGE -> tr("ae2vf.command.no_change");
+            case INTERNAL -> tr("ae2vf.command.internal");
+            case EMPTY_DRAFT -> tr("ae2vf.command.empty_draft");
+            case NOT_HOLDING_WAND -> tr("ae2vf.command.not_holding_wand");
+            case STALE_REQUEST -> tr("ae2vf.command.stale_request");
+            case TYPE_MISMATCH -> tr("ae2vf.command.type_mismatch");
+            case DUPLICATE_BLOCK -> tr("ae2vf.command.duplicate_block");
+            case BLOCK_CLAIMED -> tr("ae2vf.command.block_claimed");
+            case BLOCK_UNLOADED -> tr("ae2vf.command.block_unloaded");
+            case NOT_A_MACHINE -> tr("ae2vf.command.not_a_machine");
+            case LIMIT_NODES -> tr("ae2vf.command.limit_nodes");
+            case LIMIT_MACHINES -> tr("ae2vf.command.limit_machines");
+            case MEMBER_NOT_REMOVABLE -> tr("ae2vf.command.member_not_removable");
+            case DELETE_BLOCKED_RULES -> tr("ae2vf.command.delete_blocked_rules");
+            case DELETE_BLOCKED_PATTERNS -> tr("ae2vf.command.delete_blocked_patterns");
+            case INVALID_DRAFT -> tr("ae2vf.command.invalid_draft");
         };
     }
 
@@ -75,7 +75,7 @@ public final class CommandText {
      */
     public static String hud(CommandResult result) {
         return result.ok()
-                ? Component.translatable("idlefactory.command.anchor_updated").getString()
+                ? Component.translatable("ae2vf.command.anchor_updated").getString()
                 : text(result);
     }
 

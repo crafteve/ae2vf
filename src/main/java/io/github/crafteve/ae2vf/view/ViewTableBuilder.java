@@ -5,7 +5,7 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.io.IoAnalyzer;
 import io.github.crafteve.ae2vf.io.IoForm;
 import io.github.crafteve.ae2vf.io.IoKey;
@@ -77,7 +77,7 @@ public final class ViewTableBuilder {
             @Nullable IoForm form, @Nullable LiveNodeApply liveNodes, long now) {
         BlockFacts.Source facts = observations == null ? key -> BlockFacts.UNKNOWN : observations;
         long healthNow = observations == null ? 0L : observations.currentTick();
-        long staleTicks = IdleFactoryConfig.staleHealthTicks();
+        long staleTicks = VoidFactoryConfig.staleHealthTicks();
         boolean storageOnline = factory.storageOnline();
         List<Node> configured = factory.nodes().all();
         List<ViewNode> rows = new ArrayList<>(configured.size());

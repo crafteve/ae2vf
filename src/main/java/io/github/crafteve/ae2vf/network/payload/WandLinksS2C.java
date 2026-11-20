@@ -6,8 +6,8 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
+import io.github.crafteve.ae2vf.VoidFactory;
 
 import io.github.crafteve.ae2vf.client.network.ClientWandLinksHandler;
 import io.github.crafteve.ae2vf.factory.Factory;
@@ -41,9 +41,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param nodes 全部节点
  */
 public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> nodes) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:factory_links}。 */
+    /** 包类型：{@code ae2vf:factory_links}。 */
     public static final Type<WandLinksS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID,
                     "wand_links"));
 
     /** 编解码器。 */
@@ -93,9 +93,9 @@ public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> node
     }
 
     private static void write(RegistryFriendlyByteBuf buf, WandLinksS2C payload) {
-        int nodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxNodes());
+        int machinePerNodeLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxMachinesPerNode());
+        int totalLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxTotalMachines());
         buf.writeBoolean(payload.storageAnchor() != null);
         if (payload.storageAnchor() != null) {
             WandDraftCodec.writeBlockKey(buf, payload.storageAnchor());
@@ -120,9 +120,9 @@ public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> node
     }
 
     private static WandLinksS2C read(RegistryFriendlyByteBuf buf) {
-        int nodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxNodes());
+        int machinePerNodeLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxMachinesPerNode());
+        int totalLimit = NetworkLimit.wireLimit(VoidFactoryConfig.maxTotalMachines());
         BlockKey storageAnchor = buf.readBoolean() ? WandDraftCodec.readBlockKey(buf) : null;
         int nodeCount = readCount(buf, nodeLimit, "节点");
         List<NodeLink> nodes = new ArrayList<>(nodeCount);

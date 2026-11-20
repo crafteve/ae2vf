@@ -33,7 +33,7 @@ import net.minecraft.world.entity.player.Inventory;
 /**
  * 草稿确认面板：AE2 对话框样式，逐行列出草稿并提交。
  *
- * <p>背景与两个按钮的几何来自 {@code assets/ae2/screens/idlefactory_wand_draft.json} 的
+ * <p>背景与两个按钮的几何来自 {@code assets/ae2/screens/ae2vf_wand_draft.json} 的
  * {@code generatedBackground}：那是 AE2 自己按尺寸生成的浅色边框底，不带任何烤死的表格线。
  * 面板内容（标题、摘要、草稿行、滚动条、状态行）全部自绘，颜色取自本类常量与文字色与 {@code NineSliceRenderer} 的凹槽贴图，和节点终端保持同一套外观。</p>
  *

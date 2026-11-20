@@ -11,7 +11,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.io.PortExecutor;
 import io.github.crafteve.ae2vf.runtime.LiveNodeLibrary.Spec;
 
@@ -189,7 +189,7 @@ public final class LiveNodeApply {
             try {
                 node.shutdown();
             } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 停机拆节点失败 [{}]：{}",
+                VoidFactory.LOGGER.warn("AE2 Void Factory: 停机拆节点失败 [{}]：{}",
                         node.node().id(), e.toString());
             }
         }
@@ -235,7 +235,7 @@ public final class LiveNodeApply {
                 node = new LiveNode(this.server, spec.factoryId(), spec.node(), spec.anchor(),
                         spec.anchorLevel(), spec.available(), this.ports, this.noticeSink());
             } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 构造节点失败 [{}]：{}",
+                VoidFactory.LOGGER.warn("AE2 Void Factory: 构造节点失败 [{}]：{}",
                         spec.node().id(), e.toString());
                 continue;
             }

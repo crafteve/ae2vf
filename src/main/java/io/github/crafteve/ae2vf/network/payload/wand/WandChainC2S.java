@@ -1,6 +1,6 @@
 package io.github.crafteve.ae2vf.network.payload.wand;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.command.CommandWand;
 import io.github.crafteve.ae2vf.command.WandDraftCodec;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
@@ -22,9 +22,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param origin 连锁起点
  */
 public record WandChainC2S(BlockKey origin) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:wand_chain}。 */
+    /** 包类型：{@code ae2vf:wand_chain}。 */
     public static final Type<WandChainC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "wand_chain"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "wand_chain"));
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, WandChainC2S> STREAM_CODEC =

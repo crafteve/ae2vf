@@ -7,7 +7,7 @@ import java.util.Map;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.machine.MatchMode;
 import io.github.crafteve.ae2vf.machine.IoRuleSpec;
 import io.github.crafteve.ae2vf.key.AeKeyAdapter;
@@ -115,7 +115,7 @@ public final class VariantPick {
         try {
             snapshot = AeKeyAdapter.snapshot(machine);
         } catch (RuntimeException e) {
-            IdleFactory.LOGGER.warn("IdleFactory: 扫描机器变体失败", e);
+            VoidFactory.LOGGER.warn("VoidFactory: 扫描机器变体失败", e);
             return List.of();
         }
         List<AEKey> result = new ArrayList<>();
@@ -143,7 +143,7 @@ public final class VariantPick {
         try {
             snapshot = AeKeyAdapter.snapshot(network);
         } catch (RuntimeException e) {
-            IdleFactory.LOGGER.warn("IdleFactory: 模糊变体索引构建失败", e);
+            VoidFactory.LOGGER.warn("VoidFactory: 模糊变体索引构建失败", e);
             return;
         }
         int keys = 0;
@@ -152,7 +152,7 @@ public final class VariantPick {
                 continue;
             }
             if (++keys > MAX_KEYS) {
-                IdleFactory.LOGGER.trace("IdleFactory: 模糊变体索引达到 {} 条上限，后续条目被忽略", MAX_KEYS);
+                VoidFactory.LOGGER.trace("VoidFactory: 模糊变体索引达到 {} 条上限，后续条目被忽略", MAX_KEYS);
                 break;
             }
             List<AEKey> list = this.byItem.computeIfAbsent(key.getId(), id -> new ArrayList<>());

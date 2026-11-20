@@ -3,7 +3,7 @@ package io.github.crafteve.ae2vf.command;
 import java.util.Optional;
 import java.util.UUID;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.factory.FactoryLibrary;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
@@ -173,7 +173,7 @@ public final class CommandController {
         UUID id = io.github.crafteve.ae2vf.factory.FactoryStore.idOf(player.getUUID());
         Factory factory = new Factory(id, player.getUUID(), null);
         if (!manager.add(factory)) {
-            IdleFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
+            VoidFactory.LOGGER.warn("自动创建工厂失败：player={}, id={}", player.getUUID(), id);
             return;
         }
         runtime.markDirtyLinks(factory);

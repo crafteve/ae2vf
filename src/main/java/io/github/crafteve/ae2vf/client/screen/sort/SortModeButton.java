@@ -91,8 +91,8 @@ public final class SortModeButton extends IconButton {
     @Override
     public List<Component> getTooltipMessage() {
         TerminalSortMode current = this.mode.get();
-        return List.of(Component.translatable("idlefactory.sort.mode.current", label(current)),
-                Component.translatable("idlefactory.sort.mode.next", label(current.next())));
+        return List.of(Component.translatable("ae2vf.sort.mode.current", label(current)),
+                Component.translatable("ae2vf.sort.mode.next", label(current.next())));
     }
 
     /**
@@ -162,12 +162,12 @@ public final class SortModeButton extends IconButton {
 
     private static String label(TerminalSortMode mode) {
         return switch (mode) {
-            case NAME -> tr("idlefactory.sort.mode.name");
+            case NAME -> tr("ae2vf.sort.mode.name");
             case ID -> "ID";
-            case MACHINE_COUNT -> tr("idlefactory.sort.mode.machines");
-            case RULE_COUNT -> tr("idlefactory.sort.mode.rules");
-            case STATUS -> tr("idlefactory.sort.mode.status");
-            case DISTANCE -> tr("idlefactory.sort.mode.distance");
+            case MACHINE_COUNT -> tr("ae2vf.sort.mode.machines");
+            case RULE_COUNT -> tr("ae2vf.sort.mode.rules");
+            case STATUS -> tr("ae2vf.sort.mode.status");
+            case DISTANCE -> tr("ae2vf.sort.mode.distance");
         };
     }
 }

@@ -58,7 +58,7 @@ final class ConfirmDialog {
     private String title = "";
     /** 已经按宽度折好的说明行；打开时算一次，绘制与测量共用。 */
     private List<String> lines = List.of();
-    private String confirmLabel = tr("idlefactory.common.confirm");
+    private String confirmLabel = tr("ae2vf.common.confirm");
     @Nullable
     private Runnable onConfirm;
     @Nullable
@@ -160,7 +160,7 @@ final class ConfirmDialog {
 
         int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
-        String cancelLabel = tr("idlefactory.common.cancel");
+        String cancelLabel = tr("ae2vf.common.cancel");
         int cancelW = Math.max(40, this.font.width(cancelLabel) + 18);
         int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;
@@ -205,7 +205,7 @@ final class ConfirmDialog {
         }
         int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
-        String cancelLabel = tr("idlefactory.common.cancel");
+        String cancelLabel = tr("ae2vf.common.cancel");
         int cancelW = Math.max(40, this.font.width(cancelLabel) + 18);
         int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;

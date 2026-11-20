@@ -191,7 +191,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         this.render = new PassiveIoRender(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.searchX() + 3, this.topPos + SEARCH_Y + 2,
-                SEARCH_W - 6, 10, Component.translatable("idlefactory.passive.search.hint"));
+                SEARCH_W - 6, 10, Component.translatable("ae2vf.passive.search.hint"));
         this.searchBox.setValue(rememberedQuery);
         this.searchBox.setResponder(this::applyQuery);
         this.addRenderableWidget(this.searchBox);
@@ -229,7 +229,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         }
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
-                tr("idlefactory.passive.title"), this.searchX() - this.leftPos - 8);
+                tr("ae2vf.passive.title"), this.searchX() - this.leftPos - 8);
         Hit hover = this.layout == null ? null : this.layout.hit(mouseX, mouseY, scroll());
         drawContent(graphics, hover);
         List<Component> tooltip = PassiveIoTooltip.of(this.model.blocks(), hover);
@@ -739,12 +739,12 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
 
     private String emptyText() {
         if (!this.model.hasFactory()) {
-            return tr("idlefactory.passive.empty.no_factory");
+            return tr("ae2vf.passive.empty.no_factory");
         }
         if (this.model.filteredEmpty()) {
-            return tr("idlefactory.passive.empty.filtered");
+            return tr("ae2vf.passive.empty.filtered");
         }
-        return tr("idlefactory.passive.empty.none");
+        return tr("ae2vf.passive.empty.none");
     }
 
     private int totalRules() {

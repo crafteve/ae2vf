@@ -1,12 +1,12 @@
 package io.github.crafteve.ae2vf.network.payload.wand;
 
 import io.github.crafteve.ae2vf.command.WandDraftCodec;
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.command.CommandResult;
 import io.github.crafteve.ae2vf.command.CommandWand;
 import io.github.crafteve.ae2vf.command.WandDraft;
 import io.github.crafteve.ae2vf.factory.FactoryLifecycle;
-import io.github.crafteve.ae2vf.registry.IdleFactoryMenus;
+import io.github.crafteve.ae2vf.registry.VoidFactoryMenus;
 
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
@@ -29,9 +29,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param draft 当前草稿
  */
 public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:wand_open}。 */
+    /** 包类型：{@code ae2vf:wand_open}。 */
     public static final Type<WandOpenC2S> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "wand_open"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "wand_open"));
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, WandOpenC2S> STREAM_CODEC =
@@ -67,10 +67,10 @@ public record WandOpenC2S(WandDraft draft) implements CustomPacketPayload {
                 return;
             }
             // 物品定位器走主手：面板与那把杖绑定，关掉再开仍是同一件物品
-            boolean opened = MenuOpener.open(IdleFactoryMenus.WAND_DRAFT.get(), player,
+            boolean opened = MenuOpener.open(VoidFactoryMenus.WAND_DRAFT.get(), player,
                     MenuLocators.forHand(player, InteractionHand.MAIN_HAND));
             if (!opened) {
-                IdleFactory.LOGGER.warn("Idle Factory: 草稿面板打开失败：player={}",
+                VoidFactory.LOGGER.warn("AE2 Void Factory: 草稿面板打开失败：player={}",
                         player.getUUID());
             }
         });

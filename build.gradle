@@ -78,7 +78,7 @@ neoForge {
             systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
             // 界面两侧留给配方查看器的宽度；现场调：./gradlew runClient -Pgutter=64
             if (project.hasProperty('gutter')) {
-                systemProperty 'idlefactory.gutter', project.property('gutter').toString()
+                systemProperty 'ae2vf.gutter', project.property('gutter').toString()
             }
         }
 

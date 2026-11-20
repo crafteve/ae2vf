@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.node.NodeCraft;
 import io.github.crafteve.ae2vf.node.Node;
 import io.github.crafteve.ae2vf.key.BlockKey;
@@ -500,7 +500,7 @@ public final class LiveNode
             return;
         }
         this.nextWarnTick = now + WARN_INTERVAL;
-        IdleFactory.LOGGER.warn("Idle Factory 节点 [{}]：{}",
+        VoidFactory.LOGGER.warn("AE2 Void Factory 节点 [{}]：{}",
                 this.node.id().toString().substring(0, 8), message);
     }
 

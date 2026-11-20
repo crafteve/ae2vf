@@ -9,7 +9,7 @@ import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
 
 import io.github.crafteve.ae2vf.menu.passiveio.PassiveIoTerminalHost;
-import io.github.crafteve.ae2vf.registry.IdleFactoryMenus;
+import io.github.crafteve.ae2vf.registry.VoidFactoryMenus;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -50,7 +50,7 @@ public class PassiveIoTerminalItem extends Item implements IMenuItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            MenuOpener.open(IdleFactoryMenus.PASSIVE_IO_TERMINAL.get(), serverPlayer,
+            MenuOpener.open(VoidFactoryMenus.PASSIVE_IO_TERMINAL.get(), serverPlayer,
                     MenuLocators.forHand(player, hand));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);

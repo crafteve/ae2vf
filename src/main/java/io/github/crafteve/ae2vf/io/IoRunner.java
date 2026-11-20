@@ -9,7 +9,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.node.NodeDispatchOrder;
 import io.github.crafteve.ae2vf.factory.Factory;
 import io.github.crafteve.ae2vf.machine.Machine;
@@ -173,7 +173,7 @@ public final class IoRunner {
             try {
                 plan = planner.plan(state, analyzer, now);
             } catch (RuntimeException e) {
-                IdleFactory.LOGGER.warn("Idle Factory: 节点 {} 投递规划异常：{}",
+                VoidFactory.LOGGER.warn("AE2 Void Factory: 节点 {} 投递规划异常：{}",
                         state.nodeId().toString().substring(0, 8), e.toString());
                 continue;
             }
@@ -296,7 +296,7 @@ public final class IoRunner {
         }
         state.queue().remove(order.id());
         if (lost > 0L) {
-            IdleFactory.LOGGER.warn("Idle Factory: 孤儿订单退回失败，{} 件已按丢弃处理", lost);
+            VoidFactory.LOGGER.warn("AE2 Void Factory: 孤儿订单退回失败，{} 件已按丢弃处理", lost);
         }
     }
 
@@ -453,7 +453,7 @@ public final class IoRunner {
             return;
         }
         this.failureLogAt.put(machine.id(), now);
-        IdleFactory.LOGGER.warn("Idle Factory: 机器 {} 本轮 IO 异常，已跳过本轮",
+        VoidFactory.LOGGER.warn("AE2 Void Factory: 机器 {} 本轮 IO 异常，已跳过本轮",
                 machine.shortId(), cause);
     }
 

@@ -9,7 +9,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.key.BlockKey;
 import io.github.crafteve.ae2vf.machine.Machine;
 import io.github.crafteve.ae2vf.observation.ObservationChange;
@@ -250,7 +250,7 @@ public final class PortExecutor implements ObservationChangeListener {
             iterator.next();
             iterator.remove();
             // 只记一次线索，不逐条刷屏：出现这种量级说明配置或机器规模已经病态。
-            IdleFactory.LOGGER.debug("Idle Factory: 端口缓存超过 {} 台，已淘汰最久未用的一台",
+            VoidFactory.LOGGER.debug("AE2 Void Factory: 端口缓存超过 {} 台，已淘汰最久未用的一台",
                     PORT_CACHE_FENCE);
         }
     }

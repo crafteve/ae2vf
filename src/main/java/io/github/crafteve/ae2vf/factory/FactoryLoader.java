@@ -3,9 +3,9 @@ package io.github.crafteve.ae2vf.factory;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.claim.BlockOccupancyTable;
-import io.github.crafteve.ae2vf.config.IdleFactoryConfig;
+import io.github.crafteve.ae2vf.config.VoidFactoryConfig;
 import io.github.crafteve.ae2vf.io.IoRunner;
 import io.github.crafteve.ae2vf.io.PortExecutor;
 import io.github.crafteve.ae2vf.network.ObservationNoticeListener;
@@ -89,9 +89,9 @@ public final class FactoryLoader {
     public Loaded load() {
         FactoryStore store = FactoryStore.get(this.server.overworld());
         ObservationRunner observations = new ObservationRunner(this.server,
-                IdleFactoryConfig::observationHealthBudgetPerTick,
-                IdleFactoryConfig::observationWorkBudgetPerTick,
-                IdleFactoryConfig::observationEventBudgetPerTick);
+                VoidFactoryConfig::observationHealthBudgetPerTick,
+                VoidFactoryConfig::observationWorkBudgetPerTick,
+                VoidFactoryConfig::observationEventBudgetPerTick);
         ObservationReader reader = observations.reader();
         WorldEventListener listener = new WorldEventListener(observations, observations.table());
         NeoForge.EVENT_BUS.register(listener);
@@ -106,7 +106,7 @@ public final class FactoryLoader {
         FactoryRunner runner = new FactoryRunner(this.server, this.library, observations, reader,
                 this.nodeIoRunner, this.nodeApply, this.nodeRunner, this.formBuilder, storage);
         observations.register(runner);
-        IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded",
+        VoidFactory.LOGGER.info("AE2 Void Factory: {} factory instance(s) loaded",
                 this.library.all().size());
         return new Loaded(store, runner, observations, reader, storage, listener);
     }

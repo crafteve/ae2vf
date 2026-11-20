@@ -3,7 +3,7 @@ package io.github.crafteve.ae2vf.network.payload;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.network.ClientCommandHandler;
 import io.github.crafteve.ae2vf.command.CommandKind;
 import io.github.crafteve.ae2vf.command.CommandReason;
@@ -32,9 +32,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 public record FactoryCommandS2C(int containerId, CommandKind kind, long requestSeq,
         CommandResult result)
         implements CustomPacketPayload {
-    /** 包类型：{@code idlefactory:command_result}。 */
+    /** 包类型：{@code ae2vf:command_result}。 */
     public static final Type<FactoryCommandS2C> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID, "command_result"));
+            new Type<>(ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "command_result"));
 
     /** 编解码器。 */
     public static final StreamCodec<RegistryFriendlyByteBuf, FactoryCommandS2C> STREAM_CODEC =

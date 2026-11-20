@@ -75,10 +75,10 @@ public final class SearchFields {
             tooltip.append('\n').append(dimensionId).append(' ').append(pos.toShortString());
         }
         tooltip.append("\n").append(net.minecraft.network.chat.Component
-                .translatable("idlefactory.search.machines_rules", machineCount, ruleCount)
+                .translatable("ae2vf.search.machines_rules", machineCount, ruleCount)
                 .getString());
         if (patternCount >= 0) {
-            tooltip.append(Component.translatable("idlefactory.search.patterns",
+            tooltip.append(Component.translatable("ae2vf.search.patterns",
                     patternCount).getString());
         }
         return new SearchQuery.Fields(name, id, namespace,

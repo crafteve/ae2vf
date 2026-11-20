@@ -48,6 +48,6 @@ public final class ExpandAllButton extends IconButton {
     public List<Component> getTooltipMessage() {
         boolean open = this.allExpanded.getAsBoolean();
         return List.of(Component.translatable(open
-                ? "idlefactory.terminal.collapse_all" : "idlefactory.terminal.expand_all"));
+                ? "ae2vf.terminal.collapse_all" : "ae2vf.terminal.expand_all"));
     }
 }

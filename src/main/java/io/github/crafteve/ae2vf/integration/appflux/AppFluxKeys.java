@@ -2,7 +2,7 @@ package io.github.crafteve.ae2vf.integration.appflux;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.ae2vf.IdleFactory;
+import io.github.crafteve.ae2vf.VoidFactory;
 
 import appeng.api.stacks.AEKey;
 
@@ -101,7 +101,7 @@ public final class AppFluxKeys {
             return;
         }
         warned = true;
-        IdleFactory.LOGGER.warn("IdleFactory: Applied Flux FE 桥接不可用，FE 将退回方块容器", error);
+        VoidFactory.LOGGER.warn("VoidFactory: Applied Flux FE 桥接不可用，FE 将退回方块容器", error);
     }
 
     /**
