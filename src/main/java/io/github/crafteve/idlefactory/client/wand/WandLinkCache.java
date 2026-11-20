@@ -28,7 +28,9 @@ public final class WandLinkCache {
     private static List<BlockKey> machineBlocks = List.of();
     private static Map<BlockKey, Owner> owners = Map.of();
     private static Map<UUID, BlockKey> machineBlocksById = Map.of();
-    private static Map<UUID, WandLinksS2C.NodeLink> nodes = Map.of();
+    private static Map<UUID, WandLinksS2C.NodeLink> nodes = Map.of();
+    /** 仓库锚点；未绑定或没有工厂为 {@code null}，存储杖据此画蓝色高亮。 */
+    private static BlockKey storageAnchor;
 
     private WandLinkCache() {
         // 纯静态缓存
@@ -64,7 +66,8 @@ public final class WandLinkCache {
         }
         owners = Map.copyOf(nextOwners);
         machineBlocksById = Map.copyOf(nextMachineBlocks);
-        nodes = Map.copyOf(nextNodes);
+        nodes = Map.copyOf(nextNodes);
+        storageAnchor = payload.storageAnchor();
         machineBlocks = List.copyOf(nextBlocks);
     }
 
@@ -73,7 +76,8 @@ public final class WandLinkCache {
         machineBlocks = List.of();
         owners = Map.of();
         machineBlocksById = Map.of();
-        nodes = Map.of();
+        nodes = Map.of();
+        storageAnchor = null;
     }
 
     /** 全部已绑定机器方块，按节点与成员顺序摊平。 */
@@ -115,4 +119,13 @@ public final class WandLinkCache {
     public static void request() {
         PacketDistributor.sendToServer(new WandLinksRequestC2S());
     }
+
+    /**
+     * 仓库锚点；未绑定为 {@code null}。
+     *
+     * @return 锚点
+     */
+    public static BlockKey storageAnchor() {
+        return storageAnchor;
+    }
 }
