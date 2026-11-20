@@ -1,66 +1,62 @@
-# AE2 Void Factory（`ae2vf`）
+# AE2 Void Factory
 
-> modid: `ae2vf` · MC 1.21.1 / NeoForge 21.1.264 · 分支 `view-client-refactor-20261120`
+> modid `ae2vf` · Minecraft 1.21.1 · NeoForge 21.1.264 · **0.1.0-beta**
 
-把「把机器接进自动化网络」这一步，从摆接口、铺线缆、调 IO 面，变成在终端里配置。
-只接管机器与仓库之间的**搬运**——机器配方、能量、加工时间全部不变。
+An **Applied Energistics 2** add-on that turns "connect machines to the ME network" into terminal
+configuration instead of cable spaghetti.
 
-## 现在是什么形态
+Instead of placing interfaces, running cables and tuning IO faces on every machine, you bind machines
+to a **node** with the binding wand and edit the node's IO rules in a terminal. The mod only moves
+items, fluids and FE between machines and AE2 storage — recipes, energy and processing time are
+untouched.
 
-- **服务端权威**：IO 逻辑全在服务端；终端界面只是监视器，只渲染并发送意图。工厂状态由服务端聚合成一张视图表（整表分页 + 差量）下发，客户端不做聚合。
-- **入口只有两个物品右键**：被动 IO 管理终端、节点管理终端。**没有聊天指令**（`/idf` 已整体删除）。
-- **节点 = 1..N 台机器**（一台机器就是一个方块），节点自己带 IO 规则与虚拟样板供应器。
-- **工厂不是数据库**：仓库是 AE2 网络或方块容器组；仓库离线 = 没料，不是断网。
+## Features
 
-## 能力
+- **Nodes** — one node manages 1..N machines, each with its own input/output rules.
+- **Passive IO** — rule-driven transfer every tick, with per-rule backoff and face learning.
+- **Active crafting** — nodes advertise patterns to AE2 CPUs through a virtual pattern provider and
+  feed dispatched jobs into their machines.
+- **Observation layer** — a second fact source for "is the block there / what is it / is it working";
+  the UI and IO gating read it instead of probing the world on the read path.
+- **Two terminals** — passive IO terminal (rule editing, list/tile views) and node terminal (nodes,
+  members, blocking, multiplier, dispatch), both with search, six sort keys and direction toggles.
+- **Machine binding wand** — right-click to bind/unbind, sneak-right-click to confirm a draft,
+  chain-bind neighbouring machines of the same type.
+- **JEI integration** — machine list, IO columns, storage, and a dedicated FE ingredient.
 
-- **被动 IO**：给节点配输入 / 输出规则（精确 / 模糊），每 tick 搬运；机器级睡眠、面路由、容器优先级。
-- **主动合成**：节点实现 AE2 的样板供应器接口，把样板广告给 CPU、接住派单推输入、回收产物；
-  写入第一张样板时自动转主动，倍率 / 阻挡 / 派单模式可配。
-- **仓库后端**：AE2 ME 网络（物品 / 流体 / FE，化学品随 Applied Mekanistics），
-  或方块容器组（箱子 / 储罐 / 能量立方）。
-- **观测层**：方块在不在、哪个面有什么能力、是否在干活。界面只读观测缓存，读路径不探世界。
-- **两个终端**：节点管理（展开成员、改名、规则 / 样板 / 阻挡 / 倍率 / 派单、定位）、
-  被动 IO 配置（按节点分组的卡片、规则 chip、列表 / 磁贴视图、六档排序与升降序）。
-- **绑定杖**：在世界里点方块接机器；带草稿预览、冲突提示与 1:1 toggle。
-- 搜索沿用 AE2 语法并接 jecharacters 拼音兼容；JEI / EMI 拖拽与 R/U；FE 使用独立配料（`ae2vf:fe`）。
+## Requirements
 
-## 明确没有 / 未实现
+| Dependency | Version | Required |
+|---|---|---|
+| Minecraft | 1.21.1 | yes |
+| NeoForge | 21.1.264 | yes |
+| Applied Energistics 2 | 19.2.10+ | yes |
+| Applied Flux | 1.21-2.1.5-neoforge+ | no (FE support) |
+| Applied Mekanistics | matching 1.21.1 build | no (chemical support) |
+| JEI | 19.21.1.304+ | no |
 
-- 聊天指令入口：`/idf` 整棵树已删除，建厂与配置全部走两个终端。
-- 产线对象：没有 Line，节点分组只是 UI 视图。
-- 区块强制加载：玩家走远后机器与容器所在区块会卸载，搬运随之停。
-- 化学品 / FE 依赖可选附属：没装 Applied Flux 就没有 FE 资源，没装 Applied Mekanistics
-  就没有化学品资源，不写降级表示。
+Without Applied Flux the mod simply has no FE resource; without Applied Mekanistics it has no
+chemical resource. Nothing degrades silently.
 
-## 技术栈
+## Installation
 
-| 项 | 值 |
-|---|---|
-| MC / NeoForge | 1.21.1 / 21.1.264 |
-| Java / Gradle / ModDevGradle | 21 / 9.2.1 / 2.0.148 |
-| AE2 | 19.2.10，硬依赖 |
-| 可选依赖 | JEI（本地测试）、Mekanism（localRuntime）、Applied Flux（FE）、Applied Mekanistics（化学品） |
+1. Install the matching NeoForge version for Minecraft 1.21.1.
+2. Drop the jar into `mods/`.
+3. Start the game. The mod also needs Applied Energistics 2.
 
-## 构建与运行
+## Building
 
 ```bash
-./gradlew build        # 构建（提交前提）
-./gradlew runClient    # 本地客户端
+./gradlew build
 ```
 
-Windows 用 `gradlew.bat`；离线构建加 `--offline`。
+The jar is written to `build/libs/ae2vf-<version>.jar`.
 
-## 文档
+## Compatibility
 
-- [AGENTS.md](AGENTS.md) —— 工作约定、分层、界面规范与开发流程，**第一入口**
-- [docs/DECISIONS.md](docs/DECISIONS.md) —— ADR 决策记录，唯一活的设计约束
-- [docs/DECISIONS.md](docs/DECISIONS.md) 的 ADR-044 —— 视图表与客户端重组（本轮）
-- [docs/README.md](docs/README.md) —— 文档索引（含历史 / 归档判定）
-- [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) —— AE2 生态调研（存储后端、FE、化学品边界）
-- [docs/视图表与客户端重构总计划.md](docs/视图表与客户端重构总计划.md) —— 本轮重构的 v3 计划与执行记录
-- [docs/草稿纸/](docs/草稿纸/) —— Agent 讨论笔记，不构成实现约束；定稿结论同步到 ADR
+This is the first public beta. Mod ids, item ids and save data changed from the internal
+`idlefactory` builds to `ae2vf`: **old worlds and old items are not compatible** — start a new world.
 
----
+## License
 
-> AE2 的自动合成已经很接近放置游戏，只有「摆机器接进去」这一步破坏体验。AE2 Void Factory 补的就是这一步。
+MIT — see [LICENSE](LICENSE).
