@@ -1,8 +1,8 @@
 package io.github.crafteve.idlefactory.registry;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
-import io.github.crafteve.idlefactory.item.FactoryPassiveIoTerminalItem;
+import io.github.crafteve.idlefactory.item.NodeTerminalItem;
+import io.github.crafteve.idlefactory.item.PassiveIoTerminalItem;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.item.MeBindingWandItem;
 
@@ -22,14 +22,14 @@ public final class IdleFactoryItems {
             DeferredRegister.create(Registries.ITEM, IdleFactory.MODID);
 
     /** 被动 IO 管理终端；右键打开第三版框架界面。 */
-    public static final DeferredHolder<Item, FactoryPassiveIoTerminalItem> PASSIVE_IO_TERMINAL =
+    public static final DeferredHolder<Item, PassiveIoTerminalItem> PASSIVE_IO_TERMINAL =
             ITEMS.register("passive_io_terminal",
-                    () -> new FactoryPassiveIoTerminalItem(unstackable()));
+                    () -> new PassiveIoTerminalItem(unstackable()));
 
     /** 节点管理终端；只管节点、成员与节点级动作。 */
-    public static final DeferredHolder<Item, FactoryNodeTerminalItem> NODE_TERMINAL =
+    public static final DeferredHolder<Item, NodeTerminalItem> NODE_TERMINAL =
             ITEMS.register("node_terminal",
-                    () -> new FactoryNodeTerminalItem(unstackable()));
+                    () -> new NodeTerminalItem(unstackable()));
 
     /** 机器绑定杖。 */
     public static final DeferredHolder<Item, MachineBindingWandItem> MACHINE_BINDING_WAND =

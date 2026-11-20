@@ -1,10 +1,10 @@
 package io.github.crafteve.idlefactory.client.screen.search;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 
 import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 
@@ -45,7 +45,7 @@ public final class SearchFields {
     public static SearchQuery.Fields of(ViewNode view, int patternCount) {
         ViewMachine first = view.machines().isEmpty() ? null : view.machines().get(0);
         return build(view.core().name() != null
-                        ? view.core().name() : UiResources.blockName(view.core().typeBlockId()),
+                        ? view.core().name() : UiText.blockName(view.core().typeBlockId()),
                 view.core().typeBlockId(), StatusView.of(view.core()).text(),
                 first == null ? null : first.block().dimension().location().toString(),
                 first == null ? null : first.block().pos(),
@@ -82,6 +82,6 @@ public final class SearchFields {
                     patternCount).getString());
         }
         return new SearchQuery.Fields(name, id, namespace,
-                UiResources.modName(namespace), tooltip.toString(), List.of());
+                UiText.modName(namespace), tooltip.toString(), List.of());
     }
 }

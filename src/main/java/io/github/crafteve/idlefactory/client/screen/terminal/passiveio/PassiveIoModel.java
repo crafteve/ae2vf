@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
@@ -113,7 +113,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
             return this.node.core().health() == NodeHealth.OFFLINE
                     ? net.minecraft.network.chat.Component.translatable("idlefactory.common.offline")
                             .getString()
-                    : UiResources.blockName(this.machine().blockId());
+                    : UiText.blockName(this.machine().blockId());
         }
     }
 

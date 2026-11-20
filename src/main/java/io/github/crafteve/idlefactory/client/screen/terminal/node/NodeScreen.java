@@ -26,7 +26,6 @@ import appeng.core.AEConfig;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 
-import io.github.crafteve.idlefactory.client.screen.ConfirmDialog;
 
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 
@@ -82,8 +81,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * {@code super.mouseClicked} 处理点击。节点行复用 IO 的卡片、键帽与状态灯；展开后的机器行只在
  * 行尾放定位。</p>
  *
- * <p>删除有规则或样板的节点会先弹确认浮层；没有配置的节点直接删除。倍增、逐台/轮询与编辑会话
- * 还没有后端，按钮保留但只提示「待接入」。</p>
+ * <p>删除有规则或样板的节点会先弹确认浮层；没有配置的节点直接删除。阻挡 / 倍率 / 派单 /
+ * 编辑都直接发命令，点卡片空白与节点名区域切换展开（名字区域双击改名）。</p>
  */
 public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         implements FeedbackSink, ViewTableSink {

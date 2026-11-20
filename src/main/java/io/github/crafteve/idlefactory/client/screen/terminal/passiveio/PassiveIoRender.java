@@ -10,7 +10,7 @@ import appeng.api.stacks.AEItemKey;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
 import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
@@ -250,7 +250,7 @@ final class PassiveIoRender {
         NineSliceRenderer.slot(graphics, slotX, top + 1, PassiveIoLayout.SLOT,
                 PassiveIoLayout.SLOT);
         ItemStack icon = block.node().core().health() == NodeHealth.OFFLINE
-                ? new ItemStack(Items.BARRIER) : UiResources.blockStack(block.machine().blockId());
+                ? new ItemStack(Items.BARRIER) : UiText.blockStack(block.machine().blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
         int nameX = slotX + PassiveIoLayout.SLOT + PassiveIoLayout.GAP;
@@ -335,7 +335,7 @@ final class PassiveIoRender {
         int chipX = PassiveIoLayout.chipX(viewport, 0);
         int textY = y + (PassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
-                ellipsize(UiResources.keyName(rule.key()), chipX - 2 - nameX), nameX,
+                ellipsize(UiText.keyName(rule.key()), chipX - 2 - nameX), nameX,
                 textY, TEXT_PRIMARY, false);
         drawChips(graphics, viewport, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
@@ -449,7 +449,7 @@ final class PassiveIoRender {
         KeyIconRenderer.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
         int nameX = x + PassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
-                ellipsize(UiResources.keyName(rule.key()), TILE_NAME_W), nameX, y + 7,
+                ellipsize(UiText.keyName(rule.key()), TILE_NAME_W), nameX, y + 7,
                 TEXT_PRIMARY, false);
         int chipY = y + PassiveIoLayout.TILE_CHIP_Y;
         int hoveredChip = chipIndex(hover, blockIndex, index);

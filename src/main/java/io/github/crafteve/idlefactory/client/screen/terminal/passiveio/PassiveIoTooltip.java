@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.stacks.AEItemKey;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
@@ -84,7 +84,7 @@ final class PassiveIoTooltip {
 
     private static List<Component> rule(BlockView block, RuleRow row) {
         List<Component> lines = new ArrayList<>(6);
-        lines.add(Component.literal(UiResources.keyName(row.key())).withStyle(ChatFormatting.BOLD));
+        lines.add(Component.literal(UiText.keyName(row.key())).withStyle(ChatFormatting.BOLD));
         lines.add(line(tr("idlefactory.passive.tooltip.direction"),
                 tr(row.input() ? "idlefactory.passive.side.input" : "idlefactory.passive.side.output")));
         lines.add(line(tr("idlefactory.passive.tooltip.face"),

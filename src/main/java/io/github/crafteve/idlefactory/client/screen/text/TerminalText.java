@@ -1,6 +1,6 @@
 package io.github.crafteve.idlefactory.client.screen.text;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;

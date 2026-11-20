@@ -10,7 +10,7 @@ import appeng.api.util.IConfigManager;
 import appeng.menu.locator.ItemMenuHostLocator;
 
 import io.github.crafteve.idlefactory.command.CommandController;
-import io.github.crafteve.idlefactory.item.FactoryNodeTerminalItem;
+import io.github.crafteve.idlefactory.item.NodeTerminalItem;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -27,7 +27,7 @@ import net.minecraft.world.entity.player.Player;
  * <p>服务端打开终端时顺手保证玩家有工厂，理由同被动 IO 终端宿主：指令删除后这是唯一的
  * 「进入工厂」入口。</p>
  */
-public final class NodeTerminalHost extends ItemMenuHost<FactoryNodeTerminalItem> {
+public final class NodeTerminalHost extends ItemMenuHost<NodeTerminalItem> {
     /** 终端自己的物品设置：排序档位与排序方向。 */
     private final IConfigManager configManager;
 
@@ -36,7 +36,7 @@ public final class NodeTerminalHost extends ItemMenuHost<FactoryNodeTerminalItem
      * @param player  打开终端的玩家
      * @param locator 物品定位器
      */
-    public NodeTerminalHost(FactoryNodeTerminalItem item, Player player,
+    public NodeTerminalHost(NodeTerminalItem item, Player player,
             ItemMenuHostLocator locator) {
         super(item, player, locator);
         if (player instanceof ServerPlayer serverPlayer) {

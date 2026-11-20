@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 
@@ -25,7 +25,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * <p>绘制层级统一走 {@link GuiLayerSpec#OVERLAY}：普通填充在 z=0，而物品图标在 z=150、
  * 数量装饰在 z=200，深度测试按 z 比较、不看绘制顺序，不抬层就会被列表里的图标盖住。</p>
  */
-public final class ConfirmDialog {
+final class ConfirmDialog {
     /** 浮层尺寸。 */
     private static final int WIDTH = 240;
     private static final int MIN_WIDTH = 160;

@@ -24,7 +24,7 @@ import io.github.crafteve.idlefactory.key.AeKeyAdapter;
  * <p>把「一行多色文字」、搜索字段需要的资源名/tooltip/tag，以及 tooltip/JEI 用的物品形态
  * 收在一起。这里全部是只读的注册表/物品栈查询，不探世界，也不改服务端状态。</p>
  */
-public final class UiResources {
+public final class UiText {
 
     /**
      * 取一条界面文案。
@@ -36,7 +36,7 @@ public final class UiResources {
         return net.minecraft.network.chat.Component.translatable(key).getString();
     }
 
-    private UiResources() {
+    private UiText() {
         // 纯静态辅助
     }
 
@@ -110,7 +110,7 @@ public final class UiResources {
      * @return 物品栈
      */
     public static ItemStack iconStack(AEKey key) {
-        return UiResources.icon(key);
+        return UiText.icon(key);
     }
 /**
      * 机器方块对应的物品图标。

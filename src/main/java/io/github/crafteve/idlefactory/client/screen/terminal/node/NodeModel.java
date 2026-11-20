@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
+import io.github.crafteve.idlefactory.client.screen.UiText;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusView;
@@ -139,6 +139,6 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
      */
     static String displayName(ViewNode view) {
         return view.core().name() != null ? view.core().name()
-                : UiResources.blockName(view.core().typeBlockId());
+                : UiText.blockName(view.core().typeBlockId());
     }
 }

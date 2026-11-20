@@ -20,8 +20,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * 节点终端的动作：把点击翻译成一个 C2S 包或一次纯客户端定位。
  *
- * <p>只发意图，不做本地乐观修改：服务端校验后回反馈与一份新快照。倍增、逐台/轮询与编辑会话
- * 还没有后端，这里明确提示「待接入」，不伪造一个会成功的动作。</p>
+ * <p>只发意图，不做本地乐观修改：服务端校验后回反馈与一份新快照。阻挡、倍率、派单与编辑
+ * 都有正式命令；定位是纯客户端行为，不同维度时只报坐标。</p>
  */
 final class NodeActions {
     private NodeActions() {

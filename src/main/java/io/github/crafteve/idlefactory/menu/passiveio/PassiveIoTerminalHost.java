@@ -12,7 +12,7 @@ import appeng.api.util.IConfigManager;
 import appeng.menu.locator.ItemMenuHostLocator;
 
 import io.github.crafteve.idlefactory.command.CommandController;
-import io.github.crafteve.idlefactory.item.FactoryPassiveIoTerminalItem;
+import io.github.crafteve.idlefactory.item.PassiveIoTerminalItem;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -27,7 +27,7 @@ import net.minecraft.world.entity.player.Player;
  * <p>服务端打开终端时顺手保证玩家有工厂：指令删除后，这里是唯一会经过的「进入工厂」入口，
  * 原 {@code /idf gui} 与快捷键入口的自动建厂职责移到这里，否则界面会一直显示「你还没有工厂」。</p>
  */
-public final class PassiveIoTerminalHost extends ItemMenuHost<FactoryPassiveIoTerminalItem> {
+public final class PassiveIoTerminalHost extends ItemMenuHost<PassiveIoTerminalItem> {
     /** 终端自己的物品设置：列表 / 卡片视图、排序档位、排序方向。 */
     private final IConfigManager configManager;
 
@@ -36,7 +36,7 @@ public final class PassiveIoTerminalHost extends ItemMenuHost<FactoryPassiveIoTe
      * @param player  打开终端的玩家
      * @param locator 物品定位器
      */
-    public PassiveIoTerminalHost(FactoryPassiveIoTerminalItem item, Player player,
+    public PassiveIoTerminalHost(PassiveIoTerminalItem item, Player player,
             ItemMenuHostLocator locator) {
         super(item, player, locator);
         if (player instanceof ServerPlayer serverPlayer) {
