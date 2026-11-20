@@ -112,7 +112,14 @@ public final class MachineWandInput {
             }
             case IDLE -> {
                 if (sneaking) {
-                    WandDraftState.startNew(minecraft);
+                    // 蹲下右键已绑定的机器：进入该节点的草稿（增删机器），而不是新建节点。
+                    var owner = block == null ? java.util.Optional.<WandLinkCache.Owner>empty()
+                            : WandLinkCache.owner(block);
+                    if (owner.isPresent()) {
+                        WandDraftState.startEdit(minecraft, owner.get().nodeId());
+                    } else {
+                        WandDraftState.startNew(minecraft);
+                    }
                     yield true;
                 }
                 if (block == null) {
@@ -126,7 +133,13 @@ public final class MachineWandInput {
             }
             case EDITING -> {
                 if (sneaking) {
-                    WandSubmitter.openDraft();
+                    // 空草稿没有可提交的内容：蹲下右键直接退出编辑态，回 IDLE。
+                    if (WandDraftState.draft().isEmpty()) {
+                        WandDraftState.clear();
+                        feedback().neutral(WandText.cancelled());
+                    } else {
+                        WandSubmitter.openDraft();
+                    }
                     yield true;
                 }
                 if (block == null) {

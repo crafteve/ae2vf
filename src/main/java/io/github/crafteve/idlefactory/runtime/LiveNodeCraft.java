@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.io.CapacityPick;
 import io.github.crafteve.idlefactory.node.ProviderMode;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
@@ -237,6 +238,60 @@ final class LiveNodeCraft implements ICraftingProvider {
             case FIXED -> provider.multiplier().resolve(0);
             case SMART -> this.smartCapacity(stack, details);
         };
+    }
+
+
+    /**
+     * 智能倍率的诊断文本：在线机器、每张样板的每份输入、各机器可装份数与最终倍数。
+     *
+     * <p>只读：不写缓存、不改队列，用来在游戏里核对「为什么智能倍率是 ×1」。</p>
+     *
+     * @return 多行文本
+     */
+    String capacityReport() {
+        NodeCraft provider = this.node.node().provider();
+        Level level = this.node.decodeLevel();
+        List<Machine> online = this.node.onlineMachines();
+        StringBuilder out = new StringBuilder("容量探测：在线 ").append(online.size()).append(" 台");
+        if (online.isEmpty()) {
+            return out.append("（没有在线机器，智能倍率只能是 ×1）").toString();
+        }
+        boolean any = false;
+        for (int slot = 0; slot < provider.capacity(); slot++) {
+            var stack = provider.pattern(slot);
+            if (stack.isEmpty() || !AEItems.PROCESSING_PATTERN.is(stack)) {
+                continue;
+            }
+            IPatternDetails details = decode(stack, level);
+            if (details == null) {
+                continue;
+            }
+            any = true;
+            var perPortion = perPortion(details);
+            long total = 0L;
+            out.append("\n槽 ").append(slot).append("：每份 ").append(perPortion.size())
+                    .append(" 种资源，各机器可装");
+            for (Machine machine : online) {
+                long fit = this.node.capacityPick().portionsThatFit(machine, perPortion);
+                total += fit;
+                out.append(' ').append(fit);
+            }
+            out.append(" → 合计 ").append(total).append(" → ×")
+                    .append(Math.max(1L, total / 4L));
+            AEKey first = perPortion.keySet().stream().findFirst().orElse(null);
+            if (first != null) {
+                out.append("\n  首行 ").append(first).append(" 选面：");
+                for (Machine machine : online) {
+                    var pick = this.node.facePick().pick(machine, first, IoSide.INPUT, null, null);
+                    out.append(' ').append(pick.picked()
+                            ? pick.face().toString() : pick.failure().toString());
+                }
+            }
+        }
+        if (!any) {
+            out.append("（没有可解码的处理样板）");
+        }
+        return out.toString();
     }
 
     /**

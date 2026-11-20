@@ -56,7 +56,8 @@ public final class CommandApply {
             case RULE_MOVE -> moveRule(factory, command.nodeId(), command.body());
             case RULE_REMOVE -> removeRule(factory, command.nodeId(), command.body());
             case PROVIDER_BLOCKING -> setBlocking(factory, command.nodeId(), command.body());
-            case PROVIDER_MULTIPLIER -> setMultiplier(factory, command.nodeId(), command.body());
+            case PROVIDER_MULTIPLIER ->
+                setMultiplier(factory, command.nodeId(), command.body(), context.player());
             case PROVIDER_DISPATCH -> setDispatch(factory, command.nodeId(), command.body());
             case NODE_RENAME -> rename(factory, command.nodeId(), command.body());
             case NODE_TYPE_MIGRATE -> migrate(factory, command.nodeId(), command.body());
@@ -205,7 +206,7 @@ public final class CommandApply {
     }
 
     private static CommandResult setMultiplier(Factory factory, java.util.UUID nodeId,
-            FactoryCommand.Body body) {
+            FactoryCommand.Body body, @Nullable net.minecraft.server.level.ServerPlayer player) {
         if (!(body instanceof FactoryCommand.Multiplier multiplier)) {
             return CommandResult.of(CommandReason.INTERNAL);
         }
@@ -218,6 +219,16 @@ public final class CommandApply {
         if (runtime != null) {
             runtime.markDirty();
             runtime.nodeManager().markPatternsDirty(nodeId);
+            // 诊断钩子：切到智能档时把容量探测结果发到聊天栏，方便核对倍率来源。
+            if (multiplier.mode() == io.github.crafteve.idlefactory.node.MultiplierMode.SMART
+                    && player != null) {
+                var live = runtime.nodeManager().node(nodeId);
+                if (live != null) {
+                    player.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(live.capacityReport()),
+                            false);
+                }
+            }
         }
         return CommandResult.node(CommandReason.OK, nodeId);
     }
