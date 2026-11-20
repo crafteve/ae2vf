@@ -32,12 +32,14 @@ public final class ClientCommandHandler {
             return;
         }
         if (payload.containerId() < 0) {
-            // 世界命令：没有终端，回执投到动作栏。
-            Minecraft minecraft = Minecraft.getInstance();
-            if (minecraft.player != null) {
-                minecraft.player.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal(
-                                ClientCommandText.hud(payload.result())), true);
+            // 世界命令（ME 绑定杖设锚点 / 解锚、绑定杖 toggle）：没有终端，回执走模组 HUD 条，
+            // 不再塞原版动作栏，否则和绑定杖的条不是一套外观。
+            var text = net.minecraft.network.chat.Component.literal(
+                    ClientCommandText.hud(payload.result()));
+            if (payload.result().ok()) {
+                io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.success(text);
+            } else {
+                io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.failure(text);
             }
             return;
         }
