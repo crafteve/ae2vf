@@ -9,7 +9,6 @@ import org.jetbrains.annotations.Nullable;
 import appeng.api.stacks.AEItemKey;
 
 import io.github.crafteve.idlefactory.client.screen.paint.Card;
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.paint.KeycapButton;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
@@ -35,7 +34,7 @@ import net.minecraft.world.item.Items;
  *
  * <p>只读模型与排版，不写任何状态：鼠标悬停由屏幕算好 {@link Hit} 传进来，滚动只影响
  * {@code scroll}，不改排版。所有静态外观来自 {@link NineSliceRenderer} 贴图与
- * {@link FactoryGuiTheme.Io} 色值。</p>
+ * 本类常量。</p>
  *
  * <p>列表式为机器行 + 规则行；磁贴式为机器行 + 77×34 磁贴两列。每台机器只有一圈机器大卡片，
  * 机器行是它顶部的一条深色带；状态灯只画在机器行，走 {@link StatusBar}，落在卡片轮廓之内。

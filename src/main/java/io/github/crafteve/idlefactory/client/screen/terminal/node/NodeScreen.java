@@ -30,7 +30,6 @@ import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
 
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
 import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 
@@ -239,8 +238,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
         // 浮层打开时不再画底层的 tooltip：原版 tooltip 在 z=400，会压在弹窗上。
         boolean dialogOpen = this.confirmDialog != null && this.confirmDialog.isOpen();
-        List<Component> tooltip = NodeTooltip.of(this.model.visibleNodes(),
-                FactoryGuiTheme.current(), hover);
+        List<Component> tooltip = NodeTooltip.of(this.model.visibleNodes(), hover);
         if (!tooltip.isEmpty() && !dialogOpen) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
@@ -275,11 +273,10 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         if (this.renameBox == null) {
             return;
         }
-        FactoryGuiTheme theme = FactoryGuiTheme.current();
         graphics.fill(box.getX() - 1, box.getY() - 1, box.getX() + box.getWidth() + 1,
-                box.getY() + box.getHeight() + 1, theme.bevelLight());
+                box.getY() + box.getHeight() + 1, BEVEL_LIGHT);
         graphics.fill(box.getX() - 1, box.getY() - 1, box.getX() + box.getWidth() + 1,
-                box.getY(), theme.slotBorderDark());
+                box.getY(), SLOT_BORDER_DARK);
         box.render(graphics, mouseX, mouseY, partialTick);
     }
 

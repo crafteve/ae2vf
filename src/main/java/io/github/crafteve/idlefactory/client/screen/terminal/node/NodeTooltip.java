@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeLayout.Hit;
@@ -32,11 +31,10 @@ final class NodeTooltip {
      * 构造 tooltip。
      *
      * @param nodes 节点行
-     * @param theme 当前主题，状态文字取色用
      * @param hit   命中；{@code null} 时返回空列表
      * @return 文本行
      */
-    static List<Component> of(List<ViewNode> nodes, FactoryGuiTheme theme, @Nullable Hit hit) {
+    static List<Component> of(List<ViewNode> nodes, @Nullable Hit hit) {
         if (hit == null || hit.node() < 0 || hit.node() >= nodes.size()) {
             return List.of();
         }
