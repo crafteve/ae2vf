@@ -133,10 +133,15 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         super(menu, inventory, title, style);
         this.view = menu.host().view();
         this.source = new TerminalSource(menu.containerId);
-        this.model = new PassiveIoModel(FactoryGuiTheme.current());
+        this.model = new PassiveIoModel(this.source, FactoryGuiTheme.current());
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         Scrollbar bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.scroll = new PassiveIoScroll(bar);
         // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
@@ -320,7 +325,12 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
      * @param table 视图表
      */
     private void acceptTable(ViewTable table) {
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.accept(table);
         rebuildLayout();
         int signature = table.nodes().size() * 37 + totalRules();
@@ -369,7 +379,12 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         }
         this.sortMode = mode;
         this.sortDirection = direction;
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.resort();
         rebuildLayout();
     }
@@ -398,7 +413,12 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         }
         this.sortMode = mode;
         this.sortDirection = direction;
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.resort();
         rebuildLayout();
         PacketDistributor.sendToServer(
