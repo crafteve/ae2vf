@@ -59,7 +59,7 @@ final class FactoryRunner implements ObservationChangeListener {
     private static final int HEARTBEAT_INTERVAL = 200;
 
     private final MinecraftServer server;
-    private final FactoryManager manager;
+    private final FactoryLibrary manager;
     private final ObservationRunner observationRunner;
     private final ObservationReader observations;
     private final IoRunner nodeIoRunner;
@@ -82,7 +82,7 @@ final class FactoryRunner implements ObservationChangeListener {
      * @param formBuilder       表单生成器
      * @param storageResolver   仓库解析器
      */
-    FactoryRunner(MinecraftServer server, FactoryManager manager,
+    FactoryRunner(MinecraftServer server, FactoryLibrary manager,
             ObservationRunner observationRunner, ObservationReader observations,
             IoRunner nodeIoRunner, LiveNodeApply nodeApply, LiveNodeRunner nodeRunner,
 

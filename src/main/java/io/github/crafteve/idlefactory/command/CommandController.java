@@ -6,7 +6,7 @@ import java.util.UUID;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryConfig;
-import io.github.crafteve.idlefactory.factory.FactoryManager;
+import io.github.crafteve.idlefactory.factory.FactoryLibrary;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 
 import io.github.crafteve.idlefactory.machine.Machine;
@@ -167,7 +167,7 @@ public final class CommandController {
         if (runtime == null) {
             return;
         }
-        FactoryManager manager = runtime.manager();
+        FactoryLibrary manager = runtime.manager();
         if (manager.byOwner(player.getUUID()).isPresent()) {
             return;
         }

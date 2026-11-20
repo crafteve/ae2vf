@@ -15,7 +15,8 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 
-import io.github.crafteve.idlefactory.network.NetworkProtocol;
+import io.github.crafteve.idlefactory.network.NetworkLimit;
+import io.github.crafteve.idlefactory.network.NetworkVersion;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
 
 import io.github.crafteve.idlefactory.node.Node;
@@ -92,9 +93,9 @@ public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> node
     }
 
     private static void write(RegistryFriendlyByteBuf buf, WandLinksS2C payload) {
-        int nodeLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxTotalMachines());
         buf.writeBoolean(payload.storageAnchor() != null);
         if (payload.storageAnchor() != null) {
             WandDraftCodec.writeBlockKey(buf, payload.storageAnchor());
@@ -119,9 +120,9 @@ public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> node
     }
 
     private static WandLinksS2C read(RegistryFriendlyByteBuf buf) {
-        int nodeLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = NetworkProtocol.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = NetworkLimit.wireLimit(IdleFactoryConfig.maxTotalMachines());
         BlockKey storageAnchor = buf.readBoolean() ? WandDraftCodec.readBlockKey(buf) : null;
         int nodeCount = readCount(buf, nodeLimit, "节点");
         List<NodeLink> nodes = new ArrayList<>(nodeCount);

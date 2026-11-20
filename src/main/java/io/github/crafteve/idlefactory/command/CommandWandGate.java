@@ -222,7 +222,7 @@ public final class CommandWandGate {
         if (level.getBlockEntity(block.pos()) == null) {
             return BlockCheck.failed(CommandReason.NOT_A_MACHINE);
         }
-        if (!io.github.crafteve.idlefactory.factory.FactoryLinkFinder.isMachine(level, block.pos())) {
+        if (!CommandChain.isMachine(level, block.pos())) {
             return BlockCheck.failed(CommandReason.NOT_A_MACHINE);
         }
         if (factory.config().nodes().machineAt(block).isPresent()) {

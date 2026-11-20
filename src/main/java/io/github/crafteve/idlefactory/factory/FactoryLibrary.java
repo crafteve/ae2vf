@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.node.NodeLibrary;
  * <p>两张表：按工厂 id 查、按拥有者 uuid 查。第一版一人一个工厂，所以 {@code byOwner} 是
  * 一对一；以后做队伍版时把它扩成一对多即可，{@code byId} 不用动。</p>
  */
-public final class FactoryManager {
+public final class FactoryLibrary {
     private final Map<UUID, Factory> byId = new LinkedHashMap<>();
     private final Map<UUID, Factory> byOwner = new HashMap<>();
 

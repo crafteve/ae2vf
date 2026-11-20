@@ -5,7 +5,7 @@ import io.github.crafteve.idlefactory.client.wand.WandSubmitter;
 import io.github.crafteve.idlefactory.command.CommandReason;
 import io.github.crafteve.idlefactory.command.WandChainResult;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
-import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
+import io.github.crafteve.idlefactory.command.CommandChain;
 import io.github.crafteve.idlefactory.key.BlockKey;
 
 import io.netty.handler.codec.DecoderException;
@@ -49,7 +49,7 @@ public record WandChainS2C(WandChainResult result) implements CustomPacketPayloa
     private static void write(RegistryFriendlyByteBuf buf, WandChainS2C payload) {
         WandChainResult result = payload.result();
         buf.writeByte(result.reason().ordinal());
-        WandDraftCodec.writeBlockKeys(buf, result.blocks(), FactoryLinkFinder.MAX_MACHINES);
+        WandDraftCodec.writeBlockKeys(buf, result.blocks(), CommandChain.MAX_MACHINES);
     }
 
     private static WandChainS2C read(RegistryFriendlyByteBuf buf) {
@@ -58,6 +58,6 @@ public record WandChainS2C(WandChainResult result) implements CustomPacketPayloa
             throw new DecoderException("invalid reason ordinal: " + ordinal);
         }
         return new WandChainS2C(new WandChainResult(CommandReason.values()[ordinal],
-                WandDraftCodec.readBlockKeys(buf, FactoryLinkFinder.MAX_MACHINES)));
+                WandDraftCodec.readBlockKeys(buf, CommandChain.MAX_MACHINES)));
     }
 }

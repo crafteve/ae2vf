@@ -59,7 +59,7 @@ public final class FactoryLifecycle {
     private static FactoryLifecycle instance;
 
     private final MinecraftServer server;
-    private final FactoryManager manager = new FactoryManager();
+    private final FactoryLibrary manager = new FactoryLibrary();
     private final IoRunner nodeIoRunner;
     /**
      * 机器侧端口缓存：全服一份，所有工厂与节点共用。
@@ -170,7 +170,7 @@ public final class FactoryLifecycle {
     }
 
     /** 档案柜。 */
-    public FactoryManager manager() {
+    public FactoryLibrary manager() {
         return this.manager;
     }
 

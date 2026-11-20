@@ -13,8 +13,8 @@ import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.claim.BlockOccupancyTable;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryLinkFinder;
-import io.github.crafteve.idlefactory.factory.FactoryRefs;
+import io.github.crafteve.idlefactory.command.CommandChain;
+import io.github.crafteve.idlefactory.factory.FactoryResolver;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.command.WandDraft;
 import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
@@ -100,10 +100,10 @@ public final class CommandWand {
         if (level == null || !level.isLoaded(origin.pos())) {
             return new WandChainResult(CommandReason.BLOCK_UNLOADED, List.of());
         }
-        if (!FactoryLinkFinder.isMachine(level, origin.pos())) {
+        if (!CommandChain.isMachine(level, origin.pos())) {
             return new WandChainResult(CommandReason.NOT_A_MACHINE, List.of());
         }
-        List<BlockPos> found = FactoryLinkFinder.machines(level, origin.pos());
+        List<BlockPos> found = CommandChain.machines(level, origin.pos());
         if (found.isEmpty()) {
             return new WandChainResult(CommandReason.OK, List.of());
         }
@@ -193,7 +193,7 @@ public final class CommandWand {
     private CommandResult connect(Factory factory, ServerLevel level, BlockKey block,
             ServerPlayer player) {
         if (level.getBlockEntity(block.pos()) == null
-                || !FactoryLinkFinder.isMachine(level, block.pos())) {
+                || !CommandChain.isMachine(level, block.pos())) {
             return CommandResult.of(CommandReason.NOT_A_MACHINE);
         }
         if (this.runtime.occupancy().check(block, factory.id(),
@@ -366,6 +366,6 @@ public final class CommandWand {
 
     @Nullable
     private Factory owned(ServerPlayer player) {
-        return FactoryRefs.owned(this.runtime.manager(), player);
+        return FactoryResolver.owned(this.runtime.manager(), player);
     }
 }

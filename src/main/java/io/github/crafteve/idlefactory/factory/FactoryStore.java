@@ -126,7 +126,7 @@ public final class FactoryStore extends SavedData {
      * @param manager    工厂档案柜
      * @param maxPerTick 本 tick 最多写几个
      */
-    public void flushRuntime(FactoryManager manager, int maxPerTick) {
+    public void flushRuntime(FactoryLibrary manager, int maxPerTick) {
         int budget = Math.max(1, maxPerTick);
         int written = 0;
         var iterator = this.runtimeDirty.iterator();
@@ -149,7 +149,7 @@ public final class FactoryStore extends SavedData {
      *
      * @param manager 工厂档案柜
      */
-    public void flushAll(FactoryManager manager) {
+    public void flushAll(FactoryLibrary manager) {
         this.entries.clear();
         for (io.github.crafteve.idlefactory.factory.Factory factory : manager.all()) {
             this.entries.put(factory.id(), toEntry(factory));

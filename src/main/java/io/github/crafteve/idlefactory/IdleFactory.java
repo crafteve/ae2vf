@@ -5,7 +5,8 @@ import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
-import io.github.crafteve.idlefactory.network.NetworkProtocol;
+import io.github.crafteve.idlefactory.network.NetworkLimit;
+import io.github.crafteve.idlefactory.network.NetworkVersion;
 import io.github.crafteve.idlefactory.registry.IdleFactoryCreativeTabs;
 import io.github.crafteve.idlefactory.registry.IdleFactoryItems;
 import io.github.crafteve.idlefactory.registry.IdleFactoryMenus;

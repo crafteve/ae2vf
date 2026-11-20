@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import io.github.crafteve.idlefactory.factory.Factory;
-import io.github.crafteve.idlefactory.factory.FactoryManager;
+import io.github.crafteve.idlefactory.factory.FactoryLibrary;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.observation.Health;
 import io.github.crafteve.idlefactory.observation.ObservationChange;
@@ -25,7 +25,7 @@ import net.minecraft.server.level.ServerPlayer;
  */
 public final class ObservationNoticeListener implements ObservationChangeListener {
     private final MinecraftServer server;
-    private final FactoryManager manager;
+    private final FactoryLibrary manager;
     /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组；tick 末一次性发出。 */
     private final Map<UUID, Integer> missingNotices = new HashMap<>();
     private final Map<UUID, Integer> restoredNotices = new HashMap<>();
@@ -34,7 +34,7 @@ public final class ObservationNoticeListener implements ObservationChangeListene
      * @param server  服务端
      * @param manager 工厂档案柜
      */
-    public ObservationNoticeListener(MinecraftServer server, FactoryManager manager) {
+    public ObservationNoticeListener(MinecraftServer server, FactoryLibrary manager) {
         this.server = server;
         this.manager = manager;
     }

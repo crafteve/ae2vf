@@ -17,8 +17,8 @@ import net.minecraft.server.level.ServerPlayer;
  *
  * <p>P1 删除产线后这里只剩机器：机器只有短 id 一种引用方式。</p>
  */
-public final class FactoryRefs {
-    private FactoryRefs() {
+public final class FactoryResolver {
+    private FactoryResolver() {
         // 纯静态工具类
     }
 
@@ -60,7 +60,7 @@ public final class FactoryRefs {
      * @param player  玩家
      * @return 工厂；没有时为 {@code null}
      */
-    public static Factory owned(FactoryManager manager, ServerPlayer player) {
+    public static Factory owned(FactoryLibrary manager, ServerPlayer player) {
         return manager.byOwner(player.getUUID()).orElse(null);
     }
 }

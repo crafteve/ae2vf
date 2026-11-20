@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory;
+package io.github.crafteve.idlefactory.command;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  * <p>BFS 用显式队列，不用递归 DFS：大型机器群不会爆栈，且能随时按「结果数 / 访问数 / 半径」
  * 三个上限停住。</p>
  */
-public final class FactoryLinkFinder {
+public final class CommandChain {
     /** 一次连锁最多返回多少台机器。 */
     public static final int MAX_MACHINES = 128;
     /** 最多访问多少个方块，防止大面积同 id 方块拖垮服务端。 */
@@ -34,7 +34,7 @@ public final class FactoryLinkFinder {
     /** 连锁半径（格）。 */
     private static final int MAX_RADIUS = 32;
 
-    private FactoryLinkFinder() {
+    private CommandChain() {
         // 纯静态工具类
     }
 

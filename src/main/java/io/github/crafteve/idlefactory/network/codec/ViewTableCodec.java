@@ -14,7 +14,8 @@ import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.network.NetworkProtocol;
+import io.github.crafteve.idlefactory.network.NetworkLimit;
+import io.github.crafteve.idlefactory.network.NetworkVersion;
 import io.github.crafteve.idlefactory.network.codec.AeKeyCodec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
@@ -78,7 +79,7 @@ public final class ViewTableCodec {
      */
     public static ViewTable readTable(RegistryFriendlyByteBuf buf) {
         ViewHeader header = readHeader(buf);
-        int count = readCount(buf, NetworkProtocol.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
+        int count = readCount(buf, NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
         List<ViewNode> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
@@ -154,7 +155,7 @@ public final class ViewTableCodec {
         long baseRevision = buf.readLong();
         long revision = buf.readLong();
         ViewHeader header = buf.readBoolean() ? readHeader(buf) : null;
-        int count = readCount(buf, NetworkProtocol.wireLimit(IdleFactoryConfig.maxNodes()), "diff nodes");
+        int count = readCount(buf, NetworkLimit.wireLimit(IdleFactoryConfig.maxNodes()), "diff nodes");
         List<ViewNodeDiff> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNodeDiff(buf));
