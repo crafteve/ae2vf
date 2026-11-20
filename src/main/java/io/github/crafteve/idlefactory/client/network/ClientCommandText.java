@@ -21,6 +21,9 @@ public final class ClientCommandText {
      * @return 中文文案
      */
     public static String hud(CommandResult result) {
-        return result.ok() ? "已更新仓库锚点" : CommandText.text(result);
+        return result.ok()
+                ? net.minecraft.network.chat.Component
+                        .translatable("idlefactory.command.anchor_updated").getString()
+                : CommandText.text(result);
     }
 }

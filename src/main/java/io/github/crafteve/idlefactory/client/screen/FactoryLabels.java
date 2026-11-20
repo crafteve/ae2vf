@@ -59,7 +59,7 @@ public final class FactoryLabels {
      */
     public static String blockName(@Nullable ResourceLocation blockId) {
         if (blockId == null) {
-            return "未知机器";
+            return tr("idlefactory.common.unknown_machine");
         }
         var block = BuiltInRegistries.BLOCK.get(blockId);
         return block.asItem() == Items.AIR ? blockId.toString() : block.getName().getString();
@@ -125,15 +125,15 @@ public final class FactoryLabels {
      */
     public static String face(@Nullable Direction face) {
         if (face == null) {
-            return "任意";
+            return tr("idlefactory.face.any");
         }
         return switch (face) {
-            case UP -> "上";
-            case DOWN -> "下";
-            case NORTH -> "北";
-            case SOUTH -> "南";
-            case EAST -> "东";
-            case WEST -> "西";
+            case UP -> tr("idlefactory.face.up");
+            case DOWN -> tr("idlefactory.face.down");
+            case NORTH -> tr("idlefactory.face.north");
+            case SOUTH -> tr("idlefactory.face.south");
+            case EAST -> tr("idlefactory.face.east");
+            case WEST -> tr("idlefactory.face.west");
         };
     }
 
@@ -234,15 +234,17 @@ public final class FactoryLabels {
      */
     public static String reason(IoReason reason, boolean input) {
         return switch (reason) {
-            case RUN -> "正常";
-            case SLEEPING -> "休息中";
-            case NO_MATERIAL -> input ? "仓库缺料" : "机器无产出";
-            case FULL -> input ? "机器已满" : "仓库已满";
-            case NO_FACE -> "无可用面";
-            case BUDGET_OUT -> "本轮预算用完";
-            case REJECTED -> "该面拒收";
-            case FACE_CONFIG_INVALID -> "配置面不可用";
-            case ERROR -> "异常";
+            case RUN -> tr("idlefactory.reason.run");
+            case SLEEPING -> tr("idlefactory.reason.sleeping");
+            case NO_MATERIAL -> tr(input
+                    ? "idlefactory.reason.no_material.input" : "idlefactory.reason.no_material.output");
+            case FULL -> tr(input
+                    ? "idlefactory.reason.full.input" : "idlefactory.reason.full.output");
+            case NO_FACE -> tr("idlefactory.reason.no_face");
+            case BUDGET_OUT -> tr("idlefactory.reason.budget_out");
+            case REJECTED -> tr("idlefactory.reason.rejected");
+            case FACE_CONFIG_INVALID -> tr("idlefactory.reason.face_invalid");
+            case ERROR -> tr("idlefactory.reason.error");
         };
     }
 
@@ -252,6 +254,16 @@ public final class FactoryLabels {
      * @param reason 原因
      * @return ARGB 颜色
      */
+    /**
+     * 取一条界面文案。
+     *
+     * @param key 语言键
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
+    }
+
     static int tooltipReasonColor(IoReason reason) {
         return switch (reason) {
             case RUN -> TooltipPalette.OK;
@@ -363,7 +375,7 @@ public final class FactoryLabels {
      */
     static Component state(IoReason reason, boolean input) {
         return Component.empty()
-                .append(colored("状态：", TooltipPalette.LABEL))
+                .append(colored(tr("idlefactory.tooltip.state"), TooltipPalette.LABEL))
                 .append(coloredBold(reason(reason, input), tooltipReasonColor(reason)));
     }
 }

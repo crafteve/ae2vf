@@ -17,6 +17,7 @@ import io.github.crafteve.idlefactory.view.ViewMachine;
 import io.github.crafteve.idlefactory.view.ViewNode;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -75,7 +76,8 @@ public final class SearchFields {
         tooltip.append("\n机器 ").append(machineCount)
                 .append(" 台 · 规则 ").append(ruleCount).append(" 条");
         if (patternCount >= 0) {
-            tooltip.append(" · 样板 ").append(patternCount).append(" 份");
+            tooltip.append(Component.translatable("idlefactory.search.patterns",
+                    patternCount).getString());
         }
         return new SearchQuery.Fields(name, id, namespace,
                 UiResources.modName(namespace), tooltip.toString(), List.of());

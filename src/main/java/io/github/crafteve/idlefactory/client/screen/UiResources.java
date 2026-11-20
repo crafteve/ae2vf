@@ -82,7 +82,9 @@ public final class UiResources {
      * @return 上/下/北/南/东/西/任意
      */
     static String faceName(ResourceSpec spec) {
-        return spec.face() == null ? "任意" : FactoryLabels.face(spec.face());
+        return spec.face() == null
+                ? net.minecraft.network.chat.Component.translatable("idlefactory.face.any").getString()
+                : FactoryLabels.face(spec.face());
     }
 
     /**
