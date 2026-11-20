@@ -265,7 +265,7 @@ final class PassiveIoRender {
         int y = PassiveIoLayout.feButtonY(top);
         boolean hovered = hover != null && hover.kind() == PassiveIoLayout.Kind.ENERGY
                 && hover.block() == box.index();
-        KeycapButton.draw(graphics, this.theme, x, y, PassiveIoLayout.FE_BUTTON,
+        KeycapButton.draw(graphics, x, y, PassiveIoLayout.FE_BUTTON,
                 PassiveIoLayout.FE_BUTTON, this.theme.bevelLight(), true, hovered);
         graphics.pose().pushPose();
         graphics.pose().translate(x + 2, y + 4, 0.0F);
@@ -370,7 +370,7 @@ final class PassiveIoRender {
     private void drawChip(GuiGraphics graphics, int x, int y, String label, int background,
             int textColor, boolean enabled, boolean hovered) {
         int chip = PassiveIoLayout.CHIP;
-        KeycapButton.draw(graphics, this.theme, x, y, chip, chip, background, enabled, hovered);
+        KeycapButton.draw(graphics, x, y, chip, chip, background, enabled, hovered);
         int textX = x + (chip - this.font.width(label)) / 2;
         graphics.drawString(this.font, label, textX, y + 2, textColor, false);
     }

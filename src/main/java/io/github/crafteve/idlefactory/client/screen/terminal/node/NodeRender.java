@@ -169,7 +169,7 @@ final class NodeRender {
         int keyY = top + NodeLayout.KEY_INSET_Y;
         int keyTextY = keyY + 2;
 
-        KeycapButton.draw(graphics, this.theme, NodeLayout.keyX(viewport, 0), keyY,
+        KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 0), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 provider && row.blockingOn()
                         ? this.theme.statusRun() : this.theme.bevelLight(),
@@ -180,7 +180,7 @@ final class NodeRender {
 
         Multiplier multiplier = row.multiplier();
         boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
-        KeycapButton.draw(graphics, this.theme, NodeLayout.keyX(viewport, 1), keyY,
+        KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 1), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 multiplierActive ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
@@ -189,7 +189,7 @@ final class NodeRender {
                 multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
 
         boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
-        KeycapButton.draw(graphics, this.theme, NodeLayout.keyX(viewport, 2), keyY,
+        KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 2), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
@@ -203,7 +203,7 @@ final class NodeRender {
         int deleteX = NodeLayout.deleteX(viewport);
         boolean editing = io.github.crafteve.idlefactory.client.wand.WandDraftState
                 .isEditingNode(row.nodeId());
-        KeycapButton.draw(graphics, this.theme, editX, actionY,
+        KeycapButton.draw(graphics, editX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
                 editing ? this.theme.statusWarn() : this.theme.bevelLight(),
                 true, hovered(hover, box.index(), Kind.EDIT));
@@ -211,7 +211,7 @@ final class NodeRender {
                 NodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
-        KeycapButton.draw(graphics, this.theme, deleteX, actionY,
+        KeycapButton.draw(graphics, deleteX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : this.theme.bevelLight(), true,
                 hovered(hover, box.index(), Kind.DELETE));
@@ -327,7 +327,7 @@ final class NodeRender {
             NineSliceRenderer.icon(graphics, member.status().lamp(),
                     NodeLayout.memberDotX(viewport), y + 6, 3);
             int locateX = NodeLayout.locateX(viewport);
-            KeycapButton.draw(graphics, this.theme, locateX, y + 1, NodeLayout.LOCATE,
+            KeycapButton.draw(graphics, locateX, y + 1, NodeLayout.LOCATE,
                     NodeLayout.MEMBER_ROW_H - 2, this.theme.bevelLight(), true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);

@@ -1,8 +1,5 @@
 package io.github.crafteve.idlefactory.client.screen.paint;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-
-
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
@@ -19,6 +16,10 @@ public final class KeycapButton {
     private static final int HOVER = 0x33FFFFFF;
     /** 灰显遮罩（白色 33%）。 */
     private static final int DISABLED = 0x55FFFFFF;
+    /** 上 / 左亮边。 */
+    private static final int EDGE_LIGHT = 0xFFF2F2F2;
+    /** 下 / 右暗边。 */
+    private static final int EDGE_DARK = 0xFF878FA5;
 
     private KeycapButton() {
         // 纯静态绘制
@@ -28,7 +29,6 @@ public final class KeycapButton {
      * 画一枚键帽。
      *
      * @param graphics   画布
-     * @param theme      当前主题
      * @param x          左边缘
      * @param y          上边缘
      * @param width      宽
@@ -37,13 +37,13 @@ public final class KeycapButton {
      * @param enabled    是否可点
      * @param hovered    是否悬停
      */
-    public static void draw(GuiGraphics graphics, FactoryGuiTheme theme, int x, int y,
+    public static void draw(GuiGraphics graphics, int x, int y,
             int width, int height, int background, boolean enabled, boolean hovered) {
         if (width <= 2 || height <= 2) {
             return;
         }
-        int light = theme.panelBorderLight();
-        int dark = theme.slotBorderDark();
+        int light = EDGE_LIGHT;
+        int dark = EDGE_DARK;
         graphics.fill(x, y, x + width, y + 1, light);
         graphics.fill(x, y + 1, x + 1, y + height - 1, light);
         graphics.fill(x, y + height - 1, x + width, y + height, dark);

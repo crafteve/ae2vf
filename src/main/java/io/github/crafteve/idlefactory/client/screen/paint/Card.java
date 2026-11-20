@@ -1,8 +1,5 @@
 package io.github.crafteve.idlefactory.client.screen.paint;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
-
-
 import net.minecraft.client.gui.GuiGraphics;
 
 /**
@@ -25,6 +22,14 @@ public final class Card {
 
     /** 外侧阴影：所有层级共用同一个颜色和 1px 偏移。 */
     private static final int OUTER_SHADOW = 0x33000000;
+    /** 上 / 左亮边（与 AE2 终端贴图同色）。 */
+    private static final int EDGE_LIGHT = 0xFFF2F2F2;
+    /** 下 / 右暗边。 */
+    private static final int EDGE_DARK = 0xFF878FA5;
+    /** 工作区与 IO 卡片的底色。 */
+    private static final int BACKGROUND_FLAT = 0xFFCBCCD4;
+    /** 机器大卡片的底色，比工作区亮一档。 */
+    private static final int BACKGROUND_MACHINE = 0xFFD8D9DF;
 
     private Card() {
         // 纯静态组件
@@ -46,12 +51,11 @@ public final class Card {
         if (width <= 2 || height <= 2) {
             return;
         }
-        FactoryGuiTheme theme = FactoryGuiTheme.current();
-        graphics.fill(x, y, x + width, y + height, background(level, theme));
-        int light = theme.panelBorderLight();
+        graphics.fill(x, y, x + width, y + height, background(level));
+        int light = EDGE_LIGHT;
         graphics.fill(x, y, x + width, y + 1, light);
         graphics.fill(x, y, x + 1, y + height, light);
-        int dark = theme.slotBorderDark();
+        int dark = EDGE_DARK;
         graphics.fill(x, y + height - 1, x + width, y + height, dark);
         graphics.fill(x + width - 1, y, x + width, y + height, dark);
         if (shadow) {
@@ -60,10 +64,10 @@ public final class Card {
         }
     }
 
-    private static int background(Level level, FactoryGuiTheme theme) {
+    private static int background(Level level) {
         return switch (level) {
-            case WORK_AREA, IO -> theme.panelBg();
-            case MACHINE -> theme.bevelLight();
+            case WORK_AREA, IO -> BACKGROUND_FLAT;
+            case MACHINE -> BACKGROUND_MACHINE;
         };
     }
 }
