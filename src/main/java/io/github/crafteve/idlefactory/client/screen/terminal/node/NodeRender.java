@@ -43,20 +43,26 @@ final class NodeRender {
     /** 悬停底色（白色 12%）。 */
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** 待确认删除的键帽底色。 */
-    /** 模式键的闲置底与分类色：都走低饱和，避免整行被饱和色块压住。 */
+    /** 模式键闲置底：冷灰。 */
     private static final int MODE_IDLE = 0xFFE3E5EE;
-    /** 倍率开启：淡蓝。 */
-    private static final int MODE_BLUE = 0xFFB9CFE6;
-    private static final int MODE_BLUE_TEXT = 0xFF12263A;
-    /** 派单切到轮询：淡紫。 */
-    private static final int MODE_VIOLET = 0xFFCBBFE3;
-    private static final int MODE_VIOLET_TEXT = 0xFF221933;
-    /** 阻挡开启：淡绿。 */
+    /** 倍率关闭：纯白键。 */
+    private static final int MULT_OFF = 0xFFFFFFFF;
+    /** 倍率固定档：浅蓝 + 深蓝字。 */
+    private static final int MULT_BLUE = 0xFFB9CFE6;
+    private static final int MULT_BLUE_TEXT = 0xFF12263A;
+    /** 倍率智能：浅青 + 黑字。 */
+    private static final int MULT_SMART = 0xFF9FD8D2;
+    /** 派单逐台：淡紫；轮询：淡黄。 */
+    private static final int DISPATCH_SEQUENTIAL = 0xFFCBBFE3;
+    private static final int DISPATCH_SEQUENTIAL_TEXT = 0xFF221933;
+    private static final int DISPATCH_ROUND = 0xFFE6D79A;
+    private static final int DISPATCH_ROUND_TEXT = 0xFF33280A;
+    /** 阻挡开启：淡绿 + 深绿字。 */
     private static final int BLOCK_GREEN = 0xFFB7D8B0;
     private static final int BLOCK_GREEN_TEXT = 0xFF14300F;
-    /** 动作键白底与删除字色。 */
-    private static final int ACTION_KEY = 0xFFFFFFFF;
-    private static final int DELETE_TEXT = 0xFF9B1C1C;
+    /** 动作键：编辑冷灰 + 黑字；删除灰红 + 白字。 */
+    private static final int EDIT_KEY = 0xFFDCDEE6;
+    private static final int DELETE_KEY = 0xFFD9A8A8;
     private static final int DELETE_ARMED = 0xFFFF5A5A;
 
     /** 正文色。 */
@@ -202,39 +208,43 @@ final class NodeRender {
         Multiplier multiplier = row.multiplier();
         boolean multiplierActive = multiplier.mode()
                 != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
+        boolean smart = multiplier.mode()
+                == io.github.crafteve.idlefactory.node.MultiplierMode.SMART;
+        int multiplierBg = !multiplierActive ? MULT_OFF
+                : smart ? MULT_SMART : MULT_BLUE;
+        int multiplierText = smart ? 0xFF000000
+                : multiplierActive ? MULT_BLUE_TEXT : TEXT_PRIMARY;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 1), keyY,
-                NodeLayout.KEY_W, NodeLayout.KEY_H,
-                multiplierActive ? MODE_BLUE : MODE_IDLE,
+                NodeLayout.KEY_W, NodeLayout.KEY_H, multiplierBg,
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
         drawLabel(graphics, multiplierLabel(multiplier), NodeLayout.keyX(viewport, 1),
-                NodeLayout.KEY_W, keyTextY,
-                multiplierActive ? MODE_BLUE_TEXT : TEXT_DIM);
+                NodeLayout.KEY_W, keyTextY, multiplierText);
 
         boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 2), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
-                roundRobin ? MODE_VIOLET : MODE_IDLE,
+                roundRobin ? DISPATCH_ROUND : DISPATCH_SEQUENTIAL,
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
         drawLabel(graphics, tr(roundRobin
                 ? "idlefactory.node.label.round_robin" : "idlefactory.node.label.sequential"),
                 NodeLayout.keyX(viewport, 2), NodeLayout.KEY_W, keyTextY,
-                roundRobin ? MODE_VIOLET_TEXT : TEXT_PRIMARY);
+                roundRobin ? DISPATCH_ROUND_TEXT : DISPATCH_SEQUENTIAL_TEXT);
 
-        // 动作键没有开关态：白键 + 深色字，删除字用暗红，避免整行都是饱和色块。
+        // 动作键没有开关态：编辑冷灰 + 黑字，删除灰红 + 白字，和模式键的浅色系统分开。
         int actionY = top + NodeLayout.KEY_INSET_Y;
         int editX = NodeLayout.actionX(viewport);
         int deleteX = NodeLayout.deleteX(viewport);
         KeycapButton.draw(graphics, editX, actionY,
-                NodeLayout.ACTION_W, NodeLayout.ACTION_H, ACTION_KEY,
+                NodeLayout.ACTION_W, NodeLayout.ACTION_H, EDIT_KEY,
                 true, hovered(hover, box.index(), Kind.EDIT));
         drawLabel(graphics, tr("idlefactory.node.label.edit"), editX,
                 NodeLayout.ACTION_W, keyTextY, TEXT_PRIMARY);
 
         KeycapButton.draw(graphics, deleteX, actionY,
-                NodeLayout.ACTION_W, NodeLayout.ACTION_H, ACTION_KEY, true,
+                NodeLayout.ACTION_W, NodeLayout.ACTION_H, DELETE_KEY, true,
                 hovered(hover, box.index(), Kind.DELETE));
         drawLabel(graphics, tr("idlefactory.node.label.delete"), deleteX,
-                NodeLayout.ACTION_W, keyTextY, DELETE_TEXT);
+                NodeLayout.ACTION_W, keyTextY, 0xFFFFFFFF);
     }
 
     /**
