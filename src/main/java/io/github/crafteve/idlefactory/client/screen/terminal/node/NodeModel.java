@@ -84,7 +84,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
     protected List<NodeRow> buildRows(ViewTable table) {
         List<NodeRow> rows = new ArrayList<>(table.nodes().size());
         for (ViewNode view : table.nodes()) {
-            FactoryStatus status = FactoryStatus.of(view.core(), theme());
+            FactoryStatus status = FactoryStatus.of(view.core());
             rows.add(new NodeRow(view, status, displayName(view), members(view, status)));
         }
         return rows;

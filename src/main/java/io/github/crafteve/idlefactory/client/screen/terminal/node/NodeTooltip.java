@@ -41,7 +41,7 @@ final class NodeTooltip {
             return List.of();
         }
         ViewNode node = nodes.get(hit.node());
-        FactoryStatus status = FactoryStatus.of(node.core(), theme);
+        FactoryStatus status = FactoryStatus.of(node.core());
         return switch (hit.kind()) {
             case NODE, NAME -> nodeLines(displayName(node), status, node.core().available(),
                     node.core().blocking().isOn(), node.machineCount(), node.ruleCount(),

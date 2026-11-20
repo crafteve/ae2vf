@@ -47,7 +47,7 @@ public final class SearchFields {
         ViewMachine first = view.machines().isEmpty() ? null : view.machines().get(0);
         return build(view.core().name() != null
                         ? view.core().name() : FactoryLabels.blockName(view.core().typeBlockId()),
-                view.core().typeBlockId(), FactoryStatus.of(view.core(), theme).text(),
+                view.core().typeBlockId(), FactoryStatus.of(view.core()).text(),
                 first == null ? null : first.block().dimension().location().toString(),
                 first == null ? null : first.block().pos(),
                 view.machineCount(), view.ruleCount(), patternCount);

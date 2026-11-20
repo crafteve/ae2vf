@@ -229,7 +229,7 @@ final class NodeRender {
      */
     private CardData cardOf(ViewNode node) {
         ViewNodeCore core = node.core();
-        FactoryStatus status = FactoryStatus.of(core, this.theme);
+        FactoryStatus status = FactoryStatus.of(core);
         List<MemberCardData> members = new ArrayList<>(node.machines().size());
         for (int i = 0; i < node.machines().size(); i++) {
             ViewMachine machine = node.machines().get(i);

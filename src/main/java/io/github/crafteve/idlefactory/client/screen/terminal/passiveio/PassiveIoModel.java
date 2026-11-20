@@ -137,7 +137,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
     protected List<BlockView> buildRows(ViewTable table) {
         List<BlockView> blocks = new ArrayList<>(table.nodes().size());
         for (ViewNode node : table.nodes()) {
-            blocks.add(new BlockView(node, FactoryStatus.of(node.core(), theme()), rules(node)));
+            blocks.add(new BlockView(node, FactoryStatus.of(node.core()), rules(node)));
         }
         return blocks;
     }
