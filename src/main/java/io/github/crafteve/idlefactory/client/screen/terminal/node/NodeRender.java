@@ -1,5 +1,7 @@
 package io.github.crafteve.idlefactory.client.screen.terminal.node;
 
+import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;
+
 import io.github.crafteve.idlefactory.client.wand.WandDraftState;
 
 import java.util.ArrayList;
@@ -43,12 +45,19 @@ final class NodeRender {
     /** 待确认删除的键帽底色。 */
     private static final int DELETE_ARMED = 0xFFFF5A5A;
 
-    private final Font font;
-    private final FactoryGuiTheme theme;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 键帽亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 机器行深色带。 */
+    private static final int IO_ROW = 0xFFA9AAB8;
 
-    NodeRender(Font font, FactoryGuiTheme theme) {
+    private final Font font;
+
+    NodeRender(Font font) {
         this.font = font;
-        this.theme = theme;
     }
 
     /**
@@ -112,7 +121,7 @@ final class NodeRender {
         if (rows.isEmpty()) {
             graphics.drawString(this.font, emptyText,
                     viewport.x() + (viewport.width() - this.font.width(emptyText)) / 2,
-                    viewport.y() + 12, this.theme.textDim(), false);
+                    viewport.y() + 12, TEXT_DIM, false);
             return;
         }
         for (NodeBox box : layout.boxes()) {
@@ -144,7 +153,7 @@ final class NodeRender {
         int right = NodeLayout.cardRight(viewport) - 1;
         int bandTop = top + 1;
         int bandBottom = top + NodeLayout.NODE_ROW_H - 1;
-        graphics.fill(left, bandTop, right, bandBottom, this.theme.io().machineRow());
+        graphics.fill(left, bandTop, right, bandBottom, IO_ROW);
         StatusBar.draw(graphics, left, bandTop, bandBottom - bandTop, row.status().color());
 
         int slotX = NodeLayout.nameX(viewport) - NodeLayout.SLOT - 1;
@@ -162,7 +171,7 @@ final class NodeRender {
 
         String name = ellipsize(row.name(), NodeLayout.nameWidth(viewport));
         graphics.drawString(this.font, name, NodeLayout.nameX(viewport), top + 6,
-                this.theme.textPrimary(), false);
+                TEXT_PRIMARY, false);
         drawStatusHints(graphics, viewport, row, top);
 
         boolean provider = row.available();
@@ -172,30 +181,30 @@ final class NodeRender {
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 0), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
                 provider && row.blockingOn()
-                        ? this.theme.statusRun() : this.theme.bevelLight(),
+                        ? StatusColor.RUN : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.BLOCKING));
         drawLabel(graphics, "阻", NodeLayout.keyX(viewport, 0), NodeLayout.KEY_W,
                 keyTextY, provider && row.blockingOn()
-                        ? 0xFFFFFFFF : this.theme.textPrimary());
+                        ? 0xFFFFFFFF : TEXT_PRIMARY);
 
         Multiplier multiplier = row.multiplier();
         boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 1), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
-                multiplierActive ? this.theme.statusRun() : this.theme.bevelLight(),
+                multiplierActive ? StatusColor.RUN : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
         drawLabel(graphics, multiplierLabel(multiplier), NodeLayout.keyX(viewport, 1),
                 NodeLayout.KEY_W, keyTextY,
-                multiplierActive ? 0xFFFFFFFF : this.theme.textDim());
+                multiplierActive ? 0xFFFFFFFF : TEXT_DIM);
 
         boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 2), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
-                roundRobin ? this.theme.statusRun() : this.theme.bevelLight(),
+                roundRobin ? StatusColor.RUN : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
         drawLabel(graphics, roundRobin ? "轮" : "序", NodeLayout.keyX(viewport, 2),
                 NodeLayout.KEY_W, keyTextY,
-                roundRobin ? 0xFFFFFFFF : this.theme.textDim());
+                roundRobin ? 0xFFFFFFFF : TEXT_DIM);
 
         // 编辑 / 删除与 provider 键同规格、横向并排；内区只画 + / × 字形。
         int actionY = top + NodeLayout.KEY_INSET_Y;
@@ -205,18 +214,18 @@ final class NodeRender {
                 .isEditingNode(row.nodeId());
         KeycapButton.draw(graphics, editX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
-                editing ? this.theme.statusWarn() : this.theme.bevelLight(),
+                editing ? StatusColor.WARN : BEVEL_LIGHT,
                 true, hovered(hover, box.index(), Kind.EDIT));
         drawPlus(graphics, editX, actionY, NodeLayout.ACTION_W,
-                NodeLayout.ACTION_H, editing ? 0xFFFFFFFF : this.theme.textPrimary());
+                NodeLayout.ACTION_H, editing ? 0xFFFFFFFF : TEXT_PRIMARY);
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
         KeycapButton.draw(graphics, deleteX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
-                armed ? DELETE_ARMED : this.theme.bevelLight(), true,
+                armed ? DELETE_ARMED : BEVEL_LIGHT, true,
                 hovered(hover, box.index(), Kind.DELETE));
         drawCross(graphics, deleteX, actionY, NodeLayout.ACTION_W,
-                NodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
+                NodeLayout.ACTION_H, armed ? 0xFFFFFFFF : StatusColor.ERROR);
     }
 
     /**
@@ -323,23 +332,23 @@ final class NodeRender {
             graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon, 0, 0);
             graphics.pose().popPose();
             graphics.drawString(this.font, member.label(), NodeLayout.memberTextX(viewport),
-                    y + 4, this.theme.textPrimary(), false);
+                    y + 4, TEXT_PRIMARY, false);
             NineSliceRenderer.icon(graphics, member.status().lamp(),
                     NodeLayout.memberDotX(viewport), y + 6, 3);
             int locateX = NodeLayout.locateX(viewport);
             KeycapButton.draw(graphics, locateX, y + 1, NodeLayout.LOCATE,
-                    NodeLayout.MEMBER_ROW_H - 2, this.theme.bevelLight(), true,
+                    NodeLayout.MEMBER_ROW_H - 2, BEVEL_LIGHT, true,
                     hover != null && hover.kind() == Kind.LOCATE && hover.node() == box.index()
                             && hover.member() == i);
             drawLabel(graphics, "定", locateX, NodeLayout.LOCATE, y + 3,
-                    this.theme.textPrimary());
+                    TEXT_PRIMARY);
         }
         if (box.totalMembers() > box.shownMembers()) {
             int y = NodeLayout.moreRowY(viewport, box, scroll);
             int x = NodeLayout.memberX(viewport);
             graphics.drawString(this.font,
                     "… " + (box.totalMembers() - box.shownMembers()) + " 台", x + 4, y + 3,
-                    this.theme.textDim(), false);
+                    TEXT_DIM, false);
         }
     }
 

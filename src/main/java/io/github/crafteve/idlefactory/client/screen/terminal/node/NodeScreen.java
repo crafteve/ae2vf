@@ -187,7 +187,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.imageHeight = terminal.getScreenHeight(this.rows);
         super.init();
         this.setTextHidden("entriesShown", true);
-        this.render = new NodeRender(this.font, FactoryGuiTheme.current());
+        this.render = new NodeRender(this.font);
         this.confirmDialog = new FactoryConfirmDialog(this.font, FactoryGuiTheme.current());
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
