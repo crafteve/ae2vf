@@ -977,3 +977,31 @@
 - 协议不变：`IoReason` 的枚举 ordinal 与声明顺序未动，`PROTOCOL_VERSION` 仍为 36。
 - `AGENTS.md` §2.1 已同步两张后缀表与第 9 条硬条款；§6.3 记录本次偏差修正。
 - `node` 包按用户要求暂不动：`Multiplier` → `MultiplierSpec`、`ScaledPatternDetails` → `ScaledPattern` 仍待办。
+
+---
+
+## ADR-044 视图表：一条读通道与客户端重组
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. **读侧只有一张表**。服务端在 `FactoryRunner` 里把工厂状态聚合成 `ViewTable`（`ViewHeader` + 节点列表：`ViewNode` / `ViewNodeCore` / `ViewIoRule` / `ViewMachine`），客户端只做展示映射。`MachineSnapshot` / `NodeSnapshot` / `ProviderSnapshot` / `NodeStatus` / `NodeStatusBuilder` / `TotalState` 与协议 32 的「节点表 + 机器表」两张快照全部删除。
+2. **聚合口径不变**：原 `NodeStatusResolver` 的 any / all 规则原样搬进 `ViewTableBuilder`（未探测优先、过期其次、失联 / 缺机再次、最后看活动），`INPUT_BLOCKED` 的 200 tick 宽限常量保留。
+3. **两段式下发**：整表分页（`ViewTableS2C`，按 16 KiB 预算切页）与差量（`ViewTableDiffS2C`，`ViewIoRule.identity()` 做行身份、`machineId` 做机器身份）。`ViewPort` 是唯一出口，`PROTOCOL_VERSION` = 41。
+4. **客户端结构**：`client` 拆 `world`（世界高亮）/ `wand`（绑定杖输入与草稿）/ `network`（报文投递）/ `screen`；两个终端分到 `terminal.node` 与 `terminal.passiveio`，共用 `TerminalSource`（分页拼装与差量应用）、`TerminalModel`（搜索 / 排序 / 玩家上下文）、`TerminalChrome`（外壳与标题）。
+5. **命名**：客户端类去掉 `Factory` 前缀（`NodeScreen` / `PassiveIoModel` / `WandHud` …）；排序键与上下文进 `screen.sort`（`SortKey` / `SortContext`），搜索字段进 `screen.search.SearchFields`；`ResourceKeyCodec` → `AeKeyCodec`，`NoticeHandler` → `ObservationNoticeListener`，`ModNetwork` → `IdleFactoryNetwork`。
+6. **颜色与文案**：删除 `FactoryGuiTheme`，颜色归属组件（`paint/StatusColor` 集中四色）；界面文案走 `idlefactory.*` 语言键（中英各一份），代码里不再有中文字面量。
+7. **绑定杖链接快照**带仓库锚点：`WandLinksS2C(storageAnchor, nodes)`，锚点先编码、再编码节点数。
+
+**理由**：
+
+- 两条并行的读通道（节点表 + 机器表）需要客户端自己按节点合并，聚合规则必然漂移；一张表把口径钉在服务端。
+- 分页 + 差量让首屏与后续 tick 都不必整表重发，同时保留「客户端零聚合」。
+- 客户端按「数据源 / 模型 / 排版 / 绘制 / 交互 / 外壳」切分，才可能让两个终端真正共用一套基座。
+
+**后果**：
+
+- 协议号 41；旧的两张表负载与客户端 Handler 已删，没有兼容层。
+- `AGENTS.md` §2.1 / §2.4 / §3.2 / §5.4 / §6.1–6.3 已同步；`docs/README.md` 与 `README.md` 的结构说明同步更新。
+- 偏差记录：多出 `ViewTableCodec` 一个编解码文件；`FactoryLifecycle.stop()` 额外调用 `ViewPort.clear()`；客户端 `TerminalFrame` 已并入 `TerminalChrome`，`PassiveIoScroll` 已删除（直连 AE2 `Scrollbar`）。

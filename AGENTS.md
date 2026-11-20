@@ -29,7 +29,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | MC / NeoForge | 1.21.1 / 21.1.264 |
 | Java / Gradle / ModDevGradle | 21 / 9.2.1 / 2.0.148 |
 | Parchment | 2024.11.17 |
-| modid / 版本 / 分支 | `idlefactory` / 0.1.0 / `slim-20261110`（轻量化分支，从 `1.21.1neoforge` 快进而来） |
+| modid / 版本 / 分支 | `idlefactory` / 0.1.0 / `view-client-refactor-20261120`（视图表与客户端重构；从快进后的 `1.21.1neoforge` 切出） |
 | AE2 | 19.2.10，`implementation`，硬依赖 |
 | JEI | 19.21.1.304，`compileOnly + runtimeOnly`，可选 |
 | Mekanism | 10.7.19.85，仅 `localRuntime`，本地测试用 |
@@ -53,13 +53,13 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `node` | 节点配置数据：`Node` / `NodeIo` / `NodeIoRules` / `NodeCraft` / `NodeDispatchQueue` / `NodeDispatchOrder` / `NodeLibrary` / `NodeCodec` | 世界探测、搬运、存档根 |
 | `claim` | 方块占用表（机器 / 仓库锚点唯一性） | 世界探测 |
 | `command` | 唯一写入口：`FactoryCommand` 信封、`CommandController`、门禁、执行、拓扑、绑定杖、回执与原因 | 存储实现、界面 |
-| `view` | 只读快照与状态：`MachineSnapshot` / `NodeSnapshot` / `ProviderSnapshot` / `NodeStatus` / `TotalState` / `NodeStatusBuilder` | 持久化、世界探测 |
+| `view` | 视图表：`ViewTable` / `ViewHeader` / `ViewNode`（内嵌 `Activity`）/ `ViewNodeCore` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewNodeDiff` / `ViewTableBuilder` | 持久化、世界探测、配置写入 |
 | `config` / `resource` / `location` | 配置项；`AEKey` 适配；`BlockKey` | 业务逻辑 |
 | `event` / `registry` | 绑定杖世界事件；MenuType 注册 | 业务逻辑 |
 | `menu` | 菜单与玩家槽位 | 工厂数据 |
-| `network` | 协议、负载、`CommandPort`、`NoticeHandler`（失联提示） | 业务判断 |
-| `client` | 客户端入口、世界链接、绑定杖、按键 | 工厂界面细节 |
-| `client.screen` | 两个终端界面（`terminal` 子包）、共享渲染组件（主题 / 九宫格 / 文案 / 搜索 / 图标 / 排序） | 服务端状态 |
+| `network` | 协议、负载、`ViewPort`（视图出口）、`CommandPort`、`ObservationNoticeListener`（失联提示） | 业务判断 |
+| `client` | 客户端入口与四个子包：`world`（世界高亮）、`wand`（绑定杖输入与草稿）、`network`（报文投递）、`screen`（界面） | 工厂数据、服务端状态 |
+| `client.screen` | 两个终端界面（`terminal.node` / `terminal.passiveio`）、共享组件（`paint` 卡片与键帽、`theme` 层序与贴图、`text` 文案、`search`、`sort`、`wand`） | 服务端状态 |
 | `integration` | AE2 / Applied Flux / JEI / jecharacters 适配 | 核心逻辑 |
 
 命名后缀固定：
@@ -113,11 +113,11 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 禁止布尔盲参数：不写 `foo(true, false)`，用枚举或具名类型。
 - 物品身份 = `AEItemKey`（注册名 + 数据组件），相等性直接用它自己的实现，不再自己对齐。
 - `ResourceSpec` 的 `MatchMode` 决定规则是否比较组件；旧档缺 `Mode` 的物品规则按 `IGNORE_COMPONENTS` 读入。
-- 规则落盘时整个 key 交给 `AEKey.toTagGeneric` / `fromTagGeneric`，网络统一走 `AEKey.STREAM_CODEC`（经 `ResourceKeyCodec` 薄包装）。
+- 规则落盘时整个 key 交给 `AEKey.toTagGeneric` / `fromTagGeneric`，网络统一走 `AEKey.STREAM_CODEC`（经 `AeKeyCodec` 薄包装）。
 
 ### 2.4 其余包
 
-`runtime` 活节点 · `claim` 占用表 · `view` 只读快照与状态 · `command` 唯一写入口 · `event` 绑定杖世界事件 · `registry` MenuType · `menu` 两个终端菜单宿主与 36 个玩家槽位 · `network` 协议版本、负载、快照出口、失联提示 · `client` 客户端入口/世界链接/绑定杖/按键 · `client.screen.terminal` 两个终端界面（节点管理、被动 IO 配置），共享渲染组件在 `client.screen` 根下，类名统一 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `event` 绑定杖世界事件 · `registry` MenuType · `menu` 两个终端菜单宿主与 36 个玩家槽位 · `network` 协议版本、负载、视图出口（`ViewPort`）、失联提示（`ObservationNoticeListener`） · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -140,18 +140,18 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 风格：AE2 终端浅色、立体、科幻。不发挥。
 
-- 唯色源 `FactoryGuiTheme.AE2`；状态用 `statusRun / statusWarn / statusError / statusIdle` 四色。`DARK` 只保留，不用。
+- 颜色归属组件：卡片、键帽、状态、tooltip、输入框、各终端 Render 各自持有色值常量；状态四色集中在 `paint/StatusColor`（`RUN / WARN / ERROR / IDLE`）。不再有集中主题类。
 - 立体感只来自贴图：九宫格边框、内凹斜边、上/左深阴影、下/右高光、深色机器卡片。表格外层保留「深色 + 白色」双像素框。
 - 嵌套立体：下拉框本身是立体框，选项各自也是小立体框。
 - 1px 像素精度：线条不糊、不对齐就重画；槽位保留格子感与悬停/选中动画。
 - 图标主导，少文字：物品、机器、状态优先用图标 + 颜色 + 动画表达。
 - 排序入口固定在两个终端的左侧工具栏：帮助 → 终端高度 → 档位 → 方向 →（被动 IO 再加视图切换）。档位 / 方向按钮沿用 AE2 工具栏按钮规格；自绘图标（状态 / IO 规则数 / 距离）由 `tools/gui/gen_textures.py` 生成，16×16、白 `#F2F2F2` + 右下 1px `#4D4D67` 阴影，Java 只 blit。
 - 状态表达：灯色 + 文字色 + 1px 状态条；列宽自适应，压缩机器名与状态，信息列优先。
-- 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步 `FactoryGuiTheme`。
+- 贴图由 `tools/gui/gen_textures.py` 离线生成，Java 只 blit。禁止手改 PNG；改色必须同步生成脚本与使用该贴图的组件常量。
 - 流体 / FE 图标按 AE2 风格：流体 still 贴图染色，FE 用 Applied Flux 图标（未装时绿色水贴图兜底）；物品用原版装饰层补耐久条。
 - 仓库格数量：物品 / FE 最多 4 字符、流体最多 5 字符，缩放 0.666；完整精度只放 tooltip 与速率。
 - 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
-- 几何只在各自的 `*Layout`（`FactoryNodeLayout` / `FactoryPassiveIoLayout`）。溢出先让位，不许压到相邻区域。
+- 几何只在各自的 `*Layout`（`NodeLayout` / `PassiveIoLayout`）。溢出先让位，不许压到相邻区域。
 - 绘制层级由各终端屏幕自己的 `draw` 顺序决定：底 → 内容 → 物品 → 数量 → 浮层 → tooltip。浮层必须高于数量层，否则会被物品数量盖住；tooltip 由原版固定在最后。不要在调用点写 z 魔法数。
 - 尺寸问题先看 `logs/latest.log` 的 `Idle Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Didlefactory.gutter` 现场调。
 
@@ -236,7 +236,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
 - `.tmp/` 是 Agent 的临时工作目录（审查报告、校验脚本、diff 落盘）。它已被 git 忽略，**禁止 Agent 私自删除**；确需清理必须先征得用户同意，且只删自己本轮新建的文件，不得整目录清空。
-- 当前分支 `slim-20261110`（轻量化分支）；`1.21.1neoforge` 已快进到同一提交，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
+- 当前分支 `view-client-refactor-20261120`（视图表与客户端重构）；`1.21.1neoforge` 已快进并含本轮文档提交，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
 
 ### 5.5 草稿纸（讨论文档）
 
@@ -267,7 +267,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryManager.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `NodeStatus.java` · `NodeStatusBuilder.java` · `TotalState.java` · `NoticeHandler.java` · `FactoryNodeScreen.java` · `FactoryPassiveIoScreen.java` · `FactoryLabels.java` · `FactoryGuiTheme.java` · `FactoryNineSlice.java` · `FactorySortKey.java`（排序比较链） · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryManager.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `FactorySortMode.java`（档位与循环顺序） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -286,9 +286,9 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 浮层的绘制顺序写在终端屏幕的 `draw` 里，浮层必须排在物品与数量之后；被数量盖住基本都是顺序写错。
 15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
-16. 失联是运行时状态，不写档；`NoticeHandler` 按工厂聚合、10 秒节流发 actionbar，`UNLOADED` 不通知。只有显式删除机器才删规则。
+16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、10 秒节流发 actionbar，`UNLOADED` 不通知。只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
-18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `FactoryResourceIconRender`，R/U 走 `addIngredientInfo` 的 FE 信息页。
+18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `ResourceIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
     - **派活前把方向写死**：资源类型范围、可选附属的归属、存档兼容策略、包名与命名。方向没定死不要开工；确实要改，先停下来把已改的部分收口到可提交状态再改。
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
@@ -298,6 +298,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议 41），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键。
 - 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
 - 2026-11-11 修正 §1.2：原文写「主动合成未实现」，与代码不符（`NodeCraftService`、
