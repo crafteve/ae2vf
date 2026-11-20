@@ -26,6 +26,12 @@ import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortS2C;
 
+import io.github.crafteve.idlefactory.network.payload.ViewTableDiffS2C;
+
+import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
+
+import io.github.crafteve.idlefactory.network.payload.ViewTableS2C;
+
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainC2S;
 
 import io.github.crafteve.idlefactory.network.payload.wand.WandChainS2C;
@@ -41,14 +47,13 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前包含机器表、仓库快照、IO 规则动作、编辑反馈、界面打开请求、被动 IO 视图同步、
- * 两个终端共用的排序偏好同步、绑定杖操作与三层链接快照。绑定杖的 1:1 toggle、连锁、草稿预校验
- * 与提交各有独立的请求 / 回执包，不再复用仓库动作包。改包结构时记得递增
+ * <p>当前同时挂两条读通道：旧的机器表 / 节点表（第 3c 步删除）与新的视图表（全量页 + 差量），
+ * 另有写命令、被动 IO 视图偏好、排序偏好、绑定杖链接快照与三层绑定杖包。改包结构时记得递增
  * {@link #PROTOCOL_VERSION}。</p>
  */
-public final class ModNetwork {
+public final class IdleFactoryNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
-    public static final String PROTOCOL_VERSION = "39";
+    public static final String PROTOCOL_VERSION = "40";
 
     /**
      * 线协议固定的条目硬上限（每个包）。
@@ -61,7 +66,7 @@ public final class ModNetwork {
     /** 由 {@link RegisterPayloadHandlersEvent} 创建，事件回调之后才非空。 */
     private static PayloadRegistrar registrar;
 
-    private ModNetwork() {
+    private IdleFactoryNetwork() {
         // 纯静态工具类
     }
 
@@ -71,7 +76,7 @@ public final class ModNetwork {
      * @param modEventBus mod 事件总线
      */
     public static void register(IEventBus modEventBus) {
-        modEventBus.addListener(ModNetwork::onRegisterPayloadHandlers);
+        modEventBus.addListener(IdleFactoryNetwork::onRegisterPayloadHandlers);
     }
 
     /**
@@ -121,6 +126,14 @@ public final class ModNetwork {
                 FactoryLinksRequestC2S::handle);
         registrar.playToClient(FactoryLinksS2C.TYPE, FactoryLinksS2C.STREAM_CODEC,
                 FactoryLinksS2C::handle);
+
+        // 视图表：请求、全量分页、差量（读侧唯一通道，第 3c 步后旧两对包删除）
+        registrar.playToServer(ViewTableRequestC2S.TYPE, ViewTableRequestC2S.STREAM_CODEC,
+                ViewTableRequestC2S::handle);
+        registrar.playToClient(ViewTableS2C.TYPE, ViewTableS2C.STREAM_CODEC,
+                ViewTableS2C::handle);
+        registrar.playToClient(ViewTableDiffS2C.TYPE, ViewTableDiffS2C.STREAM_CODEC,
+                ViewTableDiffS2C::handle);
 
         // 节点管理终端：节点表请求 / 回包
         registrar.playToServer(FactoryNodeTableRequestC2S.TYPE,

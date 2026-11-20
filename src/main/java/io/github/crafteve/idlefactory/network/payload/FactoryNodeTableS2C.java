@@ -19,7 +19,7 @@ import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.node.Node;
-import io.github.crafteve.idlefactory.network.ModNetwork;
+import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
 import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 
@@ -94,7 +94,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         int containerId = buf.readVarInt();
         boolean hasFactory = buf.readBoolean();
         boolean storageOnline = buf.readBoolean();
-        int count = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
+        int count = readCount(buf, IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes()), "nodes");
         List<NodeSnapshot> nodes = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             nodes.add(readNode(buf));
@@ -142,7 +142,7 @@ public record FactoryNodeTableS2C(int containerId, boolean hasFactory, boolean s
         Multiplier multiplier = new Multiplier(readEnum(buf, MultiplierMode.values(), "multiplier mode"),
                 buf.readVarInt());
         DispatchMode dispatch = readEnum(buf, DispatchMode.values(), "dispatch");
-        int memberCount = readCount(buf, ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode()),
+        int memberCount = readCount(buf, IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode()),
                 "members");
         List<MemberSnapshot> members = new ArrayList<>(memberCount);
         for (int i = 0; i < memberCount; i++) {

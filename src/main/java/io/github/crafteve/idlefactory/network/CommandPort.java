@@ -4,8 +4,7 @@ import io.github.crafteve.idlefactory.command.CommandController;
 import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.command.FactoryCommand;
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandS2C;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -15,9 +14,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 写命令的网络端口：解码后的命令在这里落地，并决定回执与快照怎么发。
  *
- * <p>控制器只回 {@link CommandResult}，本类负责三件事：系统命令不回执、屏幕命令投
- * {@code FactoryCommandS2C}、按种类推一份新快照。世界命令（{@code containerId = -1}）
- * 不推屏幕快照，由调用方自己的通道同步。</p>
+ * <p>控制器只回 {@link CommandResult}，本类负责两件事：系统命令不回执、屏幕命令投
+ * {@code FactoryCommandS2C}。写入成功后按工厂刷新视图表，世界命令与屏幕命令走同一条路。</p>
  */
 public final class CommandPort {
     private CommandPort() {
@@ -44,29 +42,27 @@ public final class CommandPort {
             PacketDistributor.sendToPlayer(player, new FactoryCommandS2C(command.containerId(),
                     command.kind(), command.requestSeq(), result));
         }
-        sendSnapshot(player, command);
+        if (result.ok()) {
+            refreshView(player);
+        }
     }
 
     /**
-     * 动作完成后立即推一份新快照。
+     * 写命令成功后刷新视图表。
      *
-     * <p>推哪种表由**当前打开的菜单**决定，而不是命令种类：节点终端的阻挡 / 倍率 / 派单
-     * 与被动 IO 终端的规则动作都改同一份配置，但要看的表不同。按种类写死会把节点终端的
-     * 设置动作推成机器表，界面只能等下一次 20 tick 轮询，表现为「节点设置慢半拍」。</p>
+     * <p>按<b>工厂</b>刷新而不是按当前菜单类型：节点终端的阻挡 / 倍率 / 派单与被动 IO 终端的
+     * 规则动作改的是同一份配置，两个终端读的也是同一张视图表；世界命令（{@code containerId = -1}）
+     * 同样会改变表，已打开的终端也该立刻看到。</p>
      *
-     * @param player  玩家
-     * @param command 命令
+     * <p>没有打开的终端时 {@link ViewPort#refresh} 直接返回——没有基线就没有差量可算。</p>
+     *
+     * @param player 发命令的玩家
      */
-    private static void sendSnapshot(ServerPlayer player, FactoryCommand command) {
-        if (command.containerId() < 0
-                || player.containerMenu.containerId != command.containerId()) {
-            // 世界命令没有终端；界面已经关掉时也不必再推。
+    private static void refreshView(ServerPlayer player) {
+        FactoryLifecycle runtime = FactoryLifecycle.get();
+        if (runtime == null) {
             return;
         }
-        if (player.containerMenu instanceof FactoryNodeMenu) {
-            FactoryNodeSnapshots.send(player, command.containerId());
-        } else if (player.containerMenu instanceof FactoryPassiveIoMenu) {
-            FactoryTableSnapshots.send(player, command.containerId());
-        }
+        runtime.manager().byOwner(player.getUUID()).ifPresent(ViewPort::refresh);
     }
 }

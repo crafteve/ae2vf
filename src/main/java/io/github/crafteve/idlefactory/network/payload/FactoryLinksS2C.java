@@ -13,7 +13,7 @@ import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 
-import io.github.crafteve.idlefactory.network.ModNetwork;
+import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
 import io.github.crafteve.idlefactory.command.WandDraftCodec;
 
 import io.github.crafteve.idlefactory.node.Node;
@@ -89,9 +89,9 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
     }
 
     private static void write(RegistryFriendlyByteBuf buf, FactoryLinksS2C payload) {
-        int nodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
         int nodeCount = Math.min(payload.nodes().size(), nodeLimit);
         buf.writeVarInt(nodeCount);
         int writtenMachines = 0;
@@ -112,9 +112,9 @@ public record FactoryLinksS2C(List<NodeLink> nodes) implements CustomPacketPaylo
     }
 
     private static FactoryLinksS2C read(RegistryFriendlyByteBuf buf) {
-        int nodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxNodes());
-        int machinePerNodeLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
-        int totalLimit = ModNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
+        int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
+        int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
         int nodeCount = readCount(buf, nodeLimit, "节点");
         List<NodeLink> nodes = new ArrayList<>(nodeCount);
         int readMachines = 0;

@@ -2,7 +2,11 @@ package io.github.crafteve.idlefactory.menu;
 
 import appeng.menu.AEBaseMenu;
 
+import io.github.crafteve.idlefactory.network.ViewPort;
+
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 
 /**
@@ -32,5 +36,20 @@ public final class FactoryNodeMenu extends AEBaseMenu {
      */
     public FactoryNodeHost host() {
         return this.host;
+    }
+
+    /**
+     * 关闭终端时注销视图会话。
+     *
+     * <p>最后一个会话关闭后服务端丢弃差量基线，重开走全量（草稿 23 的"节奏一"）。</p>
+     *
+     * @param player 关闭终端的玩家
+     */
+    @Override
+    public void removed(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
+            ViewPort.close(serverPlayer);
+        }
+        super.removed(player);
     }
 }

@@ -29,6 +29,7 @@ import io.github.crafteve.idlefactory.observation.WorldEventListener;
 import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
 import io.github.crafteve.idlefactory.network.NoticeHandler;
+import io.github.crafteve.idlefactory.network.ViewPort;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
 import net.minecraft.server.MinecraftServer;
@@ -157,6 +158,8 @@ public final class FactoryLifecycle {
         runtime.runner = null;
         runtime.notices.clear();
         runtime.lastAcceptedSeq.clear();
+        // 视图出口的会话与差量基线都是静态内存：不跟着实例清掉会跨存档残留。
+        ViewPort.clear();
         instance = null;
     }
 
