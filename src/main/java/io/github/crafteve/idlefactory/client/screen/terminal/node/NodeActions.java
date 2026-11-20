@@ -76,7 +76,8 @@ final class NodeActions {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
                 || !minecraft.level.dimension().location().equals(dimension)) {
-            message(tr("idlefactory.node.locate.other_dimension", dimension, pos.toShortString()));
+            message(tr("idlefactory.node.locate.other_dimension", dimension.toString(),
+                    pos.toShortString()));
             return;
         }
         LocateRenderer.show(minecraft.level.dimension(), pos);

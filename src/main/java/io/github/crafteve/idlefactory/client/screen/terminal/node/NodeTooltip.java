@@ -97,7 +97,8 @@ final class NodeTooltip {
         if (!node.machines().isEmpty()) {
             ViewMachine first = node.machines().get(0);
             lines.add(keyed("idlefactory.node.tooltip.position",
-                    first.block().dimension().location(), first.block().pos().toShortString()));
+                    first.block().dimension().location().toString(),
+                    first.block().pos().toShortString()));
         }
         lines.add(hint(Component.translatable("idlefactory.node.tooltip.node.hint")));
         return lines;
@@ -122,7 +123,8 @@ final class NodeTooltip {
         List<Component> lines = new ArrayList<>(4);
         lines.add(bold(Component.literal(label)));
         lines.add(hint(Component.translatable("idlefactory.node.tooltip.member.position",
-                machine.block().dimension().location(), machine.block().pos().toShortString())));
+                machine.block().dimension().location().toString(),
+                machine.block().pos().toShortString())));
         lines.add(hint(Component.literal(machine.health().describe())));
         lines.add(hint(Component.translatable("idlefactory.node.tooltip.member.locate")));
         return lines;
@@ -132,7 +134,7 @@ final class NodeTooltip {
         return List.of(
                 bold(Component.translatable("idlefactory.node.tooltip.locate")),
                 hint(Component.translatable("idlefactory.node.tooltip.member.position",
-                        machine.block().dimension().location(),
+                        machine.block().dimension().location().toString(),
                         machine.block().pos().toShortString())),
                 hint(Component.translatable("idlefactory.node.tooltip.locate.hint")));
     }
