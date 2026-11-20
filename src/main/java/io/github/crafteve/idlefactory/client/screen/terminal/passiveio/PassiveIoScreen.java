@@ -52,6 +52,7 @@ import io.github.crafteve.idlefactory.view.ViewTableDiff;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.util.Mth;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.fml.loading.FMLLoader;
@@ -111,7 +112,11 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     @Nullable
     private PassiveIoRender render;
     /** 滚动状态与 AE2 滚动条。 */
-    private final PassiveIoScroll scroll;
+    /** 内容区滚动像素；拖动与滚轮都写它。 */
+    private int scroll;
+    /** AE2 右侧滚动条；init 时创建。 */
+    @Nullable
+    private Scrollbar bar;
     /** 请求节拍计数。 */
     private int requestTicker;
     /** 顶栏搜索框。 */
@@ -142,8 +147,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
                         ? null : this.minecraft.player.level().dimension(),
                 this.minecraft == null || this.minecraft.player == null
                         ? null : this.minecraft.player.blockPosition());
-        Scrollbar bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
-        this.scroll = new PassiveIoScroll(bar);
+        this.bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         // AE2 自带的帮助按钮只在 getHelpTopic() 非空时显示；本模组还没有指南页，
         // 先用一个同图标、同位置的按钮占位，等指南页确定后再换成 GuideME 跳转。
         this.addToLeftToolbar(new PassiveIoHelpButton(button -> {
@@ -215,7 +219,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         if (this.layout != null) {
-            this.scroll.syncFromBar(this.layout);
+            syncFromBar();
         }
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos);
@@ -276,7 +280,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (this.layout != null && insideViewport(this.layout.viewport(), mouseX, mouseY)) {
-            this.scroll.scrollBy(this.layout, (int) (-scrollY * PassiveIoLayout.ROW_H));
+            scrollBy((int) (-scrollY * PassiveIoLayout.ROW_H));
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -452,7 +456,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         }
         Viewport viewport = contentViewport();
         this.layout = PassiveIoLayout.of(this.model.blocks(), viewport, this.view);
-        this.scroll.clampTo(this.layout);
+        clampScroll();
     }
 
     /**
@@ -483,7 +487,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
 
     /** 当前滚动像素。 */
     int scroll() {
-        return this.scroll.value();
+        return this.scroll;
     }
 
     /** 当前排版；可能为 {@code null}。 */
@@ -693,5 +697,43 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     private static boolean insideViewport(Viewport viewport, double mouseX, double mouseY) {
         return mouseX >= viewport.x() && mouseX < viewport.x() + viewport.width()
                 && mouseY >= viewport.y() && mouseY < viewport.y() + viewport.height();
+    }
+
+    /** 把滚动夹到当前排版上限，并把范围同步给 AE2 滚动条。 */
+    private void clampScroll() {
+        if (this.bar == null || this.layout == null) {
+            return;
+        }
+        int height = this.layout.viewport().height();
+        this.scroll = Mth.clamp(this.scroll, 0, this.layout.maxScroll(height));
+        this.bar.setHeight(height);
+        this.bar.setRange(0, this.layout.maxScroll(height), height);
+        this.bar.setCurrentScroll(this.scroll);
+        this.bar.setVisible(true);
+    }
+
+    /**
+     * 按像素滚动。
+     *
+     * @param delta 正数向下
+     */
+    private void scrollBy(int delta) {
+        if (this.bar == null || this.layout == null) {
+            return;
+        }
+        int height = this.layout.viewport().height();
+        this.scroll = Mth.clamp(this.scroll + delta, 0, this.layout.maxScroll(height));
+        this.bar.setCurrentScroll(this.scroll);
+    }
+
+    /** 读取滚动条位置（拖动由 AE2 控件改），越界时夹紧。 */
+    private void syncFromBar() {
+        if (this.bar == null || this.layout == null) {
+            return;
+        }
+        int value = this.bar.getCurrentScroll();
+        if (value != this.scroll) {
+            this.scroll = Mth.clamp(value, 0, this.layout.maxScroll(this.layout.viewport().height()));
+        }
     }
 }
