@@ -49,6 +49,7 @@ final class NodeTooltip {
                     hint(Component.translatable("idlefactory.node.tooltip.click_toggle")));
             case MULTIPLIER -> List.of(
                     bold(Component.translatable("idlefactory.node.tooltip.multiplier")),
+                    hint(Component.translatable("idlefactory.node.tooltip.multiplier.smart")),
                     hint(Component.translatable("idlefactory.node.tooltip.multiplier.cycle")));
             case DISPATCH -> List.of(
                     bold(Component.translatable("idlefactory.node.tooltip.dispatch")),

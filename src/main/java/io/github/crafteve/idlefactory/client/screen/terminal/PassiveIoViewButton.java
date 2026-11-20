@@ -29,6 +29,15 @@ public final class PassiveIoViewButton extends IconButton {
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1) {
+            // 两态按钮：右键与左键等价，走同一条按下路径（含音效与焦点）。
+            return super.mouseClicked(mouseX, mouseY, 0);
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
     protected Icon getIcon() {
         return this.view.get() == FactoryPassiveIoView.LIST
                 ? Icon.VIEW_MODE_STORED : Icon.VIEW_MODE_ALL;

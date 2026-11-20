@@ -254,7 +254,10 @@ final class LiveNodeCraft implements ICraftingProvider {
             return Math.max(1, cached);
         }
         int capacity = probeCapacity(details);
-        this.smartCache.put(key, capacity);
+        if (capacity > 1) {
+            // 探到 1 多半是这一轮端口没准备好、或机器刚好只装得下一份：不写缓存，下次重建再探。
+            this.smartCache.put(key, capacity);
+        }
         return capacity;
     }
 

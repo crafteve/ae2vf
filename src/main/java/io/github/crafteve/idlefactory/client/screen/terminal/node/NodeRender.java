@@ -279,7 +279,7 @@ final class NodeRender {
             io.github.crafteve.idlefactory.node.Multiplier multiplier) {
         return switch (multiplier.mode()) {
             case OFF -> tr("idlefactory.node.label.multiplier.off");
-            case FIXED -> multiplier.factor() >= 8 ? "8" : Integer.toString(multiplier.factor());
+            case FIXED -> Integer.toString(multiplier.factor());
             case SMART -> tr("idlefactory.node.label.multiplier.smart");
         };
     }

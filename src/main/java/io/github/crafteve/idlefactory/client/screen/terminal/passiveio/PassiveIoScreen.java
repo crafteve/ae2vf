@@ -163,9 +163,9 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
         this.addToLeftToolbar(new SortModeButton(() -> this.sortMode,
-                button -> this.cycleSortMode()));
+                reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
-                button -> this.toggleSortDirection()));
+                reverse -> this.toggleSortDirection()));
         this.addToLeftToolbar(new PassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
     }
@@ -401,9 +401,13 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         rebuildLayout();
     }
 
-    /** 档位按钮：循环到下一个档位。 */
-    private void cycleSortMode() {
-        applySort(this.sortMode.next(), this.sortDirection);
+    /**
+     * 档位按钮：左键下一个档位，右键上一个档位。
+     *
+     * @param reverse 右键反向时为 {@code true}
+     */
+    private void stepSortMode(boolean reverse) {
+        applySort(reverse ? this.sortMode.previous() : this.sortMode.next(), this.sortDirection);
     }
 
     /** 方向按钮：升序 / 降序互换。 */

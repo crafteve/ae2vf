@@ -229,6 +229,8 @@ public final class LiveNode
         }
         this.available = next;
         this.terminal.setAvailable(next);
+        // 机器可用性变化会改变智能倍率的容量：重新缩放样板，别让广告出去的一份停在旧倍数。
+        this.patternsDirty = true;
         this.craft.publish();
     }
 
@@ -325,8 +327,10 @@ public final class LiveNode
         for (UUID id : online) {
             this.machineOnline.put(id, Boolean.TRUE);
         }
-        // 在线集合变了，智能倍率的「能装几份」跟着变，缓存整体作废。
+        // 在线集合变了，智能倍率的「能装几份」跟着变，缓存整体作废；
+        // 但已经广告给 CPU 的样板是按旧容量缩放过的，必须重新缩放，否则智能档会一直停在旧倍数。
         this.craft.onOnlineChanged();
+        this.patternsDirty = true;
     }
 
     /**

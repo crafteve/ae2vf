@@ -29,4 +29,14 @@ public enum FactorySortMode {
         FactorySortMode[] values = values();
         return values[(ordinal() + 1) % values.length];
     }
+
+    /**
+     * 上一个档位；档位按钮右键按这个顺序走。
+     *
+     * @return 上一个档位
+     */
+    public FactorySortMode previous() {
+        FactorySortMode[] values = values();
+        return values[Math.floorMod(ordinal() - 1, values.length)];
+    }
 }

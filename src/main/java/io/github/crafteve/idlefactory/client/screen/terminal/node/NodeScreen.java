@@ -176,9 +176,9 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.addToLeftToolbar(new SettingToggleButton<>(Settings.TERMINAL_STYLE,
                 AEConfig.instance().getTerminalStyle(), this::toggleTerminalStyle));
         this.addToLeftToolbar(new SortModeButton(() -> this.sortMode,
-                button -> this.cycleSortMode()));
+                reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
-                button -> this.toggleSortDirection()));
+                reverse -> this.toggleSortDirection()));
     }
 
     @Override
@@ -454,9 +454,13 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         rebuildLayout();
     }
 
-    /** 档位按钮：循环到下一个档位。 */
-    private void cycleSortMode() {
-        applySort(this.sortMode.next(), this.sortDirection);
+    /**
+     * 档位按钮：左键下一个档位，右键上一个档位。
+     *
+     * @param reverse 右键反向时为 {@code true}
+     */
+    private void stepSortMode(boolean reverse) {
+        applySort(reverse ? this.sortMode.previous() : this.sortMode.next(), this.sortDirection);
     }
 
     /** 方向按钮：升序 / 降序互换。 */
@@ -552,19 +556,36 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
             return;
         }
         NodeRow node = this.model.rows().get(hit.node());
+        boolean reverse = button == 1;
         switch (hit.kind()) {
-            case NODE -> toggleExpanded(node.nodeId());
-            case NAME -> beginRename(hit.node(), node);
+            case NODE -> {
+                if (!reverse) {
+                    toggleExpanded(node.nodeId());
+                }
+            }
+            case NAME -> {
+                if (!reverse) {
+                    beginRename(hit.node(), node);
+                }
+            }
             case BLOCKING -> {
                 if (node.view().core().available()) {
                     NodeActions.setBlocking(this.menu.containerId, node,
                             !node.view().core().blocking().isOn());
                 }
             }
-            case MULTIPLIER -> NodeActions.cycleMultiplier(this.menu.containerId, node);
+            case MULTIPLIER -> NodeActions.cycleMultiplier(this.menu.containerId, node, reverse);
             case DISPATCH -> NodeActions.toggleDispatch(this.menu.containerId, node);
-            case EDIT -> NodeActions.edit(this.menu.containerId, node);
-            case DELETE -> requestDelete(node);
+            case EDIT -> {
+                if (!reverse) {
+                    NodeActions.edit(this.menu.containerId, node);
+                }
+            }
+            case DELETE -> {
+                if (!reverse) {
+                    requestDelete(node);
+                }
+            }
             case MEMBER -> {
                 // 机器行主体不做事，定位在行尾准星上。
             }

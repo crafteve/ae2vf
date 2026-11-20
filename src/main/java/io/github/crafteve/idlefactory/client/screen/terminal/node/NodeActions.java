@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.Memb
 import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeModel.NodeRow;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.node.Multiplier;
-import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandSource;
 import io.github.crafteve.idlefactory.command.FactoryCommand;
@@ -124,30 +123,16 @@ final class NodeActions {
     }
 
     /**
-     * 循环倍率：关 → ×2 → ×4 → ×8 → 智能 → 关。
+     * 循环倍率：不倍增 → ×2 → ×4 → ×8 → ×16 → ×64 → 智能 → 不倍增。
      *
      * @param containerId 菜单容器 id
      * @param node        节点
+     * @param reverse     右键反向时为 {@code true}
      */
-    static void cycleMultiplier(int containerId, NodeRow node) {
-        Multiplier current = node.view().core().multiplier();
-        MultiplierMode mode;
-        int factor;
-        if (current.mode() == MultiplierMode.OFF) {
-            mode = MultiplierMode.FIXED;
-            factor = 2;
-        } else if (current.mode() == MultiplierMode.FIXED && current.factor() < 8) {
-            mode = MultiplierMode.FIXED;
-            factor = current.factor() + 2;
-        } else if (current.mode() == MultiplierMode.FIXED) {
-            mode = MultiplierMode.SMART;
-            factor = 1;
-        } else {
-            mode = MultiplierMode.OFF;
-            factor = 1;
-        }
+    static void cycleMultiplier(int containerId, NodeRow node, boolean reverse) {
+        Multiplier next = node.view().core().multiplier().cycle(!reverse);
         send(containerId, node.nodeId(), CommandKind.PROVIDER_MULTIPLIER,
-                new FactoryCommand.Multiplier(mode, factor));
+                new FactoryCommand.Multiplier(next.mode(), next.factor()));
     }
 
     /**

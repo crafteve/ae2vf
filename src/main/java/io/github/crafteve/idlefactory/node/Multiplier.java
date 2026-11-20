@@ -20,6 +20,8 @@ import net.minecraft.nbt.CompoundTag;
 public record Multiplier(MultiplierMode mode, int factor) {
     /** 最小倍数；倍率不允许是 0 或负数。 */
     public static final int MIN_FACTOR = 1;
+    /** 固定倍率的档位梯子：循环时按这个顺序升，降序反过来。 */
+    private static final int[] FIXED_LADDER = {2, 4, 8, 16, 64};
 
     private static final String TAG_MODE = "MultiplierMode";
     private static final String TAG_FACTOR = "MultiplierFactor";
@@ -33,6 +35,53 @@ public record Multiplier(MultiplierMode mode, int factor) {
      */
     public Multiplier {
         factor = Math.max(factor, MIN_FACTOR);
+    }
+
+    /**
+     * 在「不倍增 → ×2 → ×4 → ×8 → ×16 → ×64 → 智能」之间循环。
+     *
+     * <p>按钮左键正向、右键反向；档位梯子只在这里维护一份，界面不再自己拼阶。</p>
+     *
+     * @param forward 正向为 {@code true}
+     * @return 下一档
+     */
+    public Multiplier cycle(boolean forward) {
+        int step = position();
+        int total = FIXED_LADDER.length + 2;
+        int next = Math.floorMod(forward ? step + 1 : step - 1, total);
+        if (next == 0) {
+            return off();
+        }
+        if (next == total - 1) {
+            return new Multiplier(MultiplierMode.SMART, MIN_FACTOR);
+        }
+        return new Multiplier(MultiplierMode.FIXED, FIXED_LADDER[next - 1]);
+    }
+
+    /**
+     * 当前档位在循环梯子里的下标：0 是不倍增，末尾是智能。
+     *
+     * @return 下标
+     */
+    private int position() {
+        if (this.mode == MultiplierMode.OFF) {
+            return 0;
+        }
+        if (this.mode == MultiplierMode.SMART) {
+            return FIXED_LADDER.length + 1;
+        }
+        for (int i = 0; i < FIXED_LADDER.length; i++) {
+            if (FIXED_LADDER[i] == this.factor) {
+                return i + 1;
+            }
+        }
+        // 手改档里的非梯子倍数：退到不超过它的最大梯子档，循环不会卡住。
+        for (int i = FIXED_LADDER.length - 1; i >= 0; i--) {
+            if (FIXED_LADDER[i] <= this.factor) {
+                return i + 1;
+            }
+        }
+        return 1;
     }
 
     /** 关：按样板原始数量派单。 */

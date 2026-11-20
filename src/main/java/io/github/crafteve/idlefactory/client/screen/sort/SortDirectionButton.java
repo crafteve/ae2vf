@@ -18,14 +18,25 @@ import net.minecraft.network.chat.Component;
 public final class SortDirectionButton extends IconButton {
     /** 当前方向来源；按钮每帧现查，切换后下一帧自动换图标。 */
     private final Supplier<SortDir> direction;
+    private final SortPress press;
 
     /**
      * @param direction 当前方向
      * @param press     点击动作
      */
-    public SortDirectionButton(Supplier<SortDir> direction, OnPress press) {
-        super(press);
+    public SortDirectionButton(Supplier<SortDir> direction, SortPress press) {
+        super(button -> { });
         this.direction = direction;
+        this.press = press;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1 && this.active && this.visible && clicked(mouseX, mouseY)) {
+            this.press.press(true);
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override

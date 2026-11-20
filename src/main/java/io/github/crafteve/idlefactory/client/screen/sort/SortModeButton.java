@@ -29,14 +29,25 @@ import net.minecraft.resources.ResourceLocation;
 public final class SortModeButton extends IconButton {
     /** 当前档位来源；按钮每帧现查，切档后下一帧自动换图标。 */
     private final Supplier<FactorySortMode> mode;
+    private final SortPress press;
 
     /**
      * @param mode  当前档位
      * @param press 点击动作
      */
-    public SortModeButton(Supplier<FactorySortMode> mode, OnPress press) {
-        super(press);
+    public SortModeButton(Supplier<FactorySortMode> mode, SortPress press) {
+        super(button -> { });
         this.mode = mode;
+        this.press = press;
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 1 && this.active && this.visible && clicked(mouseX, mouseY)) {
+            this.press.press(true);
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
