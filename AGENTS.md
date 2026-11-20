@@ -56,7 +56,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `view` | 视图表：`ViewTable` / `ViewHeader` / `ViewNode`（内嵌 `Activity`）/ `ViewNodeCore` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewNodeDiff` / `ViewTableBuilder` | 持久化、世界探测、配置写入 |
 | `config` / `resource` / `location` | 配置项；`AEKey` 适配；`BlockKey` | 业务逻辑 |
 | `event` / `registry` | 绑定杖世界事件；MenuType 注册 | 业务逻辑 |
-| `menu` | 菜单与玩家槽位 | 工厂数据 |
+| `menu` | 会话层：`node/` / `passiveio/` / `wand/` 三组 Host+Menu，终端偏好契约（`TerminalSetting` / `TerminalSortMode` / `PassiveIoViewMode`），门禁 `MenuGate` | 工厂数据、界面绘制 |
 | `network` | 协议、负载、`ViewPort`（视图出口）、`CommandPort`、`ObservationNoticeListener`（失联提示） | 业务判断 |
 | `client` | 客户端入口与四个子包：`world`（世界高亮）、`wand`（绑定杖输入与草稿）、`network`（报文投递）、`screen`（界面） | 工厂数据、服务端状态 |
 | `client.screen` | 两个终端界面（`terminal.node` / `terminal.passiveio`）、共享组件（`paint` 卡片与键帽、`theme` 层序与贴图、`text` 文案、`search`、`sort`、`wand`） | 服务端状态 |
@@ -132,7 +132,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 上限：节点 4096、单节点机器 256、全厂机器 8192、规则每侧 16、仓库快照 1024。
 - 读路径不探世界：展示与界面只读观测缓存。
 - 索引 O(1)：`byId`、`byPosition`；不每 tick 新建集合、不重复分配。
-- 所有遍历有上限护栏；失联通知按工厂聚合、10 秒节流；心跳走 trace。
+- 所有遍历有上限护栏；失联通知按工厂聚合、每 tick 最多一条；心跳走 trace。
 - 模糊物品变体：索引 TTL 20 tick、单 id 64 个、单规则 8 个 / 单机器 16 个变体每 tick；仓库快照按 512 KiB 分片。
 - 卡顿先降频，再考虑加预算。
 
@@ -286,7 +286,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 13. Applied Flux 的可选性靠 `ModList` 短路 + `LinkageError` 降级；不要在 `Bridge` 外直接引用它的类。
 14. 浮层的绘制顺序写在终端屏幕的 `draw` 里，浮层必须排在物品与数量之后；被数量盖住基本都是顺序写错。
 15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
-16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、10 秒节流发 `HudNoticeS2C`（模组 HUD 条，不是原版 actionbar），`UNLOADED` 不通知。只有显式删除机器才删规则。
+16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、每 tick 最多一条发 `HudNoticeS2C`（模组 HUD 条，不是原版 actionbar），`UNLOADED` 不通知。只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
 18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `ResourceIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
