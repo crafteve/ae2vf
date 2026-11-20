@@ -34,9 +34,20 @@ public final class PassiveIoViewButton extends IconButton {
                 ? Icon.VIEW_MODE_STORED : Icon.VIEW_MODE_ALL;
     }
 
+    /**
+     * 取一条界面文案。
+     *
+     * @param key 语言键
+     * @return 当前语言下的文本
+     */
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
+    }
+
     @Override
     public List<Component> getTooltipMessage() {
-        String next = this.view.get() == FactoryPassiveIoView.LIST ? "磁贴视图" : "列表视图";
-        return List.of(Component.literal("切换为" + next));
+        String next = tr(this.view.get() == FactoryPassiveIoView.LIST
+                ? "idlefactory.passive.view.tile" : "idlefactory.passive.view.list");
+        return List.of(Component.translatable("idlefactory.passive.view.switch", next));
     }
 }

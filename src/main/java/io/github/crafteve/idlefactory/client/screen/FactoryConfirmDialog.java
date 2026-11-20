@@ -58,7 +58,7 @@ public final class FactoryConfirmDialog {
     private String title = "";
     /** 已经按宽度折好的说明行；打开时算一次，绘制与测量共用。 */
     private List<String> lines = List.of();
-    private String confirmLabel = "确定";
+    private String confirmLabel = tr("idlefactory.common.confirm");
     @Nullable
     private Runnable onConfirm;
     @Nullable
@@ -160,13 +160,18 @@ public final class FactoryConfirmDialog {
 
         int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
-        int cancelW = Math.max(40, this.font.width("取消") + 18);
+        String cancelLabel = tr("idlefactory.common.cancel");
+        int cancelW = Math.max(40, this.font.width(cancelLabel) + 18);
         int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;
-        drawButton(graphics, cancelX, buttonY, cancelW, "取消", false, mouseX, mouseY);
+        drawButton(graphics, cancelX, buttonY, cancelW, cancelLabel, false, mouseX, mouseY);
         drawButton(graphics, confirmX, buttonY, confirmW, this.confirmLabel, true,
                 mouseX, mouseY);
         graphics.pose().popPose();
+    }
+
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
     }
 
     private void drawButton(GuiGraphics graphics, int x, int y, int w, String label,

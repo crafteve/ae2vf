@@ -78,8 +78,8 @@ public final class SortModeButton extends IconButton {
     @Override
     public List<Component> getTooltipMessage() {
         FactorySortMode current = this.mode.get();
-        return List.of(Component.literal("排序：" + label(current)),
-                Component.literal("点击切到：" + label(current.next())));
+        return List.of(Component.translatable("idlefactory.sort.mode.current", label(current)),
+                Component.translatable("idlefactory.sort.mode.next", label(current.next())));
     }
 
     /**
@@ -143,14 +143,18 @@ public final class SortModeButton extends IconButton {
      * @param mode 档位
      * @return 中文名
      */
+    private static String tr(String key) {
+        return net.minecraft.network.chat.Component.translatable(key).getString();
+    }
+
     private static String label(FactorySortMode mode) {
         return switch (mode) {
-            case NAME -> "名称";
+            case NAME -> tr("idlefactory.sort.mode.name");
             case ID -> "ID";
-            case MACHINE_COUNT -> "机器台数";
-            case RULE_COUNT -> "IO 规则数";
-            case STATUS -> "状态";
-            case DISTANCE -> "距离";
+            case MACHINE_COUNT -> tr("idlefactory.sort.mode.machines");
+            case RULE_COUNT -> tr("idlefactory.sort.mode.rules");
+            case STATUS -> tr("idlefactory.sort.mode.status");
+            case DISTANCE -> tr("idlefactory.sort.mode.distance");
         };
     }
 }

@@ -36,7 +36,8 @@ public final class SortDirectionButton extends IconButton {
     @Override
     public List<Component> getTooltipMessage() {
         boolean ascending = this.direction.get() == SortDir.ASCENDING;
-        return List.of(Component.literal(ascending ? "升序" : "降序"),
-                Component.literal("点击切换升降序"));
+        return List.of(Component.translatable(ascending
+                ? "idlefactory.sort.direction.ascending" : "idlefactory.sort.direction.descending"),
+                Component.translatable("idlefactory.sort.direction.toggle"));
     }
 }

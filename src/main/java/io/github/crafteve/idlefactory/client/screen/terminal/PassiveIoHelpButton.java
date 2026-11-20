@@ -28,6 +28,6 @@ public final class PassiveIoHelpButton extends IconButton {
 
     @Override
     public List<Component> getTooltipMessage() {
-        return List.of(Component.literal("打开 AE 指南"), Component.literal("指南页待接入"));
+        return List.of(Component.translatable("idlefactory.passive.help.open"), Component.translatable("idlefactory.passive.help.pending"));
     }
 }
