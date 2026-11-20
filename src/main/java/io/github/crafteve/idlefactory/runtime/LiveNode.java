@@ -457,6 +457,8 @@ public final class LiveNode
         return this.capacityPick;
     }
 
+
+
     /**
      * 智能倍率的诊断文本；只读，不写缓存。
      *

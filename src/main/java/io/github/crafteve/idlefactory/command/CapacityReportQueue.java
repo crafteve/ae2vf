@@ -46,6 +46,8 @@ public final class CapacityReportQueue {
         }
         PENDING.add(new Pending(player.getUUID(), nodeId,
                 player.serverLevel().getGameTime() + MAX_WAIT_TICKS));
+        io.github.crafteve.idlefactory.IdleFactory.LOGGER.info(
+                "容量探测：已排队 node={} player={}", nodeId, player.getName().getString());
     }
 
     /**
@@ -69,11 +71,16 @@ public final class CapacityReportQueue {
             }
             LiveNode live = runtime.nodeManager().node(pending.nodeId());
             if (live != null) {
-                player.displayClientMessage(Component.literal(live.capacityReport()), false);
+                String report = live.capacityReport();
+                io.github.crafteve.idlefactory.IdleFactory.LOGGER.info("容量探测：输出 node={}\n{}",
+                        pending.nodeId(), report);
+                player.displayClientMessage(Component.literal(report), false);
                 it.remove();
                 continue;
             }
             if (now >= pending.expireAt()) {
+                io.github.crafteve.idlefactory.IdleFactory.LOGGER.info(
+                        "容量探测：超时 node={}", pending.nodeId());
                 player.displayClientMessage(
                         Component.literal("容量探测超时：节点还没建出来，稍后再切一次智能档"), false);
                 it.remove();

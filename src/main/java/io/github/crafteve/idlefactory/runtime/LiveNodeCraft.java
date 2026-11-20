@@ -31,6 +31,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.core.definitions.AEItems;
 
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 
 /**
@@ -275,21 +276,27 @@ final class LiveNodeCraft implements ICraftingProvider {
             for (Machine machine : online) {
                 long fit = this.node.capacityPick().portionsThatFit(machine, perPortion);
                 total += fit;
-                out.append("\n  ").append(machine.block().pos().toShortString()).append("：可装 ")
-                        .append(fit);
-                perPortion.forEach((key, amount) -> {
-                    var pick = this.node.facePick().pick(machine, key, IoSide.INPUT, null, null);
-                    if (!pick.picked()) {
-                        out.append("；").append(key).append(" 选面失败 ").append(pick.failure());
-                        return;
+                out.append("\n  ").append(machine.block().pos().toShortString())
+                        .append("：可装 ").append(fit);
+                AEKey first = perPortion.keySet().stream().findFirst().orElse(null);
+                long amount = first == null ? 0L : perPortion.get(first);
+                for (Direction face : Direction.values()) {
+                    out.append("\n    ").append(face).append(' ');
+                    try {
+                        var storage = this.node.ports().storage(machine, face);
+                        if (storage == null) {
+                            out.append("无存储");
+                            continue;
+                        }
+                        long sim = first == null ? 0L
+                                : storage.insert(first, amount,
+                                        appeng.api.config.Actionable.SIMULATE,
+                                        io.github.crafteve.idlefactory.resource.AeKeyAdapter.SOURCE);
+                        out.append("收 ").append(sim).append('/').append(amount);
+                    } catch (RuntimeException e) {
+                        out.append("异常 ").append(e.getClass().getSimpleName());
                     }
-                    var storage = this.node.ports().storage(machine, pick.face());
-                    long sim = storage == null ? -1L
-                            : storage.insert(key, amount, appeng.api.config.Actionable.SIMULATE,
-                                    io.github.crafteve.idlefactory.resource.AeKeyAdapter.SOURCE);
-                    out.append("；").append(pick.face()).append(" 单份 ").append(sim).append('/')
-                            .append(amount);
-                });
+                }
             }
             out.append("\n  合计 ").append(total).append(" → ×").append(Math.max(1L, total / 4L));
         }
