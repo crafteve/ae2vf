@@ -150,7 +150,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
             ScreenStyle style) {
         super(menu, inventory, title, style);
         this.source = new TerminalSource(menu.containerId);
-        this.model = new NodeModel(this.source, FactoryGuiTheme.current());
+        this.model = new NodeModel(this.source);
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
         this.model.setSort(this.sortMode, this.sortDirection);

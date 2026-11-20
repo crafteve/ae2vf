@@ -137,7 +137,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         super(menu, inventory, title, style);
         this.view = menu.host().view();
         this.source = new TerminalSource(menu.containerId);
-        this.model = new PassiveIoModel(this.source, FactoryGuiTheme.current());
+        this.model = new PassiveIoModel(this.source);
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
         this.model.setSort(this.sortMode, this.sortDirection);

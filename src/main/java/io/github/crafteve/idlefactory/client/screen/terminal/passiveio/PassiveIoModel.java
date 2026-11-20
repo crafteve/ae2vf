@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
@@ -117,10 +116,9 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
 
     /**
      * @param source 终端数据源
-     * @param theme  当前主题
      */
-    PassiveIoModel(TerminalSource source, FactoryGuiTheme theme) {
-        super(source, theme);
+    PassiveIoModel(TerminalSource source) {
+        super(source);
     }
 
     /** 当前可见块（模型基座里叫行，这里保持界面语汇）。 */
@@ -145,7 +143,7 @@ final class PassiveIoModel extends TerminalModel<PassiveIoModel.BlockView> {
     @Override
     protected SearchQuery.Fields fields(BlockView block) {
         // 被动 IO 终端不看样板数，搜索字段里省掉那一段。
-        return SearchFields.of(block.node(), theme(), -1);
+        return SearchFields.of(block.node(), -1);
     }
 
     @Override

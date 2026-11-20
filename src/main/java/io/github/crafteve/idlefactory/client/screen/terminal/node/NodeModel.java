@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.search.SearchFields;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
@@ -60,10 +59,9 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
 
     /**
      * @param source 终端数据源
-     * @param theme  当前主题
      */
-    NodeModel(TerminalSource source, FactoryGuiTheme theme) {
-        super(source, theme);
+    NodeModel(TerminalSource source) {
+        super(source);
     }
 
     /** 当前可见的节点行对应的视图，顺序与 {@link #rows()} 一致。 */
@@ -92,7 +90,7 @@ final class NodeModel extends TerminalModel<NodeModel.NodeRow> {
 
     @Override
     protected SearchQuery.Fields fields(NodeRow row) {
-        return SearchFields.of(row.view(), theme(), row.view().core().patternCount());
+        return SearchFields.of(row.view(), row.view().core().patternCount());
     }
 
     /**

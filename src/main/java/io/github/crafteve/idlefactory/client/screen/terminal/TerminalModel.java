@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.config.SortDir;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
@@ -30,7 +29,6 @@ import net.minecraft.world.level.Level;
  */
 public abstract class TerminalModel<T> {
     private final TerminalSource source;
-    private final FactoryGuiTheme theme;
     @Nullable
     private ViewTable table;
     private SearchQuery query = SearchQuery.EMPTY;
@@ -45,21 +43,14 @@ public abstract class TerminalModel<T> {
 
     /**
      * @param source 终端数据源
-     * @param theme  当前主题，状态与搜索字段取色用
      */
-    protected TerminalModel(TerminalSource source, FactoryGuiTheme theme) {
+    protected TerminalModel(TerminalSource source) {
         this.source = source;
-        this.theme = theme;
     }
 
     /** 数据源；屏幕发请求与取版本用。 */
     public final TerminalSource source() {
         return this.source;
-    }
-
-    /** 当前主题。 */
-    protected final FactoryGuiTheme theme() {
-        return this.theme;
     }
 
     /**

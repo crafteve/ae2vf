@@ -6,7 +6,6 @@ import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 
@@ -38,12 +37,10 @@ public final class SearchFields {
      * "第一台"语义一致，所以两个终端对同一节点给出的坐标相同。</p>
      *
      * @param view         节点行
-     * @param theme        当前主题，状态文字取色用
      * @param patternCount 样板份数；传 -1 表示省略该段（被动 IO 终端不看样板）
      * @return 搜索字段
      */
-    public static SearchQuery.Fields of(ViewNode view, FactoryGuiTheme theme,
-            int patternCount) {
+    public static SearchQuery.Fields of(ViewNode view, int patternCount) {
         ViewMachine first = view.machines().isEmpty() ? null : view.machines().get(0);
         return build(view.core().name() != null
                         ? view.core().name() : FactoryLabels.blockName(view.core().typeBlockId()),
