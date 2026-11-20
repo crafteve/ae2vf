@@ -2,8 +2,6 @@ package io.github.crafteve.idlefactory.client.screen.terminal.passiveio;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -147,21 +145,18 @@ final class PassiveIoLayout {
      * @param blocks   模型里的块
      * @param viewport 内容视口
      * @param view     列表 / 磁贴
-     * @param collapsed 已收起的节点 id；收起只保留机器行
      * @return 排版
      */
     static PassiveIoLayout of(List<PassiveIoModel.BlockView> blocks,
-            Viewport viewport, PassiveIoViewMode view, Set<UUID> collapsed) {
+            Viewport viewport, PassiveIoViewMode view) {
         List<BlockBox> boxes = new ArrayList<>(blocks.size());
         int cursor = 0;
         for (int i = 0; i < blocks.size(); i++) {
             PassiveIoModel.BlockView block = blocks.get(i);
-            int rules = collapsed.contains(block.node().core().nodeId())
-                    ? 0 : block.rules().size();
-            int height = blockHeight(block, view, rules);
+            int height = blockHeight(block, view);
             int bodyTop = cursor + MACHINE_ROW_H + BODY_GAP;
             boxes.add(new BlockBox(i, cursor, bodyTop, cursor + height,
-                    rules));
+                    block.rules().size()));
             cursor += height + BLOCK_GAP;
         }
         int contentHeight = boxes.isEmpty() ? 0 : cursor - BLOCK_GAP;
@@ -177,8 +172,8 @@ final class PassiveIoLayout {
      * @param view  视图
      * @return 像素高度
      */
-    static int blockHeight(PassiveIoModel.BlockView block, PassiveIoViewMode view,
-            int rules) {
+    static int blockHeight(PassiveIoModel.BlockView block, PassiveIoViewMode view) {
+        int rules = block.rules().size();
         if (rules == 0) {
             return MACHINE_ROW_H;
         }
