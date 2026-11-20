@@ -154,7 +154,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。�
 - 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
 - 几何只在各自的 `*Layout`（`NodeLayout` / `PassiveIoLayout`）。溢出先让位，不许压到相邻区域。
 - 绘制层级由各终端屏幕自己的 `draw` 顺序决定：底 → 内容 → 物品 → 数量 → 浮层 → tooltip。浮层必须高于数量层，否则会被物品数量盖住；tooltip 由原版固定在最后。不要在调用点写 z 魔法数。
-- 尺寸问题先看 `logs/latest.log` 的 `AE2 Void Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Dae2vf.gutter` 现场调。
+- 尺寸问题以游戏内截图为准；留白可用 `-Pgutter=64` 或 `-Dae2vf.gutter` 现场调。
 
 ### 3.3 便利性
 
@@ -299,9 +299,10 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-21 清理旧名残留：创造栏常量 `IDLE_FACTORY` 改 `CREATIVE_TAB`；创造栏名中英改为「虚空工厂」/「AE2 Void Factory」，停服文案同步；`tools/gui` 与 `tools/item` 三个生成脚本的输出目录从 `assets/idlefactory` 改回 `assets/ae2vf`，并删掉已不存在的 `FactoryLayout.java` 与 `Idle Factory UI:` 日志判据。
 - 2026-11-20 改名 `ae2vf`：modid、包名（`io.github.crafteve.ae2vf`）、类前缀（`VoidFactory*`）、注册 id、语言键、资源目录与存档文件名全部迁移；版本改 `0.1.0-beta`。旧存档与 `idlefactory:*` 物品不再兼容。
 - 2026-11-20 命名收敛：`NetworkProtocol` 拆成 `NetworkVersion` / `NetworkLimit`；`FactoryManager` → `FactoryLibrary`；`FactoryRefs` → `FactoryResolver`；连锁查找从 `factory` 移入 `command.CommandChain`（它只服务绑定杖，属于命令）。
-- 2026-11-20 包结构整理：`resource` + `location` 合并为 `key`；删除 `event` 包（不再拦截挖掘）；`registry` 类统一 `IdleFactory` 前缀并把负载注册收进来；编解码器集中到 `network.codec`；删除全部 `package-info`。
+- 2026-11-20 包结构整理：`resource` + `location` 合并为 `key`；删除 `event` 包（不再拦截挖掘）；`registry` 类统一 `VoidFactory` 前缀并把负载注册收进来；编解码器集中到 `network.codec`；删除全部 `package-info`。
 - 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议发布前重置为 1，内部编号 41 / 42 只留在 ADR），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键；新增 `HudNoticeS2C` 把失联 / 恢复提示并入模组 HUD 条。
 - 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。
