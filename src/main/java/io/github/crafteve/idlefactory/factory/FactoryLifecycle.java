@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import io.github.crafteve.idlefactory.command.CommitSeqStore;
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
 
@@ -98,8 +99,8 @@ public final class FactoryLifecycle {
     /** 仓库解析器：启动时创建，供工厂定时刷新与指令即时刷新共用。 */
     @Nullable
     private MeStorageResolver storageResolver;
-    /** 每个玩家已经接受过的最大草稿提交序号；成功提交才推进，下线即清。 */
-    private final Map<UUID, Long> lastAcceptedSeq = new HashMap<>();
+    /** 草稿提交序号窗口：防重放，命令层维护。 */
+    private final CommitSeqStore commitSeq = new CommitSeqStore();
 
     private FactoryLifecycle(MinecraftServer server) {
         this.server = server;
@@ -160,7 +161,7 @@ public final class FactoryLifecycle {
         runtime.observationReader = null;
         runtime.runner = null;
         runtime.notices.clear();
-        runtime.lastAcceptedSeq.clear();
+        runtime.commitSeq.clear();
         // 视图出口的会话与差量基线都是静态内存：不跟着实例清掉会跨存档残留。
         ViewPort.clear();
         instance = null;
@@ -277,7 +278,7 @@ public final class FactoryLifecycle {
      * @return 最大序号；从未成功提交过时为 {@code 0}
      */
     public long lastAcceptedSeq(UUID playerId) {
-        return this.lastAcceptedSeq.getOrDefault(playerId, 0L);
+        return this.commitSeq.lastAccepted(playerId);
     }
 
     /**
@@ -287,7 +288,7 @@ public final class FactoryLifecycle {
      * @param seq      本次草稿的版本号
      */
     public void acceptCommitSeq(UUID playerId, long seq) {
-        this.lastAcceptedSeq.merge(playerId, seq, Math::max);
+        this.commitSeq.accept(playerId, seq);
     }
 
     /**
@@ -296,7 +297,7 @@ public final class FactoryLifecycle {
      * @param playerId 玩家 id
      */
     public void forgetCommitSeq(UUID playerId) {
-        this.lastAcceptedSeq.remove(playerId);
+        this.commitSeq.forget(playerId);
     }
 
     /**
