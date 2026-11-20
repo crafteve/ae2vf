@@ -2,7 +2,8 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
+import io.github.crafteve.idlefactory.client.screen.paint.StatusColor;
+import io.github.crafteve.idlefactory.client.screen.paint.TooltipPalette;
 
 import java.util.Locale;
 
@@ -249,17 +250,16 @@ public final class FactoryLabels {
      * 深色 tooltip 上的诊断颜色，用霓虹色而不是面板状态色。
      *
      * @param reason 原因
-     * @param theme  主题
      * @return ARGB 颜色
      */
-    static int tooltipReasonColor(IoReason reason, FactoryGuiTheme theme) {
+    static int tooltipReasonColor(IoReason reason) {
         return switch (reason) {
-            case RUN -> theme.tooltip().ok();
-            case SLEEPING -> theme.tooltip().idle();
-            case NO_MATERIAL -> theme.tooltip().idle();
-            case FULL -> theme.tooltip().warn();
-            case BUDGET_OUT -> theme.tooltip().idle();
-            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.tooltip().error();
+            case RUN -> TooltipPalette.OK;
+            case SLEEPING -> TooltipPalette.IDLE;
+            case NO_MATERIAL -> TooltipPalette.IDLE;
+            case FULL -> TooltipPalette.WARN;
+            case BUDGET_OUT -> TooltipPalette.IDLE;
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> TooltipPalette.ERROR;
         };
     }
 
@@ -300,15 +300,14 @@ public final class FactoryLabels {
      *
      * @param rate   速率
      * @param reason 最近一次原因
-     * @param theme  主题
      * @return ARGB 颜色
      */
-    static int rateColorTooltip(long rate, IoReason reason, FactoryGuiTheme theme) {
+    static int rateColorTooltip(long rate, IoReason reason) {
         return switch (reason) {
-            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.tooltip().error();
-            case FULL -> theme.tooltip().warn();
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> TooltipPalette.ERROR;
+            case FULL -> TooltipPalette.WARN;
             case RUN, SLEEPING, BUDGET_OUT, NO_MATERIAL ->
-                    rate > 0L ? theme.tooltip().ok() : theme.tooltip().idle();
+                    rate > 0L ? TooltipPalette.OK : TooltipPalette.IDLE;
         };
     }
 
@@ -317,15 +316,14 @@ public final class FactoryLabels {
      *
      * @param rate   速率
      * @param reason 最近一次原因
-     * @param theme  主题
      * @return ARGB 颜色
      */
-    public static int rateColorUi(long rate, IoReason reason, FactoryGuiTheme theme) {
+    public static int rateColorUi(long rate, IoReason reason) {
         return switch (reason) {
-            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> theme.error();
-            case FULL -> theme.statusWarn();
+            case NO_FACE, REJECTED, FACE_CONFIG_INVALID, ERROR -> StatusColor.ERROR;
+            case FULL -> StatusColor.WARN;
             case RUN, SLEEPING, BUDGET_OUT, NO_MATERIAL ->
-                    rate > 0L ? theme.statusRun() : theme.statusIdle();
+                    rate > 0L ? StatusColor.RUN : StatusColor.IDLE;
         };
     }
 
@@ -349,12 +347,10 @@ public final class FactoryLabels {
      * @param rate   速率值
      * @param key    资源 key；类型决定单位
      * @param reason 最近一次原因
-     * @param theme  主题
      * @return 文本组件
      */
-    static Component rate(long rate, @Nullable AEKey key, IoReason reason,
-            FactoryGuiTheme theme) {
-        int color = rateColorTooltip(rate, reason, theme);
+    static Component rate(long rate, @Nullable AEKey key, IoReason reason) {
+        int color = rateColorTooltip(rate, reason);
         return coloredBold(rateText(rate, key), color);
     }
 
@@ -363,12 +359,11 @@ public final class FactoryLabels {
      *
      * @param reason 原因
      * @param input  是否输入侧
-     * @param theme  主题
      * @return 文本组件
      */
-    static Component state(IoReason reason, boolean input, FactoryGuiTheme theme) {
+    static Component state(IoReason reason, boolean input) {
         return Component.empty()
-                .append(colored("状态：", theme.tooltip().label()))
-                .append(coloredBold(reason(reason, input), tooltipReasonColor(reason, theme)));
+                .append(colored("状态：", TooltipPalette.LABEL))
+                .append(coloredBold(reason(reason, input), tooltipReasonColor(reason)));
     }
 }

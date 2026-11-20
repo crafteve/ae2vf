@@ -379,7 +379,7 @@ final class PassiveIoRender {
             int maxWidth) {
         IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? this.theme.statusIdle()
-                : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
+                : FactoryLabels.rateColorUi(rule.rate(), reason);
         String clipped = ellipsize(rateText(rule), maxWidth);
         graphics.drawString(this.font, clipped, right - this.font.width(clipped), textY, color,
                 false);
@@ -438,7 +438,7 @@ final class PassiveIoRender {
         int rateRight = x + PassiveIoLayout.TILE_W - 2;
         IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
         int color = rule.rate() <= 0L ? this.theme.statusIdle()
-                : FactoryLabels.rateColorUi(rule.rate(), reason, this.theme);
+                : FactoryLabels.rateColorUi(rule.rate(), reason);
         // 速率和 chip 行同一中线：13px chip 的正文在 +2。
         graphics.drawString(this.font, rate, rateRight - this.font.width(rate), chipY + 2, color,
                 false);
