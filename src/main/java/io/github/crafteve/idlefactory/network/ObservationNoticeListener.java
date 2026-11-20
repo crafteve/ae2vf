@@ -24,20 +24,11 @@ import net.minecraft.server.level.ServerPlayer;
  * 到一行；拥有者不在线时计数直接丢弃——通知没有接收者，留着只会越攒越旧。</p>
  */
 public final class ObservationNoticeListener implements ObservationChangeListener {
-    /** 同一工厂两次「失联」提示的最短间隔（tick）：10 秒，防爆炸拆机器时刷屏。 */
-    private static final int MISSING_INTERVAL = 200;
-    /** 「恢复」提示的节流（tick）：1 秒。恢复不该等失联那 10 秒窗口。 */
-    private static final int RESTORED_INTERVAL = 20;
-
     private final MinecraftServer server;
     private final FactoryManager manager;
-    /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组。 */
+    /** 本 tick 累计的「失联」与「恢复」数量，按工厂分组；tick 末一次性发出。 */
     private final Map<UUID, Integer> missingNotices = new HashMap<>();
     private final Map<UUID, Integer> restoredNotices = new HashMap<>();
-    /** 每个工厂上一次「失联」提示的时刻。 */
-    private final Map<UUID, Long> lastMissingTick = new HashMap<>();
-    /** 每个工厂上一次「恢复」提示的时刻。 */
-    private final Map<UUID, Long> lastRestoredTick = new HashMap<>();
 
     /**
      * @param server  服务端
@@ -79,7 +70,6 @@ public final class ObservationNoticeListener implements ObservationChangeListene
         if (this.missingNotices.isEmpty() && this.restoredNotices.isEmpty()) {
             return;
         }
-        long now = this.server.overworld().getGameTime();
         Set<UUID> factoryIds = new HashSet<>();
         factoryIds.addAll(this.missingNotices.keySet());
         factoryIds.addAll(this.restoredNotices.keySet());
@@ -87,32 +77,25 @@ public final class ObservationNoticeListener implements ObservationChangeListene
             Factory factory = this.manager.byId(factoryId).orElse(null);
             ServerPlayer player = factory == null ? null
                     : this.server.getPlayerList().getPlayer(factory.config().owner());
-            if (player == null) {
-                this.missingNotices.remove(factoryId);
-                this.restoredNotices.remove(factoryId);
-                continue;
-            }
             int missing = this.missingNotices.getOrDefault(factoryId, 0);
             int restored = this.restoredNotices.getOrDefault(factoryId, 0);
-            // 失联节流 10 秒防刷屏；恢复只节流 1 秒——机器回来时 IO 已经在跑，提示不该再等 10 秒。
-            boolean missingReady = missing > 0 && ready(this.lastMissingTick, factoryId, now,
-                    MISSING_INTERVAL);
-            boolean restoredReady = restored > 0 && ready(this.lastRestoredTick, factoryId, now,
-                    RESTORED_INTERVAL);
-            if (missingReady) {
+            this.missingNotices.remove(factoryId);
+            this.restoredNotices.remove(factoryId);
+            if (player == null) {
+                // 拥有者不在线：计数直接丢弃，留着只会越攒越旧。
+                continue;
+            }
+            if (missing > 0) {
+                // 走模组 HUD 条：和绑定杖、ME 杖、定位提示同一种底板，不用原版动作栏。
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
                                 net.minecraft.network.chat.Component.literal(missing + " 台机器失联"),
                                 io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.FAILURE));
-                this.missingNotices.remove(factoryId);
-                this.lastMissingTick.put(factoryId, now);
-            } else if (restoredReady) {
+            } else if (restored > 0) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
                         new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
                                 net.minecraft.network.chat.Component.literal(restored + " 台机器回来了"),
                                 io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.SUCCESS));
-                this.restoredNotices.remove(factoryId);
-                this.lastRestoredTick.put(factoryId, now);
             }
         }
     }
@@ -126,7 +109,6 @@ public final class ObservationNoticeListener implements ObservationChangeListene
     public void clear() {
         this.missingNotices.clear();
         this.restoredNotices.clear();
-        this.lastMissingTick.clear();
-        this.lastRestoredTick.clear();
+
     }
 }

@@ -210,7 +210,7 @@ public final class ObservationTable {
         @Nullable
         private ResourceLocation beTypeId;
         private boolean machineCapable;
-        private boolean energyCapable;
+    
         private boolean legacyContainer;
 
         Entry(BlockKey key) {
@@ -257,11 +257,6 @@ public final class ObservationTable {
         /** 是否具备机器能力（方块实体 + 任一能力 / 原版容器）。 */
         public boolean machineCapable() {
             return this.machineCapable;
-        }
-
-        /** 是否具备能量能力（不限面）。 */
-        public boolean energyCapable() {
-            return this.energyCapable;
         }
 
         /** 是不是原版 {@code Container}（没注册能力的模组方块兜底）。 */
@@ -318,7 +313,7 @@ public final class ObservationTable {
             }
             this.beTypeId = result.beTypeId();
             this.machineCapable = result.machineCapable();
-            this.energyCapable = result.energyCapable();
+
             this.legacyContainer = result.legacyContainer();
             this.observedAtTick = tick;
 

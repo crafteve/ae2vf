@@ -287,7 +287,10 @@ public final class CommandWand {
         }
         boolean hasEnergy = false;
         for (BlockKey block : added) {
-            if (this.runtime.observations().energyCapable(block)) {
+            // 直接探能力：绑定时观测往往还没扫到这一格，只读观测会漏补 FE 规则。
+            ServerLevel level = this.runtime.server().getLevel(block.dimension());
+            if (level != null && io.github.crafteve.idlefactory.io.EnergyPick
+                    .capable(level, block.pos())) {
                 hasEnergy = true;
                 break;
             }

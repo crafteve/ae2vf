@@ -65,16 +65,6 @@ public final class ObservationReader implements BlockFacts.Source {
         this.runner.refresh(key);
     }
 
-    /**
-     * 这个位置是否具备能量能力。
-     *
-     * @param key 位置键
-     * @return 具备为 {@code true}；没登记或没探到为 {@code false}
-     */
-    public boolean energyCapable(BlockKey key) {
-        ObservationTable.Entry entry = this.runner.table().get(key);
-        return entry != null && entry.energyCapable();
-    }
 
     /** 当前观测时钟。 */
     public long currentTick() {

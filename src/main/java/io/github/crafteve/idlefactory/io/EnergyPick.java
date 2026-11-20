@@ -20,8 +20,8 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * 接入时直接探一次 FE 能力，不依赖观测表。
  *
- * <p>观测表是「按 tick 扫描」的第二事实层：刚放下的方块还没被探到，{@code energyCapable}
- * 只能读回 {@code false}，自动补 FE 规则就会时灵时不灵。绑定是一次性操作，这里当场按六个面
+ * <p>观测表是「按 tick 扫描」的第二事实层：刚放下的方块还没被探到，只能读回未探测，
+ * 自动补 FE 规则就会时灵时不灵。绑定是一次性操作，这里当场按六个面
  * 建一次外部存储并模拟插入 1000 FE，结果立刻可用，也不改观测缓存。</p>
  */
 public final class EnergyPick {

@@ -40,14 +40,12 @@ public final class BlockProbe {
      * @param blockId         方块 id；未加载／维度不存在时为 {@code null}
      * @param beTypeId        方块实体类型 id；没有方块实体时为 {@code null}
      * @param machineCapable  有方块实体，且至少提供物品 / 流体 / 能量之一，或是原版容器
-     * @param energyCapable   提供能量能力（不限面）
-     * @param legacyContainer 是不是原版 {@code Container}（没注册能力的模组方块兜底）
+         * @param legacyContainer 是不是原版 {@code Container}（没注册能力的模组方块兜底）
      */
     public record Presence(Health health,
                            @Nullable ResourceLocation blockId,
                            @Nullable ResourceLocation beTypeId,
                            boolean machineCapable,
-                           boolean energyCapable,
                            boolean legacyContainer) {
 
         /**
@@ -57,7 +55,7 @@ public final class BlockProbe {
          * @return 空结果
          */
         public static Presence empty(Health health) {
-            return new Presence(health, null, null, false, false, false);
+            return new Presence(health, null, null, false, false);
         }
 
         /**
@@ -66,10 +64,7 @@ public final class BlockProbe {
          * @return 如 {@code machine+energy}；都没有时是 {@code none}
          */
         public String describe() {
-            if (!this.machineCapable) {
-                return "none";
-            }
-            return this.energyCapable ? "machine+energy" : "machine";
+            return this.machineCapable ? "machine" : "none";
         }
     }
 
@@ -94,7 +89,7 @@ public final class BlockProbe {
         ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity == null) {
-            return new Presence(Health.MISSING, blockId, null, false, false, false);
+            return new Presence(Health.MISSING, blockId, null, false, false);
         }
 
         ResourceLocation beTypeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntity.getType());
@@ -104,7 +99,7 @@ public final class BlockProbe {
         boolean legacy = blockEntity instanceof Container;
         boolean machine = item || fluid || energy || legacy;
         return new Presence(machine ? Health.PRESENT : Health.MISSING, blockId, beTypeId,
-                machine, energy, legacy);
+                machine, legacy);
     }
 
     /**
