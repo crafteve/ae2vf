@@ -176,7 +176,7 @@ final class NodeActions {
     private static void message(String text) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player != null) {
-            minecraft.player.displayClientMessage(Component.literal(text), true);
+            io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.neutral(Component.literal(text));
         }
     }
 }

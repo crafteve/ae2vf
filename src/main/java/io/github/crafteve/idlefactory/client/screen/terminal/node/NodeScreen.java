@@ -425,8 +425,13 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     @Override
     public void acceptCommandResult(CommandResult result) {
         if (!result.ok() && this.minecraft != null && this.minecraft.player != null) {
-            this.minecraft.player.displayClientMessage(
-                    Component.literal(CommandText.text(result)), true);
+            if (result.ok()) {
+                    io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.success(
+                            Component.literal(CommandText.text(result)));
+                } else {
+                    io.github.crafteve.idlefactory.client.screen.hud.HUDRenderer.failure(
+                            Component.literal(CommandText.text(result)));
+                }
         }
     }
 
