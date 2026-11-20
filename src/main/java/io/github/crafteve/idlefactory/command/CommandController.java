@@ -66,6 +66,9 @@ public final class CommandController {
                     player.displayClientMessage(
                             net.minecraft.network.chat.Component.literal(live.capacityReport()),
                             false);
+                } else {
+                    // 绑定这一 tick 活节点还没建出来：排到后面几 tick 再打印。
+                    CapacityReportQueue.schedule(player, result.nodeId());
                 }
             }
             return result;

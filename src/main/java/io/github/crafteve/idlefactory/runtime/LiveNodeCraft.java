@@ -268,25 +268,30 @@ final class LiveNodeCraft implements ICraftingProvider {
             }
             any = true;
             var perPortion = perPortion(details);
+            StringBuilder keys = new StringBuilder();
+            perPortion.forEach((key, amount) -> keys.append(' ').append(key).append('×').append(amount));
+            out.append("\n槽 ").append(slot).append("：").append(keys);
             long total = 0L;
-            out.append("\n槽 ").append(slot).append("：每份 ").append(perPortion.size())
-                    .append(" 种资源，各机器可装");
             for (Machine machine : online) {
                 long fit = this.node.capacityPick().portionsThatFit(machine, perPortion);
                 total += fit;
-                out.append(' ').append(fit);
+                out.append("\n  ").append(machine.block().pos().toShortString()).append("：可装 ")
+                        .append(fit);
+                perPortion.forEach((key, amount) -> {
+                    var pick = this.node.facePick().pick(machine, key, IoSide.INPUT, null, null);
+                    if (!pick.picked()) {
+                        out.append("；").append(key).append(" 选面失败 ").append(pick.failure());
+                        return;
+                    }
+                    var storage = this.node.ports().storage(machine, pick.face());
+                    long sim = storage == null ? -1L
+                            : storage.insert(key, amount, appeng.api.config.Actionable.SIMULATE,
+                                    io.github.crafteve.idlefactory.resource.AeKeyAdapter.SOURCE);
+                    out.append("；").append(pick.face()).append(" 单份 ").append(sim).append('/')
+                            .append(amount);
+                });
             }
-            out.append(" → 合计 ").append(total).append(" → ×")
-                    .append(Math.max(1L, total / 4L));
-            AEKey first = perPortion.keySet().stream().findFirst().orElse(null);
-            if (first != null) {
-                out.append("\n  首行 ").append(first).append(" 选面：");
-                for (Machine machine : online) {
-                    var pick = this.node.facePick().pick(machine, first, IoSide.INPUT, null, null);
-                    out.append(' ').append(pick.picked()
-                            ? pick.face().toString() : pick.failure().toString());
-                }
-            }
+            out.append("\n  合计 ").append(total).append(" → ×").append(Math.max(1L, total / 4L));
         }
         if (!any) {
             out.append("（没有可解码的处理样板）");
