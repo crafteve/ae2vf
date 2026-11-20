@@ -9,11 +9,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Hit;
-import io.github.crafteve.idlefactory.view.MemberSnapshot;
 import io.github.crafteve.idlefactory.view.ViewMachine;
 import io.github.crafteve.idlefactory.view.ViewNode;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -23,12 +20,8 @@ import net.minecraft.network.chat.TextColor;
 /**
  * 节点终端的 tooltip：节点、provider 键、机器行、定位与占位按钮的说明。
  *
- * <p>只把视图里已有的字段拼成文字，不重新判断状态；状态文案取 {@code status().text()}，
- * 坐标取成员主方块。</p>
- *
- * <p>第 3a 步同时保留两种入口：{@link #of(List, Hit)} 吃旧的 {@link NodeRow}，
- * {@link #ofViews(List, Hit)} 吃视图表的 {@link ViewNode}。两边的文字拼装共用同一批私有方法，
- * 第 3c 步删除旧入口。</p>
+ * <p>只把视图表里已有的字段拼成文字，不重新判断状态；状态文案取 {@link FactoryStatus#text()}，
+ * 坐标取成员机器的方块。</p>
  */
 final class FactoryNodeTooltip {
     private FactoryNodeTooltip() {
@@ -36,65 +29,14 @@ final class FactoryNodeTooltip {
     }
 
     /**
-     * 构造 tooltip（旧入口：模型行）。
-     *
-     * @param rows 模型行
-     * @param hit  命中；{@code null} 时返回空列表
-     * @return 文本行
-     */
-    static List<Component> of(List<NodeRow> rows, @Nullable Hit hit) {
-        if (hit == null || hit.node() < 0 || hit.node() >= rows.size()) {
-            return List.of();
-        }
-        NodeRow node = rows.get(hit.node());
-        return switch (hit.kind()) {
-            case NODE, NAME -> nodeLines(node.name(), node.status(),
-                    node.view().provider().available(),
-                    node.view().provider().blocking().isOn(), node.view().machineCount(),
-                    node.view().ruleCount(), node.view().patternCount(), node.view().pendingCount(),
-                    node.view().pendingOldestAt(), firstMemberText(node));
-            case BLOCKING -> providerLines(node.view().provider().available(), "阻挡",
-                    node.view().provider().blocking().isOn() ? "开" : "关", "左键切换");
-            case MULTIPLIER -> multiplierLines();
-            case DISPATCH -> dispatchLines();
-            case EDIT -> editLines();
-            case DELETE -> deleteLines(node.view().configured(), node.view().ruleCount(),
-                    node.view().patternCount(), node.view().autoEnergyOnly());
-            case MEMBER -> {
-                if (hit.member() < 0 || hit.member() >= node.members().size()) {
-                    yield List.of();
-                }
-                MemberRow member = node.members().get(hit.member());
-                MemberSnapshot view = member.member();
-                yield memberLines(member.label(), view.dimensionId().toString(),
-                        view.primaryPos() == null ? "未知" : view.primaryPos().toShortString(),
-                        view.health().describe());
-            }
-            case LOCATE -> {
-                if (hit.member() < 0 || hit.member() >= node.members().size()) {
-                    yield List.of();
-                }
-                MemberSnapshot view = node.members().get(hit.member()).member();
-                yield locateLines(view.dimensionId().toString(),
-                        view.primaryPos() == null ? "未知" : view.primaryPos().toShortString());
-            }
-            case MORE -> moreLines(node.members().size());
-        };
-    }
-
-    /**
-     * 构造 tooltip（视图表入口）。
-     *
-     * <p>与 {@link #of(List, Hit)} 的区别只在数据来源：视图表把节点结论、规则与机器都算好了，
-     * 这里不再看 {@code NodeSnapshot}。</p>
+     * 构造 tooltip。
      *
      * @param nodes 节点行
      * @param theme 当前主题，状态文字取色用
      * @param hit   命中；{@code null} 时返回空列表
      * @return 文本行
      */
-    static List<Component> ofViews(List<ViewNode> nodes, FactoryGuiTheme theme,
-            @Nullable Hit hit) {
+    static List<Component> of(List<ViewNode> nodes, FactoryGuiTheme theme, @Nullable Hit hit) {
         if (hit == null || hit.node() < 0 || hit.node() >= nodes.size()) {
             return List.of();
         }
@@ -117,9 +59,9 @@ final class FactoryNodeTooltip {
                     yield List.of();
                 }
                 ViewMachine machine = node.machines().get(hit.member());
-                yield memberLines("#" + (hit.member() + 1),
-                        machine.block().dimension().location().toString(),
-                        machine.block().pos().toShortString(), machine.health().describe());
+                yield memberLines("#" + (hit.member() + 1), machine.block().dimension().location()
+                        .toString(), machine.block().pos().toShortString(),
+                        machine.health().describe());
             }
             case LOCATE -> {
                 if (hit.member() < 0 || hit.member() >= node.machines().size()) {
@@ -139,19 +81,9 @@ final class FactoryNodeTooltip {
      * @param node 节点行
      * @return 显示名
      */
-    private static String displayName(ViewNode node) {
+    static String displayName(ViewNode node) {
         return node.core().name() != null
                 ? node.core().name() : FactoryLabels.blockName(node.core().typeBlockId());
-    }
-
-    @Nullable
-    private static String firstMemberText(NodeRow node) {
-        if (node.members().isEmpty()) {
-            return null;
-        }
-        MemberSnapshot first = node.members().get(0).member();
-        return first.dimensionId() + " " + (first.primaryPos() == null
-                ? "未知" : first.primaryPos().toShortString());
     }
 
     @Nullable
@@ -238,8 +170,8 @@ final class FactoryNodeTooltip {
     /**
      * 悬停提示里说明「要删掉什么」：规则、样板，还是两者都有。
      *
-     * @param ruleCount     规则条数
-     * @param patternCount  样板份数
+     * @param ruleCount    规则条数
+     * @param patternCount 样板份数
      * @return 说明文字
      */
     private static String configuredText(int ruleCount, int patternCount) {

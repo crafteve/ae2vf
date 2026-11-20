@@ -53,18 +53,20 @@ public final class FactoryNodeSearchFields {
      * <p>计数与代表成员都从节点行自己取：{@code machines} 的顺序就是加入顺序，与旧快照的
      * "第一台"语义一致，所以两个终端对同一节点给出的坐标相同。</p>
      *
-     * @param view  节点行
-     * @param theme 当前主题，状态文字取色用
+     * @param view         节点行
+     * @param theme        当前主题，状态文字取色用
+     * @param patternCount 样板份数；传 -1 表示省略该段（被动 IO 终端不看样板）
      * @return 搜索字段
      */
-    public static FactorySearchQuery.Fields of(ViewNode view, FactoryGuiTheme theme) {
+    public static FactorySearchQuery.Fields of(ViewNode view, FactoryGuiTheme theme,
+            int patternCount) {
         ViewMachine first = view.machines().isEmpty() ? null : view.machines().get(0);
         return build(view.core().name() != null
                         ? view.core().name() : FactoryLabels.blockName(view.core().typeBlockId()),
                 view.core().typeBlockId(), FactoryStatus.of(view.core(), theme).text(),
                 first == null ? null : first.block().dimension().location().toString(),
                 first == null ? null : first.block().pos(),
-                view.machineCount(), view.ruleCount(), view.core().patternCount());
+                view.machineCount(), view.ruleCount(), patternCount);
     }
 
     /**

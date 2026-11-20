@@ -78,7 +78,7 @@ public final class FactoryUiText {
      * @return 上/下/北/南/东/西/任意
      */
     static String faceName(ResourceSpec spec) {
-        return FactoryLabels.face(spec);
+        return spec.face() == null ? "任意" : FactoryLabels.face(spec.face());
     }
 
     /**

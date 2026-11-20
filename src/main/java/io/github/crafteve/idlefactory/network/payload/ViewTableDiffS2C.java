@@ -53,12 +53,12 @@ public record ViewTableDiffS2C(int containerId, long baseRevision, long revision
     }
 
     /**
-     * 客户端处理：第 3b 步接入 {@code ClientViewTableHandler}。
+     * 客户端处理：转发给当前屏幕的视图表投递口。
      *
      * @param payload 负载
      * @param context 上下文
      */
     public static void handle(ViewTableDiffS2C payload, IPayloadContext context) {
-        // 3b 之前客户端不消费新通道，保留空实现避免提前引入半成品处理器。
+        io.github.crafteve.idlefactory.client.network.ClientViewTableHandler.accept(payload);
     }
 }

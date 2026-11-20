@@ -70,15 +70,13 @@ final class FactoryNodeActions {
      * @param member 成员
      */
     static void locate(NodeRow node, MemberRow member) {
-        var pos = member.member().primaryPos();
-        if (pos == null) {
-            message("这个成员没有可用坐标");
-            return;
-        }
+        net.minecraft.core.BlockPos pos = member.machine().block().pos();
+        net.minecraft.resources.ResourceLocation dimension =
+                member.machine().block().dimension().location();
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null
-                || !minecraft.level.dimension().location().equals(member.member().dimensionId())) {
-            message("节点在 " + member.member().dimensionId() + " " + pos.toShortString());
+                || !minecraft.level.dimension().location().equals(dimension)) {
+            message("节点在 " + dimension + " " + pos.toShortString());
             return;
         }
         FactoryLocateRenderer.show(minecraft.level.dimension(), pos);
@@ -131,7 +129,7 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void cycleMultiplier(int containerId, NodeRow node) {
-        Multiplier current = node.view().provider().multiplier();
+        Multiplier current = node.view().core().multiplier();
         MultiplierMode mode;
         int factor;
         if (current.mode() == MultiplierMode.OFF) {
@@ -158,7 +156,7 @@ final class FactoryNodeActions {
      * @param node        节点
      */
     static void toggleDispatch(int containerId, NodeRow node) {
-        DispatchMode next = node.view().provider().dispatch() == DispatchMode.ROUND_ROBIN
+        DispatchMode next = node.view().core().dispatch() == DispatchMode.ROUND_ROBIN
                 ? DispatchMode.SEQUENTIAL : DispatchMode.ROUND_ROBIN;
         send(containerId, node.nodeId(), CommandKind.PROVIDER_DISPATCH,
                 new FactoryCommand.Dispatch(next));

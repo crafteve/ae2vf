@@ -18,12 +18,12 @@ public final class ClientNodeTableHandler {
     /**
      * 处理节点表。
      *
+     * <p>节点终端已改用视图表通道，旧节点表服务端不再主动发；这里保留空实现只为让旧报文的
+     * 注册点在第 3c 步一起删除。</p>
+     *
      * @param payload 负载
      */
     public static void handle(FactoryNodeTableS2C payload) {
-        if (Minecraft.getInstance().screen instanceof FactoryNodeScreen screen
-                && screen.containerId() == payload.containerId()) {
-            screen.acceptNodeTable(payload);
-        }
+        // 旧读通道已停用，第 3c 步随报文一起删除。
     }
 }

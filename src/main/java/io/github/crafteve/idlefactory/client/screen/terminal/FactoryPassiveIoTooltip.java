@@ -13,7 +13,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoMod
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 
 import net.minecraft.ChatFormatting;
@@ -73,8 +72,8 @@ final class FactoryPassiveIoTooltip {
         lines.add(Component.literal(block.name()).withStyle(ChatFormatting.BOLD));
         lines.add(Component.literal(block.status().text()).withStyle(
                 style -> style.withColor(TextColor.fromRgb(block.status().color() & 0xFFFFFF))));
-        lines.add(Component.literal(block.machine().dimension().location()
-                + " " + block.machine().pos().toShortString()).withStyle(ChatFormatting.GRAY));
+        lines.add(Component.literal(block.machine().block().dimension().location()
+                + " " + block.machine().block().pos().toShortString()).withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal("机器 " + block.machineCount() + " 台")
                 .withStyle(ChatFormatting.GRAY));
         lines.add(Component.literal("规则 " + block.rules().size() + " 条")
@@ -83,15 +82,14 @@ final class FactoryPassiveIoTooltip {
     }
 
     private static List<Component> rule(BlockView block, RuleRow row) {
-        ResourceSpec spec = row.spec();
         List<Component> lines = new ArrayList<>(6);
-        lines.add(Component.literal(FactoryLabels.name(spec.key())).withStyle(ChatFormatting.BOLD));
+        lines.add(Component.literal(FactoryLabels.name(row.key())).withStyle(ChatFormatting.BOLD));
         lines.add(line("方向", row.input() ? "输入" : "输出"));
-        lines.add(line("面", spec.face() == null ? "任意" : FactoryLabels.face(spec)));
-        if (spec.key() instanceof AEItemKey) {
-            lines.add(line("模式", spec.mode() == MatchMode.EXACT ? "精确" : "模糊"));
+        lines.add(line("面", row.face() == null ? "任意" : FactoryLabels.face(row.face())));
+        if (row.key() instanceof AEItemKey) {
+            lines.add(line("模式", row.mode() == MatchMode.EXACT ? "精确" : "模糊"));
         }
-        lines.add(line("速率", FactoryLabels.rateText(row.rate(), spec.key())));
+        lines.add(line("速率", FactoryLabels.rateText(row.rate(), row.key())));
         IoReason reason = FactoryLabels.effectiveReason(row.rate(), row.reason());
         if (reason != IoReason.RUN) {
             lines.add(line("原因", FactoryLabels.reason(reason, row.input())));

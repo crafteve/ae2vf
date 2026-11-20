@@ -19,7 +19,6 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLay
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.io.IoReason;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
@@ -224,7 +223,7 @@ final class FactoryPassiveIoRender {
         int slotX = FactoryPassiveIoLayout.headerX(viewport);
         FactoryNineSlice.slot(graphics, slotX, top + 1, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        ItemStack icon = block.nodeStatus().health() == NodeHealth.OFFLINE
+        ItemStack icon = block.node().core().health() == NodeHealth.OFFLINE
                 ? new ItemStack(Items.BARRIER) : FactoryLabels.blockStack(block.machine().blockId());
         graphics.renderItem(icon.isEmpty() ? new ItemStack(Items.BARRIER) : icon,
                 slotX + 1, top + 2);
@@ -310,7 +309,7 @@ final class FactoryPassiveIoRender {
         int chipX = FactoryPassiveIoLayout.chipX(viewport, 0);
         int textY = y + (FactoryPassiveIoLayout.ROW_H - 8) / 2;
         graphics.drawString(this.font,
-                ellipsize(FactoryLabels.name(rule.spec().key()), chipX - 2 - nameX), nameX,
+                ellipsize(FactoryLabels.name(rule.key()), chipX - 2 - nameX), nameX,
                 textY, this.theme.textPrimary(), false);
         drawChips(graphics, viewport, rule, y, chipIndex(hover, box.index(), index));
         drawRate(graphics, rule, textY,
@@ -334,7 +333,7 @@ final class FactoryPassiveIoRender {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), 0, 0);
+        FactoryResourceIconRender.draw(graphics, this.font, rule.key(), 0, 0);
         graphics.pose().popPose();
     }
 
@@ -344,12 +343,12 @@ final class FactoryPassiveIoRender {
         drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 0), cy,
                 directionLabel(rule), directionColor(rule), 0xFFFFFFFF, true,
                 hoveredChip == 0);
-        drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 1), cy, faceLabel(rule.spec()),
+        drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 1), cy, faceLabel(rule),
                 this.theme.bevelLight(), this.theme.textPrimary(), true, hoveredChip == 1);
-        boolean item = rule.spec().key() instanceof AEItemKey;
-        drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 2), cy, modeLabel(rule.spec()),
-                item ? modeColor(rule.spec()) : this.theme.bevelLight(),
-                item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
+        boolean item = rule.key() instanceof AEItemKey;
+        drawChip(graphics, FactoryPassiveIoLayout.chipX(viewport, 2), cy, modeLabel(rule),
+                item ? modeColor(rule) : this.theme.bevelLight(),
+                item ? modeTextColor(rule) : this.theme.textDim(), item, hoveredChip == 2);
     }
 
     /**
@@ -395,10 +394,10 @@ final class FactoryPassiveIoRender {
      * @return 速率文案
      */
     private static String rateText(RuleRow rule) {
-        if (AeKeyAdapter.isEnergy(rule.spec().key())) {
+        if (AeKeyAdapter.isEnergy(rule.key())) {
             return FactoryLabels.count(rule.rate()) + "/s";
         }
-        return FactoryLabels.rateText(rule.rate(), rule.spec().key());
+        return FactoryLabels.rateText(rule.rate(), rule.key());
     }
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
@@ -418,23 +417,23 @@ final class FactoryPassiveIoRender {
         int slotX = x + FactoryPassiveIoLayout.TILE_INSET;
         FactoryNineSlice.slot(graphics, slotX, y + 2, FactoryPassiveIoLayout.SLOT,
                 FactoryPassiveIoLayout.SLOT);
-        FactoryResourceIconRender.draw(graphics, this.font, rule.spec().key(), slotX + 1, y + 3);
+        FactoryResourceIconRender.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
         int nameX = x + FactoryPassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
-                ellipsize(FactoryLabels.name(rule.spec().key()), TILE_NAME_W), nameX, y + 7,
+                ellipsize(FactoryLabels.name(rule.key()), TILE_NAME_W), nameX, y + 7,
                 this.theme.textPrimary(), false);
         int chipY = y + FactoryPassiveIoLayout.TILE_CHIP_Y;
         int hoveredChip = chipIndex(hover, blockIndex, index);
         drawChip(graphics, slotX, chipY, directionLabel(rule), directionColor(rule), 0xFFFFFFFF,
                 true, hoveredChip == 0);
         drawChip(graphics, slotX + FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP, chipY,
-                faceLabel(rule.spec()), this.theme.bevelLight(), this.theme.textPrimary(), true,
+                faceLabel(rule), this.theme.bevelLight(), this.theme.textPrimary(), true,
                 hoveredChip == 1);
-        boolean item = rule.spec().key() instanceof AEItemKey;
+        boolean item = rule.key() instanceof AEItemKey;
         drawChip(graphics, slotX + (FactoryPassiveIoLayout.CHIP + FactoryPassiveIoLayout.GAP) * 2,
-                chipY, modeLabel(rule.spec()),
-                item ? modeColor(rule.spec()) : this.theme.bevelLight(),
-                item ? modeTextColor(rule.spec()) : this.theme.textDim(), item, hoveredChip == 2);
+                chipY, modeLabel(rule),
+                item ? modeColor(rule) : this.theme.bevelLight(),
+                item ? modeTextColor(rule) : this.theme.textDim(), item, hoveredChip == 2);
         String rate = ellipsize(rateText(rule), TILE_RATE_W);
         int rateRight = x + FactoryPassiveIoLayout.TILE_W - 2;
         IoReason reason = FactoryLabels.effectiveReason(rule.rate(), rule.reason());
@@ -497,22 +496,22 @@ final class FactoryPassiveIoRender {
         return rule.input() ? "入" : "出";
     }
 
-    private static String faceLabel(ResourceSpec spec) {
-        return spec.face() == null ? "任" : FactoryLabels.face(spec);
+    private static String faceLabel(RuleRow rule) {
+        return rule.face() == null ? "任" : FactoryLabels.face(rule.face());
     }
 
-    private static String modeLabel(ResourceSpec spec) {
+    private static String modeLabel(RuleRow spec) {
         // 非物品固定精确，chip 仍然写「精」但灰显禁用，保持和物品规则同一套外形。
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? "精" : "模";
     }
 
-    private int modeColor(ResourceSpec spec) {
+    private int modeColor(RuleRow spec) {
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? this.theme.io().modeExact() : this.theme.io().modeFuzzy();
     }
 
-    private int modeTextColor(ResourceSpec spec) {
+    private int modeTextColor(RuleRow spec) {
         return spec.mode() == io.github.crafteve.idlefactory.machine.MatchMode.EXACT
                 ? this.theme.io().modeExactText() : this.theme.io().modeFuzzyText();
     }

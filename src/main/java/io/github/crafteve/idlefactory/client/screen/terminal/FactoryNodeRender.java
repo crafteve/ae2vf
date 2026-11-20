@@ -16,12 +16,9 @@ import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.H
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Kind;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.NodeBox;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeLayout.Viewport;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.MemberRow;
-import io.github.crafteve.idlefactory.client.screen.terminal.FactoryNodeModel.NodeRow;
 import io.github.crafteve.idlefactory.io.DispatchMode;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
-import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.view.ViewMachine;
 import io.github.crafteve.idlefactory.view.ViewNode;
 import io.github.crafteve.idlefactory.view.ViewNodeCore;
@@ -93,24 +90,11 @@ final class FactoryNodeRender {
     }
 
     /**
-     * 画整个内容区（旧入口：模型行）。
-     */
-    void draw(GuiGraphics graphics, FactoryNodeLayout layout, List<NodeRow> rows, int scroll,
-            @Nullable Hit hover, @Nullable java.util.UUID pendingDelete, String emptyText) {
-        List<CardData> cards = new ArrayList<>(rows.size());
-        for (NodeRow row : rows) {
-            cards.add(cardOf(row));
-        }
-        drawCards(graphics, layout, cards, scroll, hover, pendingDelete, emptyText);
-    }
-
-    /**
-     * 画整个内容区（视图表入口）。
+     * 画整个内容区。
      *
-     * <p>与 {@link #draw} 共用同一套绘制：节点结论、规则与机器已在服务端算好，这里只把
-     * 状态映射成颜色与贴图。</p>
+     * <p>节点结论、规则与机器都已在服务端算好，这里只把状态映射成颜色与贴图。</p>
      */
-    void drawNodes(GuiGraphics graphics, FactoryNodeLayout layout, List<ViewNode> nodes, int scroll,
+    void draw(GuiGraphics graphics, FactoryNodeLayout layout, List<ViewNode> nodes, int scroll,
             @Nullable Hit hover, @Nullable java.util.UUID pendingDelete, String emptyText) {
         List<CardData> cards = new ArrayList<>(nodes.size());
         for (ViewNode node : nodes) {
@@ -231,28 +215,6 @@ final class FactoryNodeRender {
                 hovered(hover, box.index(), Kind.DELETE));
         drawCross(graphics, deleteX, actionY, FactoryNodeLayout.ACTION_W,
                 FactoryNodeLayout.ACTION_H, armed ? 0xFFFFFFFF : this.theme.error());
-    }
-
-    /**
-     * 旧入口的绘制数据：从模型行取。
-     *
-     * @param row 模型行
-     * @return 卡片数据
-     */
-    private CardData cardOf(NodeRow row) {
-        NodeStatus status = row.view().status();
-        List<MemberCardData> members = new ArrayList<>(row.members().size());
-        for (MemberRow member : row.members()) {
-            members.add(new MemberCardData(member.label(), member.member().blockId(),
-                    member.status()));
-        }
-        return new CardData(row.nodeId(), row.name(), row.status(),
-                statusHint(status.probed(), status.stale(), status.health(),
-                        row.view().provider().available()),
-                status.probed() && status.health().isOnline(), row.view().typeBlockId(),
-                row.view().provider().available(), row.view().provider().blocking().isOn(),
-                row.view().provider().multiplier(), row.view().provider().dispatch(),
-                row.view().machineCount(), members);
     }
 
     /**

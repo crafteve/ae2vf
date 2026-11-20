@@ -113,7 +113,7 @@ final class FactoryPassiveIoProbe {
         }
         for (int i = 0; i < block.rules().size(); i++) {
             if ("minecraft:redstone".equals(
-                    block.rules().get(i).spec().key().getId().toString())) {
+                    block.rules().get(i).key().getId().toString())) {
                 return i;
             }
         }
@@ -152,9 +152,9 @@ final class FactoryPassiveIoProbe {
             StringBuilder rules = new StringBuilder();
             for (RuleRow rule : block.rules()) {
                 rules.append(' ').append(rule.input() ? "IN" : "OUT").append(':')
-                        .append(rule.spec().key().getId()).append(':')
-                        .append(rule.spec().face() == null ? "any" : rule.spec().face().getName())
-                        .append(':').append(rule.spec().mode()).append(':').append(rule.rate());
+                        .append(rule.key().getId()).append(':')
+                        .append(rule.face() == null ? "any" : rule.face().getName())
+                        .append(':').append(rule.mode()).append(':').append(rule.rate());
             }
             IdleFactory.LOGGER.info("[ui-probe] block[{}] {} status={} missing={} rules={}{}",
                     i, block.name(), block.status().text(), !block.machine().health().isOnline(),

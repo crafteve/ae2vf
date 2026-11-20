@@ -62,15 +62,12 @@ public record ViewTableS2C(int containerId, long revision, int pageIndex, int pa
     }
 
     /**
-     * 客户端处理：第 3b 步接入 {@code ClientViewTableHandler}。
-     *
-     * <p>本步只打通通道与服务端出口，客户端仍是旧读通道，收到新包直接丢弃；等 3b 切换后
-     * 这里会转发给屏幕的数据源。</p>
+     * 客户端处理：转发给当前屏幕的视图表投递口。
      *
      * @param payload 负载
      * @param context 上下文
      */
     public static void handle(ViewTableS2C payload, IPayloadContext context) {
-        // 3b 之前客户端不消费新通道，保留空实现避免提前引入半成品处理器。
+        io.github.crafteve.idlefactory.client.network.ClientViewTableHandler.accept(payload);
     }
 }

@@ -18,7 +18,7 @@ import appeng.client.gui.widgets.SettingToggleButton;
 import appeng.core.AEConfig;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
-import io.github.crafteve.idlefactory.view.NodeSnapshot;
+
 import io.github.crafteve.idlefactory.client.screen.FactoryConfirmDialog;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
@@ -56,7 +56,11 @@ import io.github.crafteve.idlefactory.menu.FactorySortMode;
 import io.github.crafteve.idlefactory.client.CommandMessages;
 import io.github.crafteve.idlefactory.command.CommandResult;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
+import io.github.crafteve.idlefactory.client.screen.ViewTableSink;
+import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
+import io.github.crafteve.idlefactory.view.ViewNode;
+import io.github.crafteve.idlefactory.view.ViewTable;
+import io.github.crafteve.idlefactory.view.ViewTableDiff;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
@@ -80,7 +84,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 还没有后端，按钮保留但只提示「待接入」。</p>
  */
 public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
-        implements FactoryFeedbackSink {
+        implements FactoryFeedbackSink, ViewTableSink {
     /** 最少内容行数。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -107,6 +111,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private int rows = MIN_ROWS;
     private final FactoryNodeModel model;
+    /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
+    private final ViewTableSink.Buffer viewTable = new ViewTableSink.Buffer();
     /** 当前排序档位；初值来自物品组件，切换后回写。 */
     private FactorySortMode sortMode;
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
@@ -217,7 +223,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         drawRenameBox(graphics, mouseX, mouseY, partialTick);
         // 浮层打开时不再画底层的 tooltip：原版 tooltip 在 z=400，会压在弹窗上。
         boolean dialogOpen = this.confirmDialog != null && this.confirmDialog.isOpen();
-        List<Component> tooltip = FactoryNodeTooltip.of(this.model.rows(), hover);
+        List<Component> tooltip = FactoryNodeTooltip.of(this.model.visibleNodes(),
+                FactoryGuiTheme.current(), hover);
         if (!tooltip.isEmpty() && !dialogOpen) {
             graphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
         }
@@ -236,7 +243,7 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         graphics.enableScissor(viewport.x(), viewport.y(),
                 viewport.x() + viewport.width(), viewport.y() + viewport.height());
         try {
-            content.draw(graphics, current, this.model.rows(), this.scroll, hover, null,
+            content.draw(graphics, current, this.model.visibleNodes(), this.scroll, hover, null,
                     emptyText());
         } finally {
             graphics.disableScissor();
@@ -346,20 +353,47 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         return this.menu.containerId;
     }
 
+    @Override
+    public void acceptFullPage(int containerId, long revision, int pageIndex, int pageCount,
+            ViewTable page) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.viewTable.acceptPage(revision, pageIndex, pageCount, page);
+        if (merged != null) {
+            acceptTable(merged);
+        }
+    }
+
+    @Override
+    public void acceptDiff(int containerId, ViewTableDiff diff) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.viewTable.acceptDiff(diff);
+        if (merged == null) {
+            // 版本对不上：丢弃这一版，下一轮请求会带着已知版本重新要全量。
+            this.viewTable.reset();
+            requestTable();
+            return;
+        }
+        acceptTable(merged);
+    }
+
     /**
-     * 接收节点表并重建排版。
+     * 接收拼装完成的视图表并重建排版。
      *
-     * @param payload 节点表
+     * @param table 视图表
      */
-    public void acceptNodeTable(FactoryNodeTableS2C payload) {
+    private void acceptTable(ViewTable table) {
         // 改名框 / 删除确认框打开时冻结行序：快照照常更新数据，但列表不在用户操作期间跳动。
         this.model.setSortFrozen(this.renameBox != null
                 || (this.confirmDialog != null && this.confirmDialog.isOpen()));
         this.model.setSortContext(this.sortContext());
-        this.model.accept(payload);
-        // 快照里已经消失的节点不再占用展开状态；搜索过滤不会误删展开状态。
+        this.model.accept(table);
+        // 表里已经消失的节点不再占用展开状态；搜索过滤不会误删展开状态。
         Set<UUID> alive = new HashSet<>();
-        for (var node : payload.nodes()) {
+        for (ViewNode node : table.nodes()) {
             alive.add(node.nodeId());
         }
         this.expanded.retainAll(alive);
@@ -497,9 +531,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             case NODE -> toggleExpanded(node.nodeId());
             case NAME -> beginRename(hit.node(), node);
             case BLOCKING -> {
-                if (node.view().provider().available()) {
+                if (node.view().core().available()) {
                     FactoryNodeActions.setBlocking(this.menu.containerId, node,
-                            !node.view().provider().blocking().isOn());
+                            !node.view().core().blocking().isOn());
                 }
             }
             case MULTIPLIER -> FactoryNodeActions.cycleMultiplier(this.menu.containerId, node);
@@ -544,7 +578,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         this.renameBox = new FactorySearchEditBox(this.font, x, top + 5, width, RENAME_H,
                 FactoryGuiTheme.current(), Component.literal("节点名"),
                 FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
-        this.renameBox.setValue(node.view().name() == null ? "" : node.view().name());
+        this.renameBox.setValue(node.view().core().name() == null ? ""
+                : node.view().core().name());
         this.renameBox.setMaxLength(io.github.crafteve.idlefactory.config.IdleFactoryConfig.maxNameLength());
         this.renameBox.setFocused(true);
         // 搜索框让出焦点，避免两个输入框的焦点框同时亮着。
@@ -654,9 +689,9 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param view 节点视图
      * @return 说明文字
      */
-    private static String deleteDetail(NodeSnapshot view) {
+    private static String deleteDetail(ViewNode view) {
         int rules = view.ruleCount();
-        int patterns = view.patternCount();
+        int patterns = view.core().patternCount();
         if (rules > 0 && patterns > 0) {
             return "有 " + rules + " 条 IO 规则、" + patterns + " 份样板，删除后不可恢复。";
         }
@@ -711,7 +746,8 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
 
     private void requestTable() {
         if (this.minecraft != null && this.minecraft.player != null) {
-            PacketDistributor.sendToServer(new FactoryNodeTableRequestC2S(this.menu.containerId));
+            PacketDistributor.sendToServer(
+                    new ViewTableRequestC2S(this.menu.containerId, this.viewTable.revision()));
         }
     }
 

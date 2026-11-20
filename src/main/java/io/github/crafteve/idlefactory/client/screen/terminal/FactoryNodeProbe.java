@@ -38,7 +38,7 @@ final class FactoryNodeProbe {
                 yield true;
             }
             case GLFW.GLFW_KEY_F7 -> {
-                boolean next = !first.view().provider().blocking().isOn();
+                boolean next = !first.view().core().blocking().isOn();
                 FactoryNodeActions.setBlocking(screen.containerId(), first, next);
                 yield true;
             }
@@ -94,8 +94,8 @@ final class FactoryNodeProbe {
             IdleFactory.LOGGER.info("[ui-probe] node[{}] {} status={} members={} rules={} "
                             + "patterns={} blocking={} available={}", i, row.name(),
                     row.status().text(), row.view().machineCount(), row.view().ruleCount(),
-                    row.view().patternCount(), row.view().provider().blocking(),
-                    row.view().provider().available());
+                    row.view().core().patternCount(), row.view().core().blocking(),
+                    row.view().core().available());
         }
     }
 

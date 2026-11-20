@@ -49,7 +49,7 @@ final class FactoryPassiveIoActions {
         IoSide target = rule.side() == IoSide.INPUT ? IoSide.OUTPUT : IoSide.INPUT;
         probe("flip", block, rule, "-> " + target);
         sendRule(containerId, block.nodeId(), CommandKind.RULE_MOVE, rule.side(),
-                rule.spec().key(), rule.spec().face(), rule.spec().mode(), target);
+                rule.key(), rule.face(), rule.mode(), target);
     }
 
     /**
@@ -62,10 +62,10 @@ final class FactoryPassiveIoActions {
      */
     static void cycleFace(int containerId, FactoryPassiveIoModel.BlockView block,
             FactoryPassiveIoModel.RuleRow rule, boolean backwards) {
-        Direction next = backwards ? previousFace(rule.spec().face()) : nextFace(rule.spec().face());
+        Direction next = backwards ? previousFace(rule.face()) : nextFace(rule.face());
         probe("face", block, rule, String.valueOf(next));
         sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
-                rule.spec().key(), next, rule.spec().mode(), null);
+                rule.key(), next, rule.mode(), null);
     }
 
     /**
@@ -77,14 +77,14 @@ final class FactoryPassiveIoActions {
      */
     static void toggleMode(int containerId, FactoryPassiveIoModel.BlockView block,
             FactoryPassiveIoModel.RuleRow rule) {
-        if (!(rule.spec().key() instanceof AEItemKey)) {
+        if (!(rule.key() instanceof AEItemKey)) {
             return;
         }
-        MatchMode next = rule.spec().mode() == MatchMode.EXACT
+        MatchMode next = rule.mode() == MatchMode.EXACT
                 ? MatchMode.IGNORE_COMPONENTS : MatchMode.EXACT;
         probe("mode", block, rule, next.name());
         sendRule(containerId, block.nodeId(), CommandKind.RULE_UPDATE, rule.side(),
-                rule.spec().key(), rule.spec().face(), next, null);
+                rule.key(), rule.face(), next, null);
     }
 
     /**
@@ -98,7 +98,7 @@ final class FactoryPassiveIoActions {
             FactoryPassiveIoModel.RuleRow rule) {
         probe("delete", block, rule, "");
         sendRule(containerId, block.nodeId(), CommandKind.RULE_REMOVE, rule.side(),
-                rule.spec().key(), rule.spec().face(), rule.spec().mode(), null);
+                rule.key(), rule.face(), rule.mode(), null);
     }
 
     /**
@@ -198,7 +198,7 @@ final class FactoryPassiveIoActions {
     private static void probe(String action, FactoryPassiveIoModel.BlockView block,
             FactoryPassiveIoModel.RuleRow rule, String detail) {
         IdleFactory.LOGGER.info("[ui-probe] {} block={} machine={} side={} key={} {}",
-                action, block.name(), block.machineId(), rule.side(), rule.spec().key().getId(),
+                action, block.name(), block.machineId(), rule.side(), rule.key().getId(),
                 detail);
     }
 }

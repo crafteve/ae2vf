@@ -8,6 +8,7 @@ import io.github.crafteve.idlefactory.io.IoReason;
 import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.machine.ResourceSpec;
 
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
@@ -108,10 +109,20 @@ public final class FactoryLabels {
      * @return 上/下/北/南/东/西/任意
      */
     public static String face(ResourceSpec spec) {
-        if (spec.face() == null) {
+        return face(spec.face());
+    }
+
+    /**
+     * 面的中文单字；视图表入口。
+     *
+     * @param face 面；{@code null} 表示任意
+     * @return 上/下/北/南/东/西/任意
+     */
+    public static String face(@Nullable Direction face) {
+        if (face == null) {
             return "任意";
         }
-        return switch (spec.face()) {
+        return switch (face) {
             case UP -> "上";
             case DOWN -> "下";
             case NORTH -> "北";

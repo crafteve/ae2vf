@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
 import io.github.crafteve.idlefactory.client.screen.FactorySortDirectionButton;
 import io.github.crafteve.idlefactory.client.screen.FactorySortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinks;
-import io.github.crafteve.idlefactory.client.screen.FactoryTableSink;
+import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.AddTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoJeiTargets.JeiTarget;
 import io.github.crafteve.idlefactory.client.screen.terminal.FactoryPassiveIoLayout.Hit;
@@ -35,7 +35,10 @@ import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
 import io.github.crafteve.idlefactory.menu.FactorySortMode;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
-import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
+import io.github.crafteve.idlefactory.client.screen.ViewTableSink;
+import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
+import io.github.crafteve.idlefactory.view.ViewTable;
+import io.github.crafteve.idlefactory.view.ViewTableDiff;
 import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
@@ -56,7 +59,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 到达的机器快照体现。</p>
  */
 public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
-        implements FactoryTableSink {
+        implements ViewTableSink, FactoryFeedbackSink {
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -88,8 +91,10 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     private FactorySortMode sortMode;
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
     private SortDir sortDirection;
-    /** 内容模型：快照 + 搜索词 → 机器块。 */
+    /** 内容模型：视图表 + 搜索词 → 机器块。 */
     private final FactoryPassiveIoModel model;
+    /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
+    private final ViewTableSink.Buffer viewTable = new ViewTableSink.Buffer();
     /** 本帧排版；由模型、视图与视口重建。 */
     @Nullable
     private FactoryPassiveIoLayout layout;
@@ -277,11 +282,42 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
     }
 
     @Override
-    public void acceptTable(FactoryTableS2C payload) {
+    public void acceptFullPage(int containerId, long revision, int pageIndex, int pageCount,
+            ViewTable page) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.viewTable.acceptPage(revision, pageIndex, pageCount, page);
+        if (merged != null) {
+            acceptTable(merged);
+        }
+    }
+
+    @Override
+    public void acceptDiff(int containerId, ViewTableDiff diff) {
+        if (containerId != containerId()) {
+            return;
+        }
+        ViewTable merged = this.viewTable.acceptDiff(diff);
+        if (merged == null) {
+            // 版本对不上：丢弃这一版，下一轮请求会带着已知版本重新要全量。
+            this.viewTable.reset();
+            requestTable();
+            return;
+        }
+        acceptTable(merged);
+    }
+
+    /**
+     * 接收拼装完成的视图表并重建排版。
+     *
+     * @param table 视图表
+     */
+    private void acceptTable(ViewTable table) {
         this.model.setSortContext(this.sortContext());
-        this.model.accept(payload);
+        this.model.accept(table);
         rebuildLayout();
-        int signature = payload.machines().size() * 37 + totalRules();
+        int signature = table.nodes().size() * 37 + totalRules();
         if (signature != this.lastLogSignature) {
             this.lastLogSignature = signature;
             FactoryPassiveIoProbe.logTable(this);
@@ -608,7 +644,8 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
 
     private void requestTable() {
         if (this.minecraft != null && this.minecraft.player != null) {
-            PacketDistributor.sendToServer(new FactoryTableRequestC2S(this.menu.containerId));
+            PacketDistributor.sendToServer(
+                    new ViewTableRequestC2S(this.menu.containerId, this.viewTable.revision()));
         }
     }
 

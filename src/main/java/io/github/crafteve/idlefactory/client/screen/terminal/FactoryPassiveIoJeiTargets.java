@@ -102,7 +102,7 @@ public final class FactoryPassiveIoJeiTargets {
                     : new JeiTarget(false, stack, machineIconArea(layout, hit, scroll));
         }
         RuleRow rule = block.rules().get(hit.rule());
-        AEKey key = rule.spec().key();
+        AEKey key = rule.key();
         return new JeiTarget(AeKeyAdapter.isEnergy(key), FactoryLabels.icon(key),
                 ruleIconArea(layout, hit, scroll));
     }
