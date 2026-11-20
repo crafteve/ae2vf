@@ -54,8 +54,9 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `claim` | 方块占用表（机器 / 仓库锚点唯一性） | 世界探测 |
 | `command` | 唯一写入口：`FactoryCommand` 信封、`CommandController`、门禁、执行、拓扑、绑定杖、回执与原因 | 存储实现、界面 |
 | `view` | 视图表：`ViewTable` / `ViewHeader` / `ViewNode`（内嵌 `Activity`）/ `ViewNodeCore` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewNodeDiff` / `ViewTableBuilder` | 持久化、世界探测、配置写入 |
-| `config` / `resource` / `location` | 配置项；`AEKey` 适配；`BlockKey` | 业务逻辑 |
-| `event` / `registry` | 绑定杖世界事件；MenuType 注册 | 业务逻辑 |
+| `key` | 身份键：`AeKeyAdapter`（AEKey ↔ 物品栈 / 标签 / 流）与 `BlockKey`（维度 + 坐标） | 业务逻辑 |
+| `config` | NeoForge 配置注册与读取（仅模组配置可用 config 命名） | 业务逻辑 |
+| `registry` | 纯注册：物品、菜单类型、创造栏、网络负载（`IdleFactoryItems` / `IdleFactoryMenus` / `IdleFactoryCreativeTabs` / `IdleFactoryPayloads`） | 业务逻辑 |
 | `menu` | 会话层：`node/` / `passiveio/` / `wand/` 三组 Host+Menu，终端偏好契约（`TerminalSetting` / `TerminalSortMode` / `PassiveIoViewMode`），门禁 `MenuGate` | 工厂数据、界面绘制 |
 | `network` | 协议、负载、`ViewPort`（视图出口）、`CommandPort`、`ObservationNoticeListener`（失联提示） | 业务判断 |
 | `client` | 客户端入口与四个子包：`world`（世界高亮）、`wand`（绑定杖输入与草稿）、`network`（报文投递）、`screen`（界面） | 工厂数据、服务端状态 |
@@ -117,7 +118,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `event` 绑定杖世界事件 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 协议版本、负载、视图出口（`ViewPort`）、失联提示（`ObservationNoticeListener`） · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 协议常量（`IdleFactoryNetwork`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -298,6 +299,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-20 包结构整理：`resource` + `location` 合并为 `key`；删除 `event` 包（不再拦截挖掘）；`registry` 类统一 `IdleFactory` 前缀并把负载注册收进来；编解码器集中到 `network.codec`；删除全部 `package-info`。
 - 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议发布前重置为 1，内部编号 41 / 42 只留在 ADR），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键；新增 `HudNoticeS2C` 把失联 / 恢复提示并入模组 HUD 条。
 - 2026-11-18 按草稿 22 收敛重构重写 §1.2 / §2.1 / §2.2 / §2.3 / §2.4 / §3.1 / §6.1 / §6.2（含 #2 / #3 / #16 / #21）：包分层加入 `runtime` / `claim` / `view` / `command`，删掉容器、能力面、`FactoryRuntime` / `FactoryService` / `NodeActions` 与旧观测预算说法。
 - 发现时顺手修，不单独开重构；下面是已修正的偏差记录。

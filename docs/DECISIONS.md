@@ -1041,3 +1041,23 @@
 **后果**：
 
 - 客户端仍有 53 处引用 `menu` 的三个偏好类型（组件值与线协议 ordinal 的契约共享）。彻底消除 `client → menu` 需要把这三个类型挪到中立 `terminal` 包，属于独立决定，本期不做。
+
+
+---
+
+## ADR-046 包结构整理：key、registry、network.codec
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. `resource`（`AeKeyAdapter`）与 `location`（`BlockKey`）合并为 `key` 包；两者都是「身份键」，`BlockKey` 不需要 Adapter——它本身就是本模组的不可变值对象，没有外部序列化形态要适配。
+2. 删除 `event` 包：唯一类 `FactoryWandEvents` 只拦 ME 杖左键挖掘，按产品决定取消该行为，不再需要这个包。
+3. `registry` 保留，类名统一模组前缀：`IdleFactoryItems` / `IdleFactoryMenus` / `IdleFactoryCreativeTabs` / `IdleFactoryPayloads`；负载注册属于「注册」，从 `network` 移到这里，`network.IdleFactoryNetwork` 只留协议版本与线路上限。
+4. 编解码器集中到 `network.codec`：`AeKeyCodec`、`ViewTableCodec`。
+5. 删除全部 `package-info.java`。
+6. `config` 保留，只有模组配置可以叫 config；`FactoryConfig`（工厂持久化部分）的命名问题留到 factory 重构时一并处理。
+
+**理由**：两个 Key 包都只有 1 个文件，分开没有信息量；事件包只服务一条已取消的行为；注册与协议行为分开后，`network` 只剩「怎么连、怎么发」，`registry` 负责「注册了什么」。
+
+**后果**：纯改名与搬文件，协议号不变（仍为 1），存档、物品组件、菜单注册顺序均不受影响。
