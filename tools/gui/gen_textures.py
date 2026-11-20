@@ -5,7 +5,7 @@
 - 色值一律从 `GuiTheme`（Java 侧）抄过来，两边必须一致；改色先改这里再同步 Java。
 - 所有九宫格贴图都用「border」表示不可拉伸的边框宽度；Java 侧 `NineSlice` 按同样的
   数字切九块。border 变了要同时改 Java 常量。
-- 生成物落在 `src/main/resources/assets/idlefactory/textures/gui/`，可重复执行覆盖。
+- 生成物落在 `src/main/resources/assets/ae2vf/textures/gui/`，可重复执行覆盖。
 - 只依赖 Pillow，不联网。
 
 用法
@@ -97,7 +97,7 @@ SORT_ICON_SHADOW = (0x4D, 0x4D, 0x67)
 
 OUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "src", "main", "resources", "assets", "idlefactory", "textures", "gui",
+    "src", "main", "resources", "assets", "ae2vf", "textures", "gui",
 )
 
 

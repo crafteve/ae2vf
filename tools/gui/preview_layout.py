@@ -10,9 +10,8 @@
 
 注意
 ----
-- **这个脚本抄了一份布局常量。** 改 `FactoryLayout.java` 时必须同步这里的常量，
-  否则图会骗人。图只是辅助，真正的判据是游戏日志里那行
-  `Idle Factory UI: screen=... guiScale=... columns=[...]`。
+- **这个脚本抄了一份布局常量。** 改 `NodeLayout` / `PassiveIoLayout` 时必须同步这里的常量，
+  否则图会骗人。图只是辅助，真正的判据是游戏内截图。
 - 字号用系统雅黑近似，**不代表** MC 真实字体宽度；字宽够不够必须进游戏看。
 - 合成区/背包的占位格子画成空槽，实际界面里是物品图标。
 """
@@ -25,7 +24,7 @@ import sys
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-TEX = os.path.join(ROOT, "src", "main", "resources", "assets", "idlefactory", "textures", "gui")
+TEX = os.path.join(ROOT, "src", "main", "resources", "assets", "ae2vf", "textures", "gui")
 OUT_DIR = os.path.join(ROOT, ".tmp", "mockup")
 
 # ---- 与 FactoryLayout.java 对齐 ----
@@ -270,8 +269,8 @@ def render(screen_w: int, screen_h: int, wanted_gutter: int, out: str) -> None:
     x = hx + 6
     solid(img, divd, x, center + 2, 6, 6)
     x += 12
-    draw.text((x, center), "放置工厂", font=font, fill=TEXT)
-    x += int(draw.textlength("放置工厂", font=font)) + 10
+    draw.text((x, center), "虚空工厂", font=font, fill=TEXT)
+    x += int(draw.textlength("虚空工厂", font=font)) + 10
     bw = int(draw.textlength("铁线", font=font)) + 24
     nine(img, btn_tex, 1, x, hy + 3, bw, TAB_H)
     draw.text((x + 8, center), "铁线", font=font, fill=TEXT)

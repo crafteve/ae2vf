@@ -1,6 +1,6 @@
 """物品贴图生成：科幻立体风格的终端 / 机器绑定杖 / 存储绑定杖。
 
-输出 64×64 贴图到 assets/idlefactory/textures/item/，并生成 .tmp/item-icons-preview.png
+输出 64×64 贴图到 assets/ae2vf/textures/item/，并生成 .tmp/item-icons-preview.png
 样张（64/32/16）。64 基准坐标，512 画布绘制后缩放。
 """
 
@@ -384,7 +384,7 @@ def preview():
 def export():
     """导出 64×64 物品贴图到资源目录。"""
     out = os.path.join(
-        ROOT, "src", "main", "resources", "assets", "idlefactory", "textures", "item")
+        ROOT, "src", "main", "resources", "assets", "ae2vf", "textures", "item")
     os.makedirs(out, exist_ok=True)
     for name, icon in (
             ("factory_terminal", terminal()),
