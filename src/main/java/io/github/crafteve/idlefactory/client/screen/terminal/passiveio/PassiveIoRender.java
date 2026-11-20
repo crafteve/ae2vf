@@ -396,7 +396,8 @@ final class PassiveIoRender {
         KeycapButton.draw(graphics, x, y, chip, chip, background, enabled, hovered);
         int textX = x + (chip - this.font.width(label)) / 2;
         // 垂直居中：chip 16px、字体行高 9px，上下各留 3px；原来写死 +2 会让拉丁字母整体偏上 1px。
-        int textY = y + (chip - this.font.lineHeight) / 2;
+        // 字体行高 9 而字形只有 8：按行高居中会视觉偏上 1px，补 1px 让笔画落正。
+        int textY = y + (chip - this.font.lineHeight) / 2 + 1;
         graphics.drawString(this.font, label, textX, textY, textColor, false);
     }
 

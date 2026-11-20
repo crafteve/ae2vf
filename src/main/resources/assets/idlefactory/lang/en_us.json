@@ -96,7 +96,7 @@
   "idlefactory.passive.empty.none": "No machines yet · right click with the binding wand to add",
   "idlefactory.passive.chip.input": "I",
   "idlefactory.passive.chip.output": "O",
-  "idlefactory.passive.chip.any_face": "*",
+  "idlefactory.passive.chip.any_face": "A",
   "idlefactory.passive.chip.exact": "E",
   "idlefactory.passive.chip.fuzzy": "F",
   "idlefactory.passive.tooltip.add_row": "Drag here from JEI to add a row",

@@ -141,7 +141,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     /** 挂起点击的到期时刻（毫秒）。 */
     private long pendingToggleAt;
     /** 双击判定窗口（毫秒）。 */
-    private static final long DOUBLE_CLICK_MS = 250L;
+    private static final long DOUBLE_CLICK_MS = 180L;
     @Nullable
     private ConfirmDialog confirmDialog;
     /** 正在改名的节点；{@code null} 表示不在改名。 */
@@ -232,6 +232,8 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // 每帧冲刷挂起的名字点击：延迟只受窗口本身约束，不再叠加 tick 的 50ms 粒度。
+        flushPendingClick();
         syncFromBar();
         super.render(graphics, mouseX, mouseY, partialTick);
         TerminalChrome.drawTitle(graphics, this.font, this.leftPos, this.topPos,
@@ -285,7 +287,6 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
 
     @Override
     public void containerTick() {
-        flushPendingClick();
         super.containerTick();
         if (++this.requestTicker >= REQUEST_INTERVAL) {
             this.requestTicker = 0;

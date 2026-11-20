@@ -176,7 +176,7 @@ final class NodeRender {
 
         boolean provider = row.available();
         int keyY = top + NodeLayout.KEY_INSET_Y;
-        int keyTextY = keyY + 2;
+        int keyTextY = keyY + (NodeLayout.KEY_H - this.font.lineHeight) / 2 + 1;
 
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 0), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
