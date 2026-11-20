@@ -10,8 +10,8 @@ import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 import io.github.crafteve.idlefactory.client.screen.FactoryNodeSearchFields;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
-import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
-import io.github.crafteve.idlefactory.client.screen.FactorySortKey;
+import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
+import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
 import io.github.crafteve.idlefactory.client.screen.FactoryStatus;
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.io.IoSide;
@@ -43,7 +43,7 @@ final class FactoryPassiveIoModel {
     private boolean storageOnline;
     private SearchQuery query = SearchQuery.EMPTY;
     /** 当前排序上下文：档位、方向与玩家位置。 */
-    private FactorySortContext sortContext = FactorySortContext.defaults();
+    private SortContext sortContext = SortContext.defaults();
     private List<BlockView> blocks = List.of();
 
     /**
@@ -175,7 +175,7 @@ final class FactoryPassiveIoModel {
      *
      * @param next 新上下文
      */
-    void setSortContext(FactorySortContext next) {
+    void setSortContext(SortContext next) {
         this.sortContext = next;
     }
 
@@ -230,7 +230,7 @@ final class FactoryPassiveIoModel {
             }
             next.add(new BlockView(node, FactoryStatus.of(node.core(), this.theme), rules(node)));
         }
-        this.blocks = FactorySortKey.sorted(next, this::sortKey, this.sortContext);
+        this.blocks = SortKey.sorted(next, this::sortKey, this.sortContext);
     }
 
     /**
@@ -242,14 +242,14 @@ final class FactoryPassiveIoModel {
      * @param block 节点块
      * @return 排序键
      */
-    private FactorySortKey sortKey(BlockView block) {
-        long nearest = FactorySortKey.UNREACHABLE_DISTANCE;
+    private SortKey sortKey(BlockView block) {
+        long nearest = SortKey.UNREACHABLE_DISTANCE;
         for (ViewMachine machine : block.members()) {
-            long distance = FactorySortKey.distance(this.sortContext.playerDimension(),
+            long distance = SortKey.distance(this.sortContext.playerDimension(),
                     this.sortContext.playerPos(), machine.block().dimension(), machine.block().pos());
             nearest = Math.min(nearest, distance);
         }
-        return new FactorySortKey(FactorySortKey.displayName(block.node().core().name(),
+        return new SortKey(SortKey.displayName(block.node().core().name(),
                         block.node().core().typeBlockId()),
                 block.node().core().typeBlockId().toString(), block.machineCount(),
                 block.node().ruleCount(), FactoryStatus.sortRank(block.node().core()), nearest,

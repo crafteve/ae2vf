@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.sort;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryLabels;
 
@@ -36,7 +36,7 @@ import net.minecraft.world.level.Level;
  * @param distance     到玩家的最近成员距离（平方）；不同维度为 {@link #UNREACHABLE_DISTANCE}
  * @param nodeId       节点 id，最后一把尺子
  */
-public record FactorySortKey(String name, String id, int machineCount, int ruleCount,
+public record SortKey(String name, String id, int machineCount, int ruleCount,
         int statusRank, long distance, UUID nodeId) {
 
     /** 不同维度或没有玩家位置时使用的距离，比任何真实距离都远。 */
@@ -53,12 +53,12 @@ public record FactorySortKey(String name, String id, int machineCount, int ruleC
      * @param <T>     行 / 块类型
      * @return 排序后的不可变列表
      */
-    public static <T> List<T> sorted(List<T> items, Function<T, FactorySortKey> keyOf,
-            FactorySortContext context) {
+    public static <T> List<T> sorted(List<T> items, Function<T, SortKey> keyOf,
+            SortContext context) {
         if (items.size() < 2) {
             return List.copyOf(items);
         }
-        Comparator<FactorySortKey> comparator = comparator(context.mode(), context.direction());
+        Comparator<SortKey> comparator = comparator(context.mode(), context.direction());
         List<Keyed<T>> keyed = new ArrayList<>(items.size());
         for (T item : items) {
             keyed.add(new Keyed<>(keyOf.apply(item), item));
@@ -85,8 +85,8 @@ public record FactorySortKey(String name, String id, int machineCount, int ruleC
      * @return 保持既有顺序的不可变列表
      */
     public static <T> List<T> preserveOrder(List<T> items, List<T> previous,
-            Function<T, UUID> idOf, Function<T, FactorySortKey> keyOf,
-            FactorySortContext context) {
+            Function<T, UUID> idOf, Function<T, SortKey> keyOf,
+            SortContext context) {
         if (previous.isEmpty()) {
             return sorted(items, keyOf, context);
         }
@@ -112,21 +112,21 @@ public record FactorySortKey(String name, String id, int machineCount, int ruleC
      * @param direction 排序方向：降序把整条链反转
      * @return 比较器
      */
-    public static Comparator<FactorySortKey> comparator(FactorySortMode mode,
+    public static Comparator<SortKey> comparator(FactorySortMode mode,
             SortDir direction) {
-        Comparator<FactorySortKey> chain = switch (mode) {
-            case NAME -> Comparator.comparing(FactorySortKey::name);
-            case ID -> Comparator.comparing(FactorySortKey::id);
-            case MACHINE_COUNT -> Comparator.comparingInt(FactorySortKey::machineCount);
-            case RULE_COUNT -> Comparator.comparingInt(FactorySortKey::ruleCount);
-            case STATUS -> Comparator.comparingInt(FactorySortKey::statusRank);
-            case DISTANCE -> Comparator.comparingLong(FactorySortKey::distance);
+        Comparator<SortKey> chain = switch (mode) {
+            case NAME -> Comparator.comparing(SortKey::name);
+            case ID -> Comparator.comparing(SortKey::id);
+            case MACHINE_COUNT -> Comparator.comparingInt(SortKey::machineCount);
+            case RULE_COUNT -> Comparator.comparingInt(SortKey::ruleCount);
+            case STATUS -> Comparator.comparingInt(SortKey::statusRank);
+            case DISTANCE -> Comparator.comparingLong(SortKey::distance);
         };
         if (mode != FactorySortMode.NAME) {
-            chain = chain.thenComparing(FactorySortKey::name);
+            chain = chain.thenComparing(SortKey::name);
         }
-        chain = chain.thenComparingInt(FactorySortKey::machineCount)
-                .thenComparing(FactorySortKey::nodeId);
+        chain = chain.thenComparingInt(SortKey::machineCount)
+                .thenComparing(SortKey::nodeId);
         return direction == SortDir.DESCENDING ? chain.reversed() : chain;
     }
 
@@ -170,6 +170,6 @@ public record FactorySortKey(String name, String id, int machineCount, int ruleC
     }
 
     /** 排序中间态：键与原对象的配对。 */
-    private record Keyed<T>(FactorySortKey key, T item) {
+    private record Keyed<T>(SortKey key, T item) {
     }
 }

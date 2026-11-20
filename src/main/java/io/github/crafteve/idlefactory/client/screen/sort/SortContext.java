@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.client.screen;
+package io.github.crafteve.idlefactory.client.screen.sort;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +22,7 @@ import net.minecraft.world.level.Level;
  * @param playerDimension 玩家所在维度；未知时 {@code null}
  * @param playerPos       玩家脚下方块坐标；未知时 {@code null}
  */
-public record FactorySortContext(FactorySortMode mode, SortDir direction,
+public record SortContext(FactorySortMode mode, SortDir direction,
         @Nullable ResourceKey<Level> playerDimension, @Nullable BlockPos playerPos) {
 
     /**
@@ -30,7 +30,7 @@ public record FactorySortContext(FactorySortMode mode, SortDir direction,
      *
      * @return 默认上下文
      */
-    public static FactorySortContext defaults() {
-        return new FactorySortContext(FactorySortMode.NAME, SortDir.ASCENDING, null, null);
+    public static SortContext defaults() {
+        return new SortContext(FactorySortMode.NAME, SortDir.ASCENDING, null, null);
     }
 }

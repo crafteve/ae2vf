@@ -29,7 +29,7 @@ import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 
-import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
 
@@ -146,10 +146,15 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
             ScreenStyle style) {
         super(menu, inventory, title, style);
         this.source = new TerminalSource(menu.containerId);
-        this.model = new FactoryNodeModel(FactoryGuiTheme.current());
+        this.model = new FactoryNodeModel(this.source, FactoryGuiTheme.current());
         this.sortMode = menu.host().sortMode();
         this.sortDirection = menu.host().sortDirection();
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.bar = this.widgets.addScrollBar("scrollbar", Scrollbar.BIG);
         this.addToLeftToolbar(new FactoryPassiveIoHelpButton(button -> {
             // 指南页待接入。
@@ -386,7 +391,12 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         // 改名框 / 删除确认框打开时冻结行序：快照照常更新数据，但列表不在用户操作期间跳动。
         this.model.setSortFrozen(this.renameBox != null
                 || (this.confirmDialog != null && this.confirmDialog.isOpen()));
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.accept(table);
         // 表里已经消失的节点不再占用展开状态；搜索过滤不会误删展开状态。
         Set<UUID> alive = new HashSet<>();
@@ -425,7 +435,12 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         }
         this.sortMode = mode;
         this.sortDirection = direction;
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.resort();
         rebuildLayout();
     }
@@ -454,7 +469,12 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
         }
         this.sortMode = mode;
         this.sortDirection = direction;
-        this.model.setSortContext(this.sortContext());
+        this.model.setSort(this.sortMode, this.sortDirection);
+        this.model.setPlayerContext(
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.level().dimension(),
+                this.minecraft == null || this.minecraft.player == null
+                        ? null : this.minecraft.player.blockPosition());
         this.model.resort();
         rebuildLayout();
         PacketDistributor.sendToServer(
@@ -468,11 +488,11 @@ public final class FactoryNodeScreen extends AEBaseScreen<FactoryNodeMenu>
      *
      * @return 排序上下文
      */
-    private FactorySortContext sortContext() {
+    private SortContext sortContext() {
         if (this.minecraft == null || this.minecraft.player == null) {
-            return new FactorySortContext(this.sortMode, this.sortDirection, null, null);
+            return new SortContext(this.sortMode, this.sortDirection, null, null);
         }
-        return new FactorySortContext(this.sortMode, this.sortDirection,
+        return new SortContext(this.sortMode, this.sortDirection,
                 this.minecraft.player.level().dimension(),
                 this.minecraft.player.blockPosition());
     }

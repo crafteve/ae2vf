@@ -17,7 +17,7 @@ import appeng.core.AEConfig;
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
-import io.github.crafteve.idlefactory.client.screen.FactorySortContext;
+import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
@@ -408,11 +408,11 @@ public final class FactoryPassiveIoScreen extends AEBaseScreen<FactoryPassiveIoM
      *
      * @return 排序上下文
      */
-    private FactorySortContext sortContext() {
+    private SortContext sortContext() {
         if (this.minecraft == null || this.minecraft.player == null) {
-            return new FactorySortContext(this.sortMode, this.sortDirection, null, null);
+            return new SortContext(this.sortMode, this.sortDirection, null, null);
         }
-        return new FactorySortContext(this.sortMode, this.sortDirection,
+        return new SortContext(this.sortMode, this.sortDirection,
                 this.minecraft.player.level().dimension(),
                 this.minecraft.player.blockPosition());
     }
