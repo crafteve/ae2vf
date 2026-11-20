@@ -2,7 +2,9 @@ package io.github.crafteve.idlefactory.network.payload;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.config.IdleFactoryConfig;
 import io.github.crafteve.idlefactory.IdleFactory;
@@ -34,9 +36,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * 不合并，单线程生成加 TCP 有序已经保证不会乱序。节点里包含全部成员机器（失联的也在），
  * 因为渲染与「属于本节点」的判断都要用到它们。</p>
  *
+ * @param storageAnchor 仓库锚点；未绑定为 {@code null}，存储杖用它画蓝色高亮
  * @param nodes 全部节点
  */
-public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload {
+public record WandLinksS2C(@Nullable BlockKey storageAnchor, List<NodeLink> nodes) implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:factory_links}。 */
     public static final Type<WandLinksS2C> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(IdleFactory.MODID,
@@ -70,12 +73,12 @@ public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload 
             }
             nodes.add(new NodeLink(node.id(), node.typeBlockId(), machines));
         }
-        return new WandLinksS2C(nodes);
+        return new WandLinksS2C(factory.config().storageAnchor(), nodes);
     }
 
     /** 空状态：没有工厂或还没有节点。 */
     public static WandLinksS2C empty() {
-        return new WandLinksS2C(List.of());
+        return new WandLinksS2C(null, List.of());
     }
 
     /**
@@ -92,6 +95,10 @@ public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload 
         int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
         int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
         int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        buf.writeBoolean(payload.storageAnchor() != null);
+        if (payload.storageAnchor() != null) {
+            WandDraftCodec.writeBlockKey(buf, payload.storageAnchor());
+        }
         int nodeCount = Math.min(payload.nodes().size(), nodeLimit);
         buf.writeVarInt(nodeCount);
         int writtenMachines = 0;
@@ -115,6 +122,7 @@ public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload 
         int nodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxNodes());
         int machinePerNodeLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxMachinesPerNode());
         int totalLimit = IdleFactoryNetwork.wireLimit(IdleFactoryConfig.maxTotalMachines());
+        BlockKey storageAnchor = buf.readBoolean() ? WandDraftCodec.readBlockKey(buf) : null;
         int nodeCount = readCount(buf, nodeLimit, "节点");
         List<NodeLink> nodes = new ArrayList<>(nodeCount);
         int readMachines = 0;
@@ -133,7 +141,7 @@ public record WandLinksS2C(List<NodeLink> nodes) implements CustomPacketPayload 
             readMachines += machineCount;
             nodes.add(new NodeLink(nodeId, typeBlockId, machines));
         }
-        return new WandLinksS2C(nodes);
+        return new WandLinksS2C(storageAnchor, nodes);
     }
 
     private static int readCount(RegistryFriendlyByteBuf buf, int limit, String what) {
