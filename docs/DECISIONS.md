@@ -1100,3 +1100,24 @@
 **理由**：包 `resource` 已并入 `key`，代码里继续出现 `Resource*` 会让人以为还有一套并行资源模型。
 
 **后果**：纯改名，无协议、存档、行为变化；`NodeIoRules` 现在管理 `IoRuleSpec` 集合，视图侧对应 `ViewIoRule`。
+
+
+---
+
+## ADR-049 改名为 ae2vf（AE2 Void Factory）
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. 对外身份统一为 **`ae2vf`**：modid、仓库短名、发行文件名（`ae2vf-0.1.0-beta.jar`）同一个词，避免“名字对不上”。
+2. 显示名 **AE2 Void Factory**；版本 `0.1.0-beta`。
+3. 包名 `io.github.crafteve.ae2vf`，代码类前缀 **`VoidFactory*`**（`VoidFactory` / `VoidFactoryClient` / `VoidFactoryConfig` …）。对外身份用 id，代码用可读前缀。
+4. 注册 id、payload id、JEI FE 配料 id（`ae2vf:fe`）、语言键（`ae2vf.*`）、资源目录（`assets/ae2vf`）、存档（`data/ae2vf_factories.dat`）、配置（`config/ae2vf-common.toml`）全部随之迁移。
+5. 系统属性 `idlefactory.gutter` → `ae2vf.gutter`；界面日志前缀改为 `AE2 Void Factory UI: ...`。
+
+**兼容性**：**不兼容**。`idlefactory:*` 的物品、旧存档、旧配置与旧 JEI 收藏全部失效；首个公开测试版之前不提供迁移。
+
+**改名理由**：Idle 在模组语境里等于“放置 / 挂机”，与本模组“AE2 IO 编排层”的定位不符；`ae2vf` 与 `ae2lt` 等附属保持同一命名习惯。
+
+**遗留**：代码目录当前仍是 `D:\DSH\idlefactory`，由作者择机改名为 `D:\DSH\ae2vf`，与 Git 历史无关。

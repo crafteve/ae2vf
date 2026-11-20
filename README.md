@@ -1,6 +1,6 @@
-# Idle Factory（放置工厂）
+# AE2 Void Factory（`ae2vf`）
 
-> modid: `idlefactory` · MC 1.21.1 / NeoForge 21.1.264 · 分支 `slim-20261110`
+> modid: `ae2vf` · MC 1.21.1 / NeoForge 21.1.264 · 分支 `view-client-refactor-20261120`
 
 把「把机器接进自动化网络」这一步，从摆接口、铺线缆、调 IO 面，变成在终端里配置。
 只接管机器与仓库之间的**搬运**——机器配方、能量、加工时间全部不变。
@@ -23,7 +23,7 @@
 - **两个终端**：节点管理（展开成员、改名、规则 / 样板 / 阻挡 / 倍率 / 派单、定位）、
   被动 IO 配置（按节点分组的卡片、规则 chip、列表 / 磁贴视图、六档排序与升降序）。
 - **绑定杖**：在世界里点方块接机器；带草稿预览、冲突提示与 1:1 toggle。
-- 搜索沿用 AE2 语法并接 jecharacters 拼音兼容；JEI / EMI 拖拽与 R/U；FE 使用独立配料（`idlefactory:fe`）。
+- 搜索沿用 AE2 语法并接 jecharacters 拼音兼容；JEI / EMI 拖拽与 R/U；FE 使用独立配料（`ae2vf:fe`）。
 
 ## 明确没有 / 未实现
 
@@ -63,4 +63,4 @@ Windows 用 `gradlew.bat`；离线构建加 `--offline`。
 
 ---
 
-> AE2 的自动合成已经很接近放置游戏，只有「摆机器接进去」这一步破坏体验。Idle Factory 补的就是这一步。
+> AE2 的自动合成已经很接近放置游戏，只有「摆机器接进去」这一步破坏体验。AE2 Void Factory 补的就是这一步。

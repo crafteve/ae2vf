@@ -4,7 +4,7 @@
 
 ### 1.1 是什么
 
-Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。把"把机器接进自动化网络"从摆接口、铺线缆、调 IO 面变成在终端里配置。
+AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。把"把机器接进自动化网络"从摆接口、铺线缆、调 IO 面变成在终端里配置。
 
 只接管机器与仓库之间的搬运。机器配方、能量、加工时间一律不变。
 
@@ -29,7 +29,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | MC / NeoForge | 1.21.1 / 21.1.264 |
 | Java / Gradle / ModDevGradle | 21 / 9.2.1 / 2.0.148 |
 | Parchment | 2024.11.17 |
-| modid / 版本 / 分支 | `idlefactory` / 0.1.0 / `view-client-refactor-20261120`（视图表与客户端重构；从快进后的 `1.21.1neoforge` 切出） |
+| modid / 版本 / 分支 | `ae2vf` / 0.1.0-beta / `view-client-refactor-20261120`（视图表与客户端重构；从快进后的 `1.21.1neoforge` 切出） |
 | AE2 | 19.2.10，`implementation`，硬依赖 |
 | JEI | 19.21.1.304，`compileOnly + runtimeOnly`，可选 |
 | Mekanism | 10.7.19.85，仅 `localRuntime`，本地测试用 |
@@ -56,7 +56,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | `view` | 视图表：`ViewTable` / `ViewHeader` / `ViewNode`（内嵌 `Activity`）/ `ViewNodeCore` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewNodeDiff` / `ViewTableBuilder` | 持久化、世界探测、配置写入 |
 | `key` | 身份键：`AeKeyAdapter`（AEKey ↔ 物品栈 / 标签 / 流）与 `BlockKey`（维度 + 坐标） | 业务逻辑 |
 | `config` | NeoForge 配置注册与读取（仅模组配置可用 config 命名） | 业务逻辑 |
-| `registry` | 纯注册：物品、菜单类型、创造栏、网络负载（`IdleFactoryItems` / `IdleFactoryMenus` / `IdleFactoryCreativeTabs` / `IdleFactoryPayloads`） | 业务逻辑 |
+| `registry` | 纯注册：物品、菜单类型、创造栏、网络负载（`VoidFactoryItems` / `VoidFactoryMenus` / `VoidFactoryCreativeTabs` / `VoidFactoryPayloads`） | 业务逻辑 |
 | `menu` | 会话层：`node/` / `passiveio/` / `wand/` 三组 Host+Menu，终端偏好契约（`TerminalSetting` / `TerminalSortMode` / `PassiveIoViewMode`），门禁 `MenuGate` | 工厂数据、界面绘制 |
 | `network` | 协议、负载、`ViewPort`（视图出口）、`CommandPort`、`ObservationNoticeListener`（失联提示） | 业务判断 |
 | `client` | 客户端入口与四个子包：`world`（世界高亮）、`wand`（绑定杖输入与草稿）、`network`（报文投递）、`screen`（界面） | 工厂数据、服务端状态 |
@@ -95,7 +95,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - `command`：唯一写入口。`CommandController` 收 `FactoryCommand` 信封；`CommandGate` / `CommandWandGate` 校验身份与作用域；`CommandApply` / `CommandTopology` / `CommandWand` 只改内存；`CommandPort` 落盘、推快照、发回执。
 - `io`：执行层。`IoForm`（内嵌 `Entry`）是唯一工作清单，不在表上的条目执行层不认识；`IoRunner` 是唯一入口，按 回收 → 主动 → 被动 依次跑；`PassivePlanner` 按规则级排期并产出逐条 `IoJob`；`ActivePlanner` 把 `DispatchOrder` 分到多台机器（顺序 / 轮询、半份优先、卡单退避）并定回收节奏；`IoExecutor` 是机器侧唯一写入口（`move` / `fill` / `refund` / `sweep`）；`FacePick` 只选面（配置面 → 经验面 → 逐面探），`CapacityPick` 只算份数，`VariantPick` 查模糊变体，`PortExecutor` 提供按面的 `MEStorage` 缓存；`IoAnalyzer` 是账本、结论、速率与经验面的唯一维护者。**`io` 可以依赖 `node`，反向则成环**：配置数据归 `node`，活节点在运行层包，执行层只取数据、不持有运行对象。
 
-调用链（被动）：`ServerTick → IdleFactoryServer → FactoryLifecycle → FactoryRunner（观测 → 节点健康 → 锚点 → 活节点 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
+调用链（被动）：`ServerTick → VoidFactoryServer → FactoryLifecycle → FactoryRunner（观测 → 节点健康 → 锚点 → 活节点 → 表单）→ IoRunner → PassivePlanner（FacePick / VariantPick）→ IoExecutor.move → PortExecutor → MEStorage`。
 
 调用链（主动，旁路）：`AE2 CPU → LiveNodeCraft.pushPattern（校验 + 拆份 + 入队）→ 同一 tick 内 IoRunner → ActivePlanner（CapacityPick / FacePick）→ IoExecutor.fill → 机器`；产物由 `IoRunner` 调 `IoExecutor.sweep` 扫回网络。
 
@@ -118,7 +118,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 
 ### 2.4 其余包
 
-`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 版本与线路上限（`NetworkVersion` / `NetworkLimit`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.IdleFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
+`runtime` 活节点 · `claim` 占用表 · `view` 视图表（`ViewTable` / `ViewNode` / `ViewIoRule` / `ViewMachine` / `ViewTableDiff` / `ViewTableBuilder`） · `command` 唯一写入口 · `registry` MenuType · `menu` 会话层（`node` / `passiveio` / `wand` 三个子包 + 偏好契约 + `MenuGate`） · `network` 版本与线路上限（`NetworkVersion` / `NetworkLimit`）、视图出口（`ViewPort`）、命令端口（`CommandPort`）、失联提示（`ObservationNoticeListener`），负载注册在 `registry.VoidFactoryPayloads`，编解码器在 `network.codec` · `client` 客户端入口，四个子包 `world` / `wand` / `network` / `screen` · `client.screen.terminal` 两个终端（`node` / `passiveio`），共用 `TerminalModel` / `TerminalSource` / `TerminalChrome`，客户端类名不带 `Factory` 前缀 · `integration` 外部模组适配，反射失败必须降级。
 
 ## 三、规模、性能、界面
 
@@ -127,7 +127,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 目标体量：上百台机器、16 个容器。
 
 - 退避：规则级（不是机器级），按上一轮原因分档——`NO_MATERIAL` 5 tick、`FULL` 10 tick、`NO_FACE` 20 tick、`REJECTED` 20×连续拒收（封顶 100）、`ERROR` 20→100、`SLEEPING` 200 tick；一次都没试过的条目立刻跑。观测按状态退避。主动单另有 5 / 10 / 20 / 40 / 80（封顶 100）的卡单退避。
-- 预算：观测三条通道各默认 128 次/tick（`IdleFactoryConfig.observationHealthBudgetPerTick` / `observationWorkBudgetPerTick` / `observationEventBudgetPerTick`，下限 1，**不设硬上限**）。
+- 预算：观测三条通道各默认 128 次/tick（`VoidFactoryConfig.observationHealthBudgetPerTick` / `observationWorkBudgetPerTick` / `observationEventBudgetPerTick`，下限 1，**不设硬上限**）。
 - 复探：健康通道 120 tick（MISSING 逐渐退到 1200），工作状态 5 / 40 / 120 → 1200 tick；读档首 tick 对账一次，之后每 1200 tick。
 - IO：固定每 tick 一轮（原本可由 `/idf diag io` 调整，指令删除后固定）。
 - 上限：节点 4096、单节点机器 256、全厂机器 8192、规则每侧 16、仓库快照 1024。
@@ -154,14 +154,14 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 - 悬停高亮 = 浅蓝填充 + 1px 描边；描边必须在图标之后画，否则会被不透明的流体贴图盖住。
 - 几何只在各自的 `*Layout`（`NodeLayout` / `PassiveIoLayout`）。溢出先让位，不许压到相邻区域。
 - 绘制层级由各终端屏幕自己的 `draw` 顺序决定：底 → 内容 → 物品 → 数量 → 浮层 → tooltip。浮层必须高于数量层，否则会被物品数量盖住；tooltip 由原版固定在最后。不要在调用点写 z 魔法数。
-- 尺寸问题先看 `logs/latest.log` 的 `Idle Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Didlefactory.gutter` 现场调。
+- 尺寸问题先看 `logs/latest.log` 的 `AE2 Void Factory UI: ...` 行；留白可用 `-Pgutter=64` 或 `-Dae2vf.gutter` 现场调。
 
 ### 3.3 便利性
 
 - 没有指令入口：节点与规则全部在两个终端里操作，绑定杖负责世界里「点方块」这一半。
 - 表格可展开规则、可搜索；搜索沿用 AE2 语法并接 jecharacters 拼音兼容层。
 - 两个终端左侧工具栏提供六档排序（名称 / ID / 机器台数 / IO 规则数 / 状态 / 距离）与升降序切换；偏好写在终端物品的 `ae2:exported_settings` 组件上，两个终端各自记忆。
-- JEI R/U 必须覆盖机器列表、IO 列、仓库、背包；FE 使用独立配料（`idlefactory:fe`）与信息页，R/U / 收藏不得落到红石粉。
+- JEI R/U 必须覆盖机器列表、IO 列、仓库、背包；FE 使用独立配料（`ae2vf:fe`）与信息页，R/U / 收藏不得落到红石粉。
 
 ## 四、编码规范
 
@@ -268,7 +268,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `IoRuleSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `VoidFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `IoRuleSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
@@ -289,7 +289,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 15. 终端视图与排序偏好（列表 / 卡片、排序档位与方向）写在物品的 `ae2:exported_settings` 组件上，不写存档、不参与服务端。
 16. 失联是运行时状态，不写档；`ObservationNoticeListener` 按工厂聚合、每 tick 最多一条发 `HudNoticeS2C`（模组 HUD 条，不是原版 actionbar），`UNLOADED` 不通知。只有显式删除机器才删规则。
 17. 节点终端里「删除」删的是整个节点；单台成员没有删除入口（旧工作台删除后不再提供）。
-18. FE 在 JEI 里必须是独立配料（`idlefactory:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `KeyIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
+18. FE 在 JEI 里必须是独立配料（`ae2vf:fe`），不能拿红石粉当替身：否则 R/U、收藏都会串到红石粉；图标统一走 `KeyIconRenderer`，R/U 走 `addIngredientInfo` 的 FE 信息页。
 19. **派活给子代理时中途改向，代价是整个已改一半的文件重翻一遍。** 2026-10-31 的 P2 就栽在这里：FE 的归属连改三次（独立规则 → Flux 为前提 → 化学品同理），每次都在子代理改到一半时下发，导致它两次回退、多花约 40 分钟。三条教训：
     - **派活前把方向写死**：资源类型范围、可选附属的归属、存档兼容策略、包名与命名。方向没定死不要开工；确实要改，先停下来把已改的部分收口到可提交状态再改。
     - **不要为了「每步可编译」造兼容层或单项转换**（例如 `aeKey()` 兼容视图、`toAEKey(ResourceKey)`）。「build 失败不提交」不等于「任何时刻都必须可编译」——中间态大面积报错是正常的，只要最终提交能编译。这类中间层只会凭空多出「先加、再迁、最后删」三步。
@@ -299,6 +299,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.3 文档偏差
 
+- 2026-11-20 改名 `ae2vf`：modid、包名（`io.github.crafteve.ae2vf`）、类前缀（`VoidFactory*`）、注册 id、语言键、资源目录与存档文件名全部迁移；版本改 `0.1.0-beta`。旧存档与 `idlefactory:*` 物品不再兼容。
 - 2026-11-20 命名收敛：`NetworkProtocol` 拆成 `NetworkVersion` / `NetworkLimit`；`FactoryManager` → `FactoryLibrary`；`FactoryRefs` → `FactoryResolver`；连锁查找从 `factory` 移入 `command.CommandChain`（它只服务绑定杖，属于命令）。
 - 2026-11-20 包结构整理：`resource` + `location` 合并为 `key`；删除 `event` 包（不再拦截挖掘）；`registry` 类统一 `IdleFactory` 前缀并把负载注册收进来；编解码器集中到 `network.codec`；删除全部 `package-info`。
 - 2026-11-20 视图表与客户端重构落地：读侧只剩 `ViewTable` / `ViewTableDiff`（协议发布前重置为 1，内部编号 41 / 42 只留在 ADR），`view` 包改为视图表，客户端拆 `world` / `wand` / `network` / `screen` 并把两个终端分到 `terminal.node` / `terminal.passiveio`；颜色从主题类迁到组件、界面文案改语言键；新增 `HudNoticeS2C` 把失联 / 恢复提示并入模组 HUD 条。
