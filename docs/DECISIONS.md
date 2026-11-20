@@ -1082,3 +1082,21 @@
 **理由**：`FactoryLifecycle` 原来同时承担启停、读档装配、脏标记、存档、链接推送、防重放与节点日志，任何一处改动都要在一个 400 行文件里找位置；拆开后每类的修改理由只剩一个。
 
 **后果**：`FactoryLifecycle` 从 412 行降到 346 行（其余是服务 getter），无协议、存档、行为变化；存档键与节点编码格式不变。
+
+
+---
+
+## ADR-048 去掉 Resource 前缀
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. `machine/ResourceSpec` → `machine/IoRuleSpec`：它是一条 IO 规则的配置值（资源 key + 面 + 数量 + 匹配模式），「Resource」这个词在这里含义太泛，且本模组不建模自己的资源类型（资源身份 = AE2 的 `AEKey`）。
+2. `client/screen/ResourceIconRenderer` → `client/screen/KeyIconRenderer`：它按 `AEKey` 画物品 / 流体 / FE 图标，叫 Key 更准确。
+3. 保留 `UiResources`（界面文本与物品形态的只读辅助），它指的是「界面资源」而非资源身份，但它内部对同包类的多余 import 一并清掉。
+4. MC 的 `ResourceLocation` / `ResourceKey` 不受影响。
+
+**理由**：包 `resource` 已并入 `key`，代码里继续出现 `Resource*` 会让人以为还有一套并行资源模型。
+
+**后果**：纯改名，无协议、存档、行为变化；`NodeIoRules` 现在管理 `IoRuleSpec` 集合，视图侧对应 `ViewIoRule`。

@@ -8,7 +8,7 @@ import appeng.api.stacks.AEKey;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 import io.github.crafteve.idlefactory.command.CommandKind;
 import io.github.crafteve.idlefactory.command.CommandSource;
@@ -124,7 +124,7 @@ final class PassiveIoActions {
      * @param key         资源
      */
     static void add(int containerId, PassiveIoModel.BlockView block, AEKey key) {
-        MatchMode mode = new ResourceSpec(key, null, 0L).mode();
+        MatchMode mode = new IoRuleSpec(key, null, 0L).mode();
         sendRule(containerId, block.nodeId(), CommandKind.RULE_ADD, IoSide.INPUT, key, null,
                 mode, null);
     }

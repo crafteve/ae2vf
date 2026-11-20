@@ -3,7 +3,7 @@ package io.github.crafteve.idlefactory.node;
 import java.util.List;
 import java.util.UUID;
 
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 import appeng.api.stacks.AEKey;
 
@@ -28,12 +28,12 @@ public final class NodeIo {
     private NodeIoRules outputs = new NodeIoRules();
 
     /** 输入清单（只读）。 */
-    public List<ResourceSpec> inputs() {
+    public List<IoRuleSpec> inputs() {
         return this.inputs.all();
     }
 
     /** 输出清单（只读）。 */
-    public List<ResourceSpec> outputs() {
+    public List<IoRuleSpec> outputs() {
         return this.outputs.all();
     }
 
@@ -53,7 +53,7 @@ public final class NodeIo {
      * @param spec 规则
      * @return 是否加入
      */
-    public boolean addInput(ResourceSpec spec) {
+    public boolean addInput(IoRuleSpec spec) {
         return this.inputs.add(spec);
     }
 
@@ -73,7 +73,7 @@ public final class NodeIo {
      * @param spec 规则
      * @return 是否加入
      */
-    public boolean addOutput(ResourceSpec spec) {
+    public boolean addOutput(IoRuleSpec spec) {
         return this.outputs.add(spec);
     }
 
@@ -94,7 +94,7 @@ public final class NodeIo {
      * @param replacement 新规则
      * @return 是否找到并替换
      */
-    public boolean replaceInput(AEKey key, ResourceSpec replacement) {
+    public boolean replaceInput(AEKey key, IoRuleSpec replacement) {
         return this.inputs.replace(key, replacement);
     }
 
@@ -105,7 +105,7 @@ public final class NodeIo {
      * @param replacement 新规则
      * @return 是否找到并替换
      */
-    public boolean replaceOutput(AEKey key, ResourceSpec replacement) {
+    public boolean replaceOutput(AEKey key, IoRuleSpec replacement) {
         return this.outputs.replace(key, replacement);
     }
 

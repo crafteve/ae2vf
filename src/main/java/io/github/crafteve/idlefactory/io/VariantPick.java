@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 
 import appeng.api.stacks.AEItemKey;
@@ -60,7 +60,7 @@ public final class VariantPick {
      * @param budget  本侧剩余额度，单元素数组，调用后扣减
      * @return 候选 key；空表且 {@code budget} 仍是正数表示确实没有可搬的变体
      */
-    public List<AEKey> candidates(MEStorage network, @Nullable MEStorage machine, ResourceSpec spec,
+    public List<AEKey> candidates(MEStorage network, @Nullable MEStorage machine, IoRuleSpec spec,
             IoSide side, long now, int[] budget) {
         if (spec.mode() == MatchMode.EXACT) {
             // 精确规则没有变体概念，也不扣额度。

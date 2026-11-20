@@ -45,7 +45,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 | 包 | 负责 | 不负责 |
 |---|---|---|
 | `observation` | 方块级观测表、观测调度、批量变化、工作状态 | 配置、搬运 |
-| `machine` | 机器（一个方块）、`ResourceSpec` / `MatchMode` 规则类型、`MachineHealth` 纯函数 | 世界探测、搬运 |
+| `machine` | 机器（一个方块）、`IoRuleSpec` / `MatchMode` 规则类型、`MachineHealth` 纯函数 | 世界探测、搬运 |
 | `storage` | 仓库解析（只解析 AE2 `MEStorage`） | IO 事务 |
 | `io` | 遍历、取面、搬运事务 | 配置、持久化 |
 | `factory` | 工厂实例与索引（`Factory` / `FactoryLibrary`）、装配（`FactoryLoader`）、生命周期（`FactoryLifecycle`）、每 tick 编排（`FactoryRunner`）、存档（`FactoryStore`）、短 id 解析（`FactoryResolver`）、表单（`IoFormBuilder`） | 存储实现、搬运实现、活节点、连锁查找、网络发包 |
@@ -74,7 +74,7 @@ Idle Factory（放置工厂）：AE2 附属式的大型工厂 IO 管理模组。
 硬条款：
 
 1. 包名只用单数领域名词。禁止 `util`、`common`、`misc`、`helper`。
-2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `ResourceSpec`，占用 = `BlockOccupancyTable`。
+2. 一个概念只建模一处：资源身份 = AE2 的 `AEKey`，观测键 = `BlockKey`，IO 规则 = `IoRuleSpec`，占用 = `BlockOccupancyTable`。
 3. 依赖不得成环。跨包 import 不逐条登记，只守这一条；历史上的 `storage → network`、`factory → integration.ae2`、`network.payload → client.network`、`io → node` 只是既成事实，不再是需要维护的例外清单。
 4. 发包只从 `network`，服务端不得直接发负载（`player.openMenu` 之外的网络动作都走负载）。
 5. `client.*` 只在客户端加载；服务端类不得引用。负载的客户端处理放 `client.network` 的 Handler。
@@ -268,7 +268,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `ResourceSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `IdleFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `IoRuleSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 

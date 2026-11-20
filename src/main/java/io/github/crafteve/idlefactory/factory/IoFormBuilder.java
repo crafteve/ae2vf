@@ -10,7 +10,7 @@ import io.github.crafteve.idlefactory.io.IoForm;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.observation.BlockFacts;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.node.Node;
 
 /**
@@ -42,10 +42,10 @@ public final class IoFormBuilder {
                     continue;
                 }
                 IoForm.Slot slot = form.slot(machine);
-                for (ResourceSpec spec : node.io().inputs()) {
+                for (IoRuleSpec spec : node.io().inputs()) {
                     slot.addInput(spec);
                 }
-                for (ResourceSpec spec : node.io().outputs()) {
+                for (IoRuleSpec spec : node.io().outputs()) {
                     slot.addOutput(spec);
                 }
             }

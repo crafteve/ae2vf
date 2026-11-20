@@ -21,7 +21,7 @@ import io.github.crafteve.idlefactory.item.MachineBindingWandItem;
 import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeIo;
 import io.github.crafteve.idlefactory.node.NodeLibrary;
@@ -275,12 +275,12 @@ public final class CommandWand {
         if (found.isEmpty()) {
             return;
         }
-        for (ResourceSpec spec : found.get().io().inputs()) {
+        for (IoRuleSpec spec : found.get().io().inputs()) {
             if (spec.key().equals(energy)) {
                 return;
             }
         }
-        for (ResourceSpec spec : found.get().io().outputs()) {
+        for (IoRuleSpec spec : found.get().io().outputs()) {
             if (spec.key().equals(energy)) {
                 return;
             }
@@ -311,7 +311,7 @@ public final class CommandWand {
      * @param spec 规则
      * @return 是自动形状的 FE 输入规则
      */
-    private static boolean isAutoEnergy(ResourceSpec spec) {
+    private static boolean isAutoEnergy(IoRuleSpec spec) {
         return AeKeyAdapter.isEnergy(spec.key()) && spec.face() == null;
     }
 

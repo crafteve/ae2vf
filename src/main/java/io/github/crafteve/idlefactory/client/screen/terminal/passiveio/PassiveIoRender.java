@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
-import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
+import io.github.crafteve.idlefactory.client.screen.KeyIconRenderer;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.BlockBox;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
@@ -356,7 +356,7 @@ final class PassiveIoRender {
         graphics.pose().pushPose();
         graphics.pose().translate(x, y, 0.0F);
         graphics.pose().scale(scale, scale, 1.0F);
-        ResourceIconRenderer.draw(graphics, this.font, rule.key(), 0, 0);
+        KeyIconRenderer.draw(graphics, this.font, rule.key(), 0, 0);
         graphics.pose().popPose();
     }
 
@@ -440,7 +440,7 @@ final class PassiveIoRender {
         int slotX = x + PassiveIoLayout.TILE_INSET;
         NineSliceRenderer.slot(graphics, slotX, y + 2, PassiveIoLayout.SLOT,
                 PassiveIoLayout.SLOT);
-        ResourceIconRenderer.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
+        KeyIconRenderer.draw(graphics, this.font, rule.key(), slotX + 1, y + 3);
         int nameX = x + PassiveIoLayout.TILE_NAME_X;
         graphics.drawString(this.font,
                 ellipsize(UiResources.keyName(rule.key()), TILE_NAME_W), nameX, y + 7,

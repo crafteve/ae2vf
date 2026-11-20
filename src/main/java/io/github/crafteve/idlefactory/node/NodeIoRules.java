@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 import appeng.api.stacks.AEKey;
 
@@ -27,10 +27,10 @@ public final class NodeIoRules {
     /** 每侧规则数硬上限。改这里等于改线协议，必须同步递增协议版本。 */
     public static final int MAX_RULES_PER_SIDE = 64;
 
-    private final List<ResourceSpec> specs = new ArrayList<>();
+    private final List<IoRuleSpec> specs = new ArrayList<>();
 
     /** 当前规则（只读）。 */
-    public List<ResourceSpec> all() {
+    public List<IoRuleSpec> all() {
         return List.copyOf(this.specs);
     }
 
@@ -50,7 +50,7 @@ public final class NodeIoRules {
      * @param spec 规则
      * @return 是否加入；同资源已有规则或已满时返回 {@code false}
      */
-    public boolean add(ResourceSpec spec) {
+    public boolean add(IoRuleSpec spec) {
         if (this.specs.size() >= MAX_RULES_PER_SIDE || this.find(spec.key()) != null) {
             return false;
         }
@@ -75,7 +75,7 @@ public final class NodeIoRules {
      * @param replacement 新规则；key 必须与原规则一致
      * @return 是否找到并替换
      */
-    public boolean replace(AEKey key, ResourceSpec replacement) {
+    public boolean replace(AEKey key, IoRuleSpec replacement) {
         if (!replacement.key().equals(key)) {
             return false;
         }
@@ -89,8 +89,8 @@ public final class NodeIoRules {
     }
 
     @Nullable
-    private ResourceSpec find(AEKey key) {
-        for (ResourceSpec spec : this.specs) {
+    private IoRuleSpec find(AEKey key) {
+        for (IoRuleSpec spec : this.specs) {
             if (spec.key().equals(key)) {
                 return spec;
             }
@@ -106,7 +106,7 @@ public final class NodeIoRules {
      */
     public ListTag save(HolderLookup.Provider registries) {
         ListTag list = new ListTag();
-        for (ResourceSpec spec : this.specs) {
+        for (IoRuleSpec spec : this.specs) {
             list.add(spec.save(registries));
         }
         return list;
@@ -126,7 +126,7 @@ public final class NodeIoRules {
         NodeIoRules rules = new NodeIoRules();
         int usable = Math.min(list.size(), MAX_RULES_PER_SIDE);
         for (int i = 0; i < usable; i++) {
-            ResourceSpec spec = ResourceSpec.load(list.getCompound(i), registries);
+            IoRuleSpec spec = IoRuleSpec.load(list.getCompound(i), registries);
             if (spec != null) {
                 rules.specs.add(spec);
             }

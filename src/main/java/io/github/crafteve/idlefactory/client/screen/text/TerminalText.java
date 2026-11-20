@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.io.IoReason;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -52,7 +52,7 @@ public final class TerminalText {
      * @param spec 规则
      * @return 上/下/北/南/东/西/任意
      */
-    public static String face(ResourceSpec spec) {
+    public static String face(IoRuleSpec spec) {
         return face(spec.face());
     }
 

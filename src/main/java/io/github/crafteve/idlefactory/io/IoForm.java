@@ -12,7 +12,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 /**
  * 本 tick 的唯一工作清单：每台在线机器各自的一组输入 / 输出条目。
@@ -131,7 +131,7 @@ public final class IoForm {
          *
          * @param spec 规则
          */
-        public void addInput(ResourceSpec spec) {
+        public void addInput(IoRuleSpec spec) {
             this.inputs.add(this.entry(spec, IoSide.INPUT));
         }
 
@@ -140,7 +140,7 @@ public final class IoForm {
          *
          * @param spec 规则
          */
-        public void addOutput(ResourceSpec spec) {
+        public void addOutput(IoRuleSpec spec) {
             this.outputs.add(this.entry(spec, IoSide.OUTPUT));
         }
 
@@ -148,7 +148,7 @@ public final class IoForm {
             this.pool.values().removeIf(entry -> !entry.seen());
         }
 
-        private Entry entry(ResourceSpec spec, IoSide side) {
+        private Entry entry(IoRuleSpec spec, IoSide side) {
             IoKey rule = new IoKey(side, spec.key(), spec.face(), spec.mode());
             Entry entry = this.pool.get(new Entry.Key(this.machine.id(), rule));
             if (entry == null) {
@@ -192,7 +192,7 @@ public final class IoForm {
         private final IoAnalyzer.Ledger ledger = new IoAnalyzer.Ledger();
         /** 本条目的历史结论（摘要，不滚）。 */
         private final IoAnalyzer.Conclusion conclusion = new IoAnalyzer.Conclusion();
-        private ResourceSpec spec;
+        private IoRuleSpec spec;
         /** 本轮是否还在表单上；表单重建后为 {@code false} 的条目会被释放。 */
         private boolean seen = true;
 
@@ -201,7 +201,7 @@ public final class IoForm {
          * @param machine 机器
          * @param spec    规则
          */
-        Entry(Key key, Machine machine, ResourceSpec spec) {
+        Entry(Key key, Machine machine, IoRuleSpec spec) {
             this.key = key;
             this.machine = machine;
             this.spec = spec;
@@ -228,7 +228,7 @@ public final class IoForm {
         }
 
         /** 当前规则；每 tick 由表单刷新。 */
-        public ResourceSpec spec() {
+        public IoRuleSpec spec() {
             return this.spec;
         }
 
@@ -247,7 +247,7 @@ public final class IoForm {
          *
          * @param spec 当前规则
          */
-        void refresh(ResourceSpec spec) {
+        void refresh(IoRuleSpec spec) {
             this.spec = spec;
             this.seen = true;
         }

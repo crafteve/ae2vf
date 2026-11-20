@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.io.PassivePlanner;
 import io.github.crafteve.idlefactory.machine.Machine;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
@@ -175,12 +175,12 @@ public final class ViewTableBuilder {
             MachineHealth machineHealth, boolean stale) {
         IoForm.Slot slot = form == null ? null : form.slotOrNull(machine.id());
         IoAnalyzer.Stats.MachineStats stats = factory.analyzer().stats().machineOrNull(machine.id());
-        List<ResourceSpec> inputs = node.io().inputs();
-        List<ResourceSpec> outputs = node.io().outputs();
+        List<IoRuleSpec> inputs = node.io().inputs();
+        List<IoRuleSpec> outputs = node.io().outputs();
         List<IoReason> inputReasons = new ArrayList<>(inputs.size());
         List<Long> inputRates = new ArrayList<>(inputs.size());
         long lastInputSuccessAt = -1L;
-        for (ResourceSpec spec : inputs) {
+        for (IoRuleSpec spec : inputs) {
             IoKey key = new IoKey(IoSide.INPUT, spec.key(), spec.face(), spec.mode());
             IoForm.Entry entry = slot == null ? null : slot.entry(key);
             inputReasons.add(entry == null
@@ -193,7 +193,7 @@ public final class ViewTableBuilder {
         }
         List<IoReason> outputReasons = new ArrayList<>(outputs.size());
         List<Long> outputRates = new ArrayList<>(outputs.size());
-        for (ResourceSpec spec : outputs) {
+        for (IoRuleSpec spec : outputs) {
             IoKey key = new IoKey(IoSide.OUTPUT, spec.key(), spec.face(), spec.mode());
             IoForm.Entry entry = slot == null ? null : slot.entry(key);
             outputReasons.add(entry == null
@@ -248,8 +248,8 @@ public final class ViewTableBuilder {
      * 用"方向 + 顺序"就足够定位，不需要一个跨方向的全局序号。</p>
      */
     private static List<ViewIoRule> rules(Node node, List<MachineFacts> facts) {
-        List<ResourceSpec> inputs = node.io().inputs();
-        List<ResourceSpec> outputs = node.io().outputs();
+        List<IoRuleSpec> inputs = node.io().inputs();
+        List<IoRuleSpec> outputs = node.io().outputs();
         List<ViewIoRule> rules = new ArrayList<>(inputs.size() + outputs.size());
         for (int index = 0; index < inputs.size(); index++) {
             rules.add(rule(IoSide.INPUT, inputs.get(index), index, facts, index, true));
@@ -270,7 +270,7 @@ public final class ViewTableBuilder {
      * @param index 这条规则在同方向列表里的下标
      * @param input 是否输入侧（决定读哪一列速率与原因）
      */
-    private static ViewIoRule rule(IoSide side, ResourceSpec spec, int order,
+    private static ViewIoRule rule(IoSide side, IoRuleSpec spec, int order,
             List<MachineFacts> facts, int index, boolean input) {
         long rate = 0L;
         IoReason worst = IoReason.RUN;

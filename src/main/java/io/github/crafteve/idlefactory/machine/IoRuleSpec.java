@@ -34,7 +34,7 @@ import appeng.api.stacks.AEKey;
  * @param amount 每轮上限；{@code <= 0} 表示塞满
  * @param mode   物品匹配模式；非物品固定精确
  */
-public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, MatchMode mode) {
+public record IoRuleSpec(AEKey key, @Nullable Direction face, long amount, MatchMode mode) {
     /** 不限面的字符串表示。 */
     public static final String ANY = "any";
 
@@ -50,7 +50,7 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
      * @param face   面
      * @param amount 每轮上限
      */
-    public ResourceSpec(AEKey key, @Nullable Direction face, long amount) {
+    public IoRuleSpec(AEKey key, @Nullable Direction face, long amount) {
         this(key, face, amount, defaultMode(key));
     }
 
@@ -61,7 +61,7 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
      * 带自定义组件取默认。带组件的 key 也可以显式使用
      * {@link MatchMode#IGNORE_COMPONENTS}，表示只按注册名匹配所有变体。</p>
      */
-    public ResourceSpec {
+    public IoRuleSpec {
         Objects.requireNonNull(key, "key");
         if (!(key instanceof AEItemKey)) {
             mode = MatchMode.EXACT;
@@ -145,7 +145,7 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
      * @return 规则；格式不对或 key 解码失败时返回 {@code null}
      */
     @Nullable
-    public static ResourceSpec load(CompoundTag tag, HolderLookup.Provider registries) {
+    public static IoRuleSpec load(CompoundTag tag, HolderLookup.Provider registries) {
         if (!tag.contains(TAG_KEY, Tag.TAG_COMPOUND)) {
             return null;
         }
@@ -161,7 +161,7 @@ public record ResourceSpec(AEKey key, @Nullable Direction face, long amount, Mat
         }
         Direction face = tag.contains(TAG_FACE) ? Direction.byName(tag.getString(TAG_FACE)) : null;
         long amount = tag.getLong(TAG_AMOUNT);
-        return new ResourceSpec(key, face, amount, readMode(tag, key));
+        return new IoRuleSpec(key, face, amount, readMode(tag, key));
     }
 
     /**

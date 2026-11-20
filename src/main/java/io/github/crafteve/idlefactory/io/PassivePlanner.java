@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 import appeng.api.stacks.AEKey;
 import appeng.api.storage.MEStorage;
@@ -162,7 +162,7 @@ public final class PassivePlanner {
      */
     private void planEntry(Plan plan, IoForm.Entry entry, Machine machine, VariantPick variants,
             MEStorage network, long now, int[] budget) {
-        ResourceSpec spec = entry.spec();
+        IoRuleSpec spec = entry.spec();
         IoSide side = entry.side();
         FacePick.Result pick = this.facePick.pick(machine, spec.key(), side, spec.face(),
                 entry.conclusion().faceHint());

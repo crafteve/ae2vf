@@ -2,14 +2,13 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import org.jetbrains.annotations.Nullable;
 
-import io.github.crafteve.idlefactory.client.screen.UiResources;
 import io.github.crafteve.idlefactory.client.screen.text.TerminalText;
 
 
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEFluidKey;
 import appeng.api.stacks.AEKey;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -95,7 +94,7 @@ public final class UiResources {
      * @param spec 规则
      * @return 上/下/北/南/东/西/任意
      */
-    static String faceName(ResourceSpec spec) {
+    static String faceName(IoRuleSpec spec) {
         return spec.face() == null
                 ? net.minecraft.network.chat.Component.translatable("idlefactory.face.any").getString()
                 : TerminalText.face(spec.face());

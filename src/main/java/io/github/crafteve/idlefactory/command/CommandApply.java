@@ -14,7 +14,7 @@ import io.github.crafteve.idlefactory.io.BlockingMode;
 import io.github.crafteve.idlefactory.io.IoSide;
 import io.github.crafteve.idlefactory.key.BlockKey;
 import io.github.crafteve.idlefactory.machine.MatchMode;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeIo;
@@ -81,7 +81,7 @@ public final class CommandApply {
             return CommandResult.node(resourceError, nodeId);
         }
         NodeIo io = ioFound.get();
-        List<ResourceSpec> rules = rules(io, rule.side());
+        List<IoRuleSpec> rules = rules(io, rule.side());
         int maxRules = IdleFactoryConfig.maxRulesPerSide();
         if (rules.size() >= maxRules) {
             return CommandResult.node(CommandReason.RULE_FULL, nodeId);
@@ -89,7 +89,7 @@ public final class CommandApply {
         if (find(rules, rule.key()) != null) {
             return CommandResult.node(CommandReason.RULE_EXISTS, nodeId);
         }
-        ResourceSpec spec = new ResourceSpec(rule.key(), rule.face(), 0L, rule.mode());
+        IoRuleSpec spec = new IoRuleSpec(rule.key(), rule.face(), 0L, rule.mode());
         boolean added = rule.side() == IoSide.INPUT ? io.addInput(spec) : io.addOutput(spec);
         if (!added) {
             return CommandResult.node(CommandReason.RULE_FULL, nodeId);
@@ -108,12 +108,12 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
         NodeIo io = ioFound.get();
-        ResourceSpec current = find(rules(io, rule.side()), rule.key());
+        IoRuleSpec current = find(rules(io, rule.side()), rule.key());
         if (current == null) {
             return CommandResult.node(CommandReason.RULE_MISSING, nodeId);
         }
         MatchMode mode = rule.mode() == null ? current.mode() : rule.mode();
-        ResourceSpec replacement = new ResourceSpec(rule.key(), rule.face(), current.amount(), mode);
+        IoRuleSpec replacement = new IoRuleSpec(rule.key(), rule.face(), current.amount(), mode);
         boolean replaced = rule.side() == IoSide.INPUT
                 ? io.replaceInput(rule.key(), replacement)
                 : io.replaceOutput(rule.key(), replacement);
@@ -139,11 +139,11 @@ public final class CommandApply {
             return CommandResult.node(CommandReason.NODE_MISSING, nodeId);
         }
         NodeIo io = ioFound.get();
-        ResourceSpec current = find(rules(io, from), rule.key());
+        IoRuleSpec current = find(rules(io, from), rule.key());
         if (current == null) {
             return CommandResult.node(CommandReason.RULE_MISSING, nodeId);
         }
-        List<ResourceSpec> target = rules(io, to);
+        List<IoRuleSpec> target = rules(io, to);
         int maxRules = IdleFactoryConfig.maxRulesPerSide();
         if (target.size() >= maxRules) {
             return CommandResult.node(CommandReason.RULE_FULL, nodeId);
@@ -362,13 +362,13 @@ public final class CommandApply {
         return factory.nodes().byId(nodeId).map(Node::io);
     }
 
-    private static List<ResourceSpec> rules(NodeIo io, IoSide side) {
+    private static List<IoRuleSpec> rules(NodeIo io, IoSide side) {
         return side == IoSide.INPUT ? io.inputs() : io.outputs();
     }
 
     @Nullable
-    private static ResourceSpec find(List<ResourceSpec> rules, AEKey key) {
-        for (ResourceSpec spec : rules) {
+    private static IoRuleSpec find(List<IoRuleSpec> rules, AEKey key) {
+        for (IoRuleSpec spec : rules) {
             if (spec.key().equals(key)) {
                 return spec;
             }

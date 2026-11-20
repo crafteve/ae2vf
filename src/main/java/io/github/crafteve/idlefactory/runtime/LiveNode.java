@@ -20,7 +20,7 @@ import io.github.crafteve.idlefactory.io.DispatchState;
 import io.github.crafteve.idlefactory.io.FacePick;
 import io.github.crafteve.idlefactory.io.PortExecutor;
 import io.github.crafteve.idlefactory.machine.Machine;
-import io.github.crafteve.idlefactory.machine.ResourceSpec;
+import io.github.crafteve.idlefactory.machine.IoRuleSpec;
 import appeng.api.implementations.blockentities.PatternContainerGroup;
 import appeng.api.inventories.InternalInventory;
 import appeng.api.networking.GridHelper;
@@ -368,7 +368,7 @@ public final class LiveNode
      */
     public DispatchState dispatchState() {
         Map<AEKey, Direction> inputFaces = new LinkedHashMap<>();
-        for (ResourceSpec spec : this.node.io().inputs()) {
+        for (IoRuleSpec spec : this.node.io().inputs()) {
             if (spec.face() != null) {
                 inputFaces.put(spec.key(), spec.face());
             }

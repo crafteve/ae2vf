@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.integration.jei;
 
 import java.util.List;
 
-import io.github.crafteve.idlefactory.client.screen.ResourceIconRenderer;
+import io.github.crafteve.idlefactory.client.screen.KeyIconRenderer;
 
 import mezz.jei.api.ingredients.IIngredientRenderer;
 
@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.key.AeKeyAdapter;
 /**
  * FE 配料的 JEI 绘制。
  *
- * <p>直接复用仓库格/IO 列的 {@link ResourceIconRenderer}：装了 Applied Flux 时画它的
+ * <p>直接复用仓库格/IO 列的 {@link KeyIconRenderer}：装了 Applied Flux 时画它的
  * FE 图标，没装时画绿色水贴图兜底，保证 JEI 里的 FE 和界面上的 FE 看起来是同一个东西。</p>
  */
 final class FeIngredientRenderer implements IIngredientRenderer<FeIngredient> {
@@ -29,7 +29,7 @@ final class FeIngredientRenderer implements IIngredientRenderer<FeIngredient> {
      */
     @Override
     public void render(GuiGraphics graphics, FeIngredient ingredient) {
-        ResourceIconRenderer.draw(graphics, Minecraft.getInstance().font,
+        KeyIconRenderer.draw(graphics, Minecraft.getInstance().font,
                 AeKeyAdapter.energy(), 0, 0);
     }
 
