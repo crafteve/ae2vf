@@ -1012,3 +1012,32 @@
 - 客户端统一入口 `client/screen/hud/HUDRenderer`：深底、1px 边框、左侧状态点；`WandHud` 常驻草稿条复用 `drawBar`，绑杖 / ME 杖 / 定位 / 改名 / 失联共五类提示全部落到这里。
 - 约定：**服务端只发无色文本，颜色由 `Kind` 决定**；条内文本自带颜色会与状态点打架，`FactoryMessages` 因此删除。
 - `EnergyPick` 在接入时直接探 FE 能力，不再依赖观测 tick；`EnergyRuleRetry` 双保险已移除。
+
+
+---
+
+## ADR-045 menu 包命名与分包
+
+**状态**：已决定（2026-11-20）
+
+**决定**：
+
+1. `menu` 定位为**会话层 + 终端偏好契约**，不是界面层：Host 拿终端物品做 AE2 `ItemMenuHost`，Menu 只建 36 个玩家槽位，数据仍走 `ViewPort` / 视图表。
+2. 分包按终端切分，与客户端目录对称：
+   - `menu/node`：`NodeTerminalMenu` / `NodeTerminalHost`
+   - `menu/passiveio`：`PassiveIoTerminalMenu` / `PassiveIoTerminalHost`
+   - `menu/wand`：`WandDraftMenu` / `WandDraftHost`
+   - 根：`TerminalSetting` / `TerminalSortMode` / `PassiveIoViewMode` / `MenuGate`
+3. 改名 `FactoryGuiOpening` → `MenuGate`（它做归属门禁，不是「打开」），方法 `isFactoryMenu` / `isWandMenu` → `allowsTerminal` / `allowsWandDraft`。
+4. **兼容性**：`Setting` 键字符串（`passive_io_view` / `terminal_sort_mode` / `terminal_sort_direction`）、枚举常量名与 ordinal、MenuType 注册顺序全部不变；协议号不变。旧终端组件与旧存档无需迁移。
+5. 迁移分四步提交：偏好类型 → 四个 Host/Menu 改名并移入子包 → MenuGate → 草稿面板；每步 `gradlew build` 通过。
+
+**理由**：
+
+- `Factory` 前缀在 client 侧已去掉，menu 仍满是前缀，命名与职责不一致；
+- `Host` / `Menu` 成对出现，按终端分包后与 `client/terminal.node` / `terminal.passiveio` 一一对应；
+- `Opening` 这个名字让人以为它负责打开界面，实际只做校验。
+
+**后果**：
+
+- 客户端仍有 53 处引用 `menu` 的三个偏好类型（组件值与线协议 ordinal 的契约共享）。彻底消除 `client → menu` 需要把这三个类型挪到中立 `terminal` 包，属于独立决定，本期不做。
