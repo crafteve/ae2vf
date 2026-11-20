@@ -39,7 +39,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIo
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 import io.github.crafteve.idlefactory.command.CommandResult;
@@ -67,7 +67,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 主动推送，否则切界面或重开时数据会停在旧值。编辑反馈不在界面上展示，动作结果只由随后
  * 到达的机器快照体现。</p>
  */
-public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
+public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
         implements ViewTableSink, FeedbackSink {
 
     /** 面板底色（AE2 终端内部实色）。 */
@@ -134,7 +134,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
      * @param title     标题
      * @param style     AE2 终端样式
      */
-    public PassiveIoScreen(FactoryPassiveIoMenu menu, Inventory inventory,
+    public PassiveIoScreen(PassiveIoTerminalMenu menu, Inventory inventory,
             Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
         this.view = menu.host().view();

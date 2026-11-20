@@ -8,7 +8,7 @@ import appeng.menu.MenuOpener;
 import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
 
-import io.github.crafteve.idlefactory.menu.FactoryNodeHost;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalHost;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -64,6 +64,6 @@ public class FactoryNodeTerminalItem extends Item implements IMenuItem {
     @Nullable
     public ItemMenuHost<?> getMenuHost(Player player, ItemMenuHostLocator locator,
             @Nullable BlockHitResult hit) {
-        return new FactoryNodeHost(this, player, locator);
+        return new NodeTerminalHost(this, player, locator);
     }
 }

@@ -1,5 +1,9 @@
 package io.github.crafteve.idlefactory.menu;
 
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
+
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
+
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
 
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -27,7 +31,7 @@ public final class FactoryGuiOpening {
      */
     public static boolean isFactoryMenu(AbstractContainerMenu menu, int containerId) {
         return menu.containerId == containerId
-                && (menu instanceof FactoryPassiveIoMenu || menu instanceof FactoryNodeMenu);
+                && (menu instanceof PassiveIoTerminalMenu || menu instanceof NodeTerminalMenu);
     }
 
     /**

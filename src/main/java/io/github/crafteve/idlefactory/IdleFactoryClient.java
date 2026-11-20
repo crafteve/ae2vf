@@ -4,8 +4,8 @@ import io.github.crafteve.idlefactory.client.screen.terminal.node.NodeScreen;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoScreen;
 import io.github.crafteve.idlefactory.client.screen.text.WandText;
 import io.github.crafteve.idlefactory.client.screen.wand.WandDraftScreen;
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
@@ -56,15 +56,15 @@ public class IdleFactoryClient {
      */
     @SubscribeEvent
     static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
-        event.<FactoryPassiveIoMenu, PassiveIoScreen>register(
+        event.<PassiveIoTerminalMenu, PassiveIoScreen>register(
                 ModMenus.PASSIVE_IO_TERMINAL.get(),
-                (FactoryPassiveIoMenu menu, Inventory inventory, Component title) ->
+                (PassiveIoTerminalMenu menu, Inventory inventory, Component title) ->
                         new PassiveIoScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/base_terminal.json")));
-        event.<FactoryNodeMenu, NodeScreen>register(
+        event.<NodeTerminalMenu, NodeScreen>register(
                 ModMenus.NODE_TERMINAL.get(),
-                (FactoryNodeMenu menu, Inventory inventory, Component title) ->
+                (NodeTerminalMenu menu, Inventory inventory, Component title) ->
                         new NodeScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(
                                         "/screens/terminals/base_terminal.json")));

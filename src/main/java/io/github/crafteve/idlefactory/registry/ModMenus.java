@@ -1,10 +1,10 @@
 package io.github.crafteve.idlefactory.registry;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.menu.FactoryNodeHost;
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoHost;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalHost;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalHost;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.idlefactory.menu.wand.WandMenu;
 import io.github.crafteve.idlefactory.menu.wand.WandMenuHost;
 
@@ -28,24 +28,24 @@ public final class ModMenus {
             DeferredRegister.create(Registries.MENU, IdleFactory.MODID);
 
     /** 被动 IO 管理终端：AE2 菜单构建器负责按物品定位器还原宿主。 */
-    public static final DeferredHolder<MenuType<?>, MenuType<FactoryPassiveIoMenu>>
+    public static final DeferredHolder<MenuType<?>, MenuType<PassiveIoTerminalMenu>>
             PASSIVE_IO_TERMINAL = MENUS.register("passive_io_terminal",
                     () -> MenuTypeBuilder
-                            .<FactoryPassiveIoMenu, FactoryPassiveIoHost>create(
+                            .<PassiveIoTerminalMenu, PassiveIoTerminalHost>create(
                                     (type, containerId, inventory, host) ->
-                                            new FactoryPassiveIoMenu(type, containerId,
+                                            new PassiveIoTerminalMenu(type, containerId,
                                                     inventory, host),
-                                    FactoryPassiveIoHost.class)
+                                    PassiveIoTerminalHost.class)
                             .buildUnregistered(id("passive_io_terminal")));
 
     /** 节点管理终端：只管节点、成员与节点级动作。 */
-    public static final DeferredHolder<MenuType<?>, MenuType<FactoryNodeMenu>>
+    public static final DeferredHolder<MenuType<?>, MenuType<NodeTerminalMenu>>
             NODE_TERMINAL = MENUS.register("node_terminal",
                     () -> MenuTypeBuilder
-                            .<FactoryNodeMenu, FactoryNodeHost>create(
+                            .<NodeTerminalMenu, NodeTerminalHost>create(
                                     (type, containerId, inventory, host) ->
-                                            new FactoryNodeMenu(type, containerId, inventory, host),
-                                    FactoryNodeHost.class)
+                                            new NodeTerminalMenu(type, containerId, inventory, host),
+                                    NodeTerminalHost.class)
                             .buildUnregistered(id("node_terminal")));
 
     /** 机器绑定杖的草稿确认面板：无槽位，只做登录壳。 */

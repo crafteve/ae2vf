@@ -7,8 +7,8 @@ import org.jetbrains.annotations.Nullable;
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
 import io.github.crafteve.idlefactory.menu.FactoryGuiOpening;
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 
 import net.minecraft.server.level.ServerPlayer;
 
@@ -73,8 +73,8 @@ public final class CommandGate {
         if (player.containerMenu.containerId != containerId) {
             return false;
         }
-        return player.containerMenu instanceof FactoryPassiveIoMenu
-                || player.containerMenu instanceof FactoryNodeMenu
+        return player.containerMenu instanceof PassiveIoTerminalMenu
+                || player.containerMenu instanceof NodeTerminalMenu
                 || player.containerMenu instanceof io.github.crafteve.idlefactory.menu.wand.WandMenu;
     }
 

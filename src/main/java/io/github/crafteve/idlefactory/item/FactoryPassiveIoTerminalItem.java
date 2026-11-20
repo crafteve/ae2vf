@@ -8,7 +8,7 @@ import appeng.menu.MenuOpener;
 import appeng.menu.locator.ItemMenuHostLocator;
 import appeng.menu.locator.MenuLocators;
 
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoHost;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalHost;
 import io.github.crafteve.idlefactory.registry.ModMenus;
 
 import net.minecraft.server.level.ServerPlayer;
@@ -68,6 +68,6 @@ public class FactoryPassiveIoTerminalItem extends Item implements IMenuItem {
     @Nullable
     public ItemMenuHost<?> getMenuHost(Player player, ItemMenuHostLocator locator,
             @Nullable BlockHitResult hit) {
-        return new FactoryPassiveIoHost(this, player, locator);
+        return new PassiveIoTerminalHost(this, player, locator);
     }
 }

@@ -1,7 +1,7 @@
 package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 import io.netty.handler.codec.DecoderException;
@@ -19,7 +19,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * <p>视图存在物品的 {@code ae2:exported_settings} 组件里；客户端直接改自己的物品栈不会
  * 同步到服务端，所以必须由服务端写组件，再回一份确认。服务端只接受当前打开的
- * {@link FactoryPassiveIoMenu} 与匹配的容器 id。</p>
+ * {@link PassiveIoTerminalMenu} 与匹配的容器 id。</p>
  *
  * @param containerId 菜单容器 id
  * @param view        目标视图
@@ -49,7 +49,7 @@ public record FactoryPassiveIoViewC2S(int containerId, PassiveIoViewMode view)
     public static void handle(FactoryPassiveIoViewC2S payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (!(context.player() instanceof ServerPlayer player)
-                    || !(player.containerMenu instanceof FactoryPassiveIoMenu menu)
+                    || !(player.containerMenu instanceof PassiveIoTerminalMenu menu)
                     || menu.containerId != payload.containerId()) {
                 return;
             }

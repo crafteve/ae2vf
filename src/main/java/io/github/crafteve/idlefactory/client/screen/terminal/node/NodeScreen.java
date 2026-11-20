@@ -54,7 +54,7 @@ import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
 
 import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
@@ -86,7 +86,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * <p>删除有规则或样板的节点会先弹确认浮层；没有配置的节点直接删除。倍增、逐台/轮询与编辑会话
  * 还没有后端，按钮保留但只提示「待接入」。</p>
  */
-public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
+public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         implements FeedbackSink, ViewTableSink {
 
     /** 面板底色（AE2 终端内部实色）。 */
@@ -150,7 +150,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param title     标题
      * @param style     AE2 终端样式
      */
-    public NodeScreen(FactoryNodeMenu menu, Inventory inventory, Component title,
+    public NodeScreen(NodeTerminalMenu menu, Inventory inventory, Component title,
             ScreenStyle style) {
         super(menu, inventory, title, style);
         this.source = new TerminalSource(menu.containerId);

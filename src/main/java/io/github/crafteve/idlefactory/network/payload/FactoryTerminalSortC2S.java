@@ -3,8 +3,8 @@ package io.github.crafteve.idlefactory.network.payload;
 import appeng.api.config.SortDir;
 
 import io.github.crafteve.idlefactory.IdleFactory;
-import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
+import io.github.crafteve.idlefactory.menu.node.NodeTerminalMenu;
+import io.github.crafteve.idlefactory.menu.passiveio.PassiveIoTerminalMenu;
 import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
 import io.netty.handler.codec.DecoderException;
@@ -60,9 +60,9 @@ public record FactoryTerminalSortC2S(int containerId, TerminalSortMode mode, Sor
             if (menu.containerId != payload.containerId()) {
                 return;
             }
-            if (menu instanceof FactoryPassiveIoMenu passive) {
+            if (menu instanceof PassiveIoTerminalMenu passive) {
                 passive.host().setSort(payload.mode(), payload.direction());
-            } else if (menu instanceof FactoryNodeMenu node) {
+            } else if (menu instanceof NodeTerminalMenu node) {
                 node.host().setSort(payload.mode(), payload.direction());
             } else {
                 return;

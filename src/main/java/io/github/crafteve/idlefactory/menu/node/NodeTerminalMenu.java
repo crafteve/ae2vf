@@ -1,4 +1,8 @@
-package io.github.crafteve.idlefactory.menu;
+package io.github.crafteve.idlefactory.menu.node;
+
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
+
+import io.github.crafteve.idlefactory.menu.TerminalSetting;
 
 import appeng.menu.AEBaseMenu;
 
@@ -10,32 +14,31 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 
 /**
- * 被动 IO 管理终端的菜单：只负责 36 个玩家背包槽。
+ * 节点管理终端的菜单：只负责 36 个玩家背包槽。
  *
- * <p>不继承 AE2 的库存菜单，避免把 ME 库存同步、repo 与搜索控件一起带进来。机器与规则
- * 不是真实槽位，后续版本自己发快照包。</p>
+ * <p>节点与成员不是真实槽位，数据走节点表快照包</p>
  */
-public final class FactoryPassiveIoMenu extends AEBaseMenu {
-    /** 终端宿主；视图设置从这里读写。 */
-    private final FactoryPassiveIoHost host;
+public final class NodeTerminalMenu extends AEBaseMenu {
+    /** 终端宿主。 */
+    private final NodeTerminalHost host;
 
     /**
      * @param menuType    注册出来的菜单类型
      * @param containerId 本次会话的容器 id
      * @param inventory   玩家物品栏
-     * @param host        被动 IO 终端宿主
+     * @param host        节点终端宿主
      */
-    public FactoryPassiveIoMenu(MenuType<?> menuType, int containerId, Inventory inventory,
-            FactoryPassiveIoHost host) {
+    public NodeTerminalMenu(MenuType<?> menuType, int containerId, Inventory inventory,
+            NodeTerminalHost host) {
         super(menuType, containerId, inventory, host);
         this.host = host;
         this.createPlayerInventorySlots(inventory);
     }
 
     /**
-     * @return 被动 IO 终端宿主
+     * @return 节点终端宿主
      */
-    public FactoryPassiveIoHost host() {
+    public NodeTerminalHost host() {
         return this.host;
     }
 
