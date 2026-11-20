@@ -205,7 +205,8 @@ public final class FactoryConfirmDialog {
         }
         int buttonY = box.y() + box.height() - 26;
         int confirmW = Math.max(48, this.font.width(this.confirmLabel) + 18);
-        int cancelW = Math.max(40, this.font.width("取消") + 18);
+        String cancelLabel = tr("idlefactory.common.cancel");
+        int cancelW = Math.max(40, this.font.width(cancelLabel) + 18);
         int confirmX = box.x() + box.width() - 12 - confirmW;
         int cancelX = confirmX - 6 - cancelW;
         if (inside(mouseX, mouseY, cancelX, buttonY, cancelW, 18)) {

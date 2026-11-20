@@ -73,8 +73,9 @@ public final class SearchFields {
         if (dimensionId != null && pos != null) {
             tooltip.append('\n').append(dimensionId).append(' ').append(pos.toShortString());
         }
-        tooltip.append("\n机器 ").append(machineCount)
-                .append(" 台 · 规则 ").append(ruleCount).append(" 条");
+        tooltip.append("\n").append(net.minecraft.network.chat.Component
+                .translatable("idlefactory.search.machines_rules", machineCount, ruleCount)
+                .getString());
         if (patternCount >= 0) {
             tooltip.append(Component.translatable("idlefactory.search.patterns",
                     patternCount).getString());
