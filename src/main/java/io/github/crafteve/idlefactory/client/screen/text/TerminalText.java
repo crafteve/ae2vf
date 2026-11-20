@@ -76,6 +76,19 @@ public final class TerminalText {
         };
     }
 
+    /**
+     * 面的单字缩写：规则行 chip 只有 16px，放不下 North / South 这类整词。
+     *
+     * @param face 面；{@code null} 表示任意
+     * @return 单字或单字母
+     */
+    public static String faceShort(@Nullable Direction face) {
+        if (face == null) {
+            return tr("idlefactory.passive.chip.any_face");
+        }
+        return tr("idlefactory.face.short." + face.getName());
+    }
+
     private static final String[] COMPACT_UNITS = {"E", "P", "T", "G", "M", "k"};
     private static final double[] COMPACT_DIVISORS = {1.0E18, 1.0E15, 1.0E12, 1.0E9, 1.0E6, 1.0E3};
 

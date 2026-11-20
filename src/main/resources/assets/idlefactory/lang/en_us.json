@@ -1,6 +1,12 @@
 {
   "idlefactory.common.unknown_machine": "Unknown machine",
   "idlefactory.common.offline": "Offline",
+    "idlefactory.face.short.up": "U",
+  "idlefactory.face.short.down": "D",
+  "idlefactory.face.short.north": "N",
+  "idlefactory.face.short.south": "S",
+  "idlefactory.face.short.east": "E",
+  "idlefactory.face.short.west": "W",
   "idlefactory.face.any": "Any",
   "idlefactory.face.up": "Up",
   "idlefactory.face.down": "Down",

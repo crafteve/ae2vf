@@ -1,6 +1,12 @@
 {
   "idlefactory.common.unknown_machine": "未知机器",
   "idlefactory.common.offline": "已失联",
+    "idlefactory.face.short.up": "上",
+  "idlefactory.face.short.down": "下",
+  "idlefactory.face.short.north": "北",
+  "idlefactory.face.short.south": "南",
+  "idlefactory.face.short.east": "东",
+  "idlefactory.face.short.west": "西",
   "idlefactory.face.any": "任意",
   "idlefactory.face.up": "上",
   "idlefactory.face.down": "下",

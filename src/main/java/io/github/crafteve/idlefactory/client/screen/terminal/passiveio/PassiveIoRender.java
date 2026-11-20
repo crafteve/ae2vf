@@ -531,7 +531,7 @@ final class PassiveIoRender {
     }
 
     private static String faceLabel(RuleRow rule) {
-        return rule.face() == null ? tr("idlefactory.passive.chip.any_face") : TerminalText.face(rule.face());
+        return TerminalText.faceShort(rule.face());
     }
 
     private static String modeLabel(RuleRow spec) {
