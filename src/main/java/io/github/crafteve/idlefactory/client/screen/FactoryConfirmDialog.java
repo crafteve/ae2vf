@@ -2,7 +2,6 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import io.github.crafteve.idlefactory.client.screen.NineSliceRenderer;
 
-import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
 import io.github.crafteve.idlefactory.client.screen.theme.GuiLayerSpec;
 
@@ -46,7 +45,14 @@ public final class FactoryConfirmDialog {
     }
 
     private final Font font;
-    private final FactoryGuiTheme theme;
+    /** 面板底色（AE2 终端内部实色）。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
+    /** 危险动作色。 */
+    private static final int DANGER = 0xFFD63A3A;
 
     private boolean open;
     private String title = "";
@@ -64,9 +70,8 @@ public final class FactoryConfirmDialog {
      * @param font  字体
      * @param theme 主题
      */
-    public FactoryConfirmDialog(Font font, FactoryGuiTheme theme) {
+    public FactoryConfirmDialog(Font font) {
         this.font = font;
-        this.theme = theme;
     }
 
     /**
@@ -141,14 +146,14 @@ public final class FactoryConfirmDialog {
         // 浮层内区必须先铺一块完全不透明的底：用半透明分隔线贴图会让背后的机器图标透上来，
         // 看起来像浮层被压在内容下面（z 值问题），实际是底色没盖住。
         graphics.fill(box.x() + 1, box.y() + 1, box.x() + box.width() - 1,
-                box.y() + box.height() - 1, this.theme.panelBg());
+                box.y() + box.height() - 1, PANEL_BG);
         NineSliceRenderer.panel(graphics, box.x(), box.y(), box.width(), box.height());
         graphics.drawString(this.font, this.title, box.x() + 12, box.y() + 10,
-                this.theme.textPrimary(), false);
+                TEXT_PRIMARY, false);
 
         int lineY = box.y() + 28;
         for (String line : this.lines) {
-            graphics.drawString(this.font, line, box.x() + 12, lineY, this.theme.textDim(),
+            graphics.drawString(this.font, line, box.x() + 12, lineY, TEXT_DIM,
                     false);
             lineY += LINE_HEIGHT;
         }
@@ -172,7 +177,7 @@ public final class FactoryConfirmDialog {
         } else {
             NineSliceRenderer.button(graphics, x, y, w, 18);
         }
-        int color = danger ? this.theme.error() : this.theme.textPrimary();
+        int color = danger ? DANGER : TEXT_PRIMARY;
         graphics.drawString(this.font, label,
                 x + (w - this.font.width(label)) / 2, y + 5, color, false);
     }

@@ -69,6 +69,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         implements ViewTableSink, FeedbackSink {
+
+    /** 面板底色（AE2 终端内部实色）。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 键帽 / 边框亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 格子暗边。 */
+    private static final int SLOT_BORDER_DARK = 0xFF878FA5;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
     /** 最少内容行数；少于两行时 AE2 的首行 / 末行切片会重叠。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -206,7 +217,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         graphics.fill(this.leftPos + 2, this.topPos + header,
                 this.leftPos + this.imageWidth - 21,
                 this.topPos + header + this.rows * rowHeight(),
-                FactoryGuiTheme.current().panelBg());
+                PANEL_BG);
         // 填充停在滑轨左侧，保留 AE2 终端贴图自带的滑轨与 Scrollbar 原始渲染。
         Viewport frame = workAreaFrame();
         TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),

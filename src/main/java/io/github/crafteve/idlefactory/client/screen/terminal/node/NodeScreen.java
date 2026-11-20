@@ -88,6 +88,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         implements FeedbackSink, ViewTableSink {
+
+    /** 面板底色（AE2 终端内部实色）。 */
+    private static final int PANEL_BG = 0xFFCBCCD4;
+    /** 键帽 / 边框亮边。 */
+    private static final int BEVEL_LIGHT = 0xFFD8D9DF;
+    /** 格子暗边。 */
+    private static final int SLOT_BORDER_DARK = 0xFF878FA5;
+    /** 正文色。 */
+    private static final int TEXT_PRIMARY = 0xFF000000;
+    /** 次要文字。 */
+    private static final int TEXT_DIM = 0xFF5F5F5F;
     /** 最少内容行数。 */
     private static final int MIN_ROWS = 3;
     /** 内容区左右内边距。 */
@@ -188,7 +199,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         super.init();
         this.setTextHidden("entriesShown", true);
         this.render = new NodeRender(this.font);
-        this.confirmDialog = new FactoryConfirmDialog(this.font, FactoryGuiTheme.current());
+        this.confirmDialog = new FactoryConfirmDialog(this.font);
         this.searchBox = new SearchEditBox(this.font,
                 this.leftPos + SEARCH_X + 3, this.topPos + SEARCH_Y + 2,
                 SEARCH_W - 6, 10, Component.literal("搜索节点…"));
@@ -210,7 +221,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         graphics.fill(this.leftPos + 2, this.topPos + header,
                 this.leftPos + this.imageWidth - 21,
                 this.topPos + header + this.rows * rowHeight(),
-                FactoryGuiTheme.current().panelBg());
+                PANEL_BG);
         Viewport frame = workAreaFrame();
         TerminalChrome.drawWorkAreaFrame(graphics, frame.x(), frame.y(), frame.width(),
                 frame.height());
@@ -593,7 +604,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
         int width = Math.max(40, NodeLayout.nameWidth(viewport));
         this.renameBox = new SearchEditBox(this.font, x, top + 5, width, RENAME_H,
                 Component.literal("节点名"),
-                FactoryGuiTheme.current().textPrimary(), FactoryGuiTheme.current().textDim());
+                TEXT_PRIMARY, TEXT_DIM);
         this.renameBox.setValue(node.view().core().name() == null ? ""
                 : node.view().core().name());
         this.renameBox.setMaxLength(io.github.crafteve.idlefactory.config.IdleFactoryConfig.maxNameLength());
