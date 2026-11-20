@@ -9,6 +9,9 @@ import io.github.crafteve.idlefactory.client.screen.terminal.PassiveIoHelpButton
 
 import io.github.crafteve.idlefactory.client.screen.terminal.TerminalChrome;
 
+import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
@@ -27,6 +30,7 @@ import io.github.crafteve.idlefactory.client.screen.search.SearchEditBox;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.terminal.ExpandAllButton;
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 import io.github.crafteve.idlefactory.client.wand.WandLinkCache;
 import io.github.crafteve.idlefactory.client.screen.FeedbackSink;
@@ -96,6 +100,8 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
     private int rows = MIN_ROWS;
     /** 当前列表 / 磁贴视图；初值来自物品组件。 */
     private PassiveIoViewMode view;
+    /** 用户主动收起的机器卡片；不在集合里就是展开。 */
+    private final Set<UUID> collapsed = new HashSet<>();
     /** 当前排序档位；初值来自物品组件，切换后回写。 */
     private TerminalSortMode sortMode;
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
@@ -158,6 +164,7 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
                 reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 reverse -> this.toggleSortDirection()));
+        this.addToLeftToolbar(new ExpandAllButton(this::allExpanded, this::toggleAllExpanded));
         this.addToLeftToolbar(new PassiveIoViewButton(() -> this.view,
                 button -> this.toggleView()));
     }
@@ -459,7 +466,13 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
             return;
         }
         Viewport viewport = contentViewport();
-        this.layout = PassiveIoLayout.of(this.model.blocks(), viewport, this.view);
+        Set<UUID> alive = new HashSet<>();
+        for (BlockView block : this.model.blocks()) {
+            alive.add(block.node().core().nodeId());
+        }
+        this.collapsed.retainAll(alive);
+        this.layout = PassiveIoLayout.of(this.model.blocks(), viewport, this.view,
+                this.collapsed);
         clampScroll();
     }
 
@@ -595,6 +608,15 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
             return;
         }
         BlockView block = this.model.blocks().get(hit.block());
+        if (hit.kind() == Kind.MACHINE) {
+            // 单击机器卡片 = 展开 / 收起规则区。
+            UUID nodeId = block.node().core().nodeId();
+            if (!this.collapsed.add(nodeId)) {
+                this.collapsed.remove(nodeId);
+            }
+            rebuildLayout();
+            return;
+        }
         if (hit.kind() == Kind.ENERGY) {
             // FE 按钮不挂在规则行上，必须先于规则下标守卫处理。
             if (button == 0) {
@@ -633,6 +655,28 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
                 // 卡片本体左键不做事，取消选中模式。
             }
         }
+    }
+
+    /** 全部卡片是否都处于展开状态。 */
+    private boolean allExpanded() {
+        for (BlockView block : this.model.blocks()) {
+            if (this.collapsed.contains(block.node().core().nodeId())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 左侧工具栏的展开 / 收起全部。 */
+    private void toggleAllExpanded() {
+        if (allExpanded()) {
+            for (BlockView block : this.model.blocks()) {
+                this.collapsed.add(block.node().core().nodeId());
+            }
+        } else {
+            this.collapsed.clear();
+        }
+        rebuildLayout();
     }
 
     private void toggleView() {

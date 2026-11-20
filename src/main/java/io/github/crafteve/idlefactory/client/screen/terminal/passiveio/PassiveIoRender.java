@@ -310,7 +310,7 @@ final class PassiveIoRender {
         if (bottom > top) {
             graphics.fill(left, top, right, bottom, PANEL_BG);
         }
-        for (int i = 0; i < block.rules().size(); i++) {
+        for (int i = 0; i < box.ruleCount(); i++) {
             drawRuleRow(graphics, viewport, box, block.rules().get(i), i, scroll, hover);
         }
     }
@@ -395,7 +395,9 @@ final class PassiveIoRender {
         int chip = PassiveIoLayout.CHIP;
         KeycapButton.draw(graphics, x, y, chip, chip, background, enabled, hovered);
         int textX = x + (chip - this.font.width(label)) / 2;
-        graphics.drawString(this.font, label, textX, y + 2, textColor, false);
+        // 垂直居中：chip 16px、字体行高 9px，上下各留 3px；原来写死 +2 会让拉丁字母整体偏上 1px。
+        int textY = y + (chip - this.font.lineHeight) / 2;
+        graphics.drawString(this.font, label, textX, textY, textColor, false);
     }
 
     private void drawRate(GuiGraphics graphics, RuleRow rule, int textY, int right,
@@ -425,7 +427,7 @@ final class PassiveIoRender {
 
     private void drawTileBody(GuiGraphics graphics, Viewport viewport, BlockBox box,
             BlockView block, int scroll, @Nullable Hit hover) {
-        for (int i = 0; i < block.rules().size(); i++) {
+        for (int i = 0; i < box.ruleCount(); i++) {
             int tileX = PassiveIoLayout.tileX(viewport, i % 2);
             int tileY = PassiveIoLayout.tileRowY(viewport, box, i / 2, scroll);
             drawTile(graphics, viewport, block, block.rules().get(i), box.index(), i, tileX,

@@ -79,6 +79,8 @@
   "idlefactory.sort.mode.distance": "Distance",
   "idlefactory.sort.direction.ascending": "Ascending",
   "idlefactory.sort.direction.descending": "Descending",
+  "idlefactory.terminal.expand_all": "Expand all",
+  "idlefactory.terminal.collapse_all": "Collapse all",
   "idlefactory.sort.direction.toggle": "Click to flip order",
   "idlefactory.passive.help.open": "Open the AE guide",
   "idlefactory.passive.help.pending": "Guide page not available yet",

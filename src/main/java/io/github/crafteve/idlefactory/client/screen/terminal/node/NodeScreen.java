@@ -37,6 +37,7 @@ import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortDirectionButton;
+import io.github.crafteve.idlefactory.client.screen.terminal.ExpandAllButton;
 
 import io.github.crafteve.idlefactory.client.screen.sort.SortModeButton;
 
@@ -128,9 +129,16 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     @Nullable
     private SearchEditBox searchBox;
     /** 当前展开的节点。 */
-    private final Set<UUID> expanded = new HashSet<>();
+    /** 用户主动收起的节点；不在集合里就是展开（默认全部展开）。 */
+    private final Set<UUID> collapsed = new HashSet<>();
     /** 点过「… N 台」的节点，展开全部成员。 */
     private final Set<UUID> expandedAll = new HashSet<>();
+    /** 上一次点击名字区域的下标与时刻：双击才进改名。 */
+    private long lastNameClickAt;
+    private int lastNameClickNode = -1;
+
+    /** 双击判定窗口（毫秒）。 */
+    private static final long DOUBLE_CLICK_MS = 320L;
     @Nullable
     private ConfirmDialog confirmDialog;
     /** 正在改名的节点；{@code null} 表示不在改名。 */
@@ -169,6 +177,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 reverse -> this.stepSortMode(reverse)));
         this.addToLeftToolbar(new SortDirectionButton(() -> this.sortDirection,
                 reverse -> this.toggleSortDirection()));
+        this.addToLeftToolbar(new ExpandAllButton(this::allExpanded, this::toggleAllExpanded));
     }
 
     @Override
@@ -402,7 +411,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
         for (ViewNode node : table.nodes()) {
             alive.add(node.nodeId());
         }
-        this.expanded.retainAll(alive);
+        this.collapsed.retainAll(alive);
         this.expandedAll.retainAll(alive);
         rebuildLayout();
     }
@@ -510,8 +519,13 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
             return;
         }
         Viewport viewport = contentViewport();
-        this.layout = NodeLayout.of(this.model.rows(), viewport, this.expanded,
-                this.expandedAll);
+        Set<UUID> open = new HashSet<>();
+        for (NodeModel.NodeRow row : this.model.rows()) {
+            if (!this.collapsed.contains(row.nodeId())) {
+                open.add(row.nodeId());
+            }
+        }
+        this.layout = NodeLayout.of(this.model.rows(), viewport, open, this.expandedAll);
         // 改名框不在这里取消：每秒一次的快照刷新也会走 rebuildLayout，取消会让改名框活不过一秒。
         // 位置在每帧 drawRenameBox 里按最新排版重贴；节点真的消失时才由 syncRenameBox 取消。
         clampScroll();
@@ -559,8 +573,12 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 }
             }
             case NAME -> {
-                if (!reverse) {
+                // 单击 = 展开 / 收起；双击名字区域才改名（双击时抵消第一次的切换）。
+                if (!reverse && isDoubleClick(hit.node())) {
+                    toggleExpanded(node.nodeId());
                     beginRename(hit.node(), node);
+                } else if (!reverse) {
+                    toggleExpanded(node.nodeId());
                 }
             }
             case BLOCKING -> {
@@ -591,7 +609,7 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
                 }
             }
             case MORE -> {
-                this.expanded.add(node.nodeId());
+                this.collapsed.remove(node.nodeId());
                 this.expandedAll.add(node.nodeId());
                 rebuildLayout();
             }
@@ -599,11 +617,48 @@ public final class NodeScreen extends AEBaseScreen<NodeTerminalMenu>
     }
 
     private void toggleExpanded(UUID nodeId) {
-        if (!this.expanded.add(nodeId)) {
-            this.expanded.remove(nodeId);
-            this.expandedAll.remove(nodeId);
+        if (!this.collapsed.add(nodeId)) {
+            this.collapsed.remove(nodeId);
+        }
+        this.expandedAll.remove(nodeId);
+        rebuildLayout();
+    }
+
+    /** 全部节点是否都处于展开状态。 */
+    private boolean allExpanded() {
+        for (NodeModel.NodeRow row : this.model.rows()) {
+            if (this.collapsed.contains(row.nodeId())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 左侧工具栏的展开 / 收起全部。 */
+    private void toggleAllExpanded() {
+        if (allExpanded()) {
+            for (NodeModel.NodeRow row : this.model.rows()) {
+                this.collapsed.add(row.nodeId());
+            }
+        } else {
+            this.collapsed.clear();
         }
         rebuildLayout();
+    }
+
+    /**
+     * 是否构成对同一节点名字区域的双击。
+     *
+     * @param node 节点下标
+     * @return 距上次点击同一节点不足 {@link #DOUBLE_CLICK_MS} 时为 {@code true}
+     */
+    private boolean isDoubleClick(int node) {
+        long now = System.currentTimeMillis();
+        boolean doubled = this.lastNameClickNode == node
+                && now - this.lastNameClickAt <= DOUBLE_CLICK_MS;
+        this.lastNameClickNode = doubled ? -1 : node;
+        this.lastNameClickAt = doubled ? 0L : now;
+        return doubled;
     }
 
     private void beginRename(int index, NodeRow node) {

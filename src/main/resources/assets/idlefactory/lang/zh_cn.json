@@ -79,6 +79,8 @@
   "idlefactory.sort.mode.distance": "距离",
   "idlefactory.sort.direction.ascending": "升序",
   "idlefactory.sort.direction.descending": "降序",
+  "idlefactory.terminal.expand_all": "全部展开",
+  "idlefactory.terminal.collapse_all": "全部收起",
   "idlefactory.sort.direction.toggle": "点击切换升降序",
   "idlefactory.passive.help.open": "打开 AE 指南",
   "idlefactory.passive.help.pending": "指南页待接入",
