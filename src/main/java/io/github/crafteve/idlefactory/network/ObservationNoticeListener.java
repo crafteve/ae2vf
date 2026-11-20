@@ -96,9 +96,16 @@ public final class ObservationNoticeListener implements ObservationChangeListene
             int missing = this.missingNotices.getOrDefault(factoryId, 0);
             int restored = this.restoredNotices.getOrDefault(factoryId, 0);
             if (missing > 0) {
-                player.displayClientMessage(FactoryMessages.warn(missing + " 台机器失联"), true);
+                // 走模组 HUD 条：和绑定杖、ME 杖、定位提示同一种底板，不用原版动作栏。
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                        new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
+                                FactoryMessages.warn(missing + " 台机器失联"),
+                                io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.FAILURE));
             } else if (restored > 0) {
-                player.displayClientMessage(FactoryMessages.ok(restored + " 台机器回来了"), true);
+                net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                        new io.github.crafteve.idlefactory.network.payload.HudNoticeS2C(
+                                FactoryMessages.ok(restored + " 台机器回来了"),
+                                io.github.crafteve.idlefactory.network.payload.HudNoticeS2C.Kind.SUCCESS));
             }
             this.missingNotices.remove(factoryId);
             this.restoredNotices.remove(factoryId);

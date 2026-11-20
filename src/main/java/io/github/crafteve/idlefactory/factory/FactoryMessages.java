@@ -119,28 +119,6 @@ public final class FactoryMessages {
     }
 
     /**
-     * 动作栏成功提示。
-     *
-     * @param player 接收者
-     * @param text   文本
-     */
-    public static void barOk(ServerPlayer player, String text) {
-        player.displayClientMessage(
-                Component.literal("[OK] " + text).withStyle(ChatFormatting.GREEN), true);
-    }
-
-    /**
-     * 动作栏失败提示。
-     *
-     * @param player 接收者
-     * @param text   文本
-     */
-    public static void barErr(ServerPlayer player, String text) {
-        player.displayClientMessage(
-                Component.literal("[!!] " + text).withStyle(ChatFormatting.RED), true);
-    }
-
-    /**
      * 回执里的「退回样板」尾巴；没有退回时为空白。
      *
      * @param returned 退回的样板数
