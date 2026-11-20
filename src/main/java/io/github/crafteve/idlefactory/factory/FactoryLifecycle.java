@@ -84,6 +84,8 @@ public final class FactoryLifecycle {
     private final LiveNodeLibrary nodeLibrary;
     private final LiveNodeApply nodeApply;
     private final LiveNodeRunner nodeRunner;
+    /** 启动装配器：读档、建观测、建运行器。 */
+    private final FactoryLoader loader;
     /** 每 tick 编排器；启动完成（load）后非 null。 */
     @Nullable
     private FactoryRunner runner;
@@ -109,6 +111,9 @@ public final class FactoryLifecycle {
         this.nodeLibrary = new LiveNodeLibrary(server, this::markDirty, this::logNodeNotice);
         this.nodeApply = new LiveNodeApply(server, this.ports, this.nodeLibrary);
         this.nodeRunner = new LiveNodeRunner(this.nodeApply, this.nodeLibrary);
+        this.loader = new FactoryLoader(server, this.manager, this.occupancy, this.ports,
+                this.notices, this.formBuilder, this.nodeIoRunner, this.nodeApply,
+                this.nodeRunner);
     }
 
     /**
@@ -249,7 +254,7 @@ public final class FactoryLifecycle {
                 this.store.put(factory);
             }
         }
-        this.occupancy.rebuild(this.occupancyEntries());
+        this.loader.rebuildOccupancy();
         // 配置变了：让虚拟节点下一 tick 重新对一次账（该建的建、该拆的拆）
         this.nodeApply.requestReconcile();
     }
@@ -320,55 +325,16 @@ public final class FactoryLifecycle {
         }
     }
 
-    /**
-     * 从当前配置拼一份全量占用快照。
-     *
-     * <p>机器与仓库锚点都算占用：同一位置不能同时是两家工厂的机器或仓库。</p>
-     *
-     * @return 占用条目
-     */
-    private java.util.List<BlockOccupancyTable.Entry> occupancyEntries() {
-        java.util.List<BlockOccupancyTable.Entry> entries = new java.util.ArrayList<>();
-        for (Factory factory : this.manager.all()) {
-            for (var node : factory.config().nodes().all()) {
-                for (var machine : node.machines()) {
-                    entries.add(new BlockOccupancyTable.Entry(factory.id(),
-                            BlockOccupancyTable.Role.MACHINE, machine.block()));
-                }
-            }
-            var anchor = factory.config().storageAnchor();
-            if (anchor != null) {
-                entries.add(new BlockOccupancyTable.Entry(factory.id(),
-                        BlockOccupancyTable.Role.STORAGE, anchor));
-            }
-        }
-        return entries;
-    }
 
     private void load() {
-        this.store = FactoryStore.get(this.server.overworld());
-        this.observationRunner = new ObservationRunner(this.server,
-                IdleFactoryConfig::observationHealthBudgetPerTick,
-                IdleFactoryConfig::observationWorkBudgetPerTick,
-                IdleFactoryConfig::observationEventBudgetPerTick);
-        this.observationReader = this.observationRunner.reader();
-        this.worldEventListener = new WorldEventListener(this.observationRunner,
-                this.observationRunner.table());
-        NeoForge.EVENT_BUS.register(this.worldEventListener);
-        this.ports.bindFacts(this.observationReader);
-        this.observationRunner.register(this.ports);
-        this.storageResolver = new MeStorageResolver(this.server);
-        this.manager.loadFrom(this.store.entries());
-        this.occupancy.rebuild(this.occupancyEntries());
-        for (Factory factory : this.manager.all()) {
-            factory.refreshStorage(this.storageResolver);
-        }
-        this.runner = new FactoryRunner(this.server, this.manager, this.observationRunner,
-                this.observationReader, this.nodeIoRunner, this.nodeApply, this.nodeRunner,
-                this.formBuilder, this.storageResolver);
-        this.observationRunner.register(this.runner);
+        FactoryLoader.Loaded loaded = this.loader.load();
+        this.store = loaded.store();
+        this.runner = loaded.runner();
+        this.observationRunner = loaded.observations();
+        this.observationReader = loaded.reader();
+        this.storageResolver = loaded.storage();
+        this.worldEventListener = loaded.listener();
         this.observationRunner.register(this.notices);
-        IdleFactory.LOGGER.info("Idle Factory: {} factory instance(s) loaded", this.manager.all().size());
     }
 
     /** 每 tick 推进一次；实际编排在 {@link FactoryRunner}。 */
