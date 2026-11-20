@@ -293,9 +293,9 @@ final class NodeLayout {
         return cardX(viewport) + 1 + STATUS_W + 1 + SLOT + 1;
     }
 
-    /** provider 键帽组左边缘（屏幕坐标）：与编辑 / 删除键列留 2px 间隙。 */
+    /** provider 键帽组左边缘（屏幕坐标）：与编辑 / 删除键列留 3px 间隙。 */
     static int keyGroupX(Viewport viewport) {
-        return actionX(viewport) - 2 - (KEY_W * 3 + KEY_GAP * 2);
+        return actionX(viewport) - 3 - (KEY_W * 3 + KEY_GAP * 2);
     }
 
     /** 第 index 枚 provider 键帽左边缘。 */

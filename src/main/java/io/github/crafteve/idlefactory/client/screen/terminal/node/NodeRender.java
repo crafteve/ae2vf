@@ -43,6 +43,8 @@ final class NodeRender {
     /** 悬停底色（白色 12%）。 */
     private static final int HOVER_FILL = 0x1FFFFFFF;
     /** 待确认删除的键帽底色。 */
+    /** 模式键的「开启但非告警」强调色：与 IO 的方向蓝同一支。 */
+    private static final int MODE_ACCENT = 0xFF2F6FB0;
     private static final int DELETE_ARMED = 0xFFFF5A5A;
 
     /** 正文色。 */
@@ -188,10 +190,13 @@ final class NodeRender {
                         ? 0xFFFFFFFF : TEXT_PRIMARY);
 
         Multiplier multiplier = row.multiplier();
-        boolean multiplierActive = multiplier.mode() != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
+        boolean multiplierActive = multiplier.mode()
+                != io.github.crafteve.idlefactory.node.MultiplierMode.OFF;
+        boolean smart = multiplier.mode()
+                == io.github.crafteve.idlefactory.node.MultiplierMode.SMART;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 1), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
-                multiplierActive ? StatusColor.RUN : BEVEL_LIGHT,
+                multiplierActive ? (smart ? MODE_ACCENT : StatusColor.RUN) : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.MULTIPLIER));
         drawLabel(graphics, multiplierLabel(multiplier), NodeLayout.keyX(viewport, 1),
                 NodeLayout.KEY_W, keyTextY,
@@ -200,14 +205,14 @@ final class NodeRender {
         boolean roundRobin = row.dispatch() == DispatchMode.ROUND_ROBIN;
         KeycapButton.draw(graphics, NodeLayout.keyX(viewport, 2), keyY,
                 NodeLayout.KEY_W, NodeLayout.KEY_H,
-                roundRobin ? StatusColor.RUN : BEVEL_LIGHT,
+                roundRobin ? MODE_ACCENT : BEVEL_LIGHT,
                 provider, hovered(hover, box.index(), Kind.DISPATCH));
         drawLabel(graphics, tr(roundRobin
-                ? "idlefactory.node.label.round_robin" : "idlefactory.node.label.sequential"), NodeLayout.keyX(viewport, 2),
-                NodeLayout.KEY_W, keyTextY,
+                ? "idlefactory.node.label.round_robin" : "idlefactory.node.label.sequential"),
+                NodeLayout.keyX(viewport, 2), NodeLayout.KEY_W, keyTextY,
                 roundRobin ? 0xFFFFFFFF : TEXT_DIM);
 
-        // 编辑 / 删除与 provider 键同规格、横向并排；内区只画 + / × 字形。
+        // 动作键：汉字与 IO 的 入/出/精/模 同一套表达，状态变化时整键换底色。
         int actionY = top + NodeLayout.KEY_INSET_Y;
         int editX = NodeLayout.actionX(viewport);
         int deleteX = NodeLayout.deleteX(viewport);
@@ -217,16 +222,16 @@ final class NodeRender {
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
                 editing ? StatusColor.WARN : BEVEL_LIGHT,
                 true, hovered(hover, box.index(), Kind.EDIT));
-        drawPlus(graphics, editX, actionY, NodeLayout.ACTION_W,
-                NodeLayout.ACTION_H, editing ? 0xFFFFFFFF : TEXT_PRIMARY);
+        drawLabel(graphics, tr("idlefactory.node.label.edit"), editX,
+                NodeLayout.ACTION_W, keyTextY, editing ? 0xFFFFFFFF : TEXT_PRIMARY);
 
         boolean armed = pendingDelete != null && pendingDelete.equals(row.nodeId());
         KeycapButton.draw(graphics, deleteX, actionY,
                 NodeLayout.ACTION_W, NodeLayout.ACTION_H,
                 armed ? DELETE_ARMED : BEVEL_LIGHT, true,
                 hovered(hover, box.index(), Kind.DELETE));
-        drawCross(graphics, deleteX, actionY, NodeLayout.ACTION_W,
-                NodeLayout.ACTION_H, armed ? 0xFFFFFFFF : StatusColor.ERROR);
+        drawLabel(graphics, tr("idlefactory.node.label.delete"), deleteX,
+                NodeLayout.ACTION_W, keyTextY, armed ? 0xFFFFFFFF : StatusColor.ERROR);
     }
 
     /**
@@ -382,54 +387,6 @@ final class NodeRender {
             int color) {
         graphics.drawString(this.font, text, x + (width - this.font.width(text)) / 2, y, color,
                 false);
-    }
-
-    /** 动作键符号的像素图案边长；1px 笔画保证任意缩放下都均匀。 */
-    private static final int SYMBOL_SIZE = 5;
-
-    /**
-     * 在键帽里画 "+"：5×5 像素图案，横竖各 1px、四臂等长。
-     *
-     * <p>不用字体字形：字体的 advance 宽与行高和实际笔画对不上，塞进带边框的小键帽会偏、
-     * 会显得粗细不匀。这里按整数像素居中，位置与笔画都是确定的。</p>
-     *
-     * @param graphics 画布
-     * @param x        键帽左边缘
-     * @param y        键帽上边缘
-     * @param width    键帽宽
-     * @param height   键帽高
-     * @param color    笔画颜色
-     */
-    private void drawPlus(GuiGraphics graphics, int x, int y, int width, int height,
-            int color) {
-        int originX = x + (width - SYMBOL_SIZE) / 2;
-        int originY = y + (height - SYMBOL_SIZE) / 2;
-        int middle = SYMBOL_SIZE / 2;
-        graphics.fill(originX, originY + middle, originX + SYMBOL_SIZE, originY + middle + 1,
-                color);
-        graphics.fill(originX + middle, originY, originX + middle + 1, originY + SYMBOL_SIZE,
-                color);
-    }
-
-    /**
-     * 在键帽里画 "×"：5×5 像素图案，两条 1px 对角线。
-     *
-     * @param graphics 画布
-     * @param x        键帽左边缘
-     * @param y        键帽上边缘
-     * @param width    键帽宽
-     * @param height   键帽高
-     * @param color    笔画颜色
-     */
-    private void drawCross(GuiGraphics graphics, int x, int y, int width, int height,
-            int color) {
-        int originX = x + (width - SYMBOL_SIZE) / 2;
-        int originY = y + (height - SYMBOL_SIZE) / 2;
-        for (int i = 0; i < SYMBOL_SIZE; i++) {
-            graphics.fill(originX + i, originY + i, originX + i + 1, originY + i + 1, color);
-            graphics.fill(originX + SYMBOL_SIZE - 1 - i, originY + i,
-                    originX + SYMBOL_SIZE - i, originY + i + 1, color);
-        }
     }
 
     private String ellipsize(String text, int width) {

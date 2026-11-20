@@ -125,6 +125,8 @@
   "idlefactory.node.label.sequential": "序",
   "idlefactory.node.label.multiplier.off": "倍",
   "idlefactory.node.label.multiplier.smart": "智",
+  "idlefactory.node.label.edit": "编",
+  "idlefactory.node.label.delete": "删",
   "idlefactory.node.label.locate": "定",
   "idlefactory.node.more": "… %s 台",
   "idlefactory.node.hint.not_me": "非 ME",

@@ -125,6 +125,8 @@
   "idlefactory.node.label.sequential": "S",
   "idlefactory.node.label.multiplier.off": "×",
   "idlefactory.node.label.multiplier.smart": "A",
+  "idlefactory.node.label.edit": "E",
+  "idlefactory.node.label.delete": "D",
   "idlefactory.node.label.locate": "Go",
   "idlefactory.node.more": "… %s more",
   "idlefactory.node.hint.not_me": "Not ME",
