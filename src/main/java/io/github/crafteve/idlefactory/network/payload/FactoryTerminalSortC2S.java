@@ -5,7 +5,7 @@ import appeng.api.config.SortDir;
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -29,7 +29,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param mode        排序档位
  * @param direction   排序方向
  */
-public record FactoryTerminalSortC2S(int containerId, FactorySortMode mode, SortDir direction)
+public record FactoryTerminalSortC2S(int containerId, TerminalSortMode mode, SortDir direction)
         implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:terminal_sort}。 */
     public static final Type<FactoryTerminalSortC2S> TYPE =
@@ -82,7 +82,7 @@ public record FactoryTerminalSortC2S(int containerId, FactorySortMode mode, Sort
 
     private static FactoryTerminalSortC2S read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
-        FactorySortMode[] modes = FactorySortMode.values();
+        TerminalSortMode[] modes = TerminalSortMode.values();
         int modeOrdinal = buf.readUnsignedByte();
         if (modeOrdinal >= modes.length) {
             throw new DecoderException("invalid terminal sort mode ordinal: " + modeOrdinal);

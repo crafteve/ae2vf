@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.client.screen.paint.StatusBar;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 /**
  * 被动 IO 内容区的排版与命中：唯一的像素来源。
@@ -128,11 +128,11 @@ final class PassiveIoLayout {
 
     private final List<BlockBox> boxes;
     private final Viewport viewport;
-    private final FactoryPassiveIoView view;
+    private final PassiveIoViewMode view;
     private final int contentHeight;
 
     private PassiveIoLayout(List<BlockBox> boxes, Viewport viewport,
-            FactoryPassiveIoView view, int contentHeight) {
+            PassiveIoViewMode view, int contentHeight) {
         this.boxes = boxes;
         this.viewport = viewport;
         this.view = view;
@@ -148,7 +148,7 @@ final class PassiveIoLayout {
      * @return 排版
      */
     static PassiveIoLayout of(List<PassiveIoModel.BlockView> blocks,
-            Viewport viewport, FactoryPassiveIoView view) {
+            Viewport viewport, PassiveIoViewMode view) {
         List<BlockBox> boxes = new ArrayList<>(blocks.size());
         int cursor = 0;
         for (int i = 0; i < blocks.size(); i++) {
@@ -172,12 +172,12 @@ final class PassiveIoLayout {
      * @param view  视图
      * @return 像素高度
      */
-    static int blockHeight(PassiveIoModel.BlockView block, FactoryPassiveIoView view) {
+    static int blockHeight(PassiveIoModel.BlockView block, PassiveIoViewMode view) {
         int rules = block.rules().size();
         if (rules == 0) {
             return MACHINE_ROW_H;
         }
-        if (view == FactoryPassiveIoView.LIST) {
+        if (view == PassiveIoViewMode.LIST) {
             return MACHINE_ROW_H + BODY_GAP + rules * ROW_H + (rules - 1) * ROW_GAP;
         }
         int rows = (rules + 1) / 2;
@@ -210,7 +210,7 @@ final class PassiveIoLayout {
     }
 
     /** 视图。 */
-    FactoryPassiveIoView view() {
+    PassiveIoViewMode view() {
         return this.view;
     }
 
@@ -250,7 +250,7 @@ final class PassiveIoLayout {
                 }
                 return new Hit(Kind.MACHINE, box.index(), -1);
             }
-            return this.view == FactoryPassiveIoView.LIST
+            return this.view == PassiveIoViewMode.LIST
                     ? hitList(box, localX, localY)
                     : hitTiles(box, localX, localY);
         }

@@ -40,8 +40,8 @@ import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIo
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompat;
 import io.github.crafteve.idlefactory.menu.FactoryPassiveIoMenu;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 import io.github.crafteve.idlefactory.command.CommandResult;
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 import io.github.crafteve.idlefactory.client.screen.ViewTableSink;
@@ -97,9 +97,9 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     /** 当前内容行数；init 时按窗口高度计算。 */
     private int rows = MIN_ROWS;
     /** 当前列表 / 磁贴视图；初值来自物品组件。 */
-    private FactoryPassiveIoView view;
+    private PassiveIoViewMode view;
     /** 当前排序档位；初值来自物品组件，切换后回写。 */
-    private FactorySortMode sortMode;
+    private TerminalSortMode sortMode;
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
     private SortDir sortDirection;
     /** 内容模型：视图表 + 搜索词 → 机器块。 */
@@ -363,7 +363,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
      *
      * @param next 服务端保存的视图
      */
-    public void acceptView(FactoryPassiveIoView next) {
+    public void acceptView(PassiveIoViewMode next) {
         if (this.view == next) {
             return;
         }
@@ -379,7 +379,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
      * @param mode      档位
      * @param direction 方向
      */
-    public void acceptSort(FactorySortMode mode, SortDir direction) {
+    public void acceptSort(TerminalSortMode mode, SortDir direction) {
         if (this.sortMode == mode && this.sortDirection == direction) {
             return;
         }
@@ -417,7 +417,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
      * @param mode      新档位
      * @param direction 新方向
      */
-    private void applySort(FactorySortMode mode, SortDir direction) {
+    private void applySort(TerminalSortMode mode, SortDir direction) {
         if (this.sortMode == mode && this.sortDirection == direction) {
             return;
         }
@@ -510,7 +510,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
     }
 
     /** 当前视图。 */
-    FactoryPassiveIoView view() {
+    PassiveIoViewMode view() {
         return this.view;
     }
 
@@ -641,7 +641,7 @@ public final class PassiveIoScreen extends AEBaseScreen<FactoryPassiveIoMenu>
         setView(this.view.next());
     }
 
-    private void setView(FactoryPassiveIoView next) {
+    private void setView(PassiveIoViewMode next) {
         if (this.view == next) {
             return;
         }

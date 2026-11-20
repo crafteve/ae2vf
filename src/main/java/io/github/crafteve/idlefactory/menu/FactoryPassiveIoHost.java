@@ -37,9 +37,9 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
             CommandController.ensureFactory(serverPlayer);
         }
         this.configManager = IConfigManager.builder(this::getItemStack)
-                .registerSetting(FactoryTerminalSetting.VIEW, FactoryPassiveIoView.LIST)
-                .registerSetting(FactoryTerminalSetting.SORT_MODE, FactorySortMode.NAME)
-                .registerSetting(FactoryTerminalSetting.SORT_DIRECTION, SortDir.ASCENDING)
+                .registerSetting(TerminalSetting.VIEW, PassiveIoViewMode.LIST)
+                .registerSetting(TerminalSetting.SORT_MODE, TerminalSortMode.NAME)
+                .registerSetting(TerminalSetting.SORT_DIRECTION, SortDir.ASCENDING)
                 .build();
     }
 
@@ -48,8 +48,8 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
      *
      * @return 视图
      */
-    public FactoryPassiveIoView view() {
-        return this.configManager.getSetting(FactoryTerminalSetting.VIEW);
+    public PassiveIoViewMode view() {
+        return this.configManager.getSetting(TerminalSetting.VIEW);
     }
 
     /**
@@ -57,8 +57,8 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
      *
      * @param view 新视图
      */
-    public void setView(FactoryPassiveIoView view) {
-        this.configManager.putSetting(FactoryTerminalSetting.VIEW, view);
+    public void setView(PassiveIoViewMode view) {
+        this.configManager.putSetting(TerminalSetting.VIEW, view);
     }
 
     /**
@@ -66,8 +66,8 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
      *
      * @return 排序档位
      */
-    public FactorySortMode sortMode() {
-        return this.configManager.getSetting(FactoryTerminalSetting.SORT_MODE);
+    public TerminalSortMode sortMode() {
+        return this.configManager.getSetting(TerminalSetting.SORT_MODE);
     }
 
     /**
@@ -76,7 +76,7 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
      * @return 排序方向
      */
     public SortDir sortDirection() {
-        return this.configManager.getSetting(FactoryTerminalSetting.SORT_DIRECTION);
+        return this.configManager.getSetting(TerminalSetting.SORT_DIRECTION);
     }
 
     /**
@@ -85,8 +85,8 @@ public final class FactoryPassiveIoHost extends ItemMenuHost<FactoryPassiveIoTer
      * @param mode      排序档位
      * @param direction 排序方向
      */
-    public void setSort(FactorySortMode mode, SortDir direction) {
-        this.configManager.putSetting(FactoryTerminalSetting.SORT_MODE, mode);
-        this.configManager.putSetting(FactoryTerminalSetting.SORT_DIRECTION, direction);
+    public void setSort(TerminalSortMode mode, SortDir direction) {
+        this.configManager.putSetting(TerminalSetting.SORT_MODE, mode);
+        this.configManager.putSetting(TerminalSetting.SORT_DIRECTION, direction);
     }
 }

@@ -23,7 +23,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIo
 import io.github.crafteve.idlefactory.io.IoReason;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -118,7 +118,7 @@ final class PassiveIoRender {
                     viewport.width() - 1, box.bottom() - box.top(),
                     Card.Level.MACHINE, true);
             drawMachineRow(graphics, viewport, block, box, top, bottom, hover);
-            if (layout.view() == FactoryPassiveIoView.LIST) {
+            if (layout.view() == PassiveIoViewMode.LIST) {
                 drawListBody(graphics, viewport, box, block, scroll, hover);
             } else {
                 drawTileBody(graphics, viewport, box, block, scroll, hover);
@@ -185,7 +185,7 @@ final class PassiveIoRender {
                     PassiveIoLayout.screenY(viewport,
                             Math.min(box.bodyTop(), box.bottom()), scroll), HOVER_FILL);
             case RULE -> {
-                if (layout.view() == FactoryPassiveIoView.LIST) {
+                if (layout.view() == PassiveIoViewMode.LIST) {
                     int rowY = rowScreenY(layout, box, hover.rule(), scroll);
                     graphics.fill(PassiveIoLayout.bodyX(viewport), rowY,
                             PassiveIoLayout.contentRight(viewport),

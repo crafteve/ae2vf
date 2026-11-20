@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIo
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
 import io.github.crafteve.idlefactory.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.item.ItemStack;
@@ -119,7 +119,7 @@ public final class PassiveIoJeiIngredients {
     private static Rect2i ruleIconArea(PassiveIoLayout layout, Hit hit, int scroll) {
         Viewport viewport = layout.viewport();
         BlockBox box = layout.boxes().get(hit.block());
-        if (layout.view() == FactoryPassiveIoView.LIST) {
+        if (layout.view() == PassiveIoViewMode.LIST) {
             int y = PassiveIoLayout.rowY(viewport, box, hit.rule(), scroll)
                     + (PassiveIoLayout.ROW_H - PassiveIoLayout.RULE_ICON) / 2;
             return new Rect2i(PassiveIoLayout.slotX(viewport), y,

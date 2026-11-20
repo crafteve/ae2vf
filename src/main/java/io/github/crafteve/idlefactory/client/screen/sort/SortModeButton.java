@@ -12,7 +12,7 @@ import appeng.client.gui.Icon;
 import appeng.client.gui.style.Blitter;
 import appeng.client.gui.widgets.IconButton;
 
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -28,14 +28,14 @@ import net.minecraft.resources.ResourceLocation;
  */
 public final class SortModeButton extends IconButton {
     /** 当前档位来源；按钮每帧现查，切档后下一帧自动换图标。 */
-    private final Supplier<FactorySortMode> mode;
+    private final Supplier<TerminalSortMode> mode;
     private final SortPress press;
 
     /**
      * @param mode  当前档位
      * @param press 点击动作
      */
-    public SortModeButton(Supplier<FactorySortMode> mode, SortPress press) {
+    public SortModeButton(Supplier<TerminalSortMode> mode, SortPress press) {
         super(button -> { });
         this.mode = mode;
         this.press = press;
@@ -62,7 +62,7 @@ public final class SortModeButton extends IconButton {
         if (!this.visible) {
             return;
         }
-        FactorySortMode current = this.mode.get();
+        TerminalSortMode current = this.mode.get();
         boolean hovered = this.isHovered();
         if (!this.isDisableBackground()) {
             Icon background = hovered ? Icon.TOOLBAR_BUTTON_BACKGROUND_HOVER
@@ -88,7 +88,7 @@ public final class SortModeButton extends IconButton {
 
     @Override
     public List<Component> getTooltipMessage() {
-        FactorySortMode current = this.mode.get();
+        TerminalSortMode current = this.mode.get();
         return List.of(Component.translatable("idlefactory.sort.mode.current", label(current)),
                 Component.translatable("idlefactory.sort.mode.next", label(current.next())));
     }
@@ -102,7 +102,7 @@ public final class SortModeButton extends IconButton {
      * @return 绘制器；没有对应贴图时 {@code null}
      */
     @Nullable
-    private static Blitter iconBlitter(FactorySortMode mode) {
+    private static Blitter iconBlitter(TerminalSortMode mode) {
         Icon icon = iconFor(mode);
         if (icon != null) {
             return icon.getBlitter();
@@ -123,7 +123,7 @@ public final class SortModeButton extends IconButton {
      * @return AE2 图标或 {@code null}
      */
     @Nullable
-    private static Icon iconFor(FactorySortMode mode) {
+    private static Icon iconFor(TerminalSortMode mode) {
         return switch (mode) {
             case NAME -> Icon.SORT_BY_NAME;
             case ID -> Icon.SORT_BY_MOD;
@@ -139,7 +139,7 @@ public final class SortModeButton extends IconButton {
      * @return 贴图或 {@code null}
      */
     @Nullable
-    private static ResourceLocation textureFor(FactorySortMode mode) {
+    private static ResourceLocation textureFor(TerminalSortMode mode) {
         return switch (mode) {
             case RULE_COUNT -> GuiTextures.SORT_RULE_COUNT;
             case STATUS -> GuiTextures.SORT_STATUS;
@@ -158,7 +158,7 @@ public final class SortModeButton extends IconButton {
         return net.minecraft.network.chat.Component.translatable(key).getString();
     }
 
-    private static String label(FactorySortMode mode) {
+    private static String label(TerminalSortMode mode) {
         return switch (mode) {
             case NAME -> tr("idlefactory.sort.mode.name");
             case ID -> "ID";

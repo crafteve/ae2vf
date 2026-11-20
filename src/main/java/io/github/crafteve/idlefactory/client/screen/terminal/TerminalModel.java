@@ -11,7 +11,7 @@ import appeng.api.config.SortDir;
 import io.github.crafteve.idlefactory.client.screen.search.SearchQuery;
 import io.github.crafteve.idlefactory.client.screen.sort.SortContext;
 import io.github.crafteve.idlefactory.client.screen.sort.SortKey;
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 import io.github.crafteve.idlefactory.view.ViewTable;
 
 import net.minecraft.core.BlockPos;
@@ -32,7 +32,7 @@ public abstract class TerminalModel<T> {
     @Nullable
     private ViewTable table;
     private SearchQuery query = SearchQuery.EMPTY;
-    private FactorySortMode sortMode = FactorySortMode.NAME;
+    private TerminalSortMode sortMode = TerminalSortMode.NAME;
     private SortDir sortDirection = SortDir.ASCENDING;
     @Nullable
     private ResourceKey<Level> playerDimension;
@@ -79,7 +79,7 @@ public abstract class TerminalModel<T> {
      * @param mode      档位
      * @param direction 方向
      */
-    public final void setSort(FactorySortMode mode, SortDir direction) {
+    public final void setSort(TerminalSortMode mode, SortDir direction) {
         this.sortMode = mode;
         this.sortDirection = direction;
     }

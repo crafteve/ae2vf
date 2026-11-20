@@ -6,7 +6,7 @@ import java.util.function.Supplier;
 import appeng.client.gui.Icon;
 import appeng.client.gui.widgets.IconButton;
 
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 import net.minecraft.network.chat.Component;
 
@@ -17,13 +17,13 @@ import net.minecraft.network.chat.Component;
  */
 public final class PassiveIoViewButton extends IconButton {
     /** 当前视图来源；按钮每帧现查，切换后下一帧自动换图标。 */
-    private final Supplier<FactoryPassiveIoView> view;
+    private final Supplier<PassiveIoViewMode> view;
 
     /**
      * @param view  当前视图
      * @param press 点击动作
      */
-    public PassiveIoViewButton(Supplier<FactoryPassiveIoView> view, OnPress press) {
+    public PassiveIoViewButton(Supplier<PassiveIoViewMode> view, OnPress press) {
         super(press);
         this.view = view;
     }
@@ -39,7 +39,7 @@ public final class PassiveIoViewButton extends IconButton {
 
     @Override
     protected Icon getIcon() {
-        return this.view.get() == FactoryPassiveIoView.LIST
+        return this.view.get() == PassiveIoViewMode.LIST
                 ? Icon.VIEW_MODE_STORED : Icon.VIEW_MODE_ALL;
     }
 
@@ -55,7 +55,7 @@ public final class PassiveIoViewButton extends IconButton {
 
     @Override
     public List<Component> getTooltipMessage() {
-        String next = tr(this.view.get() == FactoryPassiveIoView.LIST
+        String next = tr(this.view.get() == PassiveIoViewMode.LIST
                 ? "idlefactory.passive.view.tile" : "idlefactory.passive.view.list");
         return List.of(Component.translatable("idlefactory.passive.view.switch", next));
     }

@@ -12,18 +12,18 @@ import appeng.api.config.SortDir;
  *
  * <p>键字符串是落盘契约：改键名等于让玩家终端里的旧设置失效，只能新增、不能改名。</p>
  */
-public final class FactoryTerminalSetting {
+public final class TerminalSetting {
     /** 被动 IO 终端的列表 / 卡片视图；默认列表。键名沿用旧字符串，兼容已有终端。 */
-    public static final Setting<FactoryPassiveIoView> VIEW =
-            new Setting<>("passive_io_view", FactoryPassiveIoView.class);
+    public static final Setting<PassiveIoViewMode> VIEW =
+            new Setting<>("passive_io_view", PassiveIoViewMode.class);
     /** 排序档位；默认按名称。 */
-    public static final Setting<FactorySortMode> SORT_MODE =
-            new Setting<>("terminal_sort_mode", FactorySortMode.class);
+    public static final Setting<TerminalSortMode> SORT_MODE =
+            new Setting<>("terminal_sort_mode", TerminalSortMode.class);
     /** 排序方向；默认升序。 */
     public static final Setting<SortDir> SORT_DIRECTION =
             new Setting<>("terminal_sort_direction", SortDir.class);
 
-    private FactoryTerminalSetting() {
+    private TerminalSetting() {
         // 纯常量持有类
     }
 }

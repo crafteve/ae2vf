@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import appeng.api.config.SortDir;
 
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -113,7 +113,7 @@ public record SortKey(String name, String id, int machineCount, int ruleCount,
      * @param direction 排序方向：降序把整条链反转
      * @return 比较器
      */
-    public static Comparator<SortKey> comparator(FactorySortMode mode,
+    public static Comparator<SortKey> comparator(TerminalSortMode mode,
             SortDir direction) {
         Comparator<SortKey> chain = switch (mode) {
             case NAME -> Comparator.comparing(SortKey::name);
@@ -123,7 +123,7 @@ public record SortKey(String name, String id, int machineCount, int ruleCount,
             case STATUS -> Comparator.comparingInt(SortKey::statusRank);
             case DISTANCE -> Comparator.comparingLong(SortKey::distance);
         };
-        if (mode != FactorySortMode.NAME) {
+        if (mode != TerminalSortMode.NAME) {
             chain = chain.thenComparing(SortKey::name);
         }
         chain = chain.thenComparingInt(SortKey::machineCount)

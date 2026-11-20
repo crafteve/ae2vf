@@ -2,7 +2,7 @@ package io.github.crafteve.idlefactory.network.payload;
 
 import io.github.crafteve.idlefactory.IdleFactory;
 import io.github.crafteve.idlefactory.client.network.ClientPassiveIoViewHandler;
-import io.github.crafteve.idlefactory.menu.FactoryPassiveIoView;
+import io.github.crafteve.idlefactory.menu.PassiveIoViewMode;
 
 import io.netty.handler.codec.DecoderException;
 
@@ -18,7 +18,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * @param containerId 菜单容器 id
  * @param view        服务端已保存的视图
  */
-public record FactoryPassiveIoViewS2C(int containerId, FactoryPassiveIoView view)
+public record FactoryPassiveIoViewS2C(int containerId, PassiveIoViewMode view)
         implements CustomPacketPayload {
     /** 包类型：{@code idlefactory:passive_io_view_sync}。 */
     public static final Type<FactoryPassiveIoViewS2C> TYPE =
@@ -52,7 +52,7 @@ public record FactoryPassiveIoViewS2C(int containerId, FactoryPassiveIoView view
     private static FactoryPassiveIoViewS2C read(RegistryFriendlyByteBuf buf) {
         int containerId = buf.readVarInt();
         int ordinal = buf.readUnsignedByte();
-        FactoryPassiveIoView[] values = FactoryPassiveIoView.values();
+        PassiveIoViewMode[] values = PassiveIoViewMode.values();
         if (ordinal >= values.length) {
             throw new DecoderException("invalid passive IO view ordinal: " + ordinal);
         }

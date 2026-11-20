@@ -39,8 +39,8 @@ public final class FactoryNodeHost extends ItemMenuHost<FactoryNodeTerminalItem>
             CommandController.ensureFactory(serverPlayer);
         }
         this.configManager = IConfigManager.builder(this::getItemStack)
-                .registerSetting(FactoryTerminalSetting.SORT_MODE, FactorySortMode.NAME)
-                .registerSetting(FactoryTerminalSetting.SORT_DIRECTION, SortDir.ASCENDING)
+                .registerSetting(TerminalSetting.SORT_MODE, TerminalSortMode.NAME)
+                .registerSetting(TerminalSetting.SORT_DIRECTION, SortDir.ASCENDING)
                 .build();
     }
 
@@ -49,8 +49,8 @@ public final class FactoryNodeHost extends ItemMenuHost<FactoryNodeTerminalItem>
      *
      * @return 排序档位
      */
-    public FactorySortMode sortMode() {
-        return this.configManager.getSetting(FactoryTerminalSetting.SORT_MODE);
+    public TerminalSortMode sortMode() {
+        return this.configManager.getSetting(TerminalSetting.SORT_MODE);
     }
 
     /**
@@ -59,7 +59,7 @@ public final class FactoryNodeHost extends ItemMenuHost<FactoryNodeTerminalItem>
      * @return 排序方向
      */
     public SortDir sortDirection() {
-        return this.configManager.getSetting(FactoryTerminalSetting.SORT_DIRECTION);
+        return this.configManager.getSetting(TerminalSetting.SORT_DIRECTION);
     }
 
     /**
@@ -68,8 +68,8 @@ public final class FactoryNodeHost extends ItemMenuHost<FactoryNodeTerminalItem>
      * @param mode      排序档位
      * @param direction 排序方向
      */
-    public void setSort(FactorySortMode mode, SortDir direction) {
-        this.configManager.putSetting(FactoryTerminalSetting.SORT_MODE, mode);
-        this.configManager.putSetting(FactoryTerminalSetting.SORT_DIRECTION, direction);
+    public void setSort(TerminalSortMode mode, SortDir direction) {
+        this.configManager.putSetting(TerminalSetting.SORT_MODE, mode);
+        this.configManager.putSetting(TerminalSetting.SORT_DIRECTION, direction);
     }
 }

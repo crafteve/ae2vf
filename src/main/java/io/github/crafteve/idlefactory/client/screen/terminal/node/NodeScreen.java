@@ -56,7 +56,7 @@ import io.github.crafteve.idlefactory.integration.jecharacters.JecharactersCompa
 
 import io.github.crafteve.idlefactory.menu.FactoryNodeMenu;
 
-import io.github.crafteve.idlefactory.menu.FactorySortMode;
+import io.github.crafteve.idlefactory.menu.TerminalSortMode;
 
 import io.github.crafteve.idlefactory.client.screen.text.CommandText;
 import io.github.crafteve.idlefactory.command.CommandResult;
@@ -118,7 +118,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
     /** 视图表的分页拼装与差量应用；第 5 步提升为终端数据源。 */
     private final TerminalSource source;
     /** 当前排序档位；初值来自物品组件，切换后回写。 */
-    private FactorySortMode sortMode;
+    private TerminalSortMode sortMode;
     /** 当前排序方向；初值来自物品组件，切换后回写。 */
     private SortDir sortDirection;
     @Nullable
@@ -437,7 +437,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param mode      档位
      * @param direction 方向
      */
-    public void acceptSort(FactorySortMode mode, SortDir direction) {
+    public void acceptSort(TerminalSortMode mode, SortDir direction) {
         if (this.sortMode == mode && this.sortDirection == direction) {
             return;
         }
@@ -475,7 +475,7 @@ public final class NodeScreen extends AEBaseScreen<FactoryNodeMenu>
      * @param mode      新档位
      * @param direction 新方向
      */
-    private void applySort(FactorySortMode mode, SortDir direction) {
+    private void applySort(TerminalSortMode mode, SortDir direction) {
         if (this.sortMode == mode && this.sortDirection == direction) {
             return;
         }
