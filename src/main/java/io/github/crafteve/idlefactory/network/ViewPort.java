@@ -12,7 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.factory.FactoryLifecycle;
-import io.github.crafteve.idlefactory.factory.ViewTableBuilder;
+
 import io.github.crafteve.idlefactory.network.payload.ViewTableDiffS2C;
 import io.github.crafteve.idlefactory.network.payload.ViewTableCodec;
 import io.github.crafteve.idlefactory.network.payload.ViewTableS2C;
@@ -23,6 +23,7 @@ import io.github.crafteve.idlefactory.view.ViewNode;
 import io.github.crafteve.idlefactory.view.ViewNodeCore;
 import io.github.crafteve.idlefactory.view.ViewNodeDiff;
 import io.github.crafteve.idlefactory.view.ViewTable;
+import io.github.crafteve.idlefactory.view.ViewTableBuilder;
 import io.github.crafteve.idlefactory.view.ViewTableDiff;
 
 import io.netty.buffer.Unpooled;

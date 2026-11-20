@@ -2,17 +2,15 @@ package io.github.crafteve.idlefactory.client.screen;
 
 import net.minecraft.resources.ResourceLocation;
 
-import io.github.crafteve.idlefactory.factory.FactorySnapshotBuilder;
-import io.github.crafteve.idlefactory.view.TotalState;
-import io.github.crafteve.idlefactory.view.NodeStatus;
 import io.github.crafteve.idlefactory.view.ViewNode.Activity;
 import io.github.crafteve.idlefactory.view.ViewNodeCore;
 
 /**
  * 一个节点的总状态展示：文字、颜色、状态条贴图和状态灯贴图。
  *
- * <p>聚合已经在服务端 {@code NodeStatusBuilder} 完成，这里只把服务端下发的 {@link NodeStatus}
- * 映射成展示档位；绘制、搜索字段和 tooltip 用同一份结果，不在客户端再判断一次状态。</p>
+ * <p>聚合已经在服务端 {@link io.github.crafteve.idlefactory.view.ViewTableBuilder} 完成，这里只把
+ * 服务端下发的 {@code ViewNodeCore} 映射成展示档位；绘制、搜索字段和 tooltip 用同一份结果，
+ * 不在客户端再判断一次状态。</p>
  *
  * @param text  状态文字
  * @param color 状态文字颜色
@@ -56,22 +54,22 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      * 取一个节点的状态种类。
      *
      * <p>唯一一套节点判断顺序：未探测 / 过期优先，其次失联 / 缺机，最后才看"在干什么"。
-     * 两个终端都读服务端下发的 {@link NodeStatus}，这里只做展示映射，不再自己聚合。</p>
+     * 两个终端都读服务端下发的 {@link ViewNodeCore}，这里只做展示映射，不再自己聚合。</p>
      *
-     * @param status 节点状态
+     * @param core 节点自身的字段
      * @return 状态种类
      */
-    static Kind kindOf(NodeStatus status) {
-        if (!status.probed()) {
+    static Kind kindOf(ViewNodeCore core) {
+        if (!core.probed()) {
             return Kind.UNPROBED;
         }
-        if (status.stale()) {
+        if (core.stale()) {
             return Kind.STALE;
         }
-        return switch (status.health()) {
+        return switch (core.health()) {
             case OFFLINE -> Kind.OFFLINE;
             case PARTIAL -> Kind.PARTIAL;
-            case ONLINE -> kindOf(status.totalState());
+            case ONLINE -> kindOf(core.activity());
         };
     }
 
@@ -80,18 +78,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      *
      * <p>和展示用同一套 {@link Kind}，所以排序位置与灯色永远一致：升序（从好到坏）时运行在
      * 最前、失联在最后；方向按钮切降序就整体反过来。</p>
-     *
-     * @param status 节点状态
-     * @return 等级，0..10
-     */
-    public static int sortRank(NodeStatus status) {
-        return rank(kindOf(status));
-    }
-
-    /**
-     * 状态档的排序等级；视图表版本。
-     *
-     * <p>与 {@link #sortRank(NodeStatus)} 同一张表，第 3b 步切换后旧版本删除。</p>
      *
      * @param core 节点自身的字段
      * @return 等级，0..10
@@ -123,29 +109,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
-     * 取一个节点的状态种类；视图表版本。
-     *
-     * <p>判断顺序与 {@link #kindOf(NodeStatus)} 完全一致：未探测 / 过期优先，其次失联 / 缺机，
-     * 最后才看"在干什么"。视图表已经把结论字段算好，这里只做展示映射。</p>
-     *
-     * @param core 节点自身的字段
-     * @return 状态种类
-     */
-    static Kind kindOf(ViewNodeCore core) {
-        if (!core.probed()) {
-            return Kind.UNPROBED;
-        }
-        if (core.stale()) {
-            return Kind.STALE;
-        }
-        return switch (core.health()) {
-            case OFFLINE -> Kind.OFFLINE;
-            case PARTIAL -> Kind.PARTIAL;
-            case ONLINE -> kindOf(core.activity());
-        };
-    }
-
-    /**
      * 健康已确定时，把节点活动映射成种类。
      *
      * @param activity 服务端节点活动
@@ -153,25 +116,6 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
      */
     private static Kind kindOf(Activity activity) {
         return switch (activity) {
-            case OFFLINE -> Kind.OFFLINE;
-            case UNCONFIGURED -> Kind.UNCONFIGURED;
-            case RUNNING -> Kind.RUNNING;
-            case IDLE -> Kind.IDLE;
-            case WAITING_MATERIAL -> Kind.WAITING_MATERIAL;
-            case INPUT_OK -> Kind.INPUT_OK;
-            case INPUT_BLOCKED -> Kind.INPUT_BLOCKED;
-            case UNKNOWN -> Kind.UNKNOWN;
-        };
-    }
-
-    /**
-     * 健康已确定时，把总状态映射成种类。
-     *
-     * @param state 服务端总状态
-     * @return 状态种类
-     */
-    private static Kind kindOf(TotalState state) {
-        return switch (state) {
             case OFFLINE -> Kind.OFFLINE;
             case UNCONFIGURED -> Kind.UNCONFIGURED;
             case RUNNING -> Kind.RUNNING;
@@ -219,20 +163,7 @@ public record FactoryStatus(String text, int color, ResourceLocation strip, Reso
     }
 
     /**
-     * 把节点状态映射成文字、颜色和贴图。
-     *
-     * @param status 节点状态
-     * @param theme  当前主题
-     * @return 状态展示
-     */
-    public static FactoryStatus of(NodeStatus status, FactoryGuiTheme theme) {
-        return of(kindOf(status), theme);
-    }
-
-    /**
      * 把视图表的节点字段映射成文字、颜色和贴图。
-     *
-     * <p>与 {@link #of(NodeStatus, FactoryGuiTheme)} 同一张映射表，第 3b 步切换后旧版本删除。</p>
      *
      * @param core  节点自身的字段
      * @param theme 当前主题

@@ -28,7 +28,7 @@ import io.github.crafteve.idlefactory.observation.WorldEventListener;
 
 import io.github.crafteve.idlefactory.storage.MeStorageResolver;
 
-import io.github.crafteve.idlefactory.network.NoticeHandler;
+import io.github.crafteve.idlefactory.network.ObservationNoticeListener;
 import io.github.crafteve.idlefactory.network.ViewPort;
 import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 
@@ -50,7 +50,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * 所有工厂。它不认识终端、玩家会话或 GUI——终端关掉、玩家下线，它照跑。</p>
  *
  * <p>本类只做装配与生命周期：每 tick 编排在 {@link FactoryRunner}，失联通知在
- * {@link FactoryNoticeHandler}。这里保留的 getter 是对外兼容入口，新代码应通过构造注入
+ * {@link ObservationNoticeListener}。这里保留的 getter 是对外兼容入口，新代码应通过构造注入
  * 拿到需要的协作者。</p>
  *
  * <p>观测必须先于 IO：IO 的门禁读的是观测结论，读路径不许自己探世界。</p>
@@ -76,7 +76,7 @@ public final class FactoryLifecycle {
      */
     private final BlockOccupancyTable occupancy = new BlockOccupancyTable();
     /** 失联/恢复通知的聚合与节流。 */
-    private final NoticeHandler notices;
+    private final ObservationNoticeListener notices;
     /** 全服机器状态（世界的镜像，不写档）。 */
     /** 每 tick 的 IO 表单生成器。 */
     private final IoFormBuilder formBuilder = new IoFormBuilder();
@@ -104,7 +104,7 @@ public final class FactoryLifecycle {
     private FactoryLifecycle(MinecraftServer server) {
         this.server = server;
         this.ports = new PortExecutor(server);
-        this.notices = new NoticeHandler(server, this.manager);
+        this.notices = new ObservationNoticeListener(server, this.manager);
         this.nodeIoRunner = new IoRunner(this.ports);
         this.nodeLibrary = new LiveNodeLibrary(server, this::markDirty, this::logNodeNotice);
         this.nodeApply = new LiveNodeApply(server, this.ports, this.nodeLibrary);

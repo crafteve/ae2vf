@@ -1,4 +1,4 @@
-package io.github.crafteve.idlefactory.factory;
+package io.github.crafteve.idlefactory.view;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +19,7 @@ import io.github.crafteve.idlefactory.node.Node;
 import io.github.crafteve.idlefactory.node.NodeDispatchOrder;
 import io.github.crafteve.idlefactory.node.NodeDispatchQueue;
 import io.github.crafteve.idlefactory.node.NodeHealthResolver;
+import io.github.crafteve.idlefactory.factory.Factory;
 import io.github.crafteve.idlefactory.observation.BlockFacts;
 import io.github.crafteve.idlefactory.observation.NodeHealth;
 import io.github.crafteve.idlefactory.observation.ObservationReader;
@@ -26,13 +27,7 @@ import io.github.crafteve.idlefactory.observation.WorkState;
 import io.github.crafteve.idlefactory.resource.AeKeyAdapter;
 import io.github.crafteve.idlefactory.runtime.LiveNode;
 import io.github.crafteve.idlefactory.runtime.LiveNodeApply;
-import io.github.crafteve.idlefactory.view.ViewHeader;
-import io.github.crafteve.idlefactory.view.ViewIoRule;
-import io.github.crafteve.idlefactory.view.ViewMachine;
-import io.github.crafteve.idlefactory.view.ViewNode;
 import io.github.crafteve.idlefactory.view.ViewNode.Activity;
-import io.github.crafteve.idlefactory.view.ViewNodeCore;
-import io.github.crafteve.idlefactory.view.ViewTable;
 
 /**
  * 视图表的唯一组装点：工厂配置（L0）+ 观测（L1）+ 执行结果（L3）→ {@link ViewTable}。
@@ -41,7 +36,7 @@ import io.github.crafteve.idlefactory.view.ViewTable;
  * {@link IoForm} 的条目、{@link IoAnalyzer} 的速率统计与 {@link LiveNodeApply} 的待投递队列，
  * 三份真相各读各的，本类只做聚合，不回写任何一方。</p>
  *
- * <p>聚合口径（与旧 {@code NodeStatusBuilder} / {@code MachineSnapshot#totalState} 逐条对齐，
+ * <p>聚合口径（与已删除的 {@code NodeStatusBuilder} / {@code MachineSnapshot#totalState} 逐条对齐，
  * 第 1 步要求行为不变）：</p>
  * <ol>
  *   <li>{@code probed}：全部成员都探过才算探过；</li>

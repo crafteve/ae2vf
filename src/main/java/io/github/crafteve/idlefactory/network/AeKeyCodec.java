@@ -14,8 +14,8 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
  * <p>保留这个薄包装是为了把编解码收在一处：改协议时只动这里，调用方（规则负载、仓库快照）
  * 不受影响。</p>
  */
-public final class ResourceKeyCodec {
-    private ResourceKeyCodec() {
+public final class AeKeyCodec {
+    private AeKeyCodec() {
         // 纯静态工具类
     }
 

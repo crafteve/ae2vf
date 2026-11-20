@@ -24,7 +24,7 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>聚合状态住在这里（network），view 不再持有一份。一次爆炸拆掉 20 台机器，玩家也只看
  * 到一行；拥有者不在线时计数直接丢弃——通知没有接收者，留着只会越攒越旧。</p>
  */
-public final class NoticeHandler implements ObservationChangeListener {
+public final class ObservationNoticeListener implements ObservationChangeListener {
     /** 同一工厂两次提示的最短间隔（tick）：10 秒。 */
     private static final int NOTICE_INTERVAL = 200;
 
@@ -40,7 +40,7 @@ public final class NoticeHandler implements ObservationChangeListener {
      * @param server  服务端
      * @param manager 工厂档案柜
      */
-    public NoticeHandler(MinecraftServer server, FactoryManager manager) {
+    public ObservationNoticeListener(MinecraftServer server, FactoryManager manager) {
         this.server = server;
         this.manager = manager;
     }

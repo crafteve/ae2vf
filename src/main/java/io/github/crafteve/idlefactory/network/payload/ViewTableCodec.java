@@ -15,7 +15,7 @@ import io.github.crafteve.idlefactory.location.BlockKey;
 import io.github.crafteve.idlefactory.machine.MachineHealth;
 import io.github.crafteve.idlefactory.machine.MatchMode;
 import io.github.crafteve.idlefactory.network.IdleFactoryNetwork;
-import io.github.crafteve.idlefactory.network.ResourceKeyCodec;
+import io.github.crafteve.idlefactory.network.AeKeyCodec;
 import io.github.crafteve.idlefactory.node.Multiplier;
 import io.github.crafteve.idlefactory.node.MultiplierMode;
 import io.github.crafteve.idlefactory.node.Node;
@@ -49,8 +49,7 @@ import net.minecraft.resources.ResourceLocation;
  * 写在某个报文里会让另一个报文反向依赖它的私有方法。</p>
  *
  * <p>枚举一律写 ordinal、读侧越界抛 {@link DecoderException}；计数用 varint 并在读侧夹到
- * 配置上限与线协议硬上限，避免畸形包把内存打爆。资源 key 统一走
- * {@link ResourceKeyCodec}（第 3c 步改名 {@code AeKeyCodec}）。</p>
+ * 配置上限与线协议硬上限，避免畸形包把内存打爆。资源 key 统一走 {@link AeKeyCodec}。</p>
  */
 public final class ViewTableCodec {
     private ViewTableCodec() {
@@ -211,7 +210,7 @@ public final class ViewTableCodec {
 
     private static void writeRule(RegistryFriendlyByteBuf buf, ViewIoRule rule) {
         buf.writeByte(rule.side().ordinal());
-        ResourceKeyCodec.write(buf, rule.key());
+        AeKeyCodec.write(buf, rule.key());
         buf.writeBoolean(rule.face() != null);
         if (rule.face() != null) {
             buf.writeByte(rule.face().ordinal());
@@ -224,7 +223,7 @@ public final class ViewTableCodec {
 
     private static ViewIoRule readRule(RegistryFriendlyByteBuf buf) {
         IoSide side = readEnum(buf, IoSide.values(), "io side");
-        AEKey key = ResourceKeyCodec.read(buf);
+        AEKey key = AeKeyCodec.read(buf);
         Direction face = buf.readBoolean() ? readEnum(buf, Direction.values(), "rule face") : null;
         MatchMode mode = readEnum(buf, MatchMode.values(), "match mode");
         int order = buf.readVarInt();
@@ -235,12 +234,12 @@ public final class ViewTableCodec {
 
     private static void writeRuleKey(RegistryFriendlyByteBuf buf, ViewIoRule.Key key) {
         buf.writeByte(key.side().ordinal());
-        ResourceKeyCodec.write(buf, key.key());
+        AeKeyCodec.write(buf, key.key());
     }
 
     private static ViewIoRule.Key readRuleKey(RegistryFriendlyByteBuf buf) {
         return new ViewIoRule.Key(readEnum(buf, IoSide.values(), "io side"),
-                ResourceKeyCodec.read(buf));
+                AeKeyCodec.read(buf));
     }
 
     private static void writeMachine(RegistryFriendlyByteBuf buf, ViewMachine machine) {

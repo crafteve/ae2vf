@@ -39,7 +39,6 @@ import io.github.crafteve.idlefactory.client.screen.ViewTableSink;
 import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
 import io.github.crafteve.idlefactory.view.ViewTable;
 import io.github.crafteve.idlefactory.view.ViewTableDiff;
-import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
 import net.minecraft.client.gui.GuiGraphics;

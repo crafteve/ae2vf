@@ -25,8 +25,6 @@ import io.github.crafteve.idlefactory.client.screen.FactoryFeedbackSink;
 
 import io.github.crafteve.idlefactory.client.screen.FactoryGuiTheme;
 
-import io.github.crafteve.idlefactory.factory.FactoryNodeSnapshotBuilder;
-
 import io.github.crafteve.idlefactory.client.screen.FactorySearchEditBox;
 
 import io.github.crafteve.idlefactory.client.screen.FactorySearchQuery;
@@ -61,8 +59,6 @@ import io.github.crafteve.idlefactory.network.payload.ViewTableRequestC2S;
 import io.github.crafteve.idlefactory.view.ViewNode;
 import io.github.crafteve.idlefactory.view.ViewTable;
 import io.github.crafteve.idlefactory.view.ViewTableDiff;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 

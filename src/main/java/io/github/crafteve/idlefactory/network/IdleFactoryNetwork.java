@@ -10,17 +10,9 @@ import io.github.crafteve.idlefactory.network.payload.FactoryLinksS2C;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandC2S;
 import io.github.crafteve.idlefactory.network.payload.FactoryCommandS2C;
 
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableRequestC2S;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryNodeTableS2C;
-
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewC2S;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryPassiveIoViewS2C;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryTableRequestC2S;
-
-import io.github.crafteve.idlefactory.network.payload.FactoryTableS2C;
 
 import io.github.crafteve.idlefactory.network.payload.FactoryTerminalSortC2S;
 
@@ -47,9 +39,8 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 /**
  * 网络通道。
  *
- * <p>当前同时挂两条读通道：旧的机器表 / 节点表（第 3c 步删除）与新的视图表（全量页 + 差量），
- * 另有写命令、被动 IO 视图偏好、排序偏好、绑定杖链接快照与三层绑定杖包。改包结构时记得递增
- * {@link #PROTOCOL_VERSION}。</p>
+ * <p>读侧只有一条通道：视图表（请求、全量页、差量）。另有写命令、被动 IO 视图偏好、排序偏好、
+ * 绑定杖链接快照与三层绑定杖包。改包结构时记得递增 {@link #PROTOCOL_VERSION}。</p>
  */
 public final class IdleFactoryNetwork {
     /** 网络协议版本：双方不一致时 NeoForge 会拒绝连接，改包结构时记得递增。 */
@@ -97,12 +88,6 @@ public final class IdleFactoryNetwork {
     private static void onRegisterPayloadHandlers(RegisterPayloadHandlersEvent event) {
         registrar = event.registrar(PROTOCOL_VERSION);
 
-        // P1 第一小步：机器表请求 / 回包
-        registrar.playToServer(FactoryTableRequestC2S.TYPE, FactoryTableRequestC2S.STREAM_CODEC,
-                FactoryTableRequestC2S::handle);
-        registrar.playToClient(FactoryTableS2C.TYPE, FactoryTableS2C.STREAM_CODEC,
-                FactoryTableS2C::handle);
-
         // 写命令：节点、规则、provider 与应用内一切屏幕写操作都走这一对包
         registrar.playToServer(FactoryCommandC2S.TYPE, FactoryCommandC2S.STREAM_CODEC,
                 FactoryCommandC2S::handle);
@@ -134,12 +119,6 @@ public final class IdleFactoryNetwork {
                 ViewTableS2C::handle);
         registrar.playToClient(ViewTableDiffS2C.TYPE, ViewTableDiffS2C.STREAM_CODEC,
                 ViewTableDiffS2C::handle);
-
-        // 节点管理终端：节点表请求 / 回包
-        registrar.playToServer(FactoryNodeTableRequestC2S.TYPE,
-                FactoryNodeTableRequestC2S.STREAM_CODEC, FactoryNodeTableRequestC2S::handle);
-        registrar.playToClient(FactoryNodeTableS2C.TYPE, FactoryNodeTableS2C.STREAM_CODEC,
-                FactoryNodeTableS2C::handle);
 
         // 机器绑定杖：1:1 toggle、连锁、草稿预校验与提交
         registrar.playToServer(WandChainC2S.TYPE, WandChainC2S.STREAM_CODEC, WandChainC2S::handle);
