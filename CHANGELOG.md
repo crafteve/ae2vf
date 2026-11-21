@@ -1,4 +1,5 @@
 # 0.1.0-beta
+[2026-11-21 13:40] 拼音模组改用 Modrinth 版本 id 解析，避免 maven 按版本号拿到 Fabric 包
 [2026-11-21 13:35] 测试环境临时移除 ExtendedAE 与 ExtendedAE-Plus（ExtendedAE-Plus 要求 JEI >= 19.64，当前 19.21）
 [2026-11-21 13:32] 删除 JEI 的 FE 假配料（FeIngredient 一族），FE 改走 AE2 通用包裹堆栈
 [2026-11-21 12:42] 测试环境加入 JustEnoughCharacters、MouseTweaks、Extended AE、ExtendedAE-Plus（仅 localRuntime）
