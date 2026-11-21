@@ -71,7 +71,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。�
 
 值类型与结构后缀（第二张表，和角色后缀同样硬）：
 
-`Form` 表单（每 tick 的工作清单，内嵌 `Entry` / `Entry.Key`） · `Job` 一次性搬运任务（机器 / 方向 / 面 / 资源 / 量，不带结果） · `Order` 一单待投递（跨 tick、可拆给多台机器） · `Queue` 多单排队（内存与存档的唯一写入口） · `State` 一 tick 的输入或快照 · `Side` 方向 · `Mode` 互斥取值（**两值开关与多档位都叫 `Mode`，不设 `Switch`**） · `Reason` 一次操作的原因（可含成功值） · `Result` 单个目标一次操作的返回值 · `Spec` 不可变配置值组合 · `Key` 不可变身份 · `Status` 推导结论（能不能干活） · `Health` 探活结论（在不在） · `Group` 同类元素的有序集合 · `Hint` 经验值 · `Conclusion` 历史结论
+`GameTest` 游戏内测试（main 源集的 `gametest` 包，`@GameTestHolder`） · `Form` 表单（每 tick 的工作清单，内嵌 `Entry` / `Entry.Key`） · `Job` 一次性搬运任务（机器 / 方向 / 面 / 资源 / 量，不带结果） · `Order` 一单待投递（跨 tick、可拆给多台机器） · `Queue` 多单排队（内存与存档的唯一写入口） · `State` 一 tick 的输入或快照 · `Side` 方向 · `Mode` 互斥取值（**两值开关与多档位都叫 `Mode`，不设 `Switch`**） · `Reason` 一次操作的原因（可含成功值） · `Result` 单个目标一次操作的返回值 · `Spec` 不可变配置值组合 · `Key` 不可变身份 · `Status` 推导结论（能不能干活） · `Health` 探活结论（在不在） · `Group` 同类元素的有序集合 · `Hint` 经验值 · `Conclusion` 历史结论
 
 硬条款：
 
