@@ -42,7 +42,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
  * 包裹里的真实资源处理，不再需要 FE 假身份。</p>
  */
 @JeiPlugin
-public final class FactoryJeiPlugin implements IModPlugin {
+public final class VoidFactoryJeiPlugin implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         return ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "factory_jei");

@@ -101,6 +101,10 @@ public final class PassiveIoJeiIngredients {
             return stack.isEmpty() ? null
                     : new JeiTarget(stack, machineIconArea(layout, hit, scroll));
         }
+        // FE 快捷按钮与三枚 chip 不参与 R/U；只有规则行/磁贴本体给查询目标。
+        if (hit.kind() != PassiveIoLayout.Kind.RULE) {
+            return null;
+        }
         RuleRow rule = block.rules().get(hit.rule());
         AEKey key = rule.key();
         if (AeKeyAdapter.isEnergy(key)) {
