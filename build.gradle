@@ -167,8 +167,10 @@ dependencies {
     // 不要手动往 run/mods 放 jar。
     localRuntime("maven.modrinth:justenoughcharacters:${jecharacters_version}")
     localRuntime("maven.modrinth:mouse-tweaks:${mousetweaks_version}")
-    localRuntime("maven.modrinth:extended-ae:${extendedae_version}")
-    localRuntime("maven.modrinth:extendedae-plus:${extendedae_plus_version}")
+    // ExtendedAE / ExtendedAE-Plus 暂不启用：Plus 要求 JEI >= 19.64，且 ExtendedAE 还要求
+    // ae2wtlib_api；等 JEI 升级那一步再一起加回。
+    // localRuntime("maven.modrinth:extended-ae:${extendedae_version}")
+    // localRuntime("maven.modrinth:extendedae-plus:${extendedae_plus_version}")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
