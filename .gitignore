@@ -48,5 +48,9 @@ repo/
 # Archify Skill 的产物目录：候选 JSON、HTML 成品与校验回执，都不进版本库
 .archify/
 
+### Python ###
+__pycache__/
+*.pyc
+
 ### Internal docs (kept local, not published) ###
 docs/
