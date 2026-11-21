@@ -43,11 +43,10 @@ public final class PassiveIoJeiIngredients {
     /**
      * 一个 JEI 查询目标。
      *
-     * @param energy 是否 FE 目标（JEI 用独立配料，不能落到红石粉）
-     * @param stack  图标物品（流体用桶、FE 用红石）
-     * @param area   图标区域
+     * @param stack 图标物品（流体用桶）
+     * @param area  图标区域
      */
-    public record JeiTarget(boolean energy, ItemStack stack, Rect2i area) {
+    public record JeiTarget(ItemStack stack, Rect2i area) {
     }
 
     /**
@@ -100,12 +99,15 @@ public final class PassiveIoJeiIngredients {
         if (hit.kind() == PassiveIoLayout.Kind.MACHINE) {
             ItemStack stack = UiText.blockStack(block.machine().blockId());
             return stack.isEmpty() ? null
-                    : new JeiTarget(false, stack, machineIconArea(layout, hit, scroll));
+                    : new JeiTarget(stack, machineIconArea(layout, hit, scroll));
         }
         RuleRow rule = block.rules().get(hit.rule());
         AEKey key = rule.key();
-        return new JeiTarget(AeKeyAdapter.isEnergy(key), UiText.icon(key),
-                ruleIconArea(layout, hit, scroll));
+        if (AeKeyAdapter.isEnergy(key)) {
+            // FE 没有 JEI 配料：不提供查询目标，避免落到红石粉。
+            return null;
+        }
+        return new JeiTarget(UiText.icon(key), ruleIconArea(layout, hit, scroll));
     }
 
     private static Rect2i machineIconArea(PassiveIoLayout layout, Hit hit, int scroll) {

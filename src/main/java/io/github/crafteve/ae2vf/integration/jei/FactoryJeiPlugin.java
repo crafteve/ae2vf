@@ -14,7 +14,6 @@ import appeng.api.stacks.GenericStack;
 import io.github.crafteve.ae2vf.VoidFactory;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoJeiIngredients;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoScreen;
-import io.github.crafteve.ae2vf.key.AeKeyAdapter;
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
@@ -23,14 +22,11 @@ import mezz.jei.api.gui.handlers.IGlobalGuiHandler;
 import mezz.jei.api.gui.handlers.IGuiContainerHandler;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
-import mezz.jei.api.registration.IModIngredientRegistration;
-import mezz.jei.api.registration.IRecipeRegistration;
 import mezz.jei.api.runtime.IClickableIngredient;
 import mezz.jei.api.runtime.IJeiRuntime;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -43,9 +39,8 @@ import net.neoforged.neoforge.fluids.FluidStack;
  * 配方/用途页；被动 IO 终端另外注册 {@link IGhostIngredientHandler}，把 JEI 里的物品 / 流体
  * 拖到虚线新增行上就新建一条输入规则。</p>
  *
- * <p>FE 没有物品形态，不能映射成红石粉：这里注册一个独立的 {@link FeIngredient} 配料，
- * 并给它一条信息页。这样仓库 / IO 列里的 FE 在 JEI 里仍然是 FE，R/U 不会跳到红石粉配方，
- * 收藏也保存 FE 图标。</p>
+ * <p>FE 不注册 JEI 配料：它走 AE2 的通用包裹堆栈（{@code GenericStack}），
+ * 拖拽与查询都按包裹里的真实资源处理，不再需要 FE 假身份。</p>
  */
 @JeiPlugin
 public final class FactoryJeiPlugin implements IModPlugin {
@@ -55,22 +50,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
     @Override
     public ResourceLocation getPluginUid() {
         return ResourceLocation.fromNamespaceAndPath(VoidFactory.MODID, "factory_jei");
-    }
-
-    @Override
-    public void registerIngredients(IModIngredientRegistration registration) {
-        // allIngredients 给空表：FE 只在工厂界面里按需出现，不往 JEI 全局物品列表塞伪物品。
-        registration.register(FeIngredient.TYPE, List.of(), new FeIngredientHelper(),
-                new FeIngredientRenderer(), FeIngredient.CODEC);
-    }
-
-    @Override
-    public void registerRecipes(IRecipeRegistration registration) {
-        // R/U 没有真实配方可查；给 FE 一条信息页，至少让查询落在 FE 上而不是红石粉。
-        registration.addIngredientInfo(FeIngredient.INSTANCE, FeIngredient.TYPE,
-                Component.translatable("jei.ae2vf.fe.info.1"),
-                Component.translatable("jei.ae2vf.fe.info.2"),
-                Component.translatable("jei.ae2vf.fe.info.3"));
     }
 
     @Override
@@ -102,12 +81,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
         PassiveIoJeiIngredients.JeiTarget target = screen.jeiTargetAt(mouseX, mouseY);
         if (target == null || runtime == null) {
             return Optional.empty();
-        }
-        if (target.energy()) {
-            return runtime.getIngredientManager()
-                    .createClickableIngredient(FeIngredient.TYPE, FeIngredient.INSTANCE,
-                            target.area(), false)
-                    .map(ingredient -> (IClickableIngredient<?>) ingredient);
         }
         if (target.stack().isEmpty()) {
             return Optional.empty();
@@ -144,8 +117,8 @@ public final class FactoryJeiPlugin implements IModPlugin {
     /**
      * 把 JEI 拖过来的配料转成 AE2 的资源 key。
      *
-     * <p>FE 不参与拖拽：草稿 12 定的是「FE 由绑定链路决定，不走拖入」，所以这里只接收物品与
-     * 流体；其它配料返回 {@code null}，拖拽目标为空，JEI 不会显示可放置区域。</p>
+     * <p>只接收物品与流体；FE 走 AE2 的通用包裹，会以物品形态到达，由
+     * {@link #keyOfItem} 拆开。其它配料返回 {@code null}，拖拽目标为空。</p>
      *
      * @param ingredient JEI 配料
      * @return 资源 key；不支持时为 {@code null}
@@ -157,10 +130,6 @@ public final class FactoryJeiPlugin implements IModPlugin {
         }
         if (ingredient instanceof FluidStack fluid && !fluid.isEmpty()) {
             return AEFluidKey.of(fluid);
-        }
-        if (ingredient instanceof FeIngredient) {
-            // FE 是独立配料：拖它就是要一条 FE 规则；没装 Applied Flux 时没有 FE 这类资源。
-            return AeKeyAdapter.energy();
         }
         return null;
     }
