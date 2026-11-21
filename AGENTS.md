@@ -12,6 +12,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。�
 
 - 服务端权威：IO 全在服务端；GUI 只是监视器，只渲染 + 发意图；menu 是登录壳。
 - 工厂不是数据库：仓库只支持 AE2 网络（`MEStorage`）；仓库离线 = 没料，不是断网。
+- 仓库账户：每个玩家一个账户，工厂 id 由拥有者派生；组队共享是计划中的能力，当前未实现。
 - 被动 IO：玩家给机器配输入输出规则，每 tick 搬运。主动合成：AE2 pattern / CPU 下单，已实现——节点带虚拟样板供应器，把样板广告给 CPU、接住派单推输入并回收产物；被动模式只做被动搬运，主动模式在被动搬运之外参与合成，写入第一张样板时自动转主动。
 - 基础概念：节点（1..N 台机器，带自己的 IO 规则）；**没有产线对象**，分组只是 UI 视图；失联是运行时状态，不写档。
 - **机器 = 一个方块**。多方块已删除：一台机器不再占多个方块，节点靠成员机器列表承担「1 台 / 多台」的区别。
@@ -20,6 +21,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。�
 - IO 规则分精确 / 模糊：模糊忽略物品组件，旧规则默认按模糊读入。
 - 观测层是第二事实层：方块在不在、是什么方块 / 方块实体、是否在干活；不存能力面。界面只读观测。
 - **写操作只有一条路**：节点 / 规则 / 绑定杖的写入全部走 `command` 包（世界命令用 `containerId = -1`），门禁、执行、落盘、回执各管一段；没有并行的 Service 写入口。
+- 三条边界：不推断配方（配方由玩家写样板或填 IO 规则提供）；机器之间不直连，所有交换经过仓库；能量进出仓库 1:1 无损。
 - 无方块。入口只有两个终端物品右键：被动 IO 管理终端、节点管理终端；**没有聊天指令入口**（`/idf` 已整体删除）。
 
 ### 1.3 技术栈
@@ -29,7 +31,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属式的大型工厂 IO 管理模组。�
 | MC / NeoForge | 1.21.1 / 21.1.264 |
 | Java / Gradle / ModDevGradle | 21 / 9.2.1 / 2.0.148 |
 | Parchment | 2024.11.17 |
-| modid / 版本 / 分支 | `ae2vf` / 0.1.0-beta / `view-client-refactor-20261120`（视图表与客户端重构；从快进后的 `1.21.1neoforge` 切出） |
+| modid / 版本 / 分支 | `ae2vf` / 0.1.0-beta / `1.21.1neoforge`（主分支） |
 | AE2 | 19.2.10，`implementation`，硬依赖 |
 | JEI | 19.21.1.304，`compileOnly + runtimeOnly`，可选 |
 | Mekanism | 10.7.19.85，仅 `localRuntime`，本地测试用 |
@@ -203,7 +205,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 5.1 先计划后执行
 
-1. 调查代码与 ADR。
+1. 调查代码与既有文档。
 2. 写计划：改哪些文件、为什么、依赖方向、验证方式、风险。
 3. 等确认。没确认不动手。
 4. 执行，对照计划逐项自查。
@@ -239,7 +241,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 - 描述用中文，可夹英文术语。
 - 不提交 `run/`、`build/`、`.tmp/`、`.gradle/`、`.idea/`。
 - `.tmp/` 是 Agent 的临时工作目录（审查报告、校验脚本、diff 落盘）。它已被 git 忽略，**禁止 Agent 私自删除**；确需清理必须先征得用户同意，且只删自己本轮新建的文件，不得整目录清空。
-- 当前分支 `1.21.1neoforge`；`view-client-refactor-20261120` 为视图表与客户端重构分支，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
+- 主分支始终是 `1.21.1neoforge`；`view-client-refactor-20261120` 等为历史分支，旧 UI 线归档在 `archive/ui-v3-20261110` 与 `archive/m3-canvas`，只读。
 
 ### 5.5 草稿纸（讨论文档）
 
@@ -259,7 +261,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 5. 不要求用户阅读或维护；不要用草稿纸代替对话里的提问和确认。用户明确确认的才写“已确认”，推测写“待定”。
 6. 讨论中可随时改；每次只补关键变化，能一页写完就不写两页。
 7. 需要进入实现时，仍按 5.1 单独写计划并等确认；草稿纸不能替代计划。
-8. 结论确认后，把可执行的设计约束同步到 `docs/DECISIONS.md`（ADR）；草稿保留作背景，不删除，后续以 ADR 为准。
+8. 结论确认后，把可执行的设计约束写进本文件；草稿保留作背景，不删除。
 9. 草稿纸不参与构建、不参与协议版本，也不要求所有条目最终都实现；被否决的方案也留在“待定”里，避免重复讨论。
 
 ### 5.6 本文件的修改
@@ -282,7 +284,7 @@ Java 惯例：类 PascalCase、方法/字段 camelCase、常量 UPPER_SNAKE、�
 
 ### 6.1 关键文件
 
-`build.gradle` · `gradle.properties` · `docs/DECISIONS.md` · `CHANGELOG.md` · `VoidFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `IoRuleSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
+`build.gradle` · `gradle.properties` · `CHANGELOG.md` · `VoidFactoryServer.java` · `FactoryLifecycle.java` · `FactoryRunner.java` · `FactoryStore.java` · `Factory.java` · `FactoryLibrary.java` · `Node.java` · `NodeLibrary.java` · `NodeIo.java` · `NodeIoRules.java` · `NodeCraft.java` · `NodeCodec.java` · `NodeDispatchQueue.java` · `NodeDispatchOrder.java` · `Machine.java` · `MachineHealth.java` · `CommandController.java` · `CommandGate.java` · `CommandApply.java` · `CommandTopology.java` · `CommandWand.java` · `CommandPort.java` · `FactoryCommand.java` · `CommandReason.java` · `LiveNode.java` · `LiveNodeLibrary.java` · `LiveNodeApply.java` · `LiveNodeRunner.java` · `LiveNodeCraft.java` · `ObservationTable.java` · `ObservationRunner.java` · `ObservationReader.java` · `ObservationChange.java` · `BlockOccupancyTable.java` · `IoRunner.java` · `IoForm.java` · `IoKey.java` · `IoReason.java` · `IoResult.java` · `ActivePlanner.java` · `PassivePlanner.java` · `IoExecutor.java` · `FacePick.java` · `CapacityPick.java` · `VariantPick.java` · `PortExecutor.java` · `IoAnalyzer.java` · `IoJob.java` · `DispatchState.java` · `IoFormBuilder.java` · `IoRuleSpec.java` · `MatchMode.java` · `AeKeyAdapter.java` · `AppFluxKeys.java` · `MeStorageResolver.java` · `ViewTable.java` · `ViewTableBuilder.java` · `ViewPort.java`（服务端视图出口） · `AeKeyCodec.java` · `ObservationNoticeListener.java` · `client/screen/terminal/TerminalModel.java` · `TerminalSource.java` · `TerminalChrome.java` · `client/screen/terminal/node/NodeScreen.java` · `client/screen/terminal/passiveio/PassiveIoScreen.java` · `client/world/BlockHighlightRenderer.java` · `client/wand/WandSubmitter.java` · `TerminalSortMode.java`（档位与循环顺序，menu 包） · `tools/gui/gen_textures.py`
 
 ### 6.2 坑
 
