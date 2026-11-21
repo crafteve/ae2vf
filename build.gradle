@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.148'
     id 'idea'
+    id 'com.modrinth.minotaur' version '2.10.0'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -249,6 +250,134 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// ---------------------------------------------------------------------------
+// 发布到 CurseForge 与 Modrinth
+//
+// 凭据一律走环境变量，项目 id 走 -P 参数（id 不是密钥，但仓库里不写死，
+// 方便以后换项目）。缺凭据时 CurseForge 任务只是 SKIPPED，Modrinth 任务
+// 只在真正调用时才校验，两者的存在都不影响 ./gradlew build。
+// ---------------------------------------------------------------------------
+
+def releaseChannel = providers.gradleProperty('release_channel').orElse('beta').get()
+def modrinthProjectId = providers.gradleProperty('modrinth_project_id').orNull
+def curseforgeProjectId = providers.gradleProperty('curseforge_project_id').orNull
+def modrinthToken = System.getenv('MODRINTH_TOKEN')
+def curseforgeToken = System.getenv('CURSEFORGE_TOKEN')
+
+// 发布说明取 CHANGELOG.md 里当前版本标题下的条目，避免手抄两份。
+def versionChangelog = {
+    def changelog = rootProject.file('CHANGELOG.md')
+    def fallback = '本次更新见仓库 CHANGELOG.md。'
+    if (!changelog.exists()) {
+        return fallback
+    }
+    def lines = changelog.readLines('UTF-8')
+    def start = lines.findIndexOf { it.trim() == "# ${mod_version}" }
+    if (start < 0) {
+        return fallback
+    }
+    def body = []
+    for (int i = start + 1; i < lines.size(); i++) {
+        if (lines[i].startsWith('# ')) {
+            break
+        }
+        body << lines[i]
+    }
+    def text = body.join('\n').trim()
+    return text.isEmpty() ? fallback : text
+}
+
+// Minotaur 在任务执行期读取 project，开启配置缓存时 Gradle 会直接报错；
+// 显式标记后 Gradle 只为这条命令回退到「不缓存」，不影响其他任务。
+tasks.named('modrinth') {
+    notCompatibleWithConfigurationCache('Minotaur 在任务执行期访问 project，与配置缓存不兼容。')
+}
+
+modrinth {
+    // token 缺失时任务会在执行阶段报错，不会影响普通构建。
+    token = modrinthToken
+    projectId = modrinthProjectId ?: ''
+    versionNumber = mod_version
+    versionName = "${mod_name} ${mod_version}"
+    versionType = releaseChannel
+    // -Pmodrinth_debug=true 只打印将要上传的内容，不真正发请求，方便本地核对。
+    debugMode = providers.gradleProperty('modrinth_debug').map { it.toBoolean() }.getOrElse(false)
+    uploadFile = tasks.jar
+    gameVersions = [minecraft_version]
+    loaders = ['neoforge']
+    changelog = versionChangelog()
+    dependencies {
+        required.project 'ae2'
+        optional.project 'appflux'
+        optional.project 'jei'
+    }
+}
+
+// CurseForge 官方插件（net.darkhax.curseforgegradle 1.3.x）要求 JVM 25，
+// 而本项目必须用 Java 21 构建，因此这里直接用 JDK 自带的 HttpClient 调
+// legacy upload API，不引入额外依赖，也不受 Gradle 大版本影响。
+tasks.register('publishCurseForge') {
+    group = 'publishing'
+    description = '上传 build/libs 里的 jar 到 CurseForge；需要 CURSEFORGE_TOKEN 与 -Pcurseforge_project_id。'
+    dependsOn tasks.named('jar')
+    notCompatibleWithConfigurationCache('上传任务里有 HTTP 调用与临时文件拼装，不做配置缓存。')
+    doLast {
+        def token = System.getenv('CURSEFORGE_TOKEN')
+        if (!token) {
+            throw new GradleException('缺少环境变量 CURSEFORGE_TOKEN。')
+        }
+        if (!curseforgeProjectId) {
+            throw new GradleException('缺少项目 id：用 -Pcurseforge_project_id=<数字 id> 传入。')
+        }
+
+        def jarFile = tasks.jar.archiveFile.get().asFile
+        def metadata = groovy.json.JsonOutput.toJson([
+                changelog    : versionChangelog(),
+                changelogType: 'markdown',
+                displayName  : "${mod_name} ${mod_version}",
+                releaseType  : releaseChannel,
+                gameVersions : [minecraft_version],
+                modLoaders   : ['neoforge'],
+                // relations 用 CurseForge 的项目 slug（和项目页地址一致），不是 Modrinth 的短 slug：
+                // AE2 在 CF 叫 applied-energistics-2、Applied Flux 叫 applied-flux，写成 ae2 / appflux 会解析失败。
+                relations    : [
+                        projects: [
+                                [slug: 'applied-energistics-2', type: 'requiredDependency'],
+                                [slug: 'applied-flux', type: 'optionalDependency'],
+                                [slug: 'jei', type: 'optionalDependency'],
+                        ],
+                ],
+        ])
+
+        def boundary = '----ae2vf' + UUID.randomUUID().toString().replace('-', '')
+        def body = new ByteArrayOutputStream()
+        body.write(("--${boundary}\r\n" +
+                "Content-Disposition: form-data; name=\"metadata\"\r\n\r\n" +
+                metadata + "\r\n").getBytes('UTF-8'))
+        body.write(("--${boundary}\r\n" +
+                "Content-Disposition: form-data; name=\"file\"; filename=\"${jarFile.name}\"\r\n" +
+                "Content-Type: application/java-archive\r\n\r\n").getBytes('UTF-8'))
+        body.write(jarFile.bytes)
+        body.write(("\r\n--${boundary}--\r\n").getBytes('UTF-8'))
+
+        def request = java.net.http.HttpRequest.newBuilder()
+                .uri(URI.create("https://minecraft.curseforge.com/api/projects/${curseforgeProjectId}/upload"))
+                .header('X-Api-Token', token)
+                .header('Content-Type', "multipart/form-data; boundary=${boundary}")
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+                .build()
+
+        def response = java.net.http.HttpClient.newBuilder().build()
+                .send(request, java.net.http.HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() != 200) {
+            def location = response.headers().firstValue('location').orElse('')
+            def hint = response.statusCode() == 302 ? '（302 一般是项目 id 或 token 不对，也可能是项目还没审核通过）' : ''
+            throw new GradleException("CurseForge 上传失败：HTTP ${response.statusCode()} ${location}${hint}\n${response.body()}")
+        }
+        logger.lifecycle("CurseForge 上传成功：${response.body()}")
+    }
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
