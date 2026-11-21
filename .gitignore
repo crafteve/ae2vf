@@ -53,4 +53,8 @@ __pycache__/
 *.pyc
 
 ### Internal docs (kept local, not published) ###
-docs/
+# 只忽略 docs 下的内容，保留 docs/publish（项目页文案与截图要能被 raw 链接引用）
+docs/*
+!docs/publish/
+# 项目页素材的原始整屏截图（体积大，只保留切好的成品）
+docs/publish/screenshots/raw/
