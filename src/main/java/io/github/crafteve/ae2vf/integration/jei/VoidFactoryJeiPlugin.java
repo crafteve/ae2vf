@@ -2,7 +2,6 @@ package io.github.crafteve.ae2vf.integration.jei;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -17,13 +16,9 @@ import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoScreen
 
 import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
-import mezz.jei.api.gui.builder.IClickableIngredientFactory;
 import mezz.jei.api.gui.handlers.IGhostIngredientHandler;
-import mezz.jei.api.gui.handlers.IGlobalGuiHandler;
-import mezz.jei.api.gui.handlers.IGuiContainerHandler;
 import mezz.jei.api.ingredients.ITypedIngredient;
 import mezz.jei.api.registration.IGuiHandlerRegistration;
-import mezz.jei.api.runtime.IClickableIngredient;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.Rect2i;
@@ -32,11 +27,13 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 /**
- * JEI 的 R/U 查询与拖拽入口。
+ * JEI 的拖拽入口。
  *
- * <p>被动 IO 终端里的机器、输入输出都不是原版 Slot，JEI 看不到这些物品。这里把可点击的
- * {@link IClickableIngredient} 交给 JEI，让 R/U 和悬停提示都走 JEI 自己的配方/用途页；
- * 另外注册 {@link IGhostIngredientHandler}，把 JEI 里的物品 / 流体拖到机器大卡片上新建规则。</p>
+ * <p>被动 IO 终端里的机器卡片不是原版槽位，JEI 看不到；这里注册
+ * {@link IGhostIngredientHandler}，把 JEI 里的物品 / 流体拖到机器大卡片上新建规则。</p>
+ *
+ * <p>卡片不提供 R/U：机器行与规则行没有对应的原版槽位，JEI 的查询只覆盖玩家背包与
+ * 机器容器，避免在非槽位区域伪造可点击配料。</p>
  *
  * <p>FE 不注册 JEI 配料：它走 AE2 的通用包裹堆栈（{@code GenericStack}），拖拽与查询都按
  * 包裹里的真实资源处理，不再需要 FE 假身份。</p>
@@ -50,54 +47,9 @@ public final class VoidFactoryJeiPlugin implements IModPlugin {
 
     @Override
     public void registerGuiHandlers(IGuiHandlerRegistration registration) {
-        registration.addGuiContainerHandler(PassiveIoScreen.class,
-                new PassiveIoGuiHandler());
         registration.addGhostIngredientHandler(PassiveIoScreen.class,
                 new PassiveIoGhostHandler());
-        // 兜底：部分区域被 JEI 当成普通容器处理时，全局 handler 仍然能给出目标。
-        registration.addGlobalGuiHandler(new FactoryGlobalGuiHandler());
     }
-
-    // ------------------------------------------------------------------
-    // R / U 查询
-    // ------------------------------------------------------------------
-
-    private static Optional<IClickableIngredient<?>> clickableAt(
-            IClickableIngredientFactory factory, PassiveIoScreen screen,
-            double mouseX, double mouseY) {
-        PassiveIoJeiIngredients.JeiTarget target = screen.jeiTargetAt(mouseX, mouseY);
-        if (target == null || target.stack().isEmpty()) {
-            return Optional.empty();
-        }
-        return factory.createBuilder(target.stack().copyWithCount(1))
-                .buildWithArea(target.area())
-                .map(ingredient -> (IClickableIngredient<?>) ingredient);
-    }
-
-    private static final class PassiveIoGuiHandler
-            implements IGuiContainerHandler<PassiveIoScreen> {
-        @Override
-        public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
-                IClickableIngredientFactory factory, PassiveIoScreen screen,
-                double mouseX, double mouseY) {
-            return clickableAt(factory, screen, mouseX, mouseY);
-        }
-    }
-
-    private static final class FactoryGlobalGuiHandler implements IGlobalGuiHandler {
-        @Override
-        public Optional<IClickableIngredient<?>> getClickableIngredientUnderMouse(
-                IClickableIngredientFactory factory, double mouseX, double mouseY) {
-            if (Minecraft.getInstance().screen instanceof PassiveIoScreen screen) {
-                return clickableAt(factory, screen, mouseX, mouseY);
-            }
-            return Optional.empty();
-        }
-    }
-
-    // ------------------------------------------------------------------
-    // JEI → 新建规则
-    // ------------------------------------------------------------------
 
     /**
      * 把 JEI 拖过来的配料转成 AE2 的资源 key。

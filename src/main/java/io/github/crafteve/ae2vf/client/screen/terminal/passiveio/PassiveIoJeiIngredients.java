@@ -3,28 +3,16 @@ package io.github.crafteve.ae2vf.client.screen.terminal.passiveio;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.jetbrains.annotations.Nullable;
-
-import appeng.api.stacks.AEKey;
-
-import io.github.crafteve.ae2vf.client.screen.UiText;
-import io.github.crafteve.ae2vf.client.screen.text.TerminalText;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.BlockBox;
-import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
-import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoModel.BlockView;
-import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoModel.RuleRow;
-import io.github.crafteve.ae2vf.key.AeKeyAdapter;
-import io.github.crafteve.ae2vf.menu.PassiveIoViewMode;
 
 import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.world.item.ItemStack;
 
 /**
- * 被动 IO 内容区的 JEI 目标：R/U 查询区域与拖拽新建区域。
+ * 被动 IO 内容区的 JEI 拖拽目标。
  *
- * <p>两类目标都从同一份排版算出来：拖拽目标是整张机器大卡片（含机器行），查询目标是
- * 机器图标与规则图标。几何不在插件里重算，插件只负责把目标交给 JEI。</p>
+ * <p>卡片不提供 R/U：机器行与规则行不是原版槽位，查询只覆盖玩家背包与机器容器，
+ * 由 JEI 自己的槽位扫描负责。这里只把整张机器大卡片算成拖入区。</p>
  */
 public final class PassiveIoJeiIngredients {
     private PassiveIoJeiIngredients() {
@@ -38,15 +26,6 @@ public final class PassiveIoJeiIngredients {
      * @param area  机器大卡片的屏幕区域（已按视口裁剪）
      */
     public record AddTarget(int block, Rect2i area) {
-    }
-
-    /**
-     * 一个 JEI 查询目标。
-     *
-     * @param stack 图标物品（流体用桶）
-     * @param area  图标区域
-     */
-    public record JeiTarget(ItemStack stack, Rect2i area) {
     }
 
     /**
@@ -76,64 +55,5 @@ public final class PassiveIoJeiIngredients {
             targets.add(new AddTarget(box.index(), new Rect2i(left, top, width, bottom - top)));
         }
         return targets;
-    }
-
-    /**
-     * 鼠标下的查询目标。
-     *
-     * @param layout 当前排版
-     * @param blocks 模型块
-     * @param scroll 当前滚动
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 目标；没有物品时为 {@code null}
-     */
-    @Nullable
-    static JeiTarget targetAt(PassiveIoLayout layout, List<BlockView> blocks, int scroll,
-            double mouseX, double mouseY) {
-        Hit hit = layout.hit(mouseX, mouseY, scroll);
-        if (hit == null || hit.kind() == PassiveIoLayout.Kind.ADD) {
-            return null;
-        }
-        BlockView block = blocks.get(hit.block());
-        if (hit.kind() == PassiveIoLayout.Kind.MACHINE) {
-            ItemStack stack = UiText.blockStack(block.machine().blockId());
-            return stack.isEmpty() ? null
-                    : new JeiTarget(stack, machineIconArea(layout, hit, scroll));
-        }
-        // FE 快捷按钮与三枚 chip 不参与 R/U；只有规则行/磁贴本体给查询目标。
-        if (hit.kind() != PassiveIoLayout.Kind.RULE) {
-            return null;
-        }
-        RuleRow rule = block.rules().get(hit.rule());
-        AEKey key = rule.key();
-        if (AeKeyAdapter.isEnergy(key)) {
-            // FE 没有 JEI 配料：不提供查询目标，避免落到红石粉。
-            return null;
-        }
-        return new JeiTarget(UiText.icon(key), ruleIconArea(layout, hit, scroll));
-    }
-
-    private static Rect2i machineIconArea(PassiveIoLayout layout, Hit hit, int scroll) {
-        Viewport viewport = layout.viewport();
-        BlockBox box = layout.boxes().get(hit.block());
-        int x = PassiveIoLayout.headerX(viewport);
-        int y = PassiveIoLayout.screenY(viewport, box.top(), scroll) + 1;
-        return new Rect2i(x, y, PassiveIoLayout.SLOT, PassiveIoLayout.SLOT);
-    }
-
-    private static Rect2i ruleIconArea(PassiveIoLayout layout, Hit hit, int scroll) {
-        Viewport viewport = layout.viewport();
-        BlockBox box = layout.boxes().get(hit.block());
-        if (layout.view() == PassiveIoViewMode.LIST) {
-            int y = PassiveIoLayout.rowY(viewport, box, hit.rule(), scroll)
-                    + (PassiveIoLayout.ROW_H - PassiveIoLayout.RULE_ICON) / 2;
-            return new Rect2i(PassiveIoLayout.slotX(viewport), y,
-                    PassiveIoLayout.RULE_ICON, PassiveIoLayout.RULE_ICON);
-        }
-        int x = PassiveIoLayout.tileX(viewport, hit.rule() % 2)
-                + PassiveIoLayout.TILE_INSET;
-        int y = PassiveIoLayout.tileRowY(viewport, box, hit.rule() / 2, scroll) + 2;
-        return new Rect2i(x, y, PassiveIoLayout.SLOT, PassiveIoLayout.SLOT);
     }
 }

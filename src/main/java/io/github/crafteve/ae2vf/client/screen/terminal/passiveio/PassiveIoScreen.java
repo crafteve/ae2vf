@@ -35,7 +35,6 @@ import io.github.crafteve.ae2vf.client.screen.sort.SortModeButton;
 import io.github.crafteve.ae2vf.client.wand.WandLinkCache;
 import io.github.crafteve.ae2vf.client.screen.FeedbackSink;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoJeiIngredients.AddTarget;
-import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoJeiIngredients.JeiTarget;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.Hit;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.Kind;
 import io.github.crafteve.ae2vf.client.screen.terminal.passiveio.PassiveIoLayout.Viewport;
@@ -576,22 +575,6 @@ public final class PassiveIoScreen extends AEBaseScreen<PassiveIoTerminalMenu>
             return;
         }
         PassiveIoActions.add(this.menu.containerId, this.model.blocks().get(block), key);
-    }
-
-    /**
-     * 鼠标下的 JEI 查询目标（R / U）。
-     *
-     * @param mouseX 屏幕 x
-     * @param mouseY 屏幕 y
-     * @return 目标；没有物品时为 {@code null}
-     */
-    @Nullable
-    public JeiTarget jeiTargetAt(double mouseX, double mouseY) {
-        if (this.layout == null) {
-            return null;
-        }
-        return PassiveIoJeiIngredients.targetAt(this.layout, this.model.blocks(), scroll(),
-                mouseX, mouseY);
     }
 
     /**

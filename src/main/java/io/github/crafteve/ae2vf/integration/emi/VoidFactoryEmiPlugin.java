@@ -38,7 +38,7 @@ import net.minecraft.world.level.material.Fluid;
  * 所以可以直接引用 EMI 的类。</p>
  */
 @EmiEntrypoint
-public final class FactoryEmiPlugin implements EmiPlugin {
+public final class VoidFactoryEmiPlugin implements EmiPlugin {
     @Override
     public void register(EmiRegistry registry) {
         registry.addDragDropHandler(PassiveIoScreen.class, new PassiveIoDragDrop());
