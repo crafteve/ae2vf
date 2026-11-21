@@ -1,4 +1,5 @@
 # 0.1.0-beta
+[2026-11-21 14:20] JEI 的 R/U 迁移到 IClickableIngredientFactory 新 API，移除弃用重载
 [2026-11-21 14:13] 升级 AE2 至 19.2.20、JEI 至 19.71.0.475，测试环境加回 ExtendedAE 系列与 AE2WTLib
 [2026-11-21 14:03] 加入四个数据层 GameTest（节点编解码、节点库、倍率、IO 规则），16 例全过
 [2026-11-21 13:40] 拼音模组改用 Modrinth 版本 id 解析，避免 maven 按版本号拿到 Fabric 包
