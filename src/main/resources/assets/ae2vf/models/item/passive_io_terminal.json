@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "ae2vf:item/factory_terminal"
+    "layer0": "ae2vf:item/passive_io_terminal"
   }
 }

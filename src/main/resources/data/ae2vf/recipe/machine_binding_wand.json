@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " N ",
+    " I ",
+    " Q "
+  ],
+  "key": {
+    "N": { "item": "ae2:network_tool" },
+    "I": { "item": "minecraft:iron_ingot" },
+    "Q": { "item": "ae2:certus_quartz_crystal" }
+  },
+  "result": { "id": "ae2vf:machine_binding_wand", "count": 1 }
+}

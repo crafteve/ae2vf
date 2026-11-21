@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "IQI",
+    "PTP",
+    "III"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "Q": { "item": "ae2:certus_quartz_crystal" },
+    "P": { "item": "ae2:logic_processor" },
+    "T": { "item": "ae2:terminal" }
+  },
+  "result": { "id": "ae2vf:node_terminal", "count": 1 }
+}
