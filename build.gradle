@@ -162,6 +162,14 @@ dependencies {
         localRuntime("maven.modrinth:glodium:${glodium_version}")
     }
 
+    // 测试环境专用：只进 localRuntime，不参与编译、不发布。
+    // 放这里后 runClient 由 ModDevGradle 注入，重建 run/ 也不会丢；
+    // 不要手动往 run/mods 放 jar。
+    localRuntime("maven.modrinth:justenoughcharacters:${jecharacters_version}")
+    localRuntime("maven.modrinth:mouse-tweaks:${mousetweaks_version}")
+    localRuntime("maven.modrinth:extended-ae:${extendedae_version}")
+    localRuntime("maven.modrinth:extendedae-plus:${extendedae_plus_version}")
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"

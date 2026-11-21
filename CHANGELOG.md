@@ -1,4 +1,5 @@
 # 0.1.0-beta
+[2026-11-21 12:42] 测试环境加入 JustEnoughCharacters、MouseTweaks、Extended AE、ExtendedAE-Plus（仅 localRuntime）
 [2026-11-21 12:14] 移除 ADR：DECISIONS.md 归档到 docs/archive/，现行约束统一到 AGENTS.md
 [2026-11-21 11:54] CHANGELOG 改为按版本分块，删除「更新日志」总标题
 [2026-11-21 11:45] 新增 CHANGELOG.md，并在 AGENTS.md §5.7 记录更新日志的写法
