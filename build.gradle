@@ -39,6 +39,7 @@ repositories {
         url = uri("https://maven.blamejared.com")
         content {
             includeGroup("mezz.jei")
+            includeGroup("net.mezzdev.config")
         }
     }
     maven {
@@ -46,6 +47,13 @@ repositories {
         url = uri("https://api.modrinth.com/maven")
         content {
             includeGroup("maven.modrinth")
+        }
+    }
+    maven {
+        name = "NeoForged"
+        url = uri("https://maven.neoforged.net/releases")
+        content {
+            includeGroup("org.appliedenergistics")
         }
     }
 }
@@ -141,8 +149,9 @@ configurations {
 }
 
 dependencies {
-    // Applied Energistics 2（1.21.1 线）
-    implementation("org.appliedenergistics:appliedenergistics2:${ae2_version}")
+    // Applied Energistics 2（1.21.1 线）。Modmaven 的 19.2.20 目录还是空的，
+    // 改从 Modrinth 的 maven 取同版本 jar。
+    implementation("maven.modrinth:ae2:${ae2_version}")
 
     // JEI：可选依赖，编译期 + 开发运行期
     compileOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
@@ -168,10 +177,14 @@ dependencies {
     // 不要手动往 run/mods 放 jar。
     localRuntime("maven.modrinth:justenoughcharacters:${jecharacters_version}")
     localRuntime("maven.modrinth:mouse-tweaks:${mousetweaks_version}")
-    // ExtendedAE / ExtendedAE-Plus 暂不启用：Plus 要求 JEI >= 19.64，且 ExtendedAE 还要求
-    // ae2wtlib_api；等 JEI 升级那一步再一起加回。
-    // localRuntime("maven.modrinth:extended-ae:${extendedae_version}")
-    // localRuntime("maven.modrinth:extendedae-plus:${extendedae_plus_version}")
+    // AE2 / JEI 的运行时前置：GuideME 与 mezz_config 不在 mod jar 里。
+    localRuntime("org.appliedenergistics:guideme:${guideme_version}")
+    localRuntime("net.mezzdev.config:mezz_config-1.21.1-neoforge:${mezzconfig_version}")
+
+    // AE2WTLib 提供 ExtendedAE 必需的 ae2wtlib_api。
+    localRuntime("maven.modrinth:applied-energistics-2-wireless-terminals:${ae2wtlib_version}")
+    localRuntime("maven.modrinth:extended-ae:${extendedae_version}")
+    localRuntime("maven.modrinth:extendedae-plus:${extendedae_plus_version}")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
