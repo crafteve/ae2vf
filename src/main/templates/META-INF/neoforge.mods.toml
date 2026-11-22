@@ -35,11 +35,13 @@ displayName="${mod_name}" #mandatory
 # A URL for the "homepage" for this mod, displayed in the mod UI
 displayURL="https://github.com/crafteve/ae2vf" #optional
 
-# A file name (in the root of the mod JAR) containing a logo for display
-#logoFile="ae2vf_logo.png" #optional
+# 模组列表详情页顶部的图标：路径相对 jar 根目录，文件名只允许小写字母、数字、_ . - /
+# 源图中心 8% 内缩裁切后缩到 256×256；详情页按 50px 高内接绘制，方形图显示约 50×50。
+logoFile="ae2vf_logo.png" #optional
 
 # A text field displayed in the mod UI
-#credits="" #optional
+# 吉祥物中文名；英文名待定，定了再补双语。
+credits="吉祥物 虚空兽" #optional
 
 # The authors of the mod, displayed in the mod UI (optional)
 authors="crafteve"
