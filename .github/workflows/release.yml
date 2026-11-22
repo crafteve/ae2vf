@@ -1,10 +1,9 @@
 name: Release
 
-# 打 tag（v 开头）时自动构建并发布。
-# 两个平台互相独立：配了哪个的 token 就发哪个，没配的跳过并给出提示。
-# Secrets：MODRINTH_TOKEN、CURSEFORGE_TOKEN（至少配一个）
-# Variables：MODRINTH_PROJECT_ID、CURSEFORGE_PROJECT_ID
-# 也可以把项目 id 写进 gradle.properties，工作流里的 -P 会覆盖它。
+# 推 v 开头的 tag 触发：构建、发 GitHub Release，配了 CURSEFORGE_TOKEN 时再上传到 CurseForge。
+# 没有配任何凭据也能跑通，只是少了 CurseForge 那一步。
+#   Secrets：CURSEFORGE_TOKEN（可选）
+#   Variables：CURSEFORGE_PROJECT_ID（可选，与 token 一起用）
 
 on:
   push:
@@ -16,13 +15,8 @@ permissions:
   contents: write
 
 jobs:
-  publish:
+  release:
     runs-on: ubuntu-latest
-    env:
-      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-      CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-      MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID }}
-      CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,7 +33,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: 校验版本号与 tag 一致
+      - name: 校验 tag 与 mod_version 一致
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           tag="${GITHUB_REF_NAME#v}"
@@ -49,40 +43,31 @@ jobs:
             exit 1
           fi
 
-      - name: 至少配置一个发布平台
-        run: |
-          if [ -z "${MODRINTH_TOKEN}" ] && [ -z "${CURSEFORGE_TOKEN}" ]; then
-            echo "MODRINTH_TOKEN 与 CURSEFORGE_TOKEN 都没配，没有可发布的平台。"
-            exit 1
-          fi
-          # 用 || 而不是 &&：没配 token 时 [ -n ] 返回 1，会连带整个步骤失败
-          [ -z "${CURSEFORGE_TOKEN}" ] || echo "将发布到 CurseForge"
-          [ -z "${MODRINTH_TOKEN}" ] || echo "将发布到 Modrinth"
-
       - name: Build
         run: ./gradlew build --console=plain
 
-      - name: 发布到 CurseForge
-        if: env.CURSEFORGE_TOKEN != ''
-        run: |
-          args=()
-          if [ -n "${CURSEFORGE_PROJECT_ID}" ]; then
-            args+=("-Pcurseforge_project_id=${CURSEFORGE_PROJECT_ID}")
-          fi
-          ./gradlew publishCurseForge "${args[@]}" --console=plain
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ae2vf-jar
+          path: build/libs/*.jar
+          if-no-files-found: error
 
-      - name: 发布到 Modrinth
-        if: env.MODRINTH_TOKEN != ''
-        run: |
-          args=()
-          if [ -n "${MODRINTH_PROJECT_ID}" ]; then
-            args+=("-Pmodrinth_project_id=${MODRINTH_PROJECT_ID}")
-          fi
-          ./gradlew modrinth "${args[@]}" --console=plain
-
-      - name: 附到 GitHub Release
+      - name: 创建 GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: build/libs/*.jar
           generate_release_notes: true
+
+      - name: 上传到 CurseForge
+        if: env.CURSEFORGE_TOKEN != ''
+        env:
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: |
+          if [ -z "${CURSEFORGE_PROJECT_ID}" ]; then
+            echo "有 token 但没有 CURSEFORGE_PROJECT_ID，跳过上传。"
+            exit 0
+          fi
+          ./gradlew publishCurseForge -Pcurseforge_project_id="${CURSEFORGE_PROJECT_ID}" --console=plain

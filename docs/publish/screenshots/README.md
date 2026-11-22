@@ -2,7 +2,7 @@
 
 叙事顺序见 [../description-guide.md](../description-guide.md)：钩子 → 三步上手 → 主动合成 → 被动规则 → 边界。
 
-## 一、CurseForge / Modrinth 的 Gallery（按这个顺序传）
+## 一、CurseForge 的 Gallery（按这个顺序传）
 
 | 序 | 文件 | 说明 | 状态 |
 |---|---|---|---|
