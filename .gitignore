@@ -1,43 +1,108 @@
-### Gradle ###
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/**/build/
+# Editors #
+## Visual Studio Code ##
+### Workspace Folder ###
+.vscode/*
 
-### IntelliJ IDEA ###
-.idea/
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/**/out/
+### Local History ###
+.history/
 
-.run/
-
-### Eclipse ###
-.apt_generated
+## Eclipse ##
+.project
 .classpath
-.eclipse/
+.settings/
+
+## Vim ##
+### Swap ###
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]*.s[a-rt-v][a-z]
+[._]*.ss[a-gi-z]
+[._]sw[a-p]
+
+### Session ###
+Session.vim
+Sessionx.vim
+
+### Temporary Files ###
+.netrwhist
+*~
+
+### Auto-generated Tag Files ###
+tags
+
+### Undo Persistence ###
+[._]*.un~
+
+## Eclipse ##
+### Core ###
+.classpath
 .factorypath
 .project
-.settings
-.springBeans
-.sts4-cache
+.settings/
+
+## IDEA ##
+### Core ###
+.idea/
+
+# Logs #
+*.log*
+
+# Environment #
+## General ##
+*.env*
+
+## JEnv ##
+.java-version
+
+## Gradle ##
+user.properties
+
+# Artifacts #
+## Gradle ##
 bin/
-!**/src/**/bin/
+build/
+.gradle/
 
-### VS Code ###
-.vscode/
-
-### Mac OS ###
-.DS_Store
-
-### Minecraft Modding ###
+# Debugging #
+## Gradle ##
 run/
-!**/src/**/run/
-**/src/generated/**/.cache/
-repo/
-!**/src/**/repo/
+bin/
+out/
+
+# OS-Specific #
+## macOS ##
+*.DS_Store
+
+## Linux ##
+*.sh
+*.zsh
+*.fish
+*.ksh
+
+## Windows ##
+*.bat
+*.cmd
+*.ps1
+*.psm1
+*.psd1
+
+# Scripts #
+## Gradle ##
+!gradlew.bat
+!gradlew
+
+### Local Build Script Addons ###
+addon.local.gradle
+addon.local.gradle.kts
+addon.late.local.gradle
+addon.late.local.gradle.kts
+
+# Misc. #
+*.iml
+*.ipr
+*.iws
+layout.json
+
 # Agent 的临时工作目录：审查报告、校验脚本、diff 落盘都在这里。
 # 不提交；也不许 Agent 私自删除（见 AGENTS.md）。
 .tmp/
