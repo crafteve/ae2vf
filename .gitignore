@@ -39,7 +39,7 @@ run/
 repo/
 !**/src/**/repo/
 # Agent 的临时工作目录：审查报告、校验脚本、diff 落盘都在这里。
-# 不提交；也不许 Agent 私自删除（见 AGENTS.md 5.4）。
+# 不提交；也不许 Agent 私自删除（见 AGENTS.md）。
 .tmp/
 # 临时脚本与文本（.tmp_ 前缀），历史上被别的项目误放进来过
 .tmp_*
@@ -51,10 +51,3 @@ repo/
 ### Python ###
 __pycache__/
 *.pyc
-
-### Internal docs (kept local, not published) ###
-# 只忽略 docs 下的内容，保留 docs/publish（项目页文案与截图要能被 raw 链接引用）
-docs/*
-!docs/publish/
-# 项目页素材的原始整屏截图（体积大，只保留切好的成品）
-docs/publish/screenshots/raw/
