@@ -35,5 +35,5 @@
  */
 dependencies {
     // AE2 是硬依赖：1.7.10 用 GTNH 维护的 rv3 分叉，dev classifier 是 RFG 反混淆后的开发包。
-    implementation("com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-1104-GTNH:dev")
+    implementation("com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-1095-GTNH:dev")
 }
