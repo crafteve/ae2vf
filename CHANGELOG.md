@@ -1,4 +1,5 @@
 # 0.0.1
+[2026-11-25 12:57] 精简 Gradle 配置（gradle.properties / dependencies / build / settings / repositories），补上模组图标与 runClient / runServer 说明
 [2026-11-25 12:40] 依赖策略改为只对 GTNH 正式版负责、一律硬依赖；@Mod 声明 AE2 为必需依赖
 [2026-11-25 12:39] 新增 docs/依赖基线.md 与 GTNH 2.9.0 模组清单，AE2 依赖对齐整包 2.9.0（rv3-beta-1095-GTNH）
 [2026-11-25 11:57] 用 GTNH MDK 建立 1.7.10 工程骨架（GTNHGradle 2.0.33 / Gradle 9.7.1 / JDK 25），加入 AE2 rv3 依赖

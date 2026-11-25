@@ -1,5 +1,3 @@
-// Add any additional repositories for your dependencies here.
-
+// 额外依赖仓库；GTNH Maven 由 GTNHGradle 自动加入。
 repositories {
-
 }
