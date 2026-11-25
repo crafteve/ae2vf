@@ -57,7 +57,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.7.10 / Forge，GTNH 环
 | 构建 | GTNHGradle 2.0.33 约定插件 + Gradle wrapper 9.7.1（GTNH MDK starter） |
 | modid / 分支 | `ae2vf` / `1.7.10gtnh`（本线主分支） |
 | AE2 | 硬依赖，GTNH 维护的 rv3 分叉 `com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-*-GTNH` |
-| 版本号 | `0.0.1`（git tag `v0.0.1` 锁定，后续按 tag 递增） |
+| 版本号 | `0.0.1`（git tag `0.0.1` 锁定，后续按 tag 递增；GTNHGradle 取 tag 原文做版本，不加 `v` 前缀） |
 
 本线自 `ee167a8`（2026-11-25）拉出，由 GTNH MDK 建立工程骨架；当前只有入口与代理的样板类，尚无游戏逻辑。
 
