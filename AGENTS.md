@@ -1,12 +1,12 @@
 # AGENTS.md
 
-> 状态：1.20.1（Forge）重写线 · 定位 v2（工厂方块 + BE tick）· 2026-11-25 · 约束即日生效，实现细节随实现补充。
+> 状态：1.7.10（Forge / GTNH）线 · 产品定位沿用 v2（工厂方块 + BE tick）· 2026-11-25 · 工程由 GTNH MDK 建立 · 约束即日生效，实现细节随实现补充。
 
 ## 一、项目定位
 
 ### 1.1 是什么
 
-AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接管 AE2 网络与机器之间的资源 IO。
+AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.7.10 / Forge，GTNH 环境），接管 AE2 网络与机器之间的资源 IO。
 
 名字即定位：**「虚空」指无线、无接口**——不摆接口、不铺线缆；**「工厂」指管理机器的输入输出**——模组只做搬运这一件事，不动机器本身。
 
@@ -25,21 +25,21 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接�
 
 - 不猜配方：配方由玩家写样板或填 IO 规则提供。
 - 不接管机器：不改配方、能量与加工时间。
-- 机器之间不直连，所有交换经过仓库；仓库只支持 AE2 网络（`MEStorage`）。
-- 资源身份只用 AE2 的 `AEKey`，模组自己不新增资源类型。
+- 机器之间不直连，所有交换经过仓库；仓库只支持 AE2 网络（1.7.10 为 `IMEInventory` / `IMEMonitor`）。
+- 资源身份只用 AE2 的堆栈类型（1.7.10 为 `IAEStack` 家族），模组自己不新增资源类型。
 - 无线 ≠ 强制加载区块：未加载区块里的机器显示不可用，不报错、不强加载。
 
 ### 1.5 与旧线的差异（防参考污染）
 
-本线定位推翻了旧线的下列已确认项，读旧代码时先对照本表：
+本线定位推翻了旧线的下列已确认项，读旧代码时先对照本表。1.20.1 线与本线共享同一套产品定位，差异只在构建工具与 AE2 API：
 
-| 项 | 旧线（1.21.1 / NeoForge） | 本线（1.20.1 / Forge） |
+| 项 | 旧线（1.21.1 / NeoForge） | 本线（1.7.10 / GTNH） |
 |---|---|---|
 | 工厂逻辑驱动 | 全局服务器 tick | 工厂方块的 BE tick |
 | 创立入口 | 无方块，终端物品右键 | 玩家放置工厂方块 |
 | 工厂数量 | 一人一厂（骨架口径，未定稿） | 待定 |
 
-参考实现：`D:\DSH\ae2vf-1.21.1`（`1.21.1neoforge` 分支，同仓库 worktree），**只读行为参考**：读懂后自己写，不照搬包结构、类名与性能数值；不在其中提交本线改动。
+参考实现：`D:\DSH\ae2vf-1.21.1`（`1.21.1neoforge`）与 `D:\DSH\ae2vf`（`1.20.1forge`），同为仓库 worktree，**只读行为参考**：读懂后自己写，不照搬包结构、类名、性能数值与 AE2 API 用法；不在其中提交本线改动。
 
 ### 1.6 待定
 
@@ -52,13 +52,24 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接�
 
 | 项 | 值 |
 |---|---|
-| MC / Forge | 1.20.1 / 47.x |
-| Java | 17 |
-| modid / 分支 | `ae2vf` / `1.20.1forge`（本线主分支） |
-| AE2 | 硬依赖，1.20.1 Forge 版 |
-| 版本号 | 待定，首个构建时与 `gradle.properties` 一起锁定 |
+| MC / Forge | 1.7.10 / GTNH Forge 10.13.4.1614 |
+| Java | 编译 JDK 25（jabel，产出 Java 8 字节码） |
+| 构建 | GTNHGradle 2.0.33 约定插件 + Gradle wrapper 9.7.1（GTNH MDK starter） |
+| modid / 分支 | `ae2vf` / `1.7.10gtnh`（本线主分支） |
+| AE2 | 硬依赖，GTNH 维护的 rv3 分叉 `com.github.GTNewHorizons:Applied-Energistics-2-Unofficial:rv3-beta-*-GTNH` |
+| 版本号 | `0.0.1`（git tag `v0.0.1` 锁定，后续按 tag 递增） |
 
-本线自 init `0b844ca`（2026-10-24）重写；当前为纯文档骨架，尚无代码与构建文件。
+本线自 `ee167a8`（2026-11-25）拉出，由 GTNH MDK 建立工程骨架；当前只有入口与代理的样板类，尚无游戏逻辑。
+
+### 1.8 1.20.1 → 1.7.10 API 对照（实现前以依赖源码核对）
+
+| 1.20.1 | 1.7.10（AE2 rv3 / GTNH） |
+|---|---|
+| `AEKey` | `IAEStack` 家族（`IAEItemStack` / `IAEFluidStack`） |
+| `MEStorage` | `IMEInventory` / `IMEMonitor` |
+| `IGridNode` / 能力系统 | `IGridHost` / `IGridBlock` / `IActionHost` |
+
+1.7.10 没有 1.20.1 的 data component 与 capability 体系，资源、存储与网络接入都走 rv3 的旧接口；具体签名以依赖源码为准，不凭记忆写。
 
 ## 二、架构原则
 
@@ -106,7 +117,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接�
 ### 3.5 数据层
 
 - 不可变优先：`record` + `withXxx` 返回新实例；数据 record 只存 id、坐标、枚举与 AEKey，不持有 `Level`、`BlockEntity`、capability 等活对象。
-- 资源身份 = `AEKey`，不造平行的资源类型。
+- 资源身份 = AE2 的堆栈类型（1.7.10 用 rv3 的 `IAEStack` 家族，对应 1.20.1 线的 `AEKey`），不造平行的资源类型。
 - 存档读写对称；键名常量化；缺字段走默认值兼容旧档。
 - 上限、间隔、容量一律具名常量，并在解码侧校验；枚举分支用穷尽 `switch`，不留 `default` 掩盖新增值。
 - 对外返回不可变集合或防御性拷贝，不暴露内部可变表。
@@ -144,7 +155,7 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接�
 
 ### 4.2 验证与提交
 
-- `.\gradlew.bat build` 必须通过（构建文件落地后适用）。
+- `.\gradlew.bat build` 必须通过（JDK 25；构建文件落地后适用）。
 - 每次编译成功后立即本地提交，不攒到最后；一次提交一件事。
 - build 失败不提交。提交前 `git status` 确认无意外文件。
 
@@ -177,8 +188,8 @@ AE2 Void Factory（`ae2vf`）：AE2 附属（Minecraft 1.20.1 / Forge），接�
 
 ## 六、Git 规范
 
-- 远程 `origin` = `https://github.com/crafteve/ae2vf.git`；本线主分支 `1.20.1forge`；`1.21.1neoforge` 与 `archive/*` 只读。
-- 同仓库双 worktree：本线 `D:\DSH\ae2vf`，参考线 `D:\DSH\ae2vf-1.21.1`；禁止跨线提交。
+- 远程 `origin` = `https://github.com/crafteve/ae2vf.git`；本线主分支 `1.7.10gtnh`；`1.20.1forge`、`1.21.1neoforge` 与 `archive/*` 只读。
+- 同仓库三 worktree：`D:\DSH\ae2vf`（`1.20.1forge`）、`D:\DSH\ae2vf-1.21.1`（`1.21.1neoforge`，只读参考）、`D:\DSH\ae2vf-1.7.10`（`1.7.10gtnh`，本线）；禁止跨线提交。
 - Conventional Commits + scope（`feat` / `fix` / `refactor` / `docs` / `chore` / `perf` / `test` / `style`），scope 用模块名；描述用中文，可夹英文术语。
 - 推送时机：一个大任务（一个计划全部完成）收口后推一次，不逐小 commit push；push 失败如实报告，不写「已推送」。
 - 不提交 `run/`、`build/`、`.gradle/`、`.idea/`、`.tmp/`。
