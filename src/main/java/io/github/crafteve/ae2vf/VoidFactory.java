@@ -20,7 +20,8 @@ import cpw.mods.fml.common.event.FMLServerStartingEvent;
     modid = VoidFactory.MODID,
     version = Tags.VERSION,
     name = "AE2 Void Factory",
-    acceptedMinecraftVersions = "[1.7.10]")
+    acceptedMinecraftVersions = "[1.7.10]",
+    dependencies = "required-after:appliedenergistics2")
 public class VoidFactory {
 
     public static final String MODID = "ae2vf";
