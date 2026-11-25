@@ -1,0 +1,60 @@
+### Gradle ###
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/**/build/
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/**/out/
+
+.run/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.eclipse/
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/**/bin/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+### Minecraft Modding ###
+run/
+!**/src/**/run/
+**/src/generated/**/.cache/
+repo/
+!**/src/**/repo/
+# Agent 的临时工作目录：审查报告、校验脚本、diff 落盘都在这里。
+# 不提交；也不许 Agent 私自删除（见 AGENTS.md 5.4）。
+.tmp/
+# 临时脚本与文本（.tmp_ 前缀），历史上被别的项目误放进来过
+.tmp_*
+# DSH 会话的 IM 归档目录
+.dsh-im/
+# Archify Skill 的产物目录：候选 JSON、HTML 成品与校验回执，都不进版本库
+.archify/
+
+### Python ###
+__pycache__/
+*.pyc
+
+### Internal docs (kept local, not published) ###
+# 只忽略 docs 下的内容，保留 docs/publish（项目页文案与截图要能被 raw 链接引用）
+docs/*
+!docs/publish/
+# 项目页素材的原始整屏截图（体积大，只保留切好的成品）
+docs/publish/screenshots/raw/
